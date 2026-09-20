@@ -8,8 +8,8 @@ signal bell_rung()
 @export_group("Speed & Dynamics")
 @export var cruising_speed: float = 7.0 ## Comfortable cruising speed (~25 km/h)
 @export var max_sprint_speed: float = 13.0 ## Maximum downhill or sprint speed (~47 km/h)
-@export var pedal_acceleration: float = 3.5 ## Forward push rate when pedaling
-@export var pedal_attack_time: float = 0.35 ## Time in seconds to ramp up to full pedaling effort
+@export var pedal_acceleration: float = 1.3 ## Natural muscular acceleration push (calibrated Sprint 3C)
+@export var pedal_attack_time: float = 0.50 ## Progressive muscular effort onset in seconds (0.45-0.60s)
 @export var brake_deceleration: float = 7.5 ## Deceleration when braking
 @export var brake_attack_time: float = 0.15 ## Rapid initial bite and ramp-up time for braking
 @export var brake_release_time: float = 0.10 ## Fast release time when releasing brake
@@ -32,9 +32,10 @@ signal bell_rung()
 @export var pitch_decay_smoothness: float = 7.0 ## Smooth return to horizontal for visual frame pitch
 
 @export_group("Visual Ergonomics")
-@export var visual_steer_gain: float = 2.5 ## Visual handlebar amplification factor
-@export var max_visual_steer_cruising: float = deg_to_rad(12.0) ## Maximum visual steer angle at cruising speed
-@export var max_visual_steer_low_speed: float = deg_to_rad(20.0) ## Maximum visual steer angle at low speed
+@export var visual_steer_gain: float = 3.5 ## Visual handlebar amplification factor
+@export var max_visual_steer_low_speed: float = deg_to_rad(22.0) ## Maximum visual steer angle at low speed (20-24°)
+@export var max_visual_steer_cruising: float = deg_to_rad(16.0) ## Maximum visual steer angle at cruising speed (15-18°)
+@export var max_visual_steer_high_speed: float = deg_to_rad(12.0) ## Maximum visual steer angle at sprint speed (10-14°)
 
 @export_group("Node References")
 @export var front_ray: RayCast3D
@@ -264,9 +265,15 @@ func _calculate_steering_and_banking(delta: float) -> void:
 		var scrub_loss: float = excess_lateral * cornering_scrub_coeff * delta
 		current_speed = maxf(0.0, current_speed - scrub_loss)
 
-	# 7. Visual steering ergonomics (FEAT-007.0)
-	var speed_ratio: float = clampf(current_speed / 6.0, 0.0, 1.0)
-	var dynamic_max_visual: float = lerpf(max_visual_steer_low_speed, max_visual_steer_cruising, speed_ratio)
+	# 7. Visual steering ergonomics (FEAT-006.11 / Sprint 3C)
+	var dynamic_max_visual: float
+	if current_speed <= cruising_speed:
+		var speed_ratio: float = clampf(current_speed / cruising_speed, 0.0, 1.0)
+		dynamic_max_visual = lerpf(max_visual_steer_low_speed, max_visual_steer_cruising, speed_ratio)
+	else:
+		var high_speed_ratio: float = clampf((current_speed - cruising_speed) / (max_sprint_speed - cruising_speed), 0.0, 1.0)
+		dynamic_max_visual = lerpf(max_visual_steer_cruising, max_visual_steer_high_speed, high_speed_ratio)
+
 	var target_visual_steer: float = clampf(current_steer * visual_steer_gain, -dynamic_max_visual, dynamic_max_visual)
 	visual_steer = lerpf(visual_steer, target_visual_steer, 15.0 * delta)
 

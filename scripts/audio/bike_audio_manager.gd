@@ -60,16 +60,22 @@ func _process(delta: float) -> void:
 	else:
 		freewheel_timer = 0.0
 
-	# 2. Dynamic Wind Rush modulation (FEAT-007.2)
+	# 2. Dynamic Wind Rush modulation (FEAT-006.13 / Sprint 3C)
+	# Below ~18 km/h (5.0 m/s): essentially silent (-80 dB)
+	# 18-22 km/h: smooth acoustic onset
+	# 25 km/h: subtle gentle breeze (~ -39 dB)
+	# 30 km/h: noticeable air (~ -33 dB)
+	# 40+ km/h: calibrated peak ~ -26 dB
 	if wind_player:
 		var target_wind_vol: float = -80.0
 		var target_wind_pitch: float = 1.0
-		if current_speed > 3.0: # ~11 km/h threshold
-			var wind_ratio: float = clampf((current_speed - 3.0) / 9.0, 0.0, 1.0)
-			target_wind_vol = lerpf(-38.0, -12.0, wind_ratio)
-			target_wind_pitch = lerpf(0.85, 1.25, wind_ratio)
-		wind_player.volume_db = lerpf(wind_player.volume_db, target_wind_vol, 5.0 * delta)
-		wind_player.pitch_scale = lerpf(wind_player.pitch_scale, target_wind_pitch, 5.0 * delta)
+		if current_speed > 5.0: # ~18 km/h onset threshold
+			var wind_ratio: float = clampf((current_speed - 5.0) / 6.2, 0.0, 1.0)
+			var curved_ratio: float = pow(wind_ratio, 1.25)
+			target_wind_vol = lerpf(-46.0, -26.0, curved_ratio)
+			target_wind_pitch = lerpf(0.90, 1.18, wind_ratio)
+		wind_player.volume_db = lerpf(wind_player.volume_db, target_wind_vol, 4.0 * delta)
+		wind_player.pitch_scale = lerpf(wind_player.pitch_scale, target_wind_pitch, 4.0 * delta)
 
 	# 3. Dynamic Gravel / Turf Tire Noise modulation (FEAT-007.2)
 	if gravel_player:
@@ -151,11 +157,11 @@ func _create_wind_audio_stream() -> AudioStreamWAV:
 	var filter_val: float = 0.0
 	for _w in range(500):
 		var white: float = randf_range(-1.0, 1.0)
-		filter_val = filter_val * 0.94 + white * 0.06
+		filter_val = filter_val * 0.955 + white * 0.045
 
 	for i in range(total_samples):
 		var white: float = randf_range(-1.0, 1.0)
-		filter_val = filter_val * 0.94 + white * 0.06
+		filter_val = filter_val * 0.955 + white * 0.045
 		raw_samples[i] = filter_val
 
 	# Smooth crossfade boundary (256 samples) for seamless loop
@@ -169,7 +175,7 @@ func _create_wind_audio_stream() -> AudioStreamWAV:
 	var pcm_data := PackedByteArray()
 	pcm_data.resize(total_samples * 2)
 	for i in range(total_samples):
-		var s16: int = int(clampf(raw_samples[i] * 3.0, -1.0, 1.0) * 32767.0)
+		var s16: int = int(clampf(raw_samples[i] * 1.6, -1.0, 1.0) * 32767.0)
 		pcm_data.encode_s16(i * 2, s16)
 
 	var stream := AudioStreamWAV.new()

@@ -226,7 +226,7 @@ func _init() -> void:
 	# Test 14: [3A.5 FEAT-006.8] Pedaling Inertia Ramp & Instant Coasting Release
 	var p_attack: float = bike_test_instance.pedal_attack_time
 	var has_pedal_pwr: bool = "pedal_power" in bike_test_instance
-	if p_attack >= 0.30 and p_attack <= 0.40 and has_pedal_pwr:
+	if p_attack >= 0.30 and p_attack <= 0.65 and has_pedal_pwr:
 		print("[VERIFICATION #14] [PASS] Pedal power inertia ramp (%.2fs) verified!" % p_attack)
 	else:
 		print("[VERIFICATION #14] [FAIL] Pedal inertia parameters out of spec")
@@ -311,7 +311,7 @@ func _init() -> void:
 		# Test audio volume modulation at high speed
 		bike_test_instance.current_speed = 10.0 # 36 km/h
 		bike_test_instance.is_on_grass = false
-		for _f in range(30):
+		for _f in range(60):
 			audio_mgr._process(1.0 / 60.0)
 		var high_wind_vol: float = audio_mgr.wind_player.volume_db
 		var road_gravel_pitch: float = audio_mgr.gravel_player.pitch_scale
@@ -324,9 +324,9 @@ func _init() -> void:
 
 		print("[VERIFICATION #19] Procedural Audio Modulation:")
 		print("  - Looping WAV streams: %s" % ("YES" if has_loop else "NO"))
-		print("  - Wind vol at 36 km/h: %.1f dB (Target: > -30 dB)" % high_wind_vol)
+		print("  - Wind vol at 36 km/h: %.1f dB (Target: active & rebalanced, > -36 dB)" % high_wind_vol)
 		print("  - Gravel pitch on Road: %.2f | on Grass: %.2f (Target on grass: < 0.75)" % [road_gravel_pitch, grass_gravel_pitch])
-		if has_loop and high_wind_vol > -30.0 and grass_gravel_pitch < 0.75 and road_gravel_pitch > 0.85:
+		if has_loop and high_wind_vol > -36.0 and grass_gravel_pitch < 0.75 and road_gravel_pitch > 0.85:
 			print("  [PASS] Procedural wind and gravel audio modulation fully functional!")
 		else:
 			print("  [FAIL] Audio parameter modulation out of bounds")
@@ -355,6 +355,122 @@ func _init() -> void:
 	else:
 		print("  [FAIL] Speed FOV values out of spec")
 		all_ok = false
+
+	# Test 21: [3C.1 FEAT-006.11] Sprint 3C Steering Sign Alignment & Visual Clamp Range
+	bike_test_instance.current_speed = 7.0 # 25.2 km/h cruise
+	bike_test_instance.raw_steer_input = 1.0 # Left steer (A key)
+	for _frame in range(30):
+		bike_test_instance._calculate_steering_and_banking(1.0 / 60.0)
+	var s3c_left_steer: float = bike_test_instance.current_steer
+	var s3c_left_yaw: float = bike_test_instance.yaw_turn_rate
+	var s3c_left_bank: float = bike_test_instance.current_bank
+	var s3c_left_vis: float = bike_test_instance.visual_steer
+
+	bike_test_instance.raw_steer_input = -1.0 # Right steer (D key)
+	for _frame in range(60):
+		bike_test_instance._calculate_steering_and_banking(1.0 / 60.0)
+	var s3c_right_steer: float = bike_test_instance.current_steer
+	var s3c_right_yaw: float = bike_test_instance.yaw_turn_rate
+	var s3c_right_bank: float = bike_test_instance.current_bank
+	var s3c_right_vis: float = bike_test_instance.visual_steer
+
+	# Check visual angles against analyst tuning ranges (low speed 20-24°, cruise 15-18°, high speed 10-14°)
+	var max_vis_deg_low: float = rad_to_deg(bike_test_instance.max_visual_steer_low_speed)
+	var max_vis_deg_cruise: float = rad_to_deg(bike_test_instance.max_visual_steer_cruising)
+	var max_vis_deg_high: float = rad_to_deg(bike_test_instance.max_visual_steer_high_speed)
+
+	var s3c_signs_ok: bool = (s3c_left_steer > 0 and s3c_left_yaw > 0 and s3c_left_bank > 0 and s3c_left_vis > 0) and \
+							(s3c_right_steer < 0 and s3c_right_yaw < 0 and s3c_right_bank < 0 and s3c_right_vis < 0)
+	var s3c_ranges_ok: bool = (max_vis_deg_low >= 20.0 and max_vis_deg_low <= 24.0) and \
+							  (max_vis_deg_cruise >= 15.0 and max_vis_deg_cruise <= 18.0) and \
+							  (max_vis_deg_high >= 10.0 and max_vis_deg_high <= 14.0)
+	var s3c_gain_ok: bool = absf(s3c_left_vis) >= absf(s3c_left_steer)
+
+	print("[VERIFICATION #21] Sprint 3C Cockpit Visual Steering:")
+	print("  - Sign alignment: Left vis=%.3f bank=%.3f | Right vis=%.3f bank=%.3f" % [s3c_left_vis, s3c_left_bank, s3c_right_vis, s3c_right_bank])
+	print("  - Visual ranges: Low=%.1f°, Cruise=%.1f°, High=%.1f°" % [max_vis_deg_low, max_vis_deg_cruise, max_vis_deg_high])
+	if s3c_signs_ok and s3c_ranges_ok and s3c_gain_ok:
+		print("  [PASS] A/D steering sign consistency and cockpit visual tuning ranges verified!")
+	else:
+		print("  [FAIL] Steering signs or visual ranges out of bounds")
+		all_ok = false
+
+	# Test 22: [3C.1 FEAT-006.11] Front Wheel Axle & Spin Geometry
+	var fork_node = bike_test_instance.get_node_or_null("Visuals/ForkAndHandlebar")
+	var axle_node = bike_test_instance.get_node_or_null("Visuals/ForkAndHandlebar/FrontAxle")
+	var wheel_node = bike_test_instance.get_node_or_null("Visuals/ForkAndHandlebar/FrontAxle/FrontWheel")
+	if fork_node and axle_node and wheel_node:
+		bike_test_instance.visual_steer = deg_to_rad(16.0)
+		bike_test_instance.current_speed = 6.0
+		bike_test_instance._update_visual_transforms(0.05)
+		var axle_local_x: Vector3 = axle_node.transform.basis.x
+		var spin_preserved: bool = axle_local_x.is_equal_approx(Vector3.RIGHT) and absf(wheel_node.rotation.x) > 0.01
+		print("[VERIFICATION #22] Front Axle & Spin Geometry:")
+		print("  - Wheel spin: %.2f rad | Axle X axis: %s" % [wheel_node.rotation.x, axle_local_x])
+		if spin_preserved:
+			print("  [PASS] Front wheel rotates cleanly around hub axle under steering deflection!")
+		else:
+			print("  [FAIL] Wheel spin or axle alignment compromised")
+			all_ok = false
+	else:
+		print("[VERIFICATION #22] [FAIL] Wheel nodes missing")
+		all_ok = false
+
+	# Test 23: [3C.2 FEAT-006.12] Natural Muscular Acceleration & Hill Climbing
+	var sim_speed: float = 0.0
+	var sim_power: float = 0.0
+	var sim_dt: float = 1.0 / 60.0
+	var sim_t_20: float = -1.0
+	for f in range(600):
+		var cur_t = f * sim_dt
+		sim_power = minf(1.0, sim_power + (1.0 / bike_test_instance.pedal_attack_time) * sim_dt)
+		var eff = bike_test_instance.pedal_acceleration * sim_power
+		if sim_speed < bike_test_instance.cruising_speed:
+			sim_speed += eff * sim_dt
+		var drag_val = (bike_test_instance.road_rolling_resistance + bike_test_instance.air_drag_coeff * (sim_speed * sim_speed)) * sim_dt
+		sim_speed = maxf(0.0, sim_speed - drag_val)
+		if sim_speed * 3.6 >= 20.0 and sim_t_20 < 0.0:
+			sim_t_20 = cur_t
+
+	print("[VERIFICATION #23] Natural Muscular Acceleration Dynamics:")
+	print("  - Flat acceleration 0 -> 20 km/h: %.2fs (Expected corridor: 4.8 - 6.5s)" % sim_t_20)
+	print("  - Pedal acceleration: %.2f m/s² | Attack time: %.2fs" % [bike_test_instance.pedal_acceleration, bike_test_instance.pedal_attack_time])
+	if sim_t_20 >= 4.8 and sim_t_20 <= 6.5 and bike_test_instance.pedal_acceleration <= 1.4 and bike_test_instance.pedal_acceleration >= 1.2:
+		print("  [PASS] Muscular acceleration feel verified (no electric bike sudden rocket launch)!")
+	else:
+		print("  [FAIL] Acceleration dynamics out of spec: %.2fs" % sim_t_20)
+		all_ok = false
+
+	# Test 24: [3C.3 FEAT-006.13] Wind Acoustic Comfort Curve
+	if audio_mgr:
+		# 1. Low speed: 12 km/h (3.33 m/s) -> must be quiet (< -60 dB)
+		bike_test_instance.current_speed = 3.33
+		for _f in range(60):
+			audio_mgr._process(1.0 / 60.0)
+		var low_speed_wind: float = audio_mgr.wind_player.volume_db
+		
+		# 2. Cruising speed: 25 km/h (6.94 m/s) -> soft breeze (-42 to -32 dB)
+		bike_test_instance.current_speed = 6.94
+		for _f in range(120):
+			audio_mgr._process(1.0 / 60.0)
+		var cruise_speed_wind: float = audio_mgr.wind_player.volume_db
+		
+		# 3. High speed: 43 km/h (12.0 m/s) -> calibrated peak (-28 to -24 dB)
+		bike_test_instance.current_speed = 12.0
+		for _f in range(120):
+			audio_mgr._process(1.0 / 60.0)
+		var high_speed_wind: float = audio_mgr.wind_player.volume_db
+
+		print("[VERIFICATION #24] Wind Acoustic Comfort Levels:")
+		print("  - At 12 km/h (Low):    %.1f dB (Target: <= -60 dB)" % low_speed_wind)
+		print("  - At 25 km/h (Cruise): %.1f dB (Target: -42 to -32 dB)" % cruise_speed_wind)
+		print("  - At 43 km/h (Peak):   %.1f dB (Target: -28 to -24 dB)" % high_speed_wind)
+
+		if low_speed_wind <= -60.0 and cruise_speed_wind >= -42.0 and cruise_speed_wind <= -32.0 and high_speed_wind >= -28.0 and high_speed_wind <= -24.0:
+			print("  [PASS] Wind audio rebalanced to gentle aerodynamic air without storm roar!")
+		else:
+			print("  [FAIL] Wind volume curve out of comfort targets")
+			all_ok = false
 
 	bike_test_instance.free()
 
