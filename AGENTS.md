@@ -15,6 +15,8 @@ This document governs all actions of AI agents (AntiGravity and subagents) worki
 8. **No gameplay creep.** Do not introduce gears, stamina, stunts, inventory, or score mechanics unless explicitly instructed.
 9. **Preserve existing controls and camera settings.**
 10. **Single MultiMesh per Chunk.** Never combine infinite world foliage into a single monolithic MultiMesh. Group instancing locally per chunk to maintain Godot frustum culling.
+11. **Strict Plan Approval Gate.** For any sprint transition, multi-file feature, or architectural refactoring, the agent must create an `implementation_plan.md` artifact and STOP immediately to wait for explicit user approval ('Proceed' or chat confirmation). The agent must NEVER start executing code changes or modifying files until this approval is received.
+12. **Autonomous Execution Once Approved.** Once the implementation plan is approved by the user, the agent executes all internal steps, tool calls, tests, and documentation updates autonomously without pausing for trivial confirmations on each individual tool action.
 
 ---
 
