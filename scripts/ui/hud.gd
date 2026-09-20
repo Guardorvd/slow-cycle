@@ -27,7 +27,7 @@ func _process(delta: float) -> void:
 		bell_timer -= delta
 		bell_notice.modulate.a = clampf(bell_timer / 0.4, 0.0, 1.0)
 
-func _on_telemetry_updated(speed_kmh: float, _cadence_pct: float, is_coasting: bool, _gear: int) -> void:
+func _on_telemetry_updated(speed_kmh: float, _cadence_pct: float, is_coasting: bool) -> void:
 	speed_label.text = "%3.1f" % speed_kmh
 	
 	var is_braking: bool = bike_controller.get("is_braking") if bike_controller else false

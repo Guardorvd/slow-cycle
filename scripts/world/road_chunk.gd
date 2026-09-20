@@ -96,10 +96,7 @@ func _build_terrain_mesh(path_data: RefCounted, s_idx: int, e_idx: int, mat: Mat
 		st.set_material(mat)
 
 	var num_pts: int = e_idx - s_idx + 1
-	if not noise:
-		noise = FastNoiseLite.new()
-		noise.seed = 1337
-		noise.frequency = 0.04
+	assert(noise != null, "Terrain noise must be provided by WorldManager")
 
 	for i in range(num_pts):
 		var idx: int = s_idx + i

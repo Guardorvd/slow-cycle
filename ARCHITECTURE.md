@@ -8,23 +8,30 @@ Main Game Scene (res://scenes/main.tscn)
 ├── WorldManager (Seed, Chunk streaming coordinator)
 │    ├── RoadGenerator (Deterministic spline math & mood logic)
 │    ├── ChunkStreamer (Active chunk window [N-1 ... N+5])
-│    └── [Active RoadChunks]
-│          ├── RoadMesh (ArrayMesh: asphalt + stripes)
-│          ├── RoadCollision (Concave/Convex CollisionShape3D on layer "Road")
-│          ├── StripTerrain (Roadside shoulders, verges, embankments)
-│          └── ChunkFoliage (Local MultiMeshInstance3D for pines, birches, grass)
+│    ├── [Active RoadChunks]
+│    │     ├── RoadMesh (ArrayMesh: asphalt + stripes)
+│    │     ├── RoadCollision (Concave/Convex CollisionShape3D on layer "Road")
+│    │     ├── StripTerrain (Roadside shoulders, verges, embankments)
+│    │     └── ChunkFoliage (Local MultiMeshInstance3D for pines, birches, grass)
+│    └── [Planned] DayNightCycle (Sprint 4A: sun rotation, sky gradients, fog)
 │
 ├── Bicycle (CharacterBody3D, layer "Player", masks "Road" & "Default")
 │    ├── 2-Point Raycast Suspension (Pitch calculation & ground adhesion)
-│    ├── Kinematic Model (Pedal momentum, slope gravity, coasting, banking)
+│    ├── Kinematic Model (Lean-to-Steer, slope gravity, coasting, banking)
 │    ├── HandlebarCockpit (Mesh, grips, bell, steering pivot)
 │    ├── CameraRig (Stabilized 1st-person & 3rd-person spring-arm)
-│    └── AudioController (Procedural bell, freewheel ratchet, wind)
+│    ├── AudioController (Procedural bell, freewheel ratchet, wind, gravel)
+│    └── [Planned] Headlight SpotLight3D (Sprint 4A: auto-on at dusk)
 │
-└── UI Layer (CanvasLayer)
-     ├── MinimalHUD (Speed km/h, distance traveled)
-     ├── DebugHUD (F3 toggle: Seed, Chunk ID, FPS, Slope, Curvature, Memory)
-     └── ComfortSettings (Menu: FOV, Bob, Lean, Horizon stabilization)
+├── UI Layer (CanvasLayer)
+│    ├── MinimalHUD (Speed km/h, distance traveled)
+│    ├── DebugHUD (F3 toggle: Seed, Chunk ID, FPS, Slope, Curvature, Memory)
+│    ├── [Planned] PauseMenu (Sprint 4B: Esc overlay with settings)
+│    └── [Planned] MainMenu (Sprint 4B: title screen with seed selection)
+│
+└── [Planned] Autoloads
+     ├── GameState (Sprint 4A: enum RIDING/PAUSED/PHOTO_MODE)
+     └── SettingsManager (Sprint 4B: ConfigFile persistence)
 ```
 
 ---

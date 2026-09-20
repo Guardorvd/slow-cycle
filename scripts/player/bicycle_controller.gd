@@ -2,7 +2,7 @@ class_name BicycleController
 extends CharacterBody3D
 
 ## Signals for HUD and Audio systems
-signal telemetry_updated(speed_kmh: float, cadence_pct: float, is_coasting: bool, gear: int)
+signal telemetry_updated(speed_kmh: float, cadence_pct: float, is_coasting: bool)
 signal bell_rung()
 
 @export_group("Speed & Dynamics")
@@ -46,7 +46,6 @@ var is_coasting: bool = false
 var is_grounded: bool = true
 var is_on_grass: bool = false
 var wheel_rotation: float = 0.0
-var current_gear: int = 3 # Default gear
 
 const WHEELBASE: float = 1.15
 const WHEEL_RADIUS: float = 0.34
@@ -62,7 +61,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	var speed_kmh: float = current_speed * 3.6
 	var cadence_factor: float = (current_speed / cruising_speed) if is_pedaling else 0.0
-	telemetry_updated.emit(speed_kmh, cadence_factor, is_coasting, current_gear)
+	telemetry_updated.emit(speed_kmh, cadence_factor, is_coasting)
 
 	if Input.is_action_just_pressed("ring_bell"):
 		bell_rung.emit()

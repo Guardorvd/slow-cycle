@@ -115,7 +115,50 @@ func _init() -> void:
 	else:
 		print("[VERIFICATION #6] [FAIL] Bicycle layer/mask mismatch: layer=%d, mask=%d" % [bike_instance.collision_layer, bike_instance.collision_mask])
 		all_ok = false
+
+	# Test 7: [FIX-001] Verify removal of current_gear and telemetry_updated arity = 3
+	var bike_script: GDScript = load("res://scripts/player/bicycle_controller.gd")
+	var bike_source: String = bike_script.source_code
+	var has_dead_gear: bool = (bike_instance.get("current_gear") != null) or (bike_source.find("var current_gear") != -1)
+	
+	var sig_arity_ok: bool = false
+	for sig in bike_instance.get_signal_list():
+		if sig["name"] == "telemetry_updated":
+			if sig["args"].size() == 3:
+				sig_arity_ok = true
+			else:
+				print("  telemetry_updated args count: %d (expected 3)" % sig["args"].size())
+
+	var hud_src: String = load("res://scripts/ui/hud.gd").source_code
+	var hud_sig_ok: bool = hud_src.find("func _on_telemetry_updated(speed_kmh: float, _cadence_pct: float, is_coasting: bool) -> void:") != -1
+
+	if not has_dead_gear and sig_arity_ok and hud_sig_ok:
+		print("[VERIFICATION #7] [PASS] FIX-001 verified: current_gear eliminated, telemetry_updated has exactly 3 arguments across controller and HUD!")
+	else:
+		print("[VERIFICATION #7] [FAIL] FIX-001 check failed: dead_gear=%s, sig_arity_ok=%s, hud_sig_ok=%s" % [has_dead_gear, sig_arity_ok, hud_sig_ok])
+		all_ok = false
 	bike_instance.queue_free()
+
+	# Test 8: [FIX-002] Verify strict noise assert in road_chunk.gd
+	var chunk_source: String = load("res://scripts/world/road_chunk.gd").source_code
+	var has_assert: bool = chunk_source.find("assert(noise != null, \"Terrain noise must be provided by WorldManager\")") != -1
+	var has_fallback_1337: bool = chunk_source.find("1337") != -1
+	if has_assert and not has_fallback_1337:
+		print("[VERIFICATION #8] [PASS] FIX-002 verified: silent fallback seed 1337 removed, strict assert(noise != null) active!")
+	else:
+		print("[VERIFICATION #8] [FAIL] FIX-002 check failed: has_assert=%s, has_fallback_1337=%s" % [has_assert, has_fallback_1337])
+		all_ok = false
+
+	# Test 9: [FIX-003] Verify foliage noise sampled at plant spawn coordinates (X, Z)
+	var fol_src: String = load("res://scripts/world/chunk_foliage.gd").source_code
+	var has_grass_exact: bool = fol_src.find("noise.get_noise_2d(grass_base.x, grass_base.z)") != -1
+	var has_tree_exact: bool = fol_src.find("noise.get_noise_2d(tree_base.x, tree_base.z)") != -1
+	var has_old_edge_sample: bool = fol_src.find("road_edge.x") != -1
+	if has_grass_exact and has_tree_exact and not has_old_edge_sample:
+		print("[VERIFICATION #9] [PASS] FIX-003 verified: noise sampled strictly at plant spawn coordinates (X, Z)!")
+	else:
+		print("[VERIFICATION #9] [FAIL] FIX-003 check failed: grass_exact=%s, tree_exact=%s, old_edge=%s" % [has_grass_exact, has_tree_exact, has_old_edge_sample])
+		all_ok = false
 
 	if all_ok:
 		print("\n=== ALL SYSTEM VERIFICATIONS PASSED [100% OK] ===\n")
