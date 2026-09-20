@@ -42,24 +42,21 @@ func populate_chunk(parent_chunk: Node3D, path_data: RefCounted, s_idx: int, e_i
 		_create_multimesh(parent_chunk, grass_mesh, grass_transforms, "GrassMultiMesh")
 
 func _try_spawn_plant(center_pt: Vector3, lateral_dir: Vector3, norm: Vector3, rng: RandomNumberGenerator, tree_chance: float, pines: Array[Transform3D], birches: Array[Transform3D], grasses: Array[Transform3D], noise: FastNoiseLite = null) -> void:
+	var road_edge: Vector3 = center_pt + lateral_dir * 2.0
+	var h_outer: float = (noise.get_noise_2d(road_edge.x, road_edge.z) * 1.8) if noise else 0.0
+
 	if rng.randf() < 0.8:
 		var grass_dist: float = rng.randf_range(2.6, 5.2)
-		var grass_pos: Vector3 = center_pt + lateral_dir * grass_dist
-		if noise:
-			var t_factor: float = clampf((grass_dist - 2.0) / 20.0, 0.0, 1.0)
-			var h: float = noise.get_noise_2d(grass_pos.x, grass_pos.z) * 1.8 * t_factor
-			grass_pos += norm * h
-		grass_pos.y -= 0.05
+		var t_factor: float = clampf((grass_dist - 2.0) / 20.0, 0.0, 1.0)
+		var grass_pos: Vector3 = center_pt + lateral_dir * grass_dist + norm * (h_outer * t_factor)
+		grass_pos.y -= 0.02 # Slight embed so blades sit cleanly in ground
 		var t_trans := Transform3D(Basis().scaled(Vector3.ONE * rng.randf_range(0.8, 1.3)), grass_pos)
 		grasses.append(t_trans)
 
 	if rng.randf() < tree_chance:
 		var tree_dist: float = rng.randf_range(5.5, 17.5)
-		var tree_pos: Vector3 = center_pt + lateral_dir * tree_dist
-		if noise:
-			var t_factor: float = clampf((tree_dist - 2.0) / 20.0, 0.0, 1.0)
-			var h: float = noise.get_noise_2d(tree_pos.x, tree_pos.z) * 1.8 * t_factor
-			tree_pos += norm * h
+		var t_factor: float = clampf((tree_dist - 2.0) / 20.0, 0.0, 1.0)
+		var tree_pos: Vector3 = center_pt + lateral_dir * tree_dist + norm * (h_outer * t_factor)
 		var scale_val: float = rng.randf_range(0.85, 1.4)
 		var rot_y: float = rng.randf_range(0.0, TAU)
 		var basis := Basis(Vector3.UP, rot_y).scaled(Vector3.ONE * scale_val)
@@ -69,6 +66,7 @@ func _try_spawn_plant(center_pt: Vector3, lateral_dir: Vector3, norm: Vector3, r
 			pines.append(t_trans)
 		else:
 			birches.append(t_trans)
+
 
 func _create_multimesh(parent: Node3D, mesh: Mesh, transforms: Array[Transform3D], node_name: String) -> void:
 	var mmi := MultiMeshInstance3D.new()

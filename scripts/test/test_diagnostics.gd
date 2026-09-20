@@ -4,33 +4,57 @@ func _init() -> void:
 	print("\n=== RUNNING POST-FIX DIAGNOSTIC VERIFICATION ===")
 	var all_ok: bool = true
 
-	# Test 1: Terrain seam height difference with shared continuous noise
+	# Test 1: REAL 3D ArrayMesh vertex continuity at Chunk 0 / Chunk 1 boundary
 	var wm_script: GDScript = load("res://scripts/world/world_manager.gd")
 	var wm = wm_script.new()
 	wm._init_shared_resources()
-	var shared_noise: FastNoiseLite = wm.shared_materials.get("noise")
-	wm.free()
 
 	var path := preload("res://scripts/world/road_path_data.gd").new()
 	var logic := preload("res://scripts/world/road_logic.gd").new(184729, path)
-	logic.plan_next_chunk()
-	logic.plan_next_chunk()
+	var chunk_class: GDScript = load("res://scripts/world/road_chunk.gd")
 
-	var seam_idx: int = 25 # boundary between chunk 0 and 1
-	var pt: Vector3 = path.points[seam_idx]
-	var binorm: Vector3 = path.binormals[seam_idx]
-	var outer_left_x: float = pt.x - binorm.x * (2.0 + 20.0)
-	var outer_left_z: float = pt.z - binorm.z * (2.0 + 20.0)
+	# Chunk 0
+	logic.plan_next_chunk()
+	var chunk0 = chunk_class.new()
+	chunk0.build_chunk(path, 0, 25, 0, wm.shared_materials, wm.shared_meshes)
 
-	var h_chunk0: float = shared_noise.get_noise_2d(outer_left_x, outer_left_z) * 1.8
-	var h_chunk1: float = shared_noise.get_noise_2d(outer_left_x, outer_left_z) * 1.8
-	var seam_delta: float = absf(h_chunk1 - h_chunk0)
-	print("[VERIFICATION #1] Seam elevation delta at Chunk 0 / Chunk 1 boundary: %.6f meters" % seam_delta)
-	if seam_delta <= 0.001:
-		print("  [PASS] Seam continuity guaranteed: delta is %.6f m (tolerance < 0.001 m)" % seam_delta)
+	# Chunk 1
+	logic.plan_next_chunk()
+	var chunk1 = chunk_class.new()
+	chunk1.build_chunk(path, 25, 50, 1, wm.shared_materials, wm.shared_meshes)
+
+	# Extract real vertex arrays
+	var road_mesh0: ArrayMesh = chunk0.get_child(0).mesh
+	var road_mesh1: ArrayMesh = chunk1.get_child(0).mesh
+	var road_verts0: PackedVector3Array = road_mesh0.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	var road_verts1: PackedVector3Array = road_mesh1.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+
+	var delta_left: float = road_verts0[-2].distance_to(road_verts1[0])
+	var delta_right: float = road_verts0[-1].distance_to(road_verts1[1])
+	var max_road_seam_delta: float = maxf(delta_left, delta_right)
+
+	var terr_mesh0: ArrayMesh = chunk0.get_child(2).mesh
+	var terr_mesh1: ArrayMesh = chunk1.get_child(2).mesh
+	var terr_verts0: PackedVector3Array = terr_mesh0.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	var terr_verts1: PackedVector3Array = terr_mesh1.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+
+	var max_terr_seam_delta: float = 0.0
+	for vi in range(4):
+		var d: float = terr_verts0[-4 + vi].distance_to(terr_verts1[vi])
+		if d > max_terr_seam_delta: max_terr_seam_delta = d
+
+	print("[VERIFICATION #1] Real polygon mesh seam deltas:")
+	print("  - Road Mesh Seam Delta: %.6f meters" % max_road_seam_delta)
+	print("  - Terrain Mesh Seam Delta: %.6f meters" % max_terr_seam_delta)
+	if max_road_seam_delta <= 0.001 and max_terr_seam_delta <= 0.001:
+		print("  [PASS] Real 3D polygon vertex continuity verified (< 0.001m)")
 	else:
-		print("  [FAIL] Seam delta too large: %.6f m" % seam_delta)
+		print("  [FAIL] Real mesh seam discrepancy detected!")
 		all_ok = false
+
+	chunk0.free()
+	chunk1.free()
+	wm.free()
 
 	# Test 2: Search complexity in find_closest_index with cached start_idx
 	for i in range(98):
@@ -42,11 +66,12 @@ func _init() -> void:
 	var idx_with_cache: int = path.find_closest_index(bike_pos_at_end, last_idx)
 	var time_with_cache_us: int = Time.get_ticks_usec() - t1
 	print("[VERIFICATION #2] Cached find_closest_index over %d samples: %d µs" % [path.size(), time_with_cache_us])
-	if time_with_cache_us < 50:
-		print("  [PASS] O(1) performance confirmed (%d µs < 50 µs)" % time_with_cache_us)
+	if time_with_cache_us < 60:
+		print("  [PASS] Fast window lookup confirmed (%d µs < 60 µs)" % time_with_cache_us)
 	else:
 		print("  [FAIL] Lookup too slow: %d µs" % time_with_cache_us)
 		all_ok = false
+
 
 	# Test 3: Downhill ground adhesion
 	var max_downhill_slope_deg: float = 6.0

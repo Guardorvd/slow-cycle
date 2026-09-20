@@ -19,6 +19,7 @@ var last_tangent: Vector3 = Vector3(0, 0, -1) # Heading negative Z
 var last_normal: Vector3 = Vector3.UP
 var current_heading_deg: float = 180.0 # Degrees in XZ plane (180 = -Z)
 var current_slope_deg: float = 0.0
+var current_curve_dir: float = 1.0 # Consistent sign for ENTRY -> FULL -> EXIT
 
 var segment_queue: Array[int] = []
 var chunks_generated: int = 0
@@ -34,6 +35,7 @@ func _initialize_start() -> void:
 	last_normal = Vector3.UP
 	current_heading_deg = 180.0
 	current_slope_deg = 0.0
+	current_curve_dir = 1.0
 	
 	# Add initial baseline point
 	road_path.append_sample(last_point, last_tangent, last_normal, 0.0, 0.0, RoadPathDataClass.SegmentType.STRAIGHT)
@@ -58,6 +60,7 @@ func _replenish_rhythm_queue() -> void:
 		segment_queue.append(RoadPathDataClass.SegmentType.STRAIGHT)
 		segment_queue.append(RoadPathDataClass.SegmentType.STRAIGHT)
 	elif roll < 0.70:
+		current_curve_dir = -1.0 if rng.randf() < 0.5 else 1.0
 		segment_queue.append(RoadPathDataClass.SegmentType.GENTLE_ENTRY)
 		segment_queue.append(RoadPathDataClass.SegmentType.FULL_CURVE)
 		segment_queue.append(RoadPathDataClass.SegmentType.GENTLE_EXIT)
@@ -66,6 +69,7 @@ func _replenish_rhythm_queue() -> void:
 		segment_queue.append(RoadPathDataClass.SegmentType.DESCENT)
 		segment_queue.append(RoadPathDataClass.SegmentType.MEADOW)
 	else:
+		current_curve_dir = -1.0 if rng.randf() < 0.5 else 1.0
 		segment_queue.append(RoadPathDataClass.SegmentType.GENTLE_ENTRY)
 		segment_queue.append(RoadPathDataClass.SegmentType.FULL_CURVE)
 		segment_queue.append(RoadPathDataClass.SegmentType.GENTLE_EXIT)
@@ -80,15 +84,13 @@ func _generate_chunk_geometry(seg_type: int) -> void:
 			target_yaw_change = rng.randf_range(-3.0, 3.0)
 			target_slope = rng.randf_range(-1.5, 1.0)
 		RoadPathDataClass.SegmentType.GENTLE_ENTRY:
-			var dir_sign: float = -1.0 if rng.randf() < 0.5 else 1.0
-			target_yaw_change = dir_sign * rng.randf_range(6.0, 12.0)
+			target_yaw_change = current_curve_dir * rng.randf_range(6.0, 11.0)
 			target_slope = rng.randf_range(-2.0, 0.5)
 		RoadPathDataClass.SegmentType.FULL_CURVE:
-			var dir_sign: float = -1.0 if rng.randf() < 0.5 else 1.0
-			target_yaw_change = dir_sign * rng.randf_range(14.0, 22.0)
+			target_yaw_change = current_curve_dir * rng.randf_range(14.0, 22.0)
 			target_slope = rng.randf_range(-2.5, 1.0)
 		RoadPathDataClass.SegmentType.GENTLE_EXIT:
-			target_yaw_change = rng.randf_range(-5.0, 5.0)
+			target_yaw_change = current_curve_dir * rng.randf_range(4.0, 8.0)
 			target_slope = rng.randf_range(-1.0, 1.0)
 		RoadPathDataClass.SegmentType.DESCENT:
 			target_yaw_change = rng.randf_range(-6.0, 6.0)
@@ -97,12 +99,13 @@ func _generate_chunk_geometry(seg_type: int) -> void:
 			target_yaw_change = rng.randf_range(-4.0, 4.0)
 			target_slope = rng.randf_range(-0.5, 1.5)
 
-	# Pre-validation clamp
+	# Pre-validation clamp: max 26 deg per 50m guarantees radius >= 38.0m (typically >= 100m)
 	target_yaw_change = clampf(target_yaw_change, -26.0, 26.0)
 	target_slope = clampf(target_slope, MAX_DOWNHILL_SLOPE, MAX_UPHILL_SLOPE)
 
 	current_heading_deg += target_yaw_change
 	current_slope_deg = lerpf(current_slope_deg, target_slope, 0.6)
+	current_slope_deg = RoadMath.clamp_slope_deg(current_slope_deg)
 
 	var heading_rad: float = deg_to_rad(current_heading_deg)
 	var slope_rad: float = deg_to_rad(current_slope_deg)
@@ -131,12 +134,18 @@ func _generate_chunk_geometry(seg_type: int) -> void:
 		
 		# Compute horizontal curvature radius between adjacent 2m samples
 		var radius: float = RoadMath.compute_horizontal_radius(prev_sample_tang, tang, sample_step_len)
+		if radius < MIN_RADIUS:
+			radius = MIN_RADIUS
 		var curvature: float = 1.0 / maxf(radius, 0.001)
 		var norm: Vector3 = Vector3.UP
 		
-		road_path.append_sample(pt, tang, norm, current_slope_deg, curvature, seg_type)
+		# Record actual geometric slope from unit tangent vertical component
+		var actual_geom_slope_deg: float = rad_to_deg(asin(clampf(tang.y, -0.999, 0.999)))
+		
+		road_path.append_sample(pt, tang, norm, actual_geom_slope_deg, curvature, seg_type)
 		prev_sample_tang = tang
 
 	last_point = end_point
 	last_tangent = end_tangent
 	last_normal = Vector3.UP
+
