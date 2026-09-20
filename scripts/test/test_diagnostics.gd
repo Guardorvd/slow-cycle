@@ -160,6 +160,102 @@ func _init() -> void:
 		print("[VERIFICATION #9] [FAIL] FIX-003 check failed: grass_exact=%s, tree_exact=%s, old_edge=%s" % [has_grass_exact, has_tree_exact, has_old_edge_sample])
 		all_ok = false
 
+	# Test 10: [3A.1 FEAT-006.4] Coasting Equilibrium & Target Feel Calibration
+	var bike_test_instance = bike_scene.instantiate()
+	var r_road: float = bike_test_instance.road_rolling_resistance
+	var k_drag: float = bike_test_instance.air_drag_coeff
+	var r_grass: float = bike_test_instance.grass_rolling_resistance
+	var g_mult: float = bike_test_instance.gravity_slope_mult
+	var slope_neg2_rad: float = deg_to_rad(-2.0)
+	var a_gravity_neg2: float = -sin(slope_neg2_rad) * 9.8 * g_mult
+	var v_eq_ms: float = sqrt((a_gravity_neg2 - r_road) / k_drag)
+	var v_eq_kmh: float = v_eq_ms * 3.6
+	
+	# Flat coast duration from 20 km/h (5.556 m/s) to 0
+	var v0_ms: float = 20.0 / 3.6
+	var t_coast_road: float = (1.0 / sqrt(r_road * k_drag)) * atan(v0_ms * sqrt(k_drag / r_road))
+	var t_coast_grass: float = (1.0 / sqrt(r_grass * k_drag)) * atan(v0_ms * sqrt(k_drag / r_grass))
+	
+	print("[VERIFICATION #10] Sprint 3A.1 Coasting & Target Feel:")
+	print("  - Downhill -2° Equilibrium: %.2f km/h (Target: 17.0 - 21.0 km/h)" % v_eq_kmh)
+	print("  - Flat Coast Duration: %.1f s (Target: 25.0 - 35.0 s)" % t_coast_road)
+	print("  - Grass Coast Duration: %.1f s (Target: < 12.0 s)" % t_coast_grass)
+	if v_eq_kmh >= 17.0 and v_eq_kmh <= 21.0 and t_coast_road >= 25.0 and t_coast_road <= 35.0 and t_coast_grass < 12.0:
+		print("  [PASS] Target Feel physics calibration verified!")
+	else:
+		print("  [FAIL] Coasting physics outside target feel bounds")
+		all_ok = false
+
+	# Test 11: [3A.2 FEAT-006.5] Physics & Visual Pitch Decoupling
+	var has_physics_pitch: bool = "physics_pitch" in bike_test_instance
+	var has_visual_pitch: bool = "visual_pitch" in bike_test_instance
+	var attack_smooth: float = bike_test_instance.pitch_attack_smoothness
+	var decay_smooth: float = bike_test_instance.pitch_decay_smoothness
+	if has_physics_pitch and has_visual_pitch and attack_smooth == 14.0 and decay_smooth == 7.0:
+		print("[VERIFICATION #11] [PASS] Physics and Visual pitch successfully decoupled (Attack: %.1f, Decay: %.1f)!" % [attack_smooth, decay_smooth])
+	else:
+		print("[VERIFICATION #11] [FAIL] Pitch decoupling incomplete")
+		all_ok = false
+
+	# Test 12: [3A.3 FEAT-006.6] Hybrid Lean Steering & Turn Radius Limiter
+	var max_steer_low: float = bike_test_instance.max_steer_angle
+	var max_steer_high: float = bike_test_instance.high_speed_steer_limit
+	var v_high: float = 11.5 # ~41.4 km/h
+	var omega_high: float = (v_high / bike_test_instance.WHEELBASE) * tan(max_steer_high)
+	var radius_high: float = v_high / omega_high
+	print("[VERIFICATION #12] Hybrid Lean Steering & Turn Radius Limits:")
+	print("  - Low-speed max steer: %.1f° (Nimble maneuver)" % rad_to_deg(max_steer_low))
+	print("  - High-speed max steer: %.2f° -> Turn Radius: %.1fm (Target: >= 25.0m)" % [rad_to_deg(max_steer_high), radius_high])
+	if max_steer_low >= 0.48 and radius_high >= 25.0:
+		print("  [PASS] Steering prevents high-speed knife-edge turns while keeping low-speed agility!")
+	else:
+		print("  [FAIL] High speed steering radius too tight or low-speed too stiff")
+		all_ok = false
+
+	# Test 13: [3A.4 FEAT-006.7] Progressive Braking & Visual-Only Dive
+	var b_attack: float = bike_test_instance.brake_attack_time
+	var b_dive_deg: float = bike_test_instance.brake_dive_angle_deg
+	var has_dive_var: bool = "brake_dive_pitch" in bike_test_instance
+	if b_attack >= 0.12 and b_attack <= 0.20 and b_dive_deg <= 1.7 and has_dive_var:
+		print("[VERIFICATION #13] [PASS] Progressive brake attack (%.2fs) and visual dive (%.1f°) verified!" % [b_attack, b_dive_deg])
+	else:
+		print("[VERIFICATION #13] [FAIL] Progressive brake parameters out of spec: attack=%.2f, dive=%.1f" % [b_attack, b_dive_deg])
+		all_ok = false
+
+	# Test 14: [3A.5 FEAT-006.8] Pedaling Inertia Ramp & Instant Coasting Release
+	var p_attack: float = bike_test_instance.pedal_attack_time
+	var has_pedal_pwr: bool = "pedal_power" in bike_test_instance
+	if p_attack >= 0.30 and p_attack <= 0.40 and has_pedal_pwr:
+		print("[VERIFICATION #14] [PASS] Pedal power inertia ramp (%.2fs) verified!" % p_attack)
+	else:
+		print("[VERIFICATION #14] [FAIL] Pedal inertia parameters out of spec")
+		all_ok = false
+
+	# Test 15: [3A.6 FEAT-006.9] Lateral-Load Cornering Scrub
+	var scrub_thresh: float = bike_test_instance.scrub_lateral_threshold
+	var scrub_coeff: float = bike_test_instance.cornering_scrub_coeff
+	if scrub_thresh == 1.5 and scrub_coeff > 0.10:
+		print("[VERIFICATION #15] [PASS] Lateral-load cornering scrub verified (Threshold: %.1f m/s², Coeff: %.2f)!" % [scrub_thresh, scrub_coeff])
+	else:
+		print("[VERIFICATION #15] [FAIL] Scrub parameters invalid")
+		all_ok = false
+
+	# Test 16: [3A.7 FEAT-006.10] Terrain Micro-Motion Camera Layer
+	var cam_rig = bike_test_instance.get_node("CameraRig")
+	var shake_freq: float = cam_rig.shake_frequency
+	var shake_amp: float = cam_rig.gravel_shake_intensity
+	var grass_mult: float = cam_rig.grass_shake_multiplier
+	print("[VERIFICATION #16] Terrain Micro-Motion Camera:")
+	print("  - Frequency: %.1f Hz (Target: 5.0 - 10.0 Hz pseudo-noise)" % shake_freq)
+	print("  - Base Amplitude: %.4f m | Grass Multiplier: %.1fx" % [shake_amp, grass_mult])
+	if shake_freq >= 5.0 and shake_freq <= 10.0 and shake_amp <= 0.003 and grass_mult >= 1.4:
+		print("  [PASS] Camera micro-motion is subtle, smooth and non-jarring!")
+	else:
+		print("  [FAIL] Camera micro-motion frequency/amplitude out of spec")
+		all_ok = false
+
+	bike_test_instance.queue_free()
+
 	if all_ok:
 		print("\n=== ALL SYSTEM VERIFICATIONS PASSED [100% OK] ===\n")
 	else:

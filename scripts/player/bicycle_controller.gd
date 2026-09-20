@@ -9,18 +9,27 @@ signal bell_rung()
 @export var cruising_speed: float = 7.0 ## Comfortable cruising speed (~25 km/h)
 @export var max_sprint_speed: float = 13.0 ## Maximum downhill or sprint speed (~47 km/h)
 @export var pedal_acceleration: float = 3.5 ## Forward push rate when pedaling
+@export var pedal_attack_time: float = 0.35 ## Time in seconds to ramp up to full pedaling effort
 @export var brake_deceleration: float = 7.5 ## Deceleration when braking
-@export var road_rolling_resistance: float = 0.35 ## Rolling friction on gravel road
-@export var grass_rolling_resistance: float = 1.35 ## High rolling resistance when off-road on grass
+@export var brake_attack_time: float = 0.15 ## Rapid initial bite and ramp-up time for braking
+@export var brake_release_time: float = 0.10 ## Fast release time when releasing brake
+@export var brake_dive_angle_deg: float = 1.7 ## Max visual nose-dive angle in degrees under hard braking
+@export var road_rolling_resistance: float = 0.08 ## Calibrated rolling friction on gravel road (17-21 km/h cruise on -2°)
+@export var grass_rolling_resistance: float = 0.45 ## Decisive rolling resistance when off-road on grass
 @export var air_drag_coeff: float = 0.015 ## Quadratic aerodynamic drag
 @export var gravity_slope_mult: float = 1.45 ## Effect of slope gravity on downhill coasting
+@export var cornering_scrub_coeff: float = 0.18 ## Gentle speed bleed under high lateral cornering loads
+@export var scrub_lateral_threshold: float = 1.5 ## Lateral acceleration threshold (m/s^2) before scrub occurs
 
 @export_group("Steering & Banking")
 @export var steer_sensitivity: float = 1.6 ## Turn rate (radians/sec)
 @export var max_steer_angle: float = 0.50 ## ~28.6 degrees max handlebar rotation at low speed
+@export var high_speed_steer_limit: float = 0.045 ## ~2.6 degrees max handlebar rotation at high speed (R >= 26-30m)
 @export var max_bank_angle: float = 0.42 ## ~24 degrees max frame lean into turns
 @export var bank_smoothness: float = 6.0 ## Lerp speed for frame roll into turn
-@export var pitch_smoothness: float = 8.0 ## Lerp speed for slope alignment
+@export var pitch_smoothness: float = 8.0 ## Legacy reference
+@export var pitch_attack_smoothness: float = 14.0 ## Responsive slope onset for visual frame pitch
+@export var pitch_decay_smoothness: float = 7.0 ## Smooth return to horizontal for visual frame pitch
 
 @export_group("Node References")
 @export var front_ray: RayCast3D
@@ -39,7 +48,15 @@ var raw_steer_input: float = 0.0
 var filtered_steer_input: float = 0.0
 var current_steer: float = 0.0
 var current_bank: float = 0.0
-var current_pitch: float = 0.0
+var current_pitch: float = 0.0 # Mirrors visual_pitch for external observers
+var physics_pitch: float = 0.0 # Instant slope angle for gravity & ground adhesion
+var visual_pitch: float = 0.0 # Decoupled smoothed slope for visual mesh
+var pedal_power: float = 0.0 # 0.0 to 1.0 pedaling inertia
+var brake_input: float = 0.0 # 0.0 to 1.0 progressive brake ramp
+var brake_dive_pitch: float = 0.0 # Visual-only nose dive in radians
+var yaw_turn_rate: float = 0.0 # Angular turn rate in rad/s
+var turn_radius: float = INF # Computed curve radius
+var lateral_acceleration: float = 0.0 # Current lateral load in m/s^2
 var is_pedaling: bool = false
 var is_braking: bool = false
 var is_coasting: bool = false
@@ -60,7 +77,7 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	var speed_kmh: float = current_speed * 3.6
-	var cadence_factor: float = (current_speed / cruising_speed) if is_pedaling else 0.0
+	var cadence_factor: float = (current_speed / cruising_speed) * pedal_power if is_pedaling else 0.0
 	telemetry_updated.emit(speed_kmh, cadence_factor, is_coasting)
 
 	if Input.is_action_just_pressed("ring_bell"):
@@ -116,7 +133,14 @@ func _calculate_ground_and_slope(delta: float) -> void:
 		var height_diff: float = front_point.y - rear_point.y
 		target_pitch = atan2(height_diff, WHEELBASE)
 
-	current_pitch = lerpf(current_pitch, target_pitch, pitch_smoothness * delta)
+	# 1. Physics pitch: immediate response for gravity & vertical adhesion
+	physics_pitch = target_pitch
+
+	# 2. Visual pitch: decoupled asymmetric smoothing for visual frame
+	var is_steepening: bool = absf(target_pitch) > absf(visual_pitch) or (target_pitch * visual_pitch < 0.0)
+	var pitch_rate: float = pitch_attack_smoothness if is_steepening else pitch_decay_smoothness
+	visual_pitch = lerpf(visual_pitch, target_pitch, pitch_rate * delta)
+	current_pitch = visual_pitch
 
 func _calculate_forward_dynamics(delta: float) -> void:
 	# Active rolling resistance: road vs grass
@@ -128,23 +152,35 @@ func _calculate_forward_dynamics(delta: float) -> void:
 		current_speed = maxf(0.0, current_speed - active_roll_res * delta)
 		return
 
-	# 1. Slope gravity acceleration
-	var slope_gravity_accel: float = -sin(current_pitch) * 9.8 * gravity_slope_mult
+	# 1. Slope gravity acceleration using physics_pitch (instant slope response)
+	var slope_gravity_accel: float = -sin(physics_pitch) * 9.8 * gravity_slope_mult
 	current_speed += slope_gravity_accel * delta
 
-	# 2. Pedaling
+	# 2. Pedaling with pedal_power inertia ramp
 	if is_pedaling:
+		pedal_power = minf(1.0, pedal_power + (1.0 / pedal_attack_time) * delta)
 		var effective_cruising: float = cruising_speed * (0.6 if is_on_grass else 1.0)
 		var effective_sprint: float = max_sprint_speed * (0.6 if is_on_grass else 1.0)
+		var eff_accel: float = pedal_acceleration * pedal_power
 		if current_speed < effective_cruising:
-			current_speed += pedal_acceleration * delta
+			current_speed += eff_accel * delta
 		elif current_speed < effective_sprint:
 			var efficiency: float = 1.0 - ((current_speed - effective_cruising) / (effective_sprint - effective_cruising))
-			current_speed += pedal_acceleration * efficiency * 0.5 * delta
+			current_speed += eff_accel * efficiency * 0.5 * delta
+	else:
+		pedal_power = 0.0 # Instant transition to free coasting on release!
 
-	# 3. Braking
+	# 3. Progressive braking with quadratic effort curve
 	if is_braking:
-		current_speed = maxf(0.0, current_speed - brake_deceleration * delta)
+		brake_input = minf(1.0, brake_input + (1.0 / brake_attack_time) * delta)
+		var brake_curve: float = brake_input * brake_input
+		current_speed = maxf(0.0, current_speed - (brake_deceleration * brake_curve) * delta)
+	else:
+		brake_input = maxf(0.0, brake_input - (1.0 / brake_release_time) * delta)
+
+	# Visual-only nose dive under braking (smoothly tracking brake_input)
+	var target_dive: float = -deg_to_rad(brake_dive_angle_deg) * brake_input
+	brake_dive_pitch = lerpf(brake_dive_pitch, target_dive, 12.0 * delta)
 
 	# 4. Drag and rolling resistance
 	var drag: float = (active_roll_res + air_drag_coeff * (current_speed * current_speed)) * delta
@@ -158,36 +194,47 @@ func _calculate_steering_and_banking(delta: float) -> void:
 	filtered_steer_input = lerpf(filtered_steer_input, raw_steer_input, filter_rate * delta)
 	steer_input = filtered_steer_input
 
-	# 2. Speed-sensitive steering limiter (High-speed damping)
-	# At low speed (<= 2.8 m/s ~ 10 km/h): full angle ~28.6°
-	# At high speed (>= 11.5 m/s ~ 41 km/h): narrow angle ~9.2°
-	var speed_t: float = clampf((current_speed - 2.8) / 8.7, 0.0, 1.0)
-	var dynamic_max_steer: float = lerpf(max_steer_angle, 0.16, speed_t)
+	# 2. Hybrid Lean Steering & High-Speed Turn Radius Limiter
+	# Low speed (<= 0.83 m/s ~ 3 km/h): Direct steering for nimble maneuvers
+	# High speed (>= 11.5 m/s ~ 41 km/h): Clamped to high_speed_steer_limit (R >= 26-30m)
+	var speed_norm: float = clampf((current_speed - 0.83) / 10.67, 0.0, 1.0)
+	var dynamic_max_steer: float = lerpf(max_steer_angle, high_speed_steer_limit, speed_norm)
 	var target_steer: float = filtered_steer_input * dynamic_max_steer
 
-	# 3. Steering mass & centering moment (handlebars feel heavier with speed)
-	var steer_inertia_rate: float = lerpf(6.5, 12.0, speed_t)
+	# 3. Steering mass & centering moment
+	var steer_inertia_rate: float = lerpf(8.0, 14.0, speed_norm)
 	current_steer = lerpf(current_steer, target_steer, steer_inertia_rate * delta)
 
 	# 4. Kinematic bicycle yaw rate: omega = (v / wheelbase) * tan(steer)
-	var yaw_turn_rate: float = 0.0
 	if current_speed > 0.3:
 		yaw_turn_rate = (current_speed / WHEELBASE) * tan(current_steer)
-		# Clamp yaw rate to prevent extreme lateral whips
 		yaw_turn_rate = clampf(yaw_turn_rate, -1.8, 1.8)
 	else:
 		yaw_turn_rate = current_steer * steer_sensitivity * 0.2
 
+	# Compute turn radius for telemetry: R = v / |omega|
+	if absf(yaw_turn_rate) > 0.005 and current_speed > 0.5:
+		turn_radius = current_speed / absf(yaw_turn_rate)
+	else:
+		turn_radius = INF
+
 	rotate_y(yaw_turn_rate * delta)
 
 	# 5. Physics-based banking from centrifugal lateral acceleration: a_c = v * omega_yaw
-	# Equilibrium roll angle: tan(phi) = a_c / g => phi = -atan2(a_c, g)
-	var lateral_accel: float = current_speed * yaw_turn_rate
-	var physical_target_bank: float = -atan2(lateral_accel, 9.8)
+	lateral_acceleration = current_speed * absf(yaw_turn_rate)
+	var lateral_accel_signed: float = current_speed * yaw_turn_rate
+	var physical_target_bank: float = -atan2(lateral_accel_signed, 9.8)
 	physical_target_bank = clampf(physical_target_bank, -max_bank_angle, max_bank_angle)
 
 	current_bank = lerpf(current_bank, physical_target_bank, bank_smoothness * delta)
 
+	# 6. Lateral-load cornering scrub:
+	# Only triggers when lateral load exceeds scrub_lateral_threshold (1.5 m/s^2 ~ 0.15g)
+	# Straightaways and micro-adjustments produce exactly 0 scrub
+	if lateral_acceleration > scrub_lateral_threshold:
+		var excess_lateral: float = lateral_acceleration - scrub_lateral_threshold
+		var scrub_loss: float = excess_lateral * cornering_scrub_coeff * delta
+		current_speed = maxf(0.0, current_speed - scrub_loss)
 
 func _apply_motion(delta: float) -> void:
 	var forward_dir: Vector3 = -global_transform.basis.z
@@ -195,7 +242,7 @@ func _apply_motion(delta: float) -> void:
 
 	var vertical_vel: float = velocity.y
 	if is_grounded:
-		var slope_vy: float = current_speed * sin(current_pitch)
+		var slope_vy: float = current_speed * sin(physics_pitch)
 		vertical_vel = minf(-0.5, slope_vy - 0.5)
 	else:
 		vertical_vel -= 9.8 * delta
@@ -206,7 +253,7 @@ func _apply_motion(delta: float) -> void:
 func _update_visual_transforms(delta: float) -> void:
 	if visuals_root:
 		visuals_root.rotation.z = current_bank
-		visuals_root.rotation.x = current_pitch
+		visuals_root.rotation.x = visual_pitch + brake_dive_pitch
 
 	if handlebar_pivot:
 		handlebar_pivot.rotation.y = current_steer
@@ -233,4 +280,7 @@ func _execute_recovery_teleport() -> void:
 	current_speed = 3.0 # Smooth resumption speed
 	current_bank = 0.0
 	current_steer = 0.0
+	pedal_power = 0.0
+	brake_input = 0.0
+	brake_dive_pitch = 0.0
 	velocity = -global_transform.basis.z * current_speed

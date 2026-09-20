@@ -34,6 +34,16 @@ func _process(delta: float) -> void:
 	var pitch_val: float = bike_controller.get("current_pitch") if bike_controller else 0.0
 	var slope_deg: float = rad_to_deg(pitch_val)
 	var on_grass: bool = bike_controller.get("is_on_grass") if bike_controller else false
+
+	var steer_deg: float = rad_to_deg(bike_controller.get("current_steer")) if bike_controller else 0.0
+	var bank_deg: float = rad_to_deg(bike_controller.get("current_bank")) if bike_controller else 0.0
+	var yaw_rate: float = bike_controller.get("yaw_turn_rate") if bike_controller else 0.0
+	var radius_val: float = bike_controller.get("turn_radius") if bike_controller else INF
+	var radius_str: String = "INF" if is_inf(radius_val) else "%.1fm" % radius_val
+	var lat_accel: float = bike_controller.get("lateral_acceleration") if bike_controller else 0.0
+	var pedal_pct: float = (bike_controller.get("pedal_power") if bike_controller else 0.0) * 100.0
+	var brake_pct: float = (bike_controller.get("brake_input") if bike_controller else 0.0) * 100.0
+	var dive_deg: float = rad_to_deg(bike_controller.get("brake_dive_pitch")) if bike_controller else 0.0
 	
 	var active_chunks: int = 0
 	var chunk_gen_ms: float = 0.0
@@ -65,7 +75,9 @@ func _process(delta: float) -> void:
 	text += "Time: %02d:%02d | Seed: %d | Distance: %.2f km\n" % [mins, secs, seed_val, dist_km]
 	text += "Global Chunk: #%d | Active Chunks: %d\n" % [chunk_id, active_chunks]
 	text += "Spline Buffer: %d pts (Pruned) | Chunk Gen: %.2f ms\n" % [spline_pts, chunk_gen_ms]
-	text += "Speed: %.1f km/h | Slope: %.1f°\n" % [speed_kmh, slope_deg]
+	text += "Speed: %.1f km/h | Slope: %.1f° | Dive: %.1f°\n" % [speed_kmh, slope_deg, dive_deg]
+	text += "Steer: %.1f° | Bank: %.1f° | Yaw: %.2f rad/s | Radius: %s\n" % [steer_deg, bank_deg, yaw_rate, radius_str]
+	text += "Lat Accel: %.2f m/s² | Pedals: %.0f%% | Brake: %.0f%%\n" % [lat_accel, pedal_pct, brake_pct]
 	text += "FPS: %d | Frame: %.1f ms | Max Spike: %.1f ms\n" % [Engine.get_frames_per_second(), frame_ms, max_frame_time_ms]
 	text += "RAM Static: %.1f MB\n" % [ram_mb]
 	text += "Surface: %s\n" % ("GRASS (High Drag)" if on_grass else "ROAD (Gravel)")
