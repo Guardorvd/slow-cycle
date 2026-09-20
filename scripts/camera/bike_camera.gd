@@ -18,6 +18,14 @@ const BicycleControllerScript = preload("res://scripts/player/bicycle_controller
 @export var grass_shake_multiplier: float = 1.6 ## Relative roughness on grass verge
 @export var shake_frequency: float = 8.0 ## Low-frequency pseudo-noise (5-10 Hz)
 
+@export_group("Speed FOV")
+@export var fp_base_fov: float = 78.0
+@export var fp_max_fov: float = 83.0
+@export var tp_base_fov: float = 68.0
+@export var tp_max_fov: float = 72.0
+@export var fov_speed_range: float = 12.0 ## Speed in m/s (~43.2 km/h) for max FOV
+@export var fov_lerp_speed: float = 3.5
+
 var current_roll: float = 0.0
 var bob_phase: float = 0.0
 var shake_time: float = 0.0
@@ -73,6 +81,16 @@ func _process(delta: float) -> void:
 
 	if first_person_cam:
 		first_person_cam.position.x = current_shake_x
+
+	# Speed FOV dynamic expansion (FEAT-007.3)
+	var speed_ratio: float = clampf(current_speed / fov_speed_range, 0.0, 1.0)
+	var target_fp_fov: float = lerpf(fp_base_fov, fp_max_fov, speed_ratio)
+	var target_tp_fov: float = lerpf(tp_base_fov, tp_max_fov, speed_ratio)
+
+	if first_person_cam:
+		first_person_cam.fov = lerpf(first_person_cam.fov, target_fp_fov, fov_lerp_speed * delta)
+	if third_person_cam:
+		third_person_cam.fov = lerpf(third_person_cam.fov, target_tp_fov, fov_lerp_speed * delta)
 
 	# Apply roll rotation to cameras
 	if is_first_person and first_person_cam:

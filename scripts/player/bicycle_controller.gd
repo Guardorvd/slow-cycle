@@ -31,6 +31,11 @@ signal bell_rung()
 @export var pitch_attack_smoothness: float = 14.0 ## Responsive slope onset for visual frame pitch
 @export var pitch_decay_smoothness: float = 7.0 ## Smooth return to horizontal for visual frame pitch
 
+@export_group("Visual Ergonomics")
+@export var visual_steer_gain: float = 2.5 ## Visual handlebar amplification factor
+@export var max_visual_steer_cruising: float = deg_to_rad(12.0) ## Maximum visual steer angle at cruising speed
+@export var max_visual_steer_low_speed: float = deg_to_rad(20.0) ## Maximum visual steer angle at low speed
+
 @export_group("Node References")
 @export var front_ray: RayCast3D
 @export var rear_ray: RayCast3D
@@ -47,6 +52,8 @@ var steer_input: float = 0.0
 var raw_steer_input: float = 0.0
 var filtered_steer_input: float = 0.0
 var current_steer: float = 0.0
+var visual_steer: float = 0.0
+var base_fork_transform: Transform3D
 var current_bank: float = 0.0
 var current_pitch: float = 0.0 # Mirrors visual_pitch for external observers
 var physics_pitch: float = 0.0 # Instant slope angle for gravity & ground adhesion
@@ -62,6 +69,8 @@ var is_braking: bool = false
 var is_coasting: bool = false
 var is_grounded: bool = true
 var is_on_grass: bool = false
+var prev_on_grass: bool = false
+var prev_hard_brake: bool = false
 var wheel_rotation: float = 0.0
 
 const WHEELBASE: float = 1.15
@@ -74,6 +83,8 @@ func _ready() -> void:
 	if rear_ray:
 		rear_ray.enabled = true
 		rear_ray.collision_mask = 2 | 4
+	if handlebar_pivot:
+		base_fork_transform = handlebar_pivot.transform
 
 func _process(delta: float) -> void:
 	var speed_kmh: float = current_speed * 3.6
@@ -96,15 +107,16 @@ func _physics_process(delta: float) -> void:
 	_update_visual_transforms(delta)
 
 func _handle_input() -> void:
-	var target_raw: float = 0.0
-	if Input.is_action_pressed("steer_left"):
-		target_raw += 1.0
-	if Input.is_action_pressed("steer_right"):
-		target_raw -= 1.0
-	raw_steer_input = target_raw
+	# Steer analog support with stick power curve (preserves digital keyboard feel)
+	var steer_stick: float = Input.get_axis("steer_right", "steer_left")
+	var sign_val: float = signf(steer_stick)
+	raw_steer_input = sign_val * pow(absf(steer_stick), 1.5)
 
-	is_pedaling = Input.is_action_pressed("pedal") and not Input.is_action_pressed("brake")
-	is_braking = Input.is_action_pressed("brake")
+	var pedal_strength: float = Input.get_action_strength("pedal")
+	var brake_strength: float = Input.get_action_strength("brake")
+
+	is_pedaling = pedal_strength > 0.1 and brake_strength <= 0.1
+	is_braking = brake_strength > 0.1
 	is_coasting = not is_pedaling and not is_braking and current_speed > 0.3
 
 func _calculate_ground_and_slope(delta: float) -> void:
@@ -156,9 +168,12 @@ func _calculate_forward_dynamics(delta: float) -> void:
 	var slope_gravity_accel: float = -sin(physics_pitch) * 9.8 * gravity_slope_mult
 	current_speed += slope_gravity_accel * delta
 
-	# 2. Pedaling with pedal_power inertia ramp
+	# 2. Pedaling with pedal_power inertia ramp and analog throttle
 	if is_pedaling:
-		pedal_power = minf(1.0, pedal_power + (1.0 / pedal_attack_time) * delta)
+		var pedal_strength: float = Input.get_action_strength("pedal")
+		if pedal_strength < 0.1:
+			pedal_strength = 1.0 # Fallback for programmatic triggers/tests
+		pedal_power = minf(pedal_strength, pedal_power + (1.0 / pedal_attack_time) * delta)
 		var effective_cruising: float = cruising_speed * (0.6 if is_on_grass else 1.0)
 		var effective_sprint: float = max_sprint_speed * (0.6 if is_on_grass else 1.0)
 		var eff_accel: float = pedal_acceleration * pedal_power
@@ -170,9 +185,12 @@ func _calculate_forward_dynamics(delta: float) -> void:
 	else:
 		pedal_power = 0.0 # Instant transition to free coasting on release!
 
-	# 3. Progressive braking with quadratic effort curve
+	# 3. Progressive braking with quadratic effort curve and analog brake
 	if is_braking:
-		brake_input = minf(1.0, brake_input + (1.0 / brake_attack_time) * delta)
+		var brake_strength: float = Input.get_action_strength("brake")
+		if brake_strength < 0.1:
+			brake_strength = 1.0 # Fallback for programmatic triggers/tests
+		brake_input = minf(brake_strength, brake_input + (1.0 / brake_attack_time) * delta)
 		var brake_curve: float = brake_input * brake_input
 		current_speed = maxf(0.0, current_speed - (brake_deceleration * brake_curve) * delta)
 	else:
@@ -185,6 +203,16 @@ func _calculate_forward_dynamics(delta: float) -> void:
 	# 4. Drag and rolling resistance
 	var drag: float = (active_roll_res + air_drag_coeff * (current_speed * current_speed)) * delta
 	current_speed = maxf(0.0, current_speed - drag)
+
+	# 5. Haptic feedback for surface transitions and hard braking
+	if is_on_grass and not prev_on_grass:
+		_trigger_haptic(0.2, 0.1, 0.12)
+	prev_on_grass = is_on_grass
+
+	var is_hard_braking: bool = is_braking and brake_input > 0.8 and current_speed > 2.0
+	if is_hard_braking and not prev_hard_brake:
+		_trigger_haptic(0.1, 0.35, 0.15)
+	prev_hard_brake = is_hard_braking
 
 func _calculate_steering_and_banking(delta: float) -> void:
 	# 1. Soft-knee input filtering (gradual attack for micro-taps, firm return to center)
@@ -223,7 +251,7 @@ func _calculate_steering_and_banking(delta: float) -> void:
 	# 5. Physics-based banking from centrifugal lateral acceleration: a_c = v * omega_yaw
 	lateral_acceleration = current_speed * absf(yaw_turn_rate)
 	var lateral_accel_signed: float = current_speed * yaw_turn_rate
-	var physical_target_bank: float = -atan2(lateral_accel_signed, 9.8)
+	var physical_target_bank: float = atan2(lateral_accel_signed, 9.8)
 	physical_target_bank = clampf(physical_target_bank, -max_bank_angle, max_bank_angle)
 
 	current_bank = lerpf(current_bank, physical_target_bank, bank_smoothness * delta)
@@ -235,6 +263,12 @@ func _calculate_steering_and_banking(delta: float) -> void:
 		var excess_lateral: float = lateral_acceleration - scrub_lateral_threshold
 		var scrub_loss: float = excess_lateral * cornering_scrub_coeff * delta
 		current_speed = maxf(0.0, current_speed - scrub_loss)
+
+	# 7. Visual steering ergonomics (FEAT-007.0)
+	var speed_ratio: float = clampf(current_speed / 6.0, 0.0, 1.0)
+	var dynamic_max_visual: float = lerpf(max_visual_steer_low_speed, max_visual_steer_cruising, speed_ratio)
+	var target_visual_steer: float = clampf(current_steer * visual_steer_gain, -dynamic_max_visual, dynamic_max_visual)
+	visual_steer = lerpf(visual_steer, target_visual_steer, 15.0 * delta)
 
 func _apply_motion(delta: float) -> void:
 	var forward_dir: Vector3 = -global_transform.basis.z
@@ -256,7 +290,7 @@ func _update_visual_transforms(delta: float) -> void:
 		visuals_root.rotation.x = visual_pitch + brake_dive_pitch
 
 	if handlebar_pivot:
-		handlebar_pivot.rotation.y = current_steer
+		handlebar_pivot.transform = base_fork_transform.rotated_local(Vector3.UP, visual_steer)
 
 	var spin_delta: float = (current_speed / WHEEL_RADIUS) * delta
 	wheel_rotation -= spin_delta
@@ -280,7 +314,11 @@ func _execute_recovery_teleport() -> void:
 	current_speed = 3.0 # Smooth resumption speed
 	current_bank = 0.0
 	current_steer = 0.0
+	visual_steer = 0.0
 	pedal_power = 0.0
 	brake_input = 0.0
 	brake_dive_pitch = 0.0
 	velocity = -global_transform.basis.z * current_speed
+
+func _trigger_haptic(weak: float, strong: float, duration: float) -> void:
+	Input.start_joy_vibration(0, weak, strong, duration)

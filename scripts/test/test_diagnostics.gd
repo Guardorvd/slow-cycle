@@ -137,7 +137,7 @@ func _init() -> void:
 	else:
 		print("[VERIFICATION #7] [FAIL] FIX-001 check failed: dead_gear=%s, sig_arity_ok=%s, hud_sig_ok=%s" % [has_dead_gear, sig_arity_ok, hud_sig_ok])
 		all_ok = false
-	bike_instance.queue_free()
+	bike_instance.free()
 
 	# Test 8: [FIX-002] Verify strict noise assert in road_chunk.gd
 	var chunk_source: String = load("res://scripts/world/road_chunk.gd").source_code
@@ -162,6 +162,7 @@ func _init() -> void:
 
 	# Test 10: [3A.1 FEAT-006.4] Coasting Equilibrium & Target Feel Calibration
 	var bike_test_instance = bike_scene.instantiate()
+	root.add_child(bike_test_instance)
 	var r_road: float = bike_test_instance.road_rolling_resistance
 	var k_drag: float = bike_test_instance.air_drag_coeff
 	var r_grass: float = bike_test_instance.grass_rolling_resistance
@@ -254,7 +255,108 @@ func _init() -> void:
 		print("  [FAIL] Camera micro-motion frequency/amplitude out of spec")
 		all_ok = false
 
-	bike_test_instance.queue_free()
+	# Test 17: [3B.1 FEAT-007.0] Bank Sign & Steering Alignment
+	bike_test_instance.current_speed = 6.0 # ~21.6 km/h
+	bike_test_instance.raw_steer_input = 1.0 # Steering left
+	for _frame in range(30):
+		bike_test_instance._calculate_steering_and_banking(1.0 / 60.0)
+	var left_steer: float = bike_test_instance.current_steer
+	var left_bank: float = bike_test_instance.current_bank
+	var left_vis: float = bike_test_instance.visual_steer
+	var left_yaw: float = bike_test_instance.yaw_turn_rate
+
+	bike_test_instance.raw_steer_input = -1.0 # Steering right
+	for _frame in range(60):
+		bike_test_instance._calculate_steering_and_banking(1.0 / 60.0)
+	var right_steer: float = bike_test_instance.current_steer
+	var right_bank: float = bike_test_instance.current_bank
+	var right_vis: float = bike_test_instance.visual_steer
+	var right_yaw: float = bike_test_instance.yaw_turn_rate
+
+	print("[VERIFICATION #17] Bank & Steer Sign Alignment:")
+	print("  - Left:  steer=%.3f, yaw=%.3f, bank=%.3f, vis_steer=%.3f" % [left_steer, left_yaw, left_bank, left_vis])
+	print("  - Right: steer=%.3f, yaw=%.3f, bank=%.3f, vis_steer=%.3f" % [right_steer, right_yaw, right_bank, right_vis])
+	if left_steer > 0 and left_yaw > 0 and left_bank > 0 and left_vis > 0 and right_steer < 0 and right_yaw < 0 and right_bank < 0 and right_vis < 0:
+		print("  [PASS] Steer, Yaw, Bank and Visual Steer are strictly aligned in identical directions!")
+	else:
+		print("  [FAIL] Inverted sign detected in steering/banking chain!")
+		all_ok = false
+
+	# Test 18: [3B.1 FEAT-007.0] Steer Hierarchy & Axle Isolation
+	var front_axle = bike_test_instance.get_node_or_null("Visuals/ForkAndHandlebar/FrontAxle")
+	var front_wheel_node = bike_test_instance.get_node_or_null("Visuals/ForkAndHandlebar/FrontAxle/FrontWheel")
+	if front_axle != null and front_wheel_node != null and bike_test_instance.front_wheel == front_wheel_node:
+		var initial_axle_rot: Vector3 = front_axle.rotation
+		bike_test_instance.current_speed = 5.0
+		bike_test_instance._update_visual_transforms(0.1)
+		var axle_rot_after: Vector3 = front_axle.rotation
+		if initial_axle_rot.distance_to(axle_rot_after) < 0.0001 and absf(front_wheel_node.rotation.x) > 0.01:
+			print("[VERIFICATION #18] [PASS] FrontAxle compensation preserved while FrontWheel spins freely!")
+		else:
+			print("[VERIFICATION #18] [FAIL] Wheel spin disturbed FrontAxle rotation")
+			all_ok = false
+	else:
+		print("[VERIFICATION #18] [FAIL] Node hierarchy does not match ForkAndHandlebar/FrontAxle/FrontWheel")
+		all_ok = false
+
+	# Test 19: [3B.2 FEAT-007.2] Procedural Wind and Gravel Audio
+	var audio_mgr: BikeAudioManager = bike_test_instance.get_node_or_null("AudioManager")
+	if audio_mgr:
+		if audio_mgr.wind_player == null:
+			audio_mgr._ready()
+		var wind_stream: AudioStreamWAV = audio_mgr.wind_player.stream
+		var gravel_stream: AudioStreamWAV = audio_mgr.gravel_player.stream
+		var has_loop: bool = wind_stream.loop_mode == AudioStreamWAV.LOOP_FORWARD and gravel_stream.loop_mode == AudioStreamWAV.LOOP_FORWARD
+		
+		# Test audio volume modulation at high speed
+		bike_test_instance.current_speed = 10.0 # 36 km/h
+		bike_test_instance.is_on_grass = false
+		for _f in range(30):
+			audio_mgr._process(1.0 / 60.0)
+		var high_wind_vol: float = audio_mgr.wind_player.volume_db
+		var road_gravel_pitch: float = audio_mgr.gravel_player.pitch_scale
+
+		# Test on grass
+		bike_test_instance.is_on_grass = true
+		for _f in range(30):
+			audio_mgr._process(1.0 / 60.0)
+		var grass_gravel_pitch: float = audio_mgr.gravel_player.pitch_scale
+
+		print("[VERIFICATION #19] Procedural Audio Modulation:")
+		print("  - Looping WAV streams: %s" % ("YES" if has_loop else "NO"))
+		print("  - Wind vol at 36 km/h: %.1f dB (Target: > -30 dB)" % high_wind_vol)
+		print("  - Gravel pitch on Road: %.2f | on Grass: %.2f (Target on grass: < 0.75)" % [road_gravel_pitch, grass_gravel_pitch])
+		if has_loop and high_wind_vol > -30.0 and grass_gravel_pitch < 0.75 and road_gravel_pitch > 0.85:
+			print("  [PASS] Procedural wind and gravel audio modulation fully functional!")
+		else:
+			print("  [FAIL] Audio parameter modulation out of bounds")
+			all_ok = false
+	else:
+		print("[VERIFICATION #19] [FAIL] AudioManager missing wind_player or gravel_player")
+		all_ok = false
+
+	# Test 20: [3B.3 FEAT-007.3] Dynamic Speed FOV
+	cam_rig.bike = bike_test_instance
+	if not cam_rig.first_person_cam:
+		cam_rig._ready()
+	var fp_base: float = cam_rig.fp_base_fov
+	var fp_max: float = cam_rig.fp_max_fov
+	var tp_base: float = cam_rig.tp_base_fov
+	var tp_max: float = cam_rig.tp_max_fov
+	bike_test_instance.current_speed = 12.0 # 43.2 km/h
+	for _f in range(60):
+		cam_rig._process(1.0 / 60.0)
+	var expanded_fp_fov: float = cam_rig.first_person_cam.fov
+	print("[VERIFICATION #20] Dynamic Speed FOV:")
+	print("  - First-Person: Base %.1f° -> Max %.1f° | Actual at 43 km/h: %.1f°" % [fp_base, fp_max, expanded_fp_fov])
+	print("  - Third-Person: Base %.1f° -> Max %.1f°" % [tp_base, tp_max])
+	if fp_base == 78.0 and fp_max == 83.0 and tp_base == 68.0 and tp_max == 72.0 and expanded_fp_fov > 82.0:
+		print("  [PASS] Speed FOV dynamically opens on high speed without jarring jumps!")
+	else:
+		print("  [FAIL] Speed FOV values out of spec")
+		all_ok = false
+
+	bike_test_instance.free()
 
 	if all_ok:
 		print("\n=== ALL SYSTEM VERIFICATIONS PASSED [100% OK] ===\n")

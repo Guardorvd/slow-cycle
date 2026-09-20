@@ -98,7 +98,7 @@ front_ray = NodePath("FrontRay")
 rear_ray = NodePath("RearRay")
 visuals_root = NodePath("Visuals")
 handlebar_pivot = NodePath("Visuals/ForkAndHandlebar")
-front_wheel = NodePath("Visuals/ForkAndHandlebar/FrontWheel")
+front_wheel = NodePath("Visuals/ForkAndHandlebar/FrontAxle/FrontWheel")
 rear_wheel = NodePath("Visuals/RearWheel")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
@@ -148,14 +148,16 @@ mesh = SubResource("Mesh_WheelRim")
 [node name="ForkAndHandlebar" type="Node3D" parent="Visuals"]
 transform = Transform3D(1, 0, 0, 0, 0.97, -0.24, 0, 0.24, 0.97, 0, 0.38, -0.48)
 
-[node name="FrontWheel" type="Node3D" parent="Visuals/ForkAndHandlebar"]
+[node name="FrontAxle" type="Node3D" parent="Visuals/ForkAndHandlebar"]
 transform = Transform3D(1, 0, 0, 0, 0.97, 0.24, 0, -0.24, 0.97, 0, -0.38, -0.15)
 
-[node name="FrontTire" type="MeshInstance3D" parent="Visuals/ForkAndHandlebar/FrontWheel"]
+[node name="FrontWheel" type="Node3D" parent="Visuals/ForkAndHandlebar/FrontAxle"]
+
+[node name="FrontTire" type="MeshInstance3D" parent="Visuals/ForkAndHandlebar/FrontAxle/FrontWheel"]
 transform = Transform3D(-4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0, 1, 0, 0, 0)
 mesh = SubResource("Mesh_WheelTire")
 
-[node name="FrontRim" type="MeshInstance3D" parent="Visuals/ForkAndHandlebar/FrontWheel"]
+[node name="FrontRim" type="MeshInstance3D" parent="Visuals/ForkAndHandlebar/FrontAxle/FrontWheel"]
 transform = Transform3D(-4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0, 1, 0, 0, 0)
 mesh = SubResource("Mesh_WheelRim")
 
