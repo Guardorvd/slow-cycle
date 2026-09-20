@@ -2,10 +2,11 @@ shader_type spatial;
 render_mode cull_back, diffuse_burley, specular_schlick_ggx;
 
 // Rich warm dirt & gravel path with compacted tire tracks
-const vec3 BASE_GRAVEL = vec3(0.36, 0.28, 0.20);
-const vec3 RUT_COLOR = vec3(0.26, 0.20, 0.14);
-const vec3 PEBBLE_LIGHT = vec3(0.44, 0.37, 0.28);
-const vec3 PEBBLE_DARK = vec3(0.22, 0.17, 0.12);
+uniform vec3 base_gravel : source_color = vec3(0.36, 0.28, 0.20);
+uniform vec3 rut_color : source_color = vec3(0.26, 0.20, 0.14);
+uniform vec3 pebble_light : source_color = vec3(0.44, 0.37, 0.28);
+uniform vec3 pebble_dark : source_color = vec3(0.22, 0.17, 0.12);
+uniform float wetness : hint_range(0.0, 1.0) = 0.0;
 
 float hash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
@@ -32,16 +33,19 @@ void fragment() {
     float rut_right = 1.0 - smoothstep(0.0, 0.14, abs(lateral - 0.74));
     float in_ruts = max(rut_left, rut_right);
     
-    vec3 col = mix(BASE_GRAVEL, RUT_COLOR, in_ruts * 0.55);
-    col = mix(col, PEBBLE_LIGHT, fine_pebbles * 0.2);
-    col = mix(col, PEBBLE_DARK, (1.0 - fine_pebbles) * 0.15);
+    vec3 col = mix(base_gravel, rut_color, in_ruts * 0.55);
+    col = mix(col, pebble_light, fine_pebbles * 0.2);
+    col = mix(col, pebble_dark, (1.0 - fine_pebbles) * 0.15);
     col *= (0.85 + 0.25 * coarse_dirt);
     
     // Center grassy/dirt strip between ruts
     float center_ridge = 1.0 - smoothstep(0.0, 0.16, abs(lateral - 0.5));
-    col = mix(col, BASE_GRAVEL * 1.05, center_ridge * 0.25);
+    col = mix(col, base_gravel * 1.05, center_ridge * 0.25);
+
+    // Wetness darkens ground and increases specular shine
+    col = mix(col, col * 0.65, wetness * 0.5);
 
     ALBEDO = col;
-    ROUGHNESS = 0.94;
-    SPECULAR = 0.1;
+    ROUGHNESS = mix(0.94, 0.35, wetness);
+    SPECULAR = mix(0.1, 0.45, wetness);
 }

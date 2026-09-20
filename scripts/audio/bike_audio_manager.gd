@@ -15,18 +15,21 @@ func _ready() -> void:
 	bell_player = AudioStreamPlayer3D.new()
 	bell_player.stream = _create_bell_audio_stream()
 	bell_player.volume_db = 0.0
+	bell_player.bus = "SFX"
 	add_child(bell_player)
 
 	# 2. Setup Freewheel Ratchet Player
 	freewheel_player = AudioStreamPlayer3D.new()
 	freewheel_player.stream = _create_click_audio_stream()
 	freewheel_player.volume_db = -6.0
+	freewheel_player.bus = "SFX"
 	add_child(freewheel_player)
 
 	# 3. Setup Wind Rush Player (Procedural looped pink noise)
 	wind_player = AudioStreamPlayer3D.new()
 	wind_player.stream = _create_wind_audio_stream()
 	wind_player.volume_db = -80.0
+	wind_player.bus = "Ambient"
 	wind_player.autoplay = true
 	add_child(wind_player)
 
@@ -34,6 +37,7 @@ func _ready() -> void:
 	gravel_player = AudioStreamPlayer3D.new()
 	gravel_player.stream = _create_gravel_audio_stream()
 	gravel_player.volume_db = -80.0
+	gravel_player.bus = "Ambient"
 	gravel_player.autoplay = true
 	add_child(gravel_player)
 
@@ -150,8 +154,10 @@ func _create_wind_audio_stream() -> AudioStreamWAV:
 	var sample_rate: int = 22050
 	var duration: float = 2.0
 	var total_samples: int = int(sample_rate * duration)
+	var fade_len: int = 512
+	var gen_samples: int = total_samples + fade_len
 	var raw_samples := PackedFloat32Array()
-	raw_samples.resize(total_samples)
+	raw_samples.resize(gen_samples)
 
 	# Low-pass filter over white noise to create soothing aerodynamic wind rush
 	var filter_val: float = 0.0
@@ -159,18 +165,18 @@ func _create_wind_audio_stream() -> AudioStreamWAV:
 		var white: float = randf_range(-1.0, 1.0)
 		filter_val = filter_val * 0.955 + white * 0.045
 
-	for i in range(total_samples):
+	for i in range(gen_samples):
 		var white: float = randf_range(-1.0, 1.0)
 		filter_val = filter_val * 0.955 + white * 0.045
 		raw_samples[i] = filter_val
 
-	# Smooth crossfade boundary (256 samples) for seamless loop
-	var fade_len: int = 256
+	# Smooth crossfade boundary: blend extra tail samples into start of buffer for click-free loop
 	for i in range(fade_len):
 		var t: float = float(i) / float(fade_len)
-		var blended: float = raw_samples[i] * t + raw_samples[total_samples - fade_len + i] * (1.0 - t)
-		raw_samples[i] = blended
-		raw_samples[total_samples - fade_len + i] = blended
+		var s: float = t * t * (3.0 - 2.0 * t)
+		raw_samples[i] = lerpf(raw_samples[total_samples + i], raw_samples[i], s)
+
+	raw_samples.resize(total_samples)
 
 	var pcm_data := PackedByteArray()
 	pcm_data.resize(total_samples * 2)
@@ -192,8 +198,10 @@ func _create_gravel_audio_stream() -> AudioStreamWAV:
 	var sample_rate: int = 22050
 	var duration: float = 1.5
 	var total_samples: int = int(sample_rate * duration)
+	var fade_len: int = 512
+	var gen_samples: int = total_samples + fade_len
 	var raw_samples := PackedFloat32Array()
-	raw_samples.resize(total_samples)
+	raw_samples.resize(gen_samples)
 
 	var low_state: float = 0.0
 	var band_state: float = 0.0
@@ -203,24 +211,25 @@ func _create_gravel_audio_stream() -> AudioStreamWAV:
 		var high: float = white - low_state - 0.5 * band_state
 		band_state += 0.25 * high
 
-	for i in range(total_samples):
+	for i in range(gen_samples):
 		var white: float = randf_range(-1.0, 1.0)
 		low_state += 0.25 * band_state
 		var high: float = white - low_state - 0.5 * band_state
 		band_state += 0.25 * high
 
 		var grit: float = 0.0
-		if randf() < 0.015:
+		if randf() < 0.015 and i > 64 and i < (total_samples - 64):
 			grit = randf_range(-0.4, 0.4)
 
 		raw_samples[i] = band_state * 0.7 + grit
 
-	var fade_len: int = 256
+	# Smooth crossfade boundary: blend extra tail samples into start of buffer for click-free loop
 	for i in range(fade_len):
 		var t: float = float(i) / float(fade_len)
-		var blended: float = raw_samples[i] * t + raw_samples[total_samples - fade_len + i] * (1.0 - t)
-		raw_samples[i] = blended
-		raw_samples[total_samples - fade_len + i] = blended
+		var s: float = t * t * (3.0 - 2.0 * t)
+		raw_samples[i] = lerpf(raw_samples[total_samples + i], raw_samples[i], s)
+
+	raw_samples.resize(total_samples)
 
 	var pcm_data := PackedByteArray()
 	pcm_data.resize(total_samples * 2)

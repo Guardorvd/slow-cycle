@@ -47,7 +47,7 @@ func update_streaming(player_pos: Vector3) -> void:
 
 	# 2. Despawn chunks behind
 	var ids_to_remove: Array[int] = []
-	for id in active_chunks.keys():
+	for id: int in active_chunks:
 		var end_s: float = chunk_end_distances.get(id, 0.0)
 		if end_s < (player_s - BEHIND_DISTANCE):
 			ids_to_remove.append(id)

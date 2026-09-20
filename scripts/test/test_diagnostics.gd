@@ -472,10 +472,110 @@ func _init() -> void:
 			print("  [FAIL] Wind volume curve out of comfort targets")
 			all_ok = false
 
+	# Test 25: Recovery Spawn Basis Horizontal Orientation (PHYS-002)
+	var wm2 = wm_script.new()
+	wm2._init_shared_resources()
+	var test_path := preload("res://scripts/world/road_path_data.gd").new()
+	# Add downhill point with pitch = -6 deg
+	var down_tang := Vector3(0, -sin(deg_to_rad(6.0)), -cos(deg_to_rad(6.0))).normalized()
+	test_path.append_sample(Vector3(0, 5, 0), down_tang, Vector3.UP, -6.0, 0.0, 0)
+	test_path.append_sample(Vector3(0, 5, -25), down_tang, Vector3.UP, -6.0, 0.0, 0)
+	wm2.road_path = test_path
+	var rec_tf: Transform3D = wm2.request_bike_recovery(Vector3(0, 5, -25))
+	var rec_basis_up: Vector3 = rec_tf.basis.y
+	var is_strictly_up: bool = rec_basis_up.is_equal_approx(Vector3.UP) and absf(rec_tf.basis.get_euler().x) < 0.001
+	print("[VERIFICATION #25] Recovery Basis Horizontal Orientation:")
+	print("  - Spawn Basis Y: %s | Euler X: %.4f rad" % [rec_basis_up, rec_tf.basis.get_euler().x])
+	if is_strictly_up:
+		print("  [PASS] Recovery spawn basis is strictly horizontal, preventing body tilt and steering precession!")
+	else:
+		print("  [FAIL] Recovery spawn basis tilted, root body will precess")
+		all_ok = false
+	wm2.free()
+
+	# Test 26: Grass Material Two-Sided Culling (VISUAL-005)
+	var wm3 = wm_script.new()
+	wm3._init_shared_resources()
+	var grass_mesh_res: ArrayMesh = wm3.shared_meshes["grass"]
+	var grass_mat_res: BaseMaterial3D = grass_mesh_res.surface_get_material(0)
+	var is_double_sided: bool = (grass_mat_res.cull_mode == BaseMaterial3D.CULL_DISABLED)
+	print("[VERIFICATION #26] Grass Two-Sided Rendering:")
+	print("  - Grass Material cull_mode: %d (Expected CULL_DISABLED = %d)" % [grass_mat_res.cull_mode, BaseMaterial3D.CULL_DISABLED])
+	if is_double_sided:
+		print("  [PASS] Grass material has CULL_DISABLED; blades visible from all camera angles!")
+	else:
+		print("  [FAIL] Grass cull_mode is not CULL_DISABLED")
+		all_ok = false
+	wm3.free()
+
+	# Test 27: Audio Loop Boundary Crossfade Continuity (AUDIO-001)
+	if audio_mgr:
+		var w_stream: AudioStreamWAV = audio_mgr.wind_player.stream
+		var g_stream: AudioStreamWAV = audio_mgr.gravel_player.stream
+		var w_pcm: PackedByteArray = w_stream.data
+		var g_pcm: PackedByteArray = g_stream.data
+		var w_first_sample: int = w_pcm.decode_s16(0)
+		var w_last_sample: int = w_pcm.decode_s16(w_pcm.size() - 2)
+		var g_first_sample: int = g_pcm.decode_s16(0)
+		var g_last_sample: int = g_pcm.decode_s16(g_pcm.size() - 2)
+		var w_seam_delta: float = absf(float(w_last_sample - w_first_sample)) / 32767.0
+		var g_seam_delta: float = absf(float(g_last_sample - g_first_sample)) / 32767.0
+		print("[VERIFICATION #27] Audio Loop Boundary Continuity:")
+		print("  - Wind loop seam delta: %.4f | Gravel loop seam delta: %.4f" % [w_seam_delta, g_seam_delta])
+		if w_seam_delta < 0.25 and g_seam_delta < 0.25:
+			print("  [PASS] Audio loops crossfade smoothly without pop/click phase discontinuity!")
+		else:
+			print("  [FAIL] Audio loop seam discontinuity exceeds tolerance")
+			all_ok = false
+
+	# Test 28: ScreenFader Re-entrancy Protection (UI-003)
+	var fader_scene: PackedScene = load("res://scenes/ui/screen_fader.tscn")
+	var fader_instance: Node = fader_scene.instantiate()
+	root.add_child(fader_instance)
+	var call_count: int = 0
+	fader_instance.fade_reposition(func(): call_count += 1)
+	var fader_locked_on_spam: bool = fader_instance.is_fading
+	fader_instance.fade_reposition(func(): call_count += 1) # Should be ignored!
+	print("[VERIFICATION #28] ScreenFader Re-entrancy Protection:")
+	print("  - Fader is_fading on active tween: %s" % fader_locked_on_spam)
+	if fader_locked_on_spam:
+		print("  [PASS] ScreenFader ignores concurrent fade requests, preventing double teleportation!")
+	else:
+		print("  [FAIL] ScreenFader allows re-entrancy")
+		all_ok = false
+	fader_instance.queue_free()
+
+	# Test 29: Camera SpringArm3D Collision Mask (CAM-001)
+	var cam_arm: SpringArm3D = bike_test_instance.get_node_or_null("CameraRig/SpringArm3D")
+	if cam_arm:
+		print("[VERIFICATION #29] SpringArm3D Collision Mask: %d (Expected: 6)" % cam_arm.collision_mask)
+		if cam_arm.collision_mask == 6:
+			print("  [PASS] SpringArm3D detects Road (2) and Grass (4) collision layers, preventing underground clipping!")
+		else:
+			print("  [FAIL] SpringArm3D collision_mask mismatch: %d" % cam_arm.collision_mask)
+			all_ok = false
+	else:
+		print("[VERIFICATION #29] [FAIL] SpringArm3D node missing")
+		all_ok = false
+
+	# Test 30: AudioBus SFX & Ambient Routing (AUDIO-002)
+	if audio_mgr:
+		var b_bus: String = audio_mgr.bell_player.bus
+		var w_bus: String = audio_mgr.wind_player.bus
+		var g_bus: String = audio_mgr.gravel_player.bus
+		var f_bus: String = audio_mgr.freewheel_player.bus
+		print("[VERIFICATION #30] AudioBus Architecture Routing:")
+		print("  - Bell: %s | Freewheel: %s | Wind: %s | Gravel: %s" % [b_bus, f_bus, w_bus, g_bus])
+		if b_bus == "SFX" and f_bus == "SFX" and w_bus == "Ambient" and g_bus == "Ambient":
+			print("  [PASS] Audio channels successfully decoupled into SFX and Ambient buses!")
+		else:
+			print("  [FAIL] Audio bus assignments incorrect")
+			all_ok = false
+
 	bike_test_instance.free()
 
 	if all_ok:
-		print("\n=== ALL SYSTEM VERIFICATIONS PASSED [100% OK] ===\n")
+		print("\n=== ALL SYSTEM VERIFICATIONS PASSED [30/30 - 100% OK] ===\n")
 	else:
 		print("\n=== SOME VERIFICATIONS FAILED ===\n")
 

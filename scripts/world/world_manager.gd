@@ -16,6 +16,17 @@ var shared_materials: Dictionary = {}
 var shared_meshes: Dictionary = {}
 
 func _ready() -> void:
+	for arg in OS.get_cmdline_args():
+		if arg.begins_with("--seed="):
+			var val: String = arg.trim_prefix("--seed=")
+			if val.is_valid_int():
+				world_seed = val.to_int()
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--seed="):
+			var val: String = arg.trim_prefix("--seed=")
+			if val.is_valid_int():
+				world_seed = val.to_int()
+
 	_init_shared_resources()
 	
 	road_path = RoadPathDataClass.new()
@@ -45,7 +56,10 @@ func request_bike_recovery(current_pos: Vector3) -> Transform3D:
 	var norm: Vector3 = sample.get("normal", Vector3.UP)
 
 	var spawn_pos: Vector3 = pos + norm * 0.45
-	var spawn_basis: Basis = Basis.looking_at(tang, norm)
+	var horiz_tang: Vector3 = Vector3(tang.x, 0.0, tang.z).normalized()
+	if horiz_tang.is_zero_approx():
+		horiz_tang = Vector3.FORWARD
+	var spawn_basis: Basis = Basis.looking_at(horiz_tang, Vector3.UP)
 
 	return Transform3D(spawn_basis, spawn_pos)
 
@@ -157,6 +171,7 @@ func _build_grass_mesh() -> ArrayMesh:
 	var grass_mat := StandardMaterial3D.new()
 	grass_mat.albedo_color = Color(0.26, 0.46, 0.20)
 	grass_mat.roughness = 0.9
+	grass_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	st.set_material(grass_mat)
 
 	var h: float = 0.55

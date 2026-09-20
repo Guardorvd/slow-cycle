@@ -108,11 +108,14 @@ func _build_terrain_mesh(path_data: RefCounted, s_idx: int, e_idx: int, mat: Mat
 		var road_left: Vector3 = pt - binorm * ROAD_HALF_WIDTH
 		var road_right: Vector3 = pt + binorm * ROAD_HALF_WIDTH
 
-		var h_left: float = noise.get_noise_2d(road_left.x, road_left.z) * 1.8
-		var h_right: float = noise.get_noise_2d(road_right.x, road_right.z) * 1.8
+		var outer_left_base: Vector3 = pt - binorm * (ROAD_HALF_WIDTH + TERRAIN_WIDTH)
+		var outer_right_base: Vector3 = pt + binorm * (ROAD_HALF_WIDTH + TERRAIN_WIDTH)
 
-		var outer_left: Vector3 = pt - binorm * (ROAD_HALF_WIDTH + TERRAIN_WIDTH) + norm * h_left
-		var outer_right: Vector3 = pt + binorm * (ROAD_HALF_WIDTH + TERRAIN_WIDTH) + norm * h_right
+		var h_left: float = noise.get_noise_2d(outer_left_base.x, outer_left_base.z) * 1.8
+		var h_right: float = noise.get_noise_2d(outer_right_base.x, outer_right_base.z) * 1.8
+
+		var outer_left: Vector3 = outer_left_base + norm * h_left
+		var outer_right: Vector3 = outer_right_base + norm * h_right
 
 		var v_coord: float = dist * 0.15
 

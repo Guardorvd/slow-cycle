@@ -1,8 +1,6 @@
 class_name BikeCameraRig
 extends Node3D
 
-const BicycleControllerScript = preload("res://scripts/player/bicycle_controller.gd")
-
 @export_group("Cameras")
 @export var first_person_cam: Camera3D
 @export var third_person_cam: Camera3D

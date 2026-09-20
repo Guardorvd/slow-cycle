@@ -19,7 +19,7 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	# Toggle controls panel visibility
-	if Input.is_action_just_pressed("ui_cancel") or Input.is_key_pressed(KEY_H):
+	if Input.is_action_just_pressed("ui_cancel") or Input.is_action_just_pressed("toggle_help"):
 		controls_panel.visible = not controls_panel.visible
 
 	# Fade out bell notice

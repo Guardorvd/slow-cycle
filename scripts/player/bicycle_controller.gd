@@ -27,7 +27,6 @@ signal bell_rung()
 @export var high_speed_steer_limit: float = 0.045 ## ~2.6 degrees max handlebar rotation at high speed (R >= 26-30m)
 @export var max_bank_angle: float = 0.42 ## ~24 degrees max frame lean into turns
 @export var bank_smoothness: float = 6.0 ## Lerp speed for frame roll into turn
-@export var pitch_smoothness: float = 8.0 ## Legacy reference
 @export var pitch_attack_smoothness: float = 14.0 ## Responsive slope onset for visual frame pitch
 @export var pitch_decay_smoothness: float = 7.0 ## Smooth return to horizontal for visual frame pitch
 
@@ -284,7 +283,10 @@ func _apply_motion(delta: float) -> void:
 	var vertical_vel: float = velocity.y
 	if is_grounded:
 		var slope_vy: float = current_speed * sin(physics_pitch)
-		vertical_vel = minf(-0.5, slope_vy - 0.5)
+		if slope_vy > 0.0:
+			vertical_vel = slope_vy
+		else:
+			vertical_vel = minf(-0.5, slope_vy - 0.5)
 	else:
 		vertical_vel -= 9.8 * delta
 

@@ -54,6 +54,12 @@ func _process(delta: float) -> void:
 	var road_path: RefCounted = world_manager.get("road_path") if world_manager else null
 	if road_path:
 		spline_pts = road_path.size()
+		var streamer: Node = world_manager.get("chunk_streamer") if world_manager else null
+		if streamer and "last_closest_idx" in streamer:
+			last_closest_idx = streamer.last_closest_idx
+		if last_closest_idx >= spline_pts:
+			last_closest_idx = maxi(0, spline_pts - 1)
+
 		var bike_pos: Vector3 = bike_controller.global_position if bike_controller else Vector3.ZERO
 		var closest_idx: int = road_path.find_closest_index(bike_pos, last_closest_idx)
 		last_closest_idx = closest_idx
@@ -62,7 +68,6 @@ func _process(delta: float) -> void:
 			dist_km = cur_s / 1000.0
 			chunk_id = int(cur_s / 50.0)
 		
-		var streamer: Node = world_manager.get("chunk_streamer") if world_manager else null
 		if streamer:
 			active_chunks = streamer.get_active_chunk_count()
 			chunk_gen_ms = streamer.get("last_chunk_gen_ms") if "last_chunk_gen_ms" in streamer else 0.0

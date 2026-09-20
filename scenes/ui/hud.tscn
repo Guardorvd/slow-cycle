@@ -74,7 +74,7 @@ anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
 offset_left = 24.0
-offset_top = -180.0
+offset_top = -206.0
 offset_right = 320.0
 offset_bottom = -24.0
 grow_vertical = 0
@@ -90,7 +90,7 @@ layout_mode = 2
 layout_mode = 2
 theme_override_colors/font_color = Color(0.9, 0.85, 0.5, 1)
 theme_override_font_sizes/font_size = 14
-text = "УПРАВЛЕНИЕ:"
+text = "УПРАВЛЕНИЕ (Скрыть: H):"
 
 [node name="Line1" type="Label" parent="BottomMargin/ControlsCard/VBox"]
 layout_mode = 2
@@ -122,6 +122,12 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.5, 0.8, 1, 1)
 theme_override_font_sizes/font_size = 13
 text = "• V — Переключить вид (1-е / 3-е)"
+
+[node name="Line7" type="Label" parent="BottomMargin/ControlsCard/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.65, 0.65, 1)
+theme_override_font_sizes/font_size = 13
+text = "• R — Вернуться на дорогу"
 
 [node name="CenterNotice" type="CenterContainer" parent="."]
 layout_mode = 1
