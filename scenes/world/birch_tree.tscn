@@ -1,0 +1,47 @@
+[gd_scene load_steps=6 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_BirchTrunk"]
+albedo_color = Color(0.88, 0.88, 0.85, 1.0)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="Mat_BirchLeaves"]
+albedo_color = Color(0.42, 0.58, 0.22, 1.0)
+roughness = 0.75
+
+[sub_resource type="CylinderMesh" id="Mesh_BirchTrunk"]
+material = SubResource("Mat_BirchTrunk")
+top_radius = 0.12
+bottom_radius = 0.18
+height = 3.2
+radial_segments = 7
+
+[sub_resource type="SphereMesh" id="Mesh_BirchCanopy"]
+material = SubResource("Mat_BirchLeaves")
+radius = 1.15
+height = 2.0
+radial_segments = 8
+rings = 6
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_1"]
+height = 3.2
+radius = 0.22
+
+[node name="BirchTree" type="StaticBody3D"]
+collision_layer = 1
+collision_mask = 4
+
+[node name="Trunk" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+mesh = SubResource("Mesh_BirchTrunk")
+
+[node name="CanopyMain" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.2, 0)
+mesh = SubResource("Mesh_BirchCanopy")
+
+[node name="CanopySide" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.7, 0, 0, 0, 0.7, 0, 0, 0, 0.7, 0.4, 2.7, 0.3)
+mesh = SubResource("Mesh_BirchCanopy")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+shape = SubResource("CylinderShape3D_1")

@@ -1,0 +1,205 @@
+[gd_scene load_steps=19 format=3]
+
+[ext_resource type="Script" path="res://scripts/player/bicycle_controller.gd" id="1_controller"]
+[ext_resource type="Script" path="res://scripts/camera/bike_camera.gd" id="2_camera"]
+[ext_resource type="Script" path="res://scripts/audio/bike_audio_manager.gd" id="3_audio"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
+radius = 0.25
+height = 1.2
+
+[sub_resource type="StandardMaterial3D" id="Mat_Frame"]
+albedo_color = Color(0.18, 0.42, 0.31, 1.0)
+metallic = 0.2
+roughness = 0.35
+
+[sub_resource type="StandardMaterial3D" id="Mat_Silver"]
+albedo_color = Color(0.85, 0.87, 0.9, 1.0)
+metallic = 0.85
+roughness = 0.25
+
+[sub_resource type="StandardMaterial3D" id="Mat_Rubber"]
+albedo_color = Color(0.14, 0.14, 0.15, 1.0)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="Mat_Gold"]
+albedo_color = Color(1.0, 0.82, 0.35, 1.0)
+metallic = 0.9
+roughness = 0.15
+
+[sub_resource type="StandardMaterial3D" id="Mat_Screen"]
+albedo_color = Color(0.08, 0.14, 0.12, 1.0)
+emission_enabled = true
+emission = Color(0.15, 0.45, 0.35, 1.0)
+emission_energy_multiplier = 0.5
+
+[sub_resource type="CylinderMesh" id="Mesh_FrameTube"]
+material = SubResource("Mat_Frame")
+top_radius = 0.022
+bottom_radius = 0.022
+height = 0.65
+radial_segments = 12
+
+[sub_resource type="CylinderMesh" id="Mesh_WheelTire"]
+material = SubResource("Mat_Rubber")
+top_radius = 0.34
+bottom_radius = 0.34
+height = 0.04
+radial_segments = 24
+
+[sub_resource type="CylinderMesh" id="Mesh_WheelRim"]
+material = SubResource("Mat_Silver")
+top_radius = 0.3
+bottom_radius = 0.3
+height = 0.045
+radial_segments = 24
+
+[sub_resource type="CylinderMesh" id="Mesh_Stem"]
+material = SubResource("Mat_Silver")
+top_radius = 0.018
+bottom_radius = 0.018
+height = 0.2
+radial_segments = 12
+
+[sub_resource type="CylinderMesh" id="Mesh_Handlebar"]
+material = SubResource("Mat_Silver")
+top_radius = 0.016
+bottom_radius = 0.016
+height = 0.62
+radial_segments = 12
+
+[sub_resource type="CylinderMesh" id="Mesh_Grip"]
+material = SubResource("Mat_Rubber")
+top_radius = 0.02
+bottom_radius = 0.02
+height = 0.13
+radial_segments = 12
+
+[sub_resource type="SphereMesh" id="Mesh_Bell"]
+material = SubResource("Mat_Gold")
+radius = 0.03
+height = 0.03
+radial_segments = 16
+rings = 8
+
+[sub_resource type="BoxMesh" id="Mesh_Screen"]
+material = SubResource("Mat_Screen")
+size = Vector3(0.045, 0.015, 0.04)
+
+[sub_resource type="BoxMesh" id="Mesh_Saddle"]
+material = SubResource("Mat_Rubber")
+size = Vector3(0.15, 0.05, 0.24)
+
+[node name="Bicycle" type="CharacterBody3D" node_paths=PackedStringArray("front_ray", "rear_ray", "visuals_root", "handlebar_pivot", "front_wheel", "rear_wheel")]
+collision_layer = 8
+collision_mask = 7
+script = ExtResource("1_controller")
+front_ray = NodePath("FrontRay")
+rear_ray = NodePath("RearRay")
+visuals_root = NodePath("Visuals")
+handlebar_pivot = NodePath("Visuals/ForkAndHandlebar")
+front_wheel = NodePath("Visuals/ForkAndHandlebar/FrontWheel")
+rear_wheel = NodePath("Visuals/RearWheel")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.65, 0)
+shape = SubResource("CapsuleShape3D_1")
+
+[node name="FrontRay" type="RayCast3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, -0.6)
+target_position = Vector3(0, -1.4, 0)
+collision_mask = 6
+
+[node name="RearRay" type="RayCast3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0.6)
+target_position = Vector3(0, -1.4, 0)
+collision_mask = 6
+
+[node name="Visuals" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.34, 0)
+
+[node name="FrameMesh1" type="MeshInstance3D" parent="Visuals"]
+transform = Transform3D(1, 0, 0, 0, 0.766, -0.643, 0, 0.643, 0.766, 0, 0.3, -0.15)
+mesh = SubResource("Mesh_FrameTube")
+
+[node name="FrameMesh2" type="MeshInstance3D" parent="Visuals"]
+transform = Transform3D(1, 0, 0, 0, 0.866, 0.5, 0, -0.5, 0.866, 0, 0.28, 0.15)
+mesh = SubResource("Mesh_FrameTube")
+
+[node name="FrameMesh3" type="MeshInstance3D" parent="Visuals"]
+transform = Transform3D(1, 0, 0, 0, 0.05, 0.998, 0, -0.998, 0.05, 0, 0.48, -0.05)
+mesh = SubResource("Mesh_FrameTube")
+
+[node name="Saddle" type="MeshInstance3D" parent="Visuals"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.58, 0.15)
+mesh = SubResource("Mesh_Saddle")
+
+[node name="RearWheel" type="Node3D" parent="Visuals"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.58)
+
+[node name="RearTire" type="MeshInstance3D" parent="Visuals/RearWheel"]
+transform = Transform3D(-4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("Mesh_WheelTire")
+
+[node name="RearRim" type="MeshInstance3D" parent="Visuals/RearWheel"]
+transform = Transform3D(-4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("Mesh_WheelRim")
+
+[node name="ForkAndHandlebar" type="Node3D" parent="Visuals"]
+transform = Transform3D(1, 0, 0, 0, 0.97, -0.24, 0, 0.24, 0.97, 0, 0.38, -0.48)
+
+[node name="FrontWheel" type="Node3D" parent="Visuals/ForkAndHandlebar"]
+transform = Transform3D(1, 0, 0, 0, 0.97, 0.24, 0, -0.24, 0.97, 0, -0.38, -0.15)
+
+[node name="FrontTire" type="MeshInstance3D" parent="Visuals/ForkAndHandlebar/FrontWheel"]
+transform = Transform3D(-4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("Mesh_WheelTire")
+
+[node name="FrontRim" type="MeshInstance3D" parent="Visuals/ForkAndHandlebar/FrontWheel"]
+transform = Transform3D(-4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("Mesh_WheelRim")
+
+[node name="Stem" type="MeshInstance3D" parent="Visuals/ForkAndHandlebar"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.22, 0)
+mesh = SubResource("Mesh_Stem")
+
+[node name="HandlebarCross" type="MeshInstance3D" parent="Visuals/ForkAndHandlebar"]
+transform = Transform3D(-4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0, 1, 0, 0.32, 0.02)
+mesh = SubResource("Mesh_Handlebar")
+
+[node name="LeftGrip" type="MeshInstance3D" parent="Visuals/ForkAndHandlebar"]
+transform = Transform3D(-4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0, 1, -0.24, 0.32, 0.02)
+mesh = SubResource("Mesh_Grip")
+
+[node name="RightGrip" type="MeshInstance3D" parent="Visuals/ForkAndHandlebar"]
+transform = Transform3D(-4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0, 1, 0.24, 0.32, 0.02)
+mesh = SubResource("Mesh_Grip")
+
+[node name="Bell" type="MeshInstance3D" parent="Visuals/ForkAndHandlebar"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.12, 0.35, 0.03)
+mesh = SubResource("Mesh_Bell")
+
+[node name="StemComputer" type="MeshInstance3D" parent="Visuals/ForkAndHandlebar"]
+transform = Transform3D(1, 0, 0, 0, 0.94, 0.34, 0, -0.34, 0.94, 0, 0.33, 0.01)
+mesh = SubResource("Mesh_Screen")
+
+[node name="CameraRig" type="Node3D" parent="." node_paths=PackedStringArray("first_person_cam", "third_person_cam")]
+script = ExtResource("2_camera")
+first_person_cam = NodePath("FirstPersonCamera")
+third_person_cam = NodePath("SpringArm3D/ThirdPersonCamera")
+
+[node name="FirstPersonCamera" type="Camera3D" parent="CameraRig"]
+transform = Transform3D(1, 0, 0, 0, 0.956, 0.292, 0, -0.292, 0.956, 0, 1.12, 0.05)
+current = true
+fov = 78.0
+
+[node name="SpringArm3D" type="SpringArm3D" parent="CameraRig"]
+transform = Transform3D(1, 0, 0, 0, 0.95, 0.31, 0, -0.31, 0.95, 0, 1.4, 0)
+spring_length = 2.8
+
+[node name="ThirdPersonCamera" type="Camera3D" parent="CameraRig/SpringArm3D"]
+fov = 68.0
+
+[node name="AudioManager" type="Node3D" parent="." node_paths=PackedStringArray("bike_controller")]
+script = ExtResource("3_audio")
+bike_controller = NodePath("..")

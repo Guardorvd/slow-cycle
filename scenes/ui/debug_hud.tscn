@@ -1,0 +1,53 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/debug_hud.gd" id="1_debug"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_Debug"]
+bg_color = Color(0.02, 0.04, 0.03, 0.85)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.3, 0.75, 0.45, 0.9)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+content_margin_left = 14.0
+content_margin_top = 10.0
+content_margin_right = 14.0
+content_margin_bottom = 10.0
+
+[node name="DebugHUD" type="CanvasLayer"]
+layer = 5
+script = ExtResource("1_debug")
+
+[node name="Root" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Margin" type="MarginContainer" parent="Root"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -340.0
+offset_top = 24.0
+offset_right = -24.0
+offset_bottom = 240.0
+grow_horizontal = 0
+
+[node name="Panel" type="PanelContainer" parent="Root/Margin"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBox_Debug")
+
+[node name="Label" type="Label" parent="Root/Margin/Panel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.65, 0.95, 0.75, 1)
+theme_override_font_sizes/font_size = 12
+text = "DEBUG HUD INITIALIZING..."

@@ -1,0 +1,144 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_hud"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_Card"]
+bg_color = Color(0.08, 0.12, 0.1, 0.65)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+content_margin_left = 16.0
+content_margin_top = 12.0
+content_margin_right = 16.0
+content_margin_bottom = 12.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_Controls"]
+bg_color = Color(0.06, 0.08, 0.07, 0.6)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+content_margin_left = 14.0
+content_margin_top = 10.0
+content_margin_right = 14.0
+content_margin_bottom = 10.0
+
+[sub_resource type="LabelSettings" id="LabelSettings_Speed"]
+font_size = 38
+font_color = Color(0.95, 0.98, 0.95, 1)
+
+[node name="HUD" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_hud")
+
+[node name="TopMargin" type="MarginContainer" parent="."]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 24.0
+offset_right = 240.0
+offset_bottom = 140.0
+
+[node name="StatusCard" type="PanelContainer" parent="TopMargin"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBox_Card")
+
+[node name="VBox" type="VBoxContainer" parent="TopMargin/StatusCard"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="TopMargin/StatusCard/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.65, 0.75, 0.7, 1)
+theme_override_font_sizes/font_size = 13
+text = "СКОРОСТЬ (КМ/Ч)"
+
+[node name="SpeedLabel" type="Label" parent="TopMargin/StatusCard/VBox"]
+layout_mode = 2
+text = "0.0"
+label_settings = SubResource("LabelSettings_Speed")
+
+[node name="StateBadge" type="Label" parent="TopMargin/StatusCard/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.9, 0.5, 1)
+theme_override_font_sizes/font_size = 13
+text = "● ПОКОЙ"
+
+[node name="BottomMargin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = -180.0
+offset_right = 320.0
+offset_bottom = -24.0
+grow_vertical = 0
+
+[node name="ControlsCard" type="PanelContainer" parent="BottomMargin"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBox_Controls")
+
+[node name="VBox" type="VBoxContainer" parent="BottomMargin/ControlsCard"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="BottomMargin/ControlsCard/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.85, 0.5, 1)
+theme_override_font_sizes/font_size = 14
+text = "УПРАВЛЕНИЕ:"
+
+[node name="Line1" type="Label" parent="BottomMargin/ControlsCard/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "• W / ↑ — Крутить педали"
+
+[node name="Line2" type="Label" parent="BottomMargin/ControlsCard/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "• Отпустить W — Свободный накат"
+
+[node name="Line3" type="Label" parent="BottomMargin/ControlsCard/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "• A / D / ← / → — Поворот и наклон"
+
+[node name="Line4" type="Label" parent="BottomMargin/ControlsCard/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "• S / ↓ — Мягкий тормоз"
+
+[node name="Line5" type="Label" parent="BottomMargin/ControlsCard/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "• Пробел — Звоночек на руле 🔔"
+
+[node name="Line6" type="Label" parent="BottomMargin/ControlsCard/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "• V — Переключить вид (1-е / 3-е)"
+
+[node name="CenterNotice" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -100.0
+offset_top = -60.0
+offset_right = 100.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="BellNotice" type="Label" parent="CenterNotice"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.88, 0.4, 1)
+theme_override_font_sizes/font_size = 22
+text = "🔔 Дзинь!"
