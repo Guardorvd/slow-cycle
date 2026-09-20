@@ -22,8 +22,7 @@
 ## 🚀 Как запустить игру
 
 1. Открой **Godot 4** со своего ярлыка на Рабочем столе.
-2. Нажми **«Импорт» (Import)** $\rightarrow$ выбери папку проекта:  
-   `c:\Users\Luisa\Documents\antigravity\goofy-chandrasekhar`
+2. Нажми **«Импорт» (Import)** $\rightarrow$ выбери папку проекта (содержащую файл `project.godot`).  
 3. Нажми **«Импортировать и редактировать» (Import & Edit)**.
 4. Нажми клавишу **F5** (или значок ▶️ Play в правом верхнем углу).
 
@@ -43,11 +42,11 @@
 
 | Документ | Назначение |
 | :--- | :--- |
-| **[VISION.md](file:///c:/Users/Luisa/Documents/antigravity/goofy-chandrasekhar/VISION.md)** | Главный манифест игры: суть вело-дзена и строгий предохранитель от лишних механик. |
-| **[ROADMAP.md](file:///c:/Users/Luisa/Documents/antigravity/goofy-chandrasekhar/ROADMAP.md)** | Генеральный дорожный план проекта на несколько спринтов вперёд (от 2B до 4B). |
-| **[BACKLOG.md](file:///c:/Users/Luisa/Documents/antigravity/goofy-chandrasekhar/BACKLOG.md)** | Атомарный технический трекер задач со строгими критериями приёмки. |
-| **[ARCHITECTURE.md](file:///c:/Users/Luisa/Documents/antigravity/goofy-chandrasekhar/ARCHITECTURE.md)** | Архитектура кодовой базы, слои данных, физики, стриминга и правила связности (Zero Spaghetti). |
-| **[CURRENT_STATE_AUDIT.md](file:///c:/Users/Luisa/Documents/antigravity/goofy-chandrasekhar/CURRENT_STATE_AUDIT.md)** | Полный технический аудит кодовой базы, результаты тестов и аппаратных замеров на Vulkan. |
-| **[ROAD_GENERATION.md](file:///c:/Users/Luisa/Documents/antigravity/goofy-chandrasekhar/ROAD_GENERATION.md)** | Математическая спецификация генератора дороги: сплайны, непрерывность $C^1$, полосовой террейн. |
-| **[TEST_PLAN.md](file:///c:/Users/Luisa/Documents/antigravity/goofy-chandrasekhar/TEST_PLAN.md)** | Протокол верификации: тесты детерминизма, 5 сидов, замеры памяти и заезды на стабильность. |
-| **[AGENTS.md](file:///c:/Users/Luisa/Documents/antigravity/goofy-chandrasekhar/AGENTS.md)** | Директивы и регламент работы для AI-ассистентов (запрет фиче-крипа, минимальные правки). |
+| **[VISION.md](VISION.md)** | Главный манифест игры: суть вело-дзена и строгий предохранитель от лишних механик. |
+| **[ROADMAP.md](ROADMAP.md)** | Генеральный дорожный план проекта на несколько спринтов вперёд (от 2B до 4B). |
+| **[BACKLOG.md](BACKLOG.md)** | Атомарный технический трекер задач со строгими критериями приёмки. |
+| **[ARCHITECTURE.md](ARCHITECTURE.md)** | Архитектура кодовой базы, слои данных, физики, стриминга и правила связности (Zero Spaghetti). |
+| **[CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md)** | Полный технический аудит кодовой базы, результаты тестов и аппаратных замеров на Vulkan. |
+| **[ROAD_GENERATION.md](ROAD_GENERATION.md)** | Математическая спецификация генератора дороги: сплайны, непрерывность $C^1$, полосовой террейн. |
+| **[TEST_PLAN.md](TEST_PLAN.md)** | Протокол верификации: тесты детерминизма, 5 сидов, замеры памяти и заезды на стабильность. |
+| **[AGENTS.md](AGENTS.md)** | Директивы и регламент работы для AI-ассистентов (запрет фиче-крипа, минимальные правки). |
