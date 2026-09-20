@@ -49,6 +49,33 @@ func append_sample(pos: Vector3, tang: Vector3, norm: Vector3, slope_deg: float,
 	curvatures.append(curv)
 	segment_types.append(seg_type)
 
+## Prunes historical spline samples further than cutoff_distance behind the player.
+## Returns number of pruned samples so callers can adjust cached indices.
+func prune_behind(cutoff_distance: float) -> int:
+	if cumulative_distances.size() < 100:
+		return 0
+
+	var prune_count: int = 0
+	# Always keep at least 75 samples (~150m) in memory for smooth lookups and Recovery
+	var max_prune: int = cumulative_distances.size() - 75
+	while prune_count < max_prune and cumulative_distances[prune_count] < cutoff_distance:
+		prune_count += 1
+
+	if prune_count <= 0:
+		return 0
+
+	points = points.slice(prune_count)
+	tangents = tangents.slice(prune_count)
+	normals = normals.slice(prune_count)
+	binormals = binormals.slice(prune_count)
+	cumulative_distances = cumulative_distances.slice(prune_count)
+	slopes = slopes.slice(prune_count)
+	curvatures = curvatures.slice(prune_count)
+	segment_types = segment_types.slice(prune_count)
+
+	return prune_count
+
+
 ## Finds the closest centerline sample index to a given world position
 func find_closest_index(target_pos: Vector3, start_idx: int = 0) -> int:
 	if points.is_empty():

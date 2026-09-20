@@ -10,11 +10,14 @@ extends CanvasLayer
 
 var max_frame_time_ms: float = 0.0
 var last_closest_idx: int = 0
+var session_elapsed_sec: float = 0.0
 
 func _ready() -> void:
 	visible = show_on_start
 
 func _process(delta: float) -> void:
+	session_elapsed_sec += delta
+
 	if Input.is_action_just_pressed("toggle_debug"):
 		visible = not visible
 
@@ -36,15 +39,18 @@ func _process(delta: float) -> void:
 	var chunk_gen_ms: float = 0.0
 	var dist_km: float = 0.0
 	var chunk_id: int = 0
+	var spline_pts: int = 0
 
 	var road_path: RefCounted = world_manager.get("road_path") if world_manager else null
 	if road_path:
+		spline_pts = road_path.size()
 		var bike_pos: Vector3 = bike_controller.global_position if bike_controller else Vector3.ZERO
 		var closest_idx: int = road_path.find_closest_index(bike_pos, last_closest_idx)
 		last_closest_idx = closest_idx
 		if closest_idx >= 0 and closest_idx < road_path.cumulative_distances.size():
-			dist_km = road_path.cumulative_distances[closest_idx] / 1000.0
-			chunk_id = closest_idx / 25
+			var cur_s: float = road_path.cumulative_distances[closest_idx]
+			dist_km = cur_s / 1000.0
+			chunk_id = int(cur_s / 50.0)
 		
 		var streamer: Node = world_manager.get("chunk_streamer") if world_manager else null
 		if streamer:
@@ -52,10 +58,13 @@ func _process(delta: float) -> void:
 			chunk_gen_ms = streamer.get("last_chunk_gen_ms") if "last_chunk_gen_ms" in streamer else 0.0
 
 	var ram_mb: float = float(OS.get_static_memory_usage()) / 1048576.0
+	var mins: int = int(session_elapsed_sec) / 60
+	var secs: int = int(session_elapsed_sec) % 60
 
 	var text := "=== SLOW CYCLE TELEMETRY (F3) ===\n"
-	text += "Seed: %d | Distance: %.2f km | Chunk: #%d\n" % [seed_val, dist_km, chunk_id]
-	text += "Active Chunks: %d | Chunk Gen: %.2f ms\n" % [active_chunks, chunk_gen_ms]
+	text += "Time: %02d:%02d | Seed: %d | Distance: %.2f km\n" % [mins, secs, seed_val, dist_km]
+	text += "Global Chunk: #%d | Active Chunks: %d\n" % [chunk_id, active_chunks]
+	text += "Spline Buffer: %d pts (Pruned) | Chunk Gen: %.2f ms\n" % [spline_pts, chunk_gen_ms]
 	text += "Speed: %.1f km/h | Slope: %.1f°\n" % [speed_kmh, slope_deg]
 	text += "FPS: %d | Frame: %.1f ms | Max Spike: %.1f ms\n" % [Engine.get_frames_per_second(), frame_ms, max_frame_time_ms]
 	text += "RAM Static: %.1f MB\n" % [ram_mb]
@@ -63,3 +72,4 @@ func _process(delta: float) -> void:
 	text += "================================="
 
 	telemetry_label.text = text
+

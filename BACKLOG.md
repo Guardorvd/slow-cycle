@@ -16,34 +16,16 @@
 - `[x] [FEAT-005.4]` Chunk-Local MultiMesh Foliage (`scripts/world/chunk_foliage.gd`)
 - `[x] [FEAT-005.5]` Двухслойное трение и Decoupled Recovery (R) (`scripts/player/bicycle_controller.gd`, `scripts/ui/screen_fader.gd`)
 - `[x] [FEAT-005.6]` Developer Debug HUD (F3) (`scripts/ui/debug_hud.gd`, `scenes/ui/debug_hud.tscn`)
+- `[x] [SG-001/002/003]` Stability Gate 2A: Real Mesh Seam Tests (0.000m), True Tangent Slopes, Curve Group Continuity, Foliage Height Alignment (`scripts/test/test_diagnostics.gd`, `scripts/world/road_logic.gd`, `scripts/world/chunk_foliage.gd`)
+
+### Спринт 2B: 15 Минут Езды & Тюнинг Комфорта (`COMPLETED [x]`)
+- `[x] [FEAT-006.1]` 15-Minute Continuous Ride Soak Test & Rolling Buffer (`scripts/test/test_soak_run.gd`, `scripts/world/road_path_data.gd`, `scripts/world/chunk_streamer.gd`)
+- `[x] [FEAT-006.2]` Speed-Sensitive Steering & Weighted Bicycle Dynamics (`scripts/player/bicycle_controller.gd`)
+- `[x] [FEAT-006.3]` Horizon Fog & Zero Pop-In Blending (`scenes/environment/forest_env.tres`, `scripts/world/chunk_streamer.gd`)
 
 ---
 
-## 🏃 Текущий спринт: Спринт 2B (15 Минут Езды & Тюнинг Комфорта)
-
-### `[ ] [FEAT-006.1]` 15-Minute Continuous Ride Soak Test
-- **Goal**: Автоматический и ручной тест непрерывного движения на протяжении 15 минут (15–20 км пути) по разным сидам (`184729`, `10101`, `99999`).
-- **Do**: `scripts/test/test_soak_run.gd`, профилирование FPS, проверка спайков генерации $< 20\text{мс}$, валидация стабильности RAM при выгрузке 300+ чанков.
-- **Do not**: Не менять математику сплайнов генератора `road_logic.gd`.
-- **Acceptance Criteria**: Объем памяти стабилизируется на плато; ни одного падения, провала под землю или рассинхронизации коллизий.
-- **Files**: `scripts/test/test_soak_run.gd`.
-
-### `[ ] [FEAT-006.2]` Speed-Sensitive Steering & Comfort Tuning
-- **Goal**: Тонкая калибровка динамики руля на высоких скоростях и мягкая курсовая устойчивость.
-- **Do**: В `scripts/player/bicycle_controller.gd` добавить прогрессивное снижение чувствительности поворота с набором скорости (от 15 до 40 км/ч), сглаживание микроподруливаний клавиатуры.
-- **Do not**: Не нарушать физику наклона рамы (banking) и расчет уклона.
-- **Acceptance Criteria**: Приятное «аналоговое» ощущение велосипеда даже с клавиатуры, отсутствие нервного рыскания на спусках.
-- **Files**: `scripts/player/bicycle_controller.gd`.
-
-### `[ ] [FEAT-006.3]` Horizon Fog & Zero Pop-In Blending
-- **Goal**: Плавное растворение границы спавна дороги в объемном тумане горизонта.
-- **Do**: В `scenes/environment/forest_env.tres` откалибровать `volumetric_fog_density`, `fog_depth_begin/end` и `AHEAD_DISTANCE` в стримере.
-- **Acceptance Criteria**: Новые чанки дороги и деревья появляются за мягкой пеленой тумана совершенно бесшовно для глаза игрока.
-- **Files**: `scenes/environment/forest_env.tres`, `scripts/world/chunk_streamer.gd`.
-
----
-
-## 📅 Будущий спринт: Спринт 3A (Тактильность, Звук Ветра и Геймпад)
+## 🏃 Текущий спринт: Спринт 3A (Тактильность, Звук Ветра и Геймпад)
 
 ### `[ ] [FEAT-007.1]` Аналоговое управление геймпадом (Gamepads & Haptics)
 - **Goal**: Полная поддержка контроллеров Xbox, DualSense, Switch Pro.

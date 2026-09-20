@@ -58,6 +58,12 @@ func update_streaming(player_pos: Vector3) -> void:
 		chunk_end_distances.erase(id)
 		chunk_node.queue_free()
 
+	# 3. Prune historical spline samples further than 150m behind player
+	if road_path and road_path.has_method("prune_behind"):
+		var pruned: int = road_path.prune_behind(player_s - 150.0)
+		if pruned > 0:
+			last_closest_idx = maxi(0, last_closest_idx - pruned)
+
 func _spawn_next_chunk() -> void:
 	var start_idx: int = maxi(0, road_path.size() - 1)
 	

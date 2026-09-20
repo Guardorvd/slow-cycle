@@ -13,11 +13,11 @@ signal bell_rung()
 @export var road_rolling_resistance: float = 0.35 ## Rolling friction on gravel road
 @export var grass_rolling_resistance: float = 1.35 ## High rolling resistance when off-road on grass
 @export var air_drag_coeff: float = 0.015 ## Quadratic aerodynamic drag
-@export var gravity_slope_mult: float = 1.25 ## Effect of slope gravity on downhill coasting
+@export var gravity_slope_mult: float = 1.45 ## Effect of slope gravity on downhill coasting
 
 @export_group("Steering & Banking")
 @export var steer_sensitivity: float = 1.6 ## Turn rate (radians/sec)
-@export var max_steer_angle: float = 0.52 ## ~30 degrees max handlebar rotation
+@export var max_steer_angle: float = 0.50 ## ~28.6 degrees max handlebar rotation at low speed
 @export var max_bank_angle: float = 0.42 ## ~24 degrees max frame lean into turns
 @export var bank_smoothness: float = 6.0 ## Lerp speed for frame roll into turn
 @export var pitch_smoothness: float = 8.0 ## Lerp speed for slope alignment
@@ -35,6 +35,8 @@ signal bell_rung()
 # Internal kinematic state
 var current_speed: float = 0.0 # Forward speed in m/s
 var steer_input: float = 0.0
+var raw_steer_input: float = 0.0
+var filtered_steer_input: float = 0.0
 var current_steer: float = 0.0
 var current_bank: float = 0.0
 var current_pitch: float = 0.0
@@ -78,12 +80,12 @@ func _physics_process(delta: float) -> void:
 	_update_visual_transforms(delta)
 
 func _handle_input() -> void:
-	var target_steer_input: float = 0.0
+	var target_raw: float = 0.0
 	if Input.is_action_pressed("steer_left"):
-		target_steer_input += 1.0
+		target_raw += 1.0
 	if Input.is_action_pressed("steer_right"):
-		target_steer_input -= 1.0
-	steer_input = target_steer_input
+		target_raw -= 1.0
+	raw_steer_input = target_raw
 
 	is_pedaling = Input.is_action_pressed("pedal") and not Input.is_action_pressed("brake")
 	is_braking = Input.is_action_pressed("brake")
@@ -150,15 +152,43 @@ func _calculate_forward_dynamics(delta: float) -> void:
 	current_speed = maxf(0.0, current_speed - drag)
 
 func _calculate_steering_and_banking(delta: float) -> void:
-	var speed_factor: float = clampf(current_speed / cruising_speed, 0.15, 1.0)
-	var target_steer: float = steer_input * max_steer_angle
-	current_steer = lerpf(current_steer, target_steer, 8.0 * delta)
+	# 1. Soft-knee input filtering (gradual attack for micro-taps, firm return to center)
+	var steer_attack_speed: float = 4.5
+	var steer_decay_speed: float = 8.0
+	var filter_rate: float = steer_decay_speed if absf(raw_steer_input) < 0.01 else steer_attack_speed
+	filtered_steer_input = lerpf(filtered_steer_input, raw_steer_input, filter_rate * delta)
+	steer_input = filtered_steer_input
 
-	var yaw_turn_rate: float = current_steer * steer_sensitivity * speed_factor
+	# 2. Speed-sensitive steering limiter (High-speed damping)
+	# At low speed (<= 2.8 m/s ~ 10 km/h): full angle ~28.6°
+	# At high speed (>= 11.5 m/s ~ 41 km/h): narrow angle ~9.2°
+	var speed_t: float = clampf((current_speed - 2.8) / 8.7, 0.0, 1.0)
+	var dynamic_max_steer: float = lerpf(max_steer_angle, 0.16, speed_t)
+	var target_steer: float = filtered_steer_input * dynamic_max_steer
+
+	# 3. Steering mass & centering moment (handlebars feel heavier with speed)
+	var steer_inertia_rate: float = lerpf(6.5, 12.0, speed_t)
+	current_steer = lerpf(current_steer, target_steer, steer_inertia_rate * delta)
+
+	# 4. Kinematic bicycle yaw rate: omega = (v / wheelbase) * tan(steer)
+	var yaw_turn_rate: float = 0.0
+	if current_speed > 0.3:
+		yaw_turn_rate = (current_speed / WHEELBASE) * tan(current_steer)
+		# Clamp yaw rate to prevent extreme lateral whips
+		yaw_turn_rate = clampf(yaw_turn_rate, -1.8, 1.8)
+	else:
+		yaw_turn_rate = current_steer * steer_sensitivity * 0.2
+
 	rotate_y(yaw_turn_rate * delta)
 
-	var target_bank: float = -current_steer * speed_factor * max_bank_angle
-	current_bank = lerpf(current_bank, target_bank, bank_smoothness * delta)
+	# 5. Physics-based banking from centrifugal lateral acceleration: a_c = v * omega_yaw
+	# Equilibrium roll angle: tan(phi) = a_c / g => phi = -atan2(a_c, g)
+	var lateral_accel: float = current_speed * yaw_turn_rate
+	var physical_target_bank: float = -atan2(lateral_accel, 9.8)
+	physical_target_bank = clampf(physical_target_bank, -max_bank_angle, max_bank_angle)
+
+	current_bank = lerpf(current_bank, physical_target_bank, bank_smoothness * delta)
+
 
 func _apply_motion(delta: float) -> void:
 	var forward_dir: Vector3 = -global_transform.basis.z
