@@ -114,6 +114,19 @@ func _process(delta: float) -> void:
 	var rough_pct: float = (bike_controller.get("terrain_roughness") if bike_controller else 0.16) * 100.0
 	var susp_mm: float = (bike_controller.get("suspension_compression") if bike_controller else 0.0) * 1000.0
 	text += "Surface: %s | Rough: %.0f%% | Susp: %+dmm\n" % [surface_name, rough_pct, int(round(susp_mm))]
+
+	var cam_rig = bike_controller.get("camera_rig") if (bike_controller and "camera_rig" in bike_controller) else null
+	if not cam_rig and bike_controller:
+		cam_rig = bike_controller.get_node_or_null("CameraRig")
+	if cam_rig:
+		var cam_mode: String = "FP" if (cam_rig.get("is_first_person") if "is_first_person" in cam_rig else true) else "TP"
+		var fp_cam = cam_rig.get("first_person_cam") if "first_person_cam" in cam_rig else null
+		var cur_fov: float = fp_cam.fov if fp_cam else 78.0
+		var surge_mm: float = (cam_rig.get("current_surge_z") if "current_surge_z" in cam_rig else 0.0) * 1000.0
+		var cam_dive_deg: float = rad_to_deg(cam_rig.get("current_dive_pitch") if "current_dive_pitch" in cam_rig else 0.0)
+		var shake_y_mm: float = (cam_rig.get("current_shake_y") if "current_shake_y" in cam_rig else 0.0) * 1000.0
+		text += "Camera: %s | FOV: %.1f° | Surge: %+dmm | Dive: %+.1f° | Shake: %.2fmm\n" % [cam_mode, cur_fov, int(round(surge_mm)), cam_dive_deg, shake_y_mm]
+
 	text += "================================="
 
 	telemetry_label.text = text

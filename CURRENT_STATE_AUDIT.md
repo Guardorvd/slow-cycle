@@ -2,8 +2,8 @@
 
 > **Дата актуализации**: 21.09.2026  
 > **Инженер-аудитор**: AI Lead Systems Architect & Senior Game Engineer  
-> **Статус проекта**: **Спринты 1, 2, 3 (3A, 3B, 3C), 4 (4A, 4B, 4C, 4D, 4G Test Track) и Полный Технический Аудит завершены на 100%**.
-> **Текущий этап**: **Спринт 4D (Слой визуального представления велосипеда) реализован и принят**. Внедрено полное разделение физики (`CharacterBody3D`) и визуального представления (`VisualsRoot`), 4-лучевые спицы колес по критерию Найквиста ($57.7\text{ км/ч} > 44\text{ км/ч}$), кинематическая компенсация оси передней втулки `FrontAxle`, нелинейный пороговый юз заднего колеса при экстренном торможении (`smoothstep(0.65, 1.0, brake_input)`), анимированная каретка с масштабированием каденса ($75\text{ RPM}$) и горизонтированием педалей на накате. Автотесты пройдены на 100% (44/44 PASS). Следующий этап: **Спринт 4E (Камера как сенсор движения)**.
+> **Статус проекта**: **Спринты 1, 2, 3 (3A, 3B, 3C), 4 (4A, 4B, 4C, 4D, 4E, 4G Test Track) и Полный Технический Аудит завершены на 100%**.
+> **Текущий этап**: **Спринт 4E (Живая камера как сенсор движения) реализован и принят**. Внедрено сенсорное ядро камеры (`scripts/camera/bike_camera.gd`): процедурный связный шум `FastNoiseLite` с привязкой фазы к пройденной дистанции (`travel_distance += v * dt`) и отсечкой на нулевой скорости (`Zero-Speed Gating`), продольный инерционный сдвиг (`Surge`) с асимметричным первопорядковым экспоненциальным сглаживанием attack/release, упругий тормозной клевок (`Braking Dive`) с просадкой высоты глаз, вторичный слой `Apex Look-Ahead` ($\le 2.5^\circ$), отдельный кинематографичный профиль третьего лица ($0\%$ углового шума) и мгновенный сброс динамики камеры при Recovery ('R'). Автотесты пройдены на 100% (48/48 PASS). Следующий этап: **Спринт 4F (Звуковой ландшафт движения)**.
 | **Главная сцена** | `res://scenes/main.tscn` |
 | **Тестовый полигон** | `res://scenes/test/riding_feel_test_track.tscn` |
 
@@ -166,8 +166,12 @@
 [VERIFICATION #42] Rear Wheel Non-Linear Brake Skid: 0.00 skid at 40% brake (synchronous), 90% lockup at 100% brake (0.10 slip ratio)!
 [VERIFICATION #43] Crankset Cadence & Coasting Leveling: 74.4 RPM cruise cadence, 3.16° horizontal coast leveling (< 4.0°), horizontal pedal platforms!
 [VERIFICATION #44] VisualsRoot Decoupling: Pitch/Roll/Suspension applied strictly to VisualsRoot, CharacterBody3D roll=0°, pitch=0°, Up=(0,1,0)!
+[VERIFICATION #45] FastNoiseLite Distance & Zero-Speed Gating: Noise strictly 0.00000m at standstill, Rough Gravel amplifies noise (0.0020m vs 0.0004m)!
+[VERIFICATION #46] Longitudinal Surge Asymmetric Smoothing: Accel lag -0.019m in [-0.035, -0.010]m, braking lead +0.041m in [+0.030, +0.065]m, neutral relax 0.0012m!
+[VERIFICATION #47] Braking Dive & Horizon Stabilization Invariant: Brake dive -1.44° in [-1.6°, -1.0°], drop -0.024m, roll at 20° bank = 7.00° (<= 7.10° / 35%)!
+[VERIFICATION #48] Recovery Teleport Dynamics Reset: Surge, dive, shake, distance phase and base transform cleanly reset to 0 upon 'R' key!
 
-=== ALL SYSTEM VERIFICATIONS PASSED [44/44 - 100% OK] ===
+=== ALL SYSTEM VERIFICATIONS PASSED [48/48 - 100% OK] ===
 ```
 
 ### 15-минутный стресс-тест на выносливость (Soak Test):

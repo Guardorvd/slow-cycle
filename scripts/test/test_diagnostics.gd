@@ -1005,8 +1005,161 @@ func _init() -> void:
 		all_ok = false
 	bike_44.queue_free()
 
+	# Test 45: [Sprint 4E] FastNoiseLite Determinism, Distance Phase & Zero-Speed Gating Contract
+	var bike_45 = bike_scene.instantiate()
+	root.add_child(bike_45)
+	var cam_rig_45 = bike_45.get_node_or_null("CameraRig")
+	if cam_rig_45 and not cam_rig_45.first_person_cam:
+		cam_rig_45._ready()
+	var noise_gen_present: bool = cam_rig_45 != null and cam_rig_45.noise_gen != null
+
+	# Part A: Zero-speed gating (strictly zero noise at standstill)
+	bike_45.current_speed = 0.0
+	for _f in range(30):
+		cam_rig_45._process(1.0 / 60.0)
+	var zero_noise_x: float = absf(cam_rig_45.current_shake_x)
+	var zero_noise_y: float = absf(cam_rig_45.current_shake_y)
+	var zero_gating_ok: bool = zero_noise_x < 0.0001 and zero_noise_y < 0.0001
+
+	# Part B: Speed scaling & Rough Gravel amplification
+	bike_45.current_speed = 7.0 # 25.2 km/h
+	bike_45.current_surface = 0 # Gravel
+	bike_45.terrain_roughness = 0.16
+	for _f in range(60):
+		cam_rig_45._process(1.0 / 60.0)
+	var gravel_noise_mag: float = Vector2(cam_rig_45.current_shake_x, cam_rig_45.current_shake_y).length()
+
+	bike_45.current_surface = 2 # ROUGH_GRAVEL
+	bike_45.terrain_roughness = 0.75
+	for _f in range(60):
+		cam_rig_45._process(1.0 / 60.0)
+	var rough_noise_mag: float = Vector2(cam_rig_45.current_shake_x, cam_rig_45.current_shake_y).length()
+	var rough_amplification_ok: bool = rough_noise_mag > gravel_noise_mag * 1.3
+
+	print("[VERIFICATION #45] FastNoiseLite Distance & Zero-Speed Gating Contract:")
+	print("  - FastNoiseLite generator present: %s" % ("YES" if noise_gen_present else "NO"))
+	print("  - Standstill noise amplitude (0 km/h): X=%.5fm | Y=%.5fm (Expected: < 0.0001m)" % [zero_noise_x, zero_noise_y])
+	print("  - Gravel noise: %.4fm | Rough Gravel washboard noise: %.4fm (Expected: > 1.3x)" % [gravel_noise_mag, rough_noise_mag])
+	if noise_gen_present and zero_gating_ok and rough_amplification_ok:
+		print("  [PASS] FastNoiseLite coherent road noise, distance phase and zero-speed gating verified!")
+	else:
+		print("  [FAIL] Noise contract violated: gen=%s, zero=%s, rough_amp=%s" % [noise_gen_present, zero_gating_ok, rough_amplification_ok])
+		all_ok = false
+	bike_45.queue_free()
+
+	# Test 46: [Sprint 4E] Longitudinal Surge Asymmetric Smoothing Contract
+	var bike_46 = bike_scene.instantiate()
+	root.add_child(bike_46)
+	var cam_rig_46 = bike_46.get_node_or_null("CameraRig")
+	if cam_rig_46 and not cam_rig_46.first_person_cam:
+		cam_rig_46._ready()
+
+	# Part A: Acceleration lag (surge backward, negative Z)
+	bike_46.current_speed = 6.0
+	bike_46.longitudinal_acceleration = 2.5
+	for _f in range(30):
+		cam_rig_46._process(1.0 / 60.0)
+	var accel_surge_z: float = cam_rig_46.current_surge_z
+	var accel_surge_ok: bool = accel_surge_z >= -0.035 and accel_surge_z <= -0.010
+
+	# Part B: Hard braking lead (surge forward, positive Z)
+	bike_46.longitudinal_acceleration = -7.0
+	for _f in range(30):
+		cam_rig_46._process(1.0 / 60.0)
+	var brake_surge_z: float = cam_rig_46.current_surge_z
+	var brake_surge_ok: bool = brake_surge_z >= 0.030 and brake_surge_z <= 0.065
+
+	# Part C: Neutral relaxation on steady speed
+	bike_46.longitudinal_acceleration = 0.0
+	for _f in range(60):
+		cam_rig_46._process(1.0 / 60.0)
+	var neutral_surge_z: float = cam_rig_46.current_surge_z
+	var neutral_surge_ok: bool = absf(neutral_surge_z) < 0.005
+
+	print("[VERIFICATION #46] Longitudinal Surge Asymmetric Smoothing Contract:")
+	print("  - Accel surge (+2.5 m/s²): %.3fm (Corridor: [-0.035, -0.010]m)" % accel_surge_z)
+	print("  - Braking surge (-7.0 m/s²): %.3fm (Corridor: [+0.030, +0.065]m)" % brake_surge_z)
+	print("  - Neutral surge (0.0 m/s²): %.4fm (Expected: < 0.005m)" % neutral_surge_z)
+	if accel_surge_ok and brake_surge_ok and neutral_surge_ok:
+		print("  [PASS] Longitudinal surge smoothly models torso inertial lag and braking compression!")
+	else:
+		print("  [FAIL] Surge contract violated: accel=%s, brake=%s, neutral=%s" % [accel_surge_ok, brake_surge_ok, neutral_surge_ok])
+		all_ok = false
+	bike_46.queue_free()
+
+	# Test 47: [Sprint 4E] Braking Dive & Horizon Stabilization Invariant Contract
+	var bike_47 = bike_scene.instantiate()
+	root.add_child(bike_47)
+	var cam_rig_47 = bike_47.get_node_or_null("CameraRig")
+	if cam_rig_47 and not cam_rig_47.first_person_cam:
+		cam_rig_47._ready()
+
+	# Part A: Braking nose-dive and eye drop
+	bike_47.brake_input = 1.0
+	for _f in range(30):
+		cam_rig_47._process(1.0 / 60.0)
+	var dive_pitch_deg: float = rad_to_deg(cam_rig_47.current_dive_pitch)
+	var dive_y: float = cam_rig_47.current_dive_y
+	var dive_pitch_ok: bool = dive_pitch_deg >= -1.6 and dive_pitch_deg <= -1.0
+	var dive_y_ok: bool = dive_y >= -0.030 and dive_y <= -0.015
+
+	# Part B: Horizon stabilization invariant (tilt <= 35% of bike bank)
+	bike_47.brake_input = 0.0
+	bike_47.current_bank = deg_to_rad(20.0)
+	for _f in range(60):
+		cam_rig_47._process(1.0 / 60.0)
+	var cam_roll_deg: float = rad_to_deg(cam_rig_47.current_roll)
+	var max_allowed_roll_deg: float = 20.0 * 0.35 + 0.1
+	var horizon_invariant_ok: bool = absf(cam_roll_deg) <= max_allowed_roll_deg and cam_roll_deg > 6.0
+
+	print("[VERIFICATION #47] Braking Dive & Horizon Stabilization Invariant Contract:")
+	print("  - Braking Dive Pitch: %.2f° (Expected: -1.6° to -1.0°)" % dive_pitch_deg)
+	print("  - Braking Eye Drop Y: %.3fm (Expected: -0.030m to -0.015m)" % dive_y)
+	print("  - Camera Roll at 20° Bank: %.2f° (Invariant: <= %.2f° / 35%%)" % [cam_roll_deg, max_allowed_roll_deg])
+	if dive_pitch_ok and dive_y_ok and horizon_invariant_ok:
+		print("  [PASS] Braking dive pitch and 35%% horizon stabilization invariant confirmed!")
+	else:
+		print("  [FAIL] Dive or horizon contract violated: dive_pitch=%s, dive_y=%s, horizon=%s" % [dive_pitch_ok, dive_y_ok, horizon_invariant_ok])
+		all_ok = false
+	bike_47.queue_free()
+
+	# Test 48: [Sprint 4E] Recovery Teleport Dynamics Reset Contract
+	var bike_48 = bike_scene.instantiate()
+	root.add_child(bike_48)
+	var cam_rig_48 = bike_48.get_node_or_null("CameraRig")
+	if cam_rig_48 and not cam_rig_48.first_person_cam:
+		cam_rig_48._ready()
+
+	# Inject dirty non-zero camera state
+	cam_rig_48.current_surge_z = 0.045
+	cam_rig_48.current_dive_pitch = -0.025
+	cam_rig_48.current_dive_y = -0.020
+	cam_rig_48.current_shake_x = 0.002
+	cam_rig_48.current_shake_y = 0.003
+	cam_rig_48.travel_distance = 250.0
+	cam_rig_48.current_look_yaw = 0.03
+
+	# Trigger reset via recovery contract
+	cam_rig_48.reset_camera_dynamics()
+
+	var surge_reset_ok: bool = cam_rig_48.current_surge_z == 0.0
+	var dive_reset_ok: bool = cam_rig_48.current_dive_pitch == 0.0 and cam_rig_48.current_dive_y == 0.0
+	var shake_reset_ok: bool = cam_rig_48.current_shake_x == 0.0 and cam_rig_48.current_shake_y == 0.0
+	var dist_reset_ok: bool = cam_rig_48.travel_distance == 0.0
+	var fp_pos_reset_ok: bool = cam_rig_48.first_person_cam.position.is_equal_approx(cam_rig_48.base_fp_pos)
+
+	print("[VERIFICATION #48] Recovery Teleport Dynamics Reset Contract:")
+	print("  - Surge reset: %s | Dive reset: %s | Shake reset: %s" % [surge_reset_ok, dive_reset_ok, shake_reset_ok])
+	print("  - Distance phase reset: %s | Cockpit base transform restored: %s" % [dist_reset_ok, fp_pos_reset_ok])
+	if surge_reset_ok and dive_reset_ok and shake_reset_ok and dist_reset_ok and fp_pos_reset_ok:
+		print("  [PASS] Camera dynamic state and transforms cleanly reset on recovery teleport!")
+	else:
+		print("  [FAIL] Recovery reset incomplete: surge=%s, dive=%s, shake=%s, dist=%s, pos=%s" % [surge_reset_ok, dive_reset_ok, shake_reset_ok, dist_reset_ok, fp_pos_reset_ok])
+		all_ok = false
+	bike_48.queue_free()
+
 	if all_ok:
-		print("\n=== ALL SYSTEM VERIFICATIONS PASSED [44/44 - 100% OK] ===\n")
+		print("\n=== ALL SYSTEM VERIFICATIONS PASSED [48/48 - 100% OK] ===\n")
 	else:
 		print("\n=== SOME VERIFICATIONS FAILED ===\n")
 

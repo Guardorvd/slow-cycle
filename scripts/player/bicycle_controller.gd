@@ -75,6 +75,7 @@ enum SurfaceType {
 @export var rear_wheel: Node3D
 @export var world_manager: Node
 @export var screen_fader: Node
+@export var camera_rig: Node3D
 
 # Internal kinematic state
 var current_speed: float = 0.0 # Forward speed in m/s
@@ -136,6 +137,8 @@ func _ready() -> void:
 		rear_ray.collision_mask = 2 | 4 | 16
 	if handlebar_pivot:
 		base_fork_transform = handlebar_pivot.transform
+	if not camera_rig:
+		camera_rig = get_node_or_null("CameraRig")
 
 func _process(delta: float) -> void:
 	var speed_kmh: float = current_speed * 3.6
@@ -582,6 +585,8 @@ func _execute_recovery_teleport() -> void:
 	current_surface = SurfaceType.GRAVEL
 	terrain_roughness = gravel_base_roughness
 	dynamic_chatter = 0.0
+	if camera_rig and camera_rig.has_method("reset_camera_dynamics"):
+		camera_rig.reset_camera_dynamics()
 	velocity = -global_transform.basis.z * current_speed
 
 func _trigger_haptic(weak: float, strong: float, duration: float) -> void:
