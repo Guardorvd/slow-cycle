@@ -7,17 +7,20 @@ signal bell_rung()
 
 @export_group("Speed & Dynamics")
 @export var cruising_speed: float = 7.0 ## Comfortable cruising speed (~25 km/h)
-@export var max_sprint_speed: float = 13.0 ## Maximum downhill or sprint speed (~47 km/h)
-@export var pedal_acceleration: float = 1.3 ## Natural muscular acceleration push (calibrated Sprint 3C)
+@export var max_sprint_speed: float = 12.2 ## Maximum sprint speed (~44 km/h)
+@export var pedal_acceleration: float = 1.4 ## Natural muscular acceleration push
 @export var pedal_attack_time: float = 0.50 ## Progressive muscular effort onset in seconds (0.45-0.60s)
+@export var sprint_impulse: float = 1.35 ## Base impulse per sprint tap (m/s²)
+@export var sprint_decay: float = 1.1 ## Decay rate of sprint boost buffer (m/s² per second)
+@export var max_sprint_boost: float = 3.0 ## Hard cap on sprint boost acceleration (m/s²)
 @export var brake_deceleration: float = 7.5 ## Deceleration when braking
 @export var brake_attack_time: float = 0.15 ## Rapid initial bite and ramp-up time for braking
 @export var brake_release_time: float = 0.10 ## Fast release time when releasing brake
 @export var brake_dive_angle_deg: float = 1.7 ## Max visual nose-dive angle in degrees under hard braking
-@export var road_rolling_resistance: float = 0.08 ## Calibrated rolling friction on gravel road (17-21 km/h cruise on -2°)
+@export var road_rolling_resistance: float = 0.125 ## Calibrated rolling friction on gravel road (25-35s coast on flat)
 @export var grass_rolling_resistance: float = 0.45 ## Decisive rolling resistance when off-road on grass
-@export var air_drag_coeff: float = 0.015 ## Quadratic aerodynamic drag
-@export var gravity_slope_mult: float = 1.45 ## Effect of slope gravity on downhill coasting
+@export var air_drag_coeff: float = 0.0085 ## Quadratic aerodynamic drag
+@export var gravity_slope_mult: float = 1.10 ## Effect of slope gravity on downhill coasting
 @export var cornering_scrub_coeff: float = 0.18 ## Gentle speed bleed under high lateral cornering loads
 @export var scrub_lateral_threshold: float = 1.5 ## Lateral acceleration threshold (m/s^2) before scrub occurs
 
@@ -48,6 +51,7 @@ signal bell_rung()
 
 # Internal kinematic state
 var current_speed: float = 0.0 # Forward speed in m/s
+var longitudinal_acceleration: float = 0.0 # Current net longitudinal accel in m/s²
 var steer_input: float = 0.0
 var raw_steer_input: float = 0.0
 var filtered_steer_input: float = 0.0
@@ -59,12 +63,14 @@ var current_pitch: float = 0.0 # Mirrors visual_pitch for external observers
 var physics_pitch: float = 0.0 # Instant slope angle for gravity & ground adhesion
 var visual_pitch: float = 0.0 # Decoupled smoothed slope for visual mesh
 var pedal_power: float = 0.0 # 0.0 to 1.0 pedaling inertia
+var sprint_boost: float = 0.0 # 0.0 to max_sprint_boost active sprint acceleration
 var brake_input: float = 0.0 # 0.0 to 1.0 progressive brake ramp
 var brake_dive_pitch: float = 0.0 # Visual-only nose dive in radians
 var yaw_turn_rate: float = 0.0 # Angular turn rate in rad/s
 var turn_radius: float = INF # Computed curve radius
 var lateral_acceleration: float = 0.0 # Current lateral load in m/s^2
 var is_pedaling: bool = false
+var is_sprinting: bool = false
 var is_braking: bool = false
 var is_coasting: bool = false
 var is_grounded: bool = true
@@ -88,7 +94,11 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	var speed_kmh: float = current_speed * 3.6
-	var cadence_factor: float = (current_speed / cruising_speed) * pedal_power if is_pedaling else 0.0
+	var cadence_factor: float = 0.0
+	if is_sprinting:
+		cadence_factor = clampf((sprint_boost / max_sprint_boost) * 1.5, 0.6, 1.5)
+	elif is_pedaling:
+		cadence_factor = (current_speed / cruising_speed) * pedal_power
 	telemetry_updated.emit(speed_kmh, cadence_factor, is_coasting)
 
 	if Input.is_action_just_pressed("ring_bell"):
@@ -115,9 +125,35 @@ func _handle_input() -> void:
 	var pedal_strength: float = Input.get_action_strength("pedal")
 	var brake_strength: float = Input.get_action_strength("brake")
 
-	is_pedaling = pedal_strength > 0.1 and brake_strength <= 0.1
-	is_braking = brake_strength > 0.1
-	is_coasting = not is_pedaling and not is_braking and current_speed > 0.3
+	is_pedaling = pedal_strength > 0.05 and brake_strength <= 0.05
+	is_braking = brake_strength > 0.05
+
+	# Sprint pedal impulse (Shift on keyboard or X on gamepad) with speed-dependent diminishing returns
+	if Input.is_action_just_pressed("sprint_pedal") and not is_braking:
+		var tap_impulse: float = _calculate_sprint_tap_impulse()
+		sprint_boost = minf(sprint_boost + tap_impulse, max_sprint_boost)
+
+	is_sprinting = sprint_boost > 0.05
+	is_coasting = not is_pedaling and not is_sprinting and not is_braking and current_speed > 0.3
+
+func _calculate_sprint_tap_impulse() -> float:
+	var speed_kmh: float = current_speed * 3.6
+	if speed_kmh < 26.0:
+		return sprint_impulse
+	elif speed_kmh < 32.0:
+		var t: float = (speed_kmh - 26.0) / 6.0
+		return lerpf(sprint_impulse, sprint_impulse * 0.72, t)
+	elif speed_kmh < 37.0:
+		var t: float = (speed_kmh - 32.0) / 5.0
+		return lerpf(sprint_impulse * 0.72, sprint_impulse * 0.44, t)
+	elif speed_kmh < 42.0:
+		var t: float = (speed_kmh - 37.0) / 5.0
+		return lerpf(sprint_impulse * 0.44, sprint_impulse * 0.18, t)
+	elif speed_kmh < 44.0:
+		var t: float = (speed_kmh - 42.0) / 2.0
+		return lerpf(sprint_impulse * 0.18, 0.05, t)
+	else:
+		return 0.0
 
 func _calculate_ground_and_slope(delta: float) -> void:
 	var front_hit: bool = front_ray.is_colliding() if front_ray else true
@@ -155,44 +191,68 @@ func _calculate_ground_and_slope(delta: float) -> void:
 	current_pitch = visual_pitch
 
 func _calculate_forward_dynamics(delta: float) -> void:
+	# Decay sprint boost over time (move_toward zero)
+	sprint_boost = move_toward(sprint_boost, 0.0, sprint_decay * delta)
+
 	# Active rolling resistance: road vs grass
 	var active_roll_res: float = road_rolling_resistance
 	if is_on_grass:
 		active_roll_res = grass_rolling_resistance
 
 	if not is_grounded:
-		current_speed = maxf(0.0, current_speed - active_roll_res * delta)
+		var air_resistance: float = active_roll_res + air_drag_coeff * (current_speed * current_speed)
+		current_speed = maxf(0.0, current_speed - air_resistance * delta)
+		longitudinal_acceleration = -air_resistance
 		return
 
-	# 1. Slope gravity acceleration using physics_pitch (instant slope response)
-	var slope_gravity_accel: float = -sin(physics_pitch) * 9.8 * gravity_slope_mult
-	current_speed += slope_gravity_accel * delta
-
-	# 2. Pedaling with pedal_power inertia ramp and analog throttle
+	# 1. Cruise acceleration (pedal hold, analog strength, smooth onset)
+	var a_cruise: float = 0.0
+	var effective_cruising: float = cruising_speed * (0.6 if is_on_grass else 1.0)
 	if is_pedaling:
 		var pedal_strength: float = Input.get_action_strength("pedal")
-		if pedal_strength < 0.1:
-			pedal_strength = 1.0 # Fallback for programmatic triggers/tests
+		if pedal_strength < 0.05:
+			pedal_strength = 1.0 # Programmatic fallback
 		pedal_power = minf(pedal_strength, pedal_power + (1.0 / pedal_attack_time) * delta)
-		var effective_cruising: float = cruising_speed * (0.6 if is_on_grass else 1.0)
-		var effective_sprint: float = max_sprint_speed * (0.6 if is_on_grass else 1.0)
-		var eff_accel: float = pedal_acceleration * pedal_power
-		if current_speed < effective_cruising:
-			current_speed += eff_accel * delta
-		elif current_speed < effective_sprint:
-			var efficiency: float = 1.0 - ((current_speed - effective_cruising) / (effective_sprint - effective_cruising))
-			current_speed += eff_accel * efficiency * 0.5 * delta
-	else:
-		pedal_power = 0.0 # Instant transition to free coasting on release!
 
-	# 3. Progressive braking with quadratic effort curve and analog brake
+		# Sustain thrust: baseline force needed to counteract road rolling + air drag at cruising speed
+		var cruise_res: float = active_roll_res + air_drag_coeff * (effective_cruising * effective_cruising)
+		var sustain_thrust: float = cruise_res * 1.08
+
+		if current_speed < effective_cruising:
+			var speed_ratio: float = current_speed / effective_cruising
+			var cruise_taper: float = 1.0 - pow(speed_ratio, 1.6)
+			a_cruise = lerpf(sustain_thrust, pedal_acceleration, cruise_taper) * pedal_power
+		else:
+			# Above cruising speed: smoothly fade cruise thrust over a small window
+			var over_speed: float = current_speed - effective_cruising
+			var fade: float = clampf(1.0 - (over_speed / 0.8), 0.0, 1.0)
+			a_cruise = sustain_thrust * fade * pedal_power
+	else:
+		pedal_power = 0.0
+
+	# 2. Sprint boost acceleration (rhythmic tap Shift / X with diminishing returns)
+	var a_sprint: float = 0.0
+	var effective_sprint_speed: float = max_sprint_speed * (0.6 if is_on_grass else 1.0)
+	if current_speed < effective_sprint_speed and sprint_boost > 0.001:
+		var sprint_ratio: float = clampf(current_speed / effective_sprint_speed, 0.0, 1.0)
+		var sprint_eff: float = clampf(1.0 - pow(sprint_ratio, 3.6), 0.0, 1.0)
+		a_sprint = sprint_boost * sprint_eff
+	elif current_speed >= effective_sprint_speed:
+		sprint_boost = 0.0
+		a_sprint = 0.0
+
+	# 3. Slope gravity acceleration using physics_pitch (instant slope response)
+	var a_gravity: float = -sin(physics_pitch) * 9.8 * gravity_slope_mult
+
+	# 4. Progressive braking with quadratic effort curve and analog brake
+	var a_brake: float = 0.0
 	if is_braking:
 		var brake_strength: float = Input.get_action_strength("brake")
-		if brake_strength < 0.1:
-			brake_strength = 1.0 # Fallback for programmatic triggers/tests
+		if brake_strength < 0.05:
+			brake_strength = 1.0 # Programmatic fallback
 		brake_input = minf(brake_strength, brake_input + (1.0 / brake_attack_time) * delta)
 		var brake_curve: float = brake_input * brake_input
-		current_speed = maxf(0.0, current_speed - (brake_deceleration * brake_curve) * delta)
+		a_brake = brake_deceleration * brake_curve
 	else:
 		brake_input = maxf(0.0, brake_input - (1.0 / brake_release_time) * delta)
 
@@ -200,11 +260,23 @@ func _calculate_forward_dynamics(delta: float) -> void:
 	var target_dive: float = -deg_to_rad(brake_dive_angle_deg) * brake_input
 	brake_dive_pitch = lerpf(brake_dive_pitch, target_dive, 12.0 * delta)
 
-	# 4. Drag and rolling resistance
-	var drag: float = (active_roll_res + air_drag_coeff * (current_speed * current_speed)) * delta
-	current_speed = maxf(0.0, current_speed - drag)
+	# 5. Resistances: rolling friction + aerodynamic drag
+	var a_rolling: float = active_roll_res
+	var a_drag: float = air_drag_coeff * (current_speed * current_speed)
 
-	# 5. Haptic feedback for surface transitions and hard braking
+	# Continuous net longitudinal acceleration balance:
+	# Sigma a = a_cruise + a_sprint + a_gravity - a_rolling - a_drag - a_brake
+	var propulsive: float = a_cruise + a_sprint + a_gravity
+	var resistive: float = a_rolling + a_drag + a_brake
+
+	if current_speed <= 0.001 and propulsive <= resistive:
+		current_speed = 0.0
+		longitudinal_acceleration = 0.0
+	else:
+		longitudinal_acceleration = propulsive - resistive
+		current_speed = maxf(0.0, current_speed + longitudinal_acceleration * delta)
+
+	# 6. Haptic feedback for surface transitions and hard braking
 	if is_on_grass and not prev_on_grass:
 		_trigger_haptic(0.2, 0.1, 0.12)
 	prev_on_grass = is_on_grass
@@ -321,6 +393,8 @@ func _execute_recovery_teleport() -> void:
 	var safe_transform: Transform3D = world_manager.request_bike_recovery(global_position)
 	global_transform = safe_transform
 	current_speed = 3.0 # Smooth resumption speed
+	longitudinal_acceleration = 0.0
+	sprint_boost = 0.0
 	current_bank = 0.0
 	current_steer = 0.0
 	visual_steer = 0.0

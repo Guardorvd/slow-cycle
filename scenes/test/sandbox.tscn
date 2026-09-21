@@ -1,10 +1,12 @@
-[gd_scene load_steps=15 format=3]
+[gd_scene load_steps=17 format=3]
 
 [ext_resource type="Environment" path="res://scenes/environment/forest_env.tres" id="1_env"]
 [ext_resource type="PackedScene" path="res://scenes/player/bicycle.tscn" id="2_bike"]
 [ext_resource type="PackedScene" path="res://scenes/world/pine_tree.tscn" id="3_pine"]
 [ext_resource type="PackedScene" path="res://scenes/world/birch_tree.tscn" id="4_birch"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="5_hud"]
+[ext_resource type="PackedScene" path="res://scenes/ui/screen_fader.tscn" id="6_fader"]
+[ext_resource type="PackedScene" path="res://scenes/ui/debug_hud.tscn" id="7_debug"]
 
 [sub_resource type="StandardMaterial3D" id="Mat_Grass"]
 albedo_color = Color(0.29, 0.48, 0.25, 1)
@@ -147,8 +149,14 @@ transform = Transform3D(1.1, 0, 0, 0, 1.1, 0, 0, 0, 1.1, 3.5, 0, -110)
 [node name="Pine5" parent="ForestFoliage" instance=ExtResource("3_pine")]
 transform = Transform3D(1.3, 0, 0, 0, 1.3, 0, 0, 0, 1.3, -25.0, 0, -135)
 
-[node name="Bicycle" parent="." instance=ExtResource("2_bike")]
+[node name="Bicycle" parent="." node_paths=PackedStringArray("screen_fader") instance=ExtResource("2_bike")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.1, 10)
+screen_fader = NodePath("../ScreenFader")
+
+[node name="ScreenFader" parent="." instance=ExtResource("6_fader")]
 
 [node name="HUD" parent="." node_paths=PackedStringArray("bike_controller") instance=ExtResource("5_hud")]
+bike_controller = NodePath("../Bicycle")
+
+[node name="DebugHUD" parent="." node_paths=PackedStringArray("bike_controller") instance=ExtResource("7_debug")]
 bike_controller = NodePath("../Bicycle")

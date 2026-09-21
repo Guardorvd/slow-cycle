@@ -231,6 +231,13 @@ func _create_gravel_audio_stream() -> AudioStreamWAV:
 
 	raw_samples.resize(total_samples)
 
+	# Ensure seamless continuity at the exact loop boundary (sample total_samples-1 to sample 0)
+	var seam_bridge_len: int = 32
+	for j in range(seam_bridge_len):
+		var w: float = float(j + 1) / float(seam_bridge_len)
+		var idx: int = total_samples - seam_bridge_len + j
+		raw_samples[idx] = lerpf(raw_samples[idx], raw_samples[0], w * 0.85)
+
 	var pcm_data := PackedByteArray()
 	pcm_data.resize(total_samples * 2)
 	for i in range(total_samples):

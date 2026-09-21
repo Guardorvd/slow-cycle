@@ -95,39 +95,45 @@ text = "УПРАВЛЕНИЕ (Скрыть: H):"
 [node name="Line1" type="Label" parent="BottomMargin/ControlsCard/VBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
-text = "• W / ↑ — Крутить педали"
+text = "• W / RT — Круизный ход"
+
+[node name="Line1b" type="Label" parent="BottomMargin/ControlsCard/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1.0, 0.88, 0.4, 1)
+theme_override_font_sizes/font_size = 13
+text = "• Shift / X — Спринт (на педали!)"
 
 [node name="Line2" type="Label" parent="BottomMargin/ControlsCard/VBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
-text = "• Отпустить W — Свободный накат"
+text = "• Отпустить газ — Свободный накат"
 
 [node name="Line3" type="Label" parent="BottomMargin/ControlsCard/VBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
-text = "• A / D / ← / → — Поворот и наклон"
+text = "• A / D / Стик — Поворот и наклон"
 
 [node name="Line4" type="Label" parent="BottomMargin/ControlsCard/VBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
-text = "• S / ↓ — Мягкий тормоз"
+text = "• S / LT — Тормоз"
 
 [node name="Line5" type="Label" parent="BottomMargin/ControlsCard/VBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
-text = "• Пробел — Звоночек на руле 🔔"
+text = "• Пробел / A — Звоночек на руле 🔔"
 
 [node name="Line6" type="Label" parent="BottomMargin/ControlsCard/VBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.5, 0.8, 1, 1)
 theme_override_font_sizes/font_size = 13
-text = "• V — Переключить вид (1-е / 3-е)"
+text = "• V / Y — Переключить вид"
 
 [node name="Line7" type="Label" parent="BottomMargin/ControlsCard/VBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.95, 0.65, 0.65, 1)
 theme_override_font_sizes/font_size = 13
-text = "• R — Вернуться на дорогу"
+text = "• R / B — Вернуться на дорогу"
 
 [node name="CenterNotice" type="CenterContainer" parent="."]
 layout_mode = 1

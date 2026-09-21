@@ -76,11 +76,24 @@ func _process(delta: float) -> void:
 	var mins: int = int(session_elapsed_sec) / 60
 	var secs: int = int(session_elapsed_sec) % 60
 
+	var long_accel: float = bike_controller.get("longitudinal_acceleration") if bike_controller else 0.0
+	var sprint_boost_val: float = bike_controller.get("sprint_boost") if bike_controller else 0.0
+	var is_sprint: bool = bike_controller.get("is_sprinting") if bike_controller else false
+	var is_pedal: bool = bike_controller.get("is_pedaling") if bike_controller else false
+	var is_brake: bool = bike_controller.get("is_braking") if bike_controller else false
+	var is_coast: bool = bike_controller.get("is_coasting") if bike_controller else false
+	var mode_str := "IDLE"
+	if is_brake: mode_str = "BRAKE"
+	elif is_sprint: mode_str = "SPRINT"
+	elif is_coast: mode_str = "COAST"
+	elif is_pedal: mode_str = "CRUISE"
+
 	var text := "=== SLOW CYCLE TELEMETRY (F3) ===\n"
 	text += "Time: %02d:%02d | Seed: %d | Distance: %.2f km\n" % [mins, secs, seed_val, dist_km]
 	text += "Global Chunk: #%d | Active Chunks: %d\n" % [chunk_id, active_chunks]
 	text += "Spline Buffer: %d pts (Pruned) | Chunk Gen: %.2f ms\n" % [spline_pts, chunk_gen_ms]
-	text += "Speed: %.1f km/h | Slope: %.1f° | Dive: %.1f°\n" % [speed_kmh, slope_deg, dive_deg]
+	text += "Speed: %.1f km/h | Long Accel: %+.2f m/s² | Mode: %s\n" % [speed_kmh, long_accel, mode_str]
+	text += "Slope: %.1f° | Dive: %.1f° | Sprint Boost: %.2f m/s²\n" % [slope_deg, dive_deg, sprint_boost_val]
 	text += "Steer: %.1f° | Bank: %.1f° | Yaw: %.2f rad/s | Radius: %s\n" % [steer_deg, bank_deg, yaw_rate, radius_str]
 	text += "Lat Accel: %.2f m/s² | Pedals: %.0f%% | Brake: %.0f%%\n" % [lat_accel, pedal_pct, brake_pct]
 	text += "FPS: %d | Frame: %.1f ms | Max Spike: %.1f ms\n" % [Engine.get_frames_per_second(), frame_ms, max_frame_time_ms]

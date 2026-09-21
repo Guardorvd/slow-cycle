@@ -31,16 +31,20 @@ func _on_telemetry_updated(speed_kmh: float, _cadence_pct: float, is_coasting: b
 	speed_label.text = "%3.1f" % speed_kmh
 	
 	var is_braking: bool = bike_controller.get("is_braking") if bike_controller else false
+	var is_sprinting: bool = bike_controller.get("is_sprinting") if bike_controller else false
 	var is_pedaling: bool = bike_controller.get("is_pedaling") if bike_controller else false
 
 	if is_braking:
 		state_badge.text = "● ТОРМОЖЕНИЕ"
 		state_badge.add_theme_color_override("font_color", Color(1.0, 0.55, 0.3))
+	elif is_sprinting:
+		state_badge.text = "● СПРИНТ (ПЕДАЛИ)"
+		state_badge.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
 	elif is_coasting:
 		state_badge.text = "● СВОБОДНЫЙ НАКАТ"
 		state_badge.add_theme_color_override("font_color", Color(0.4, 0.9, 0.5))
 	elif is_pedaling:
-		state_badge.text = "● ПЕДАЛИРОВАНИЕ"
+		state_badge.text = "● КРУИЗ"
 		state_badge.add_theme_color_override("font_color", Color(0.4, 0.75, 1.0))
 	else:
 		state_badge.text = "● ПОКОЙ"

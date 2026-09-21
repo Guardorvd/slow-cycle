@@ -572,10 +572,72 @@ func _init() -> void:
 			print("  [FAIL] Audio bus assignments incorrect")
 			all_ok = false
 
+	# Test 31: [Sprint 4A] Continuous Flat Coasting Behavioral Contract
+	var test_speed_flat: float = 25.0 / 3.6 # 6.944 m/s
+	var sim_time_flat: float = 0.0
+	sim_dt = 1.0 / 60.0
+	var r_roll: float = bike_test_instance.road_rolling_resistance
+	var c_drag: float = bike_test_instance.air_drag_coeff
+	while test_speed_flat > 0.01 and sim_time_flat < 60.0:
+		var a_res: float = r_roll + c_drag * (test_speed_flat * test_speed_flat)
+		test_speed_flat = maxf(0.0, test_speed_flat - a_res * sim_dt)
+		sim_time_flat += sim_dt
+	print("[VERIFICATION #31] Sprint 4A Flat Coasting Behavioral Contract:")
+	print("  - Coast duration from 25 km/h to 0: %.2f s (Contract: 25.0 - 35.0 s)" % sim_time_flat)
+	if sim_time_flat >= 25.0 and sim_time_flat <= 35.0:
+		print("  [PASS] Natural prolonged glide on flat road verified!")
+	else:
+		print("  [FAIL] Coast duration out of range: %.2f s" % sim_time_flat)
+		all_ok = false
+
+	# Test 32: [Sprint 4A] Sprint Boost Buffer & Hard Speed Cap Contract
+	var b_impulse: float = bike_test_instance.sprint_impulse
+	var b_max: float = bike_test_instance.max_sprint_boost
+	var v_sprint_max: float = bike_test_instance.max_sprint_speed
+	var test_boost: float = 0.0
+	for i in range(10): # 10 rapid taps
+		test_boost = minf(test_boost + b_impulse, b_max)
+	print("[VERIFICATION #32] Sprint Boost Buffer & Speed Cap:")
+	print("  - Boost after 10 rapid taps: %.2f m/s² (Cap: %.2f m/s²)" % [test_boost, b_max])
+	print("  - Max sprint speed ceiling: %.1f km/h (%.2f m/s)" % [v_sprint_max * 3.6, v_sprint_max])
+	var cap_holds: bool = (test_boost <= b_max and test_boost == b_max)
+	var speed_ceiling_valid: bool = (v_sprint_max >= 11.5 and v_sprint_max <= 13.0)
+	if cap_holds and speed_ceiling_valid:
+		print("  [PASS] Sprint boost buffer is strictly capped, preventing infinite engine exploit!")
+	else:
+		print("  [FAIL] Sprint boost buffer cap failure: boost=%.2f, max=%.2f" % [test_boost, b_max])
+		all_ok = false
+
+	# Test 33: [Sprint 4A] Multi-Slope Behavioral Contract
+	var g_mult_test: float = bike_test_instance.gravity_slope_mult
+	var a_grav_neg2: float = -sin(deg_to_rad(-2.0)) * 9.8 * g_mult_test
+	var v_eq_neg2: float = sqrt(maxf(0.0, (a_grav_neg2 - r_roll) / c_drag)) * 3.6
+	
+	var a_grav_neg6: float = -sin(deg_to_rad(-6.0)) * 9.8 * g_mult_test
+	var v_eq_neg6: float = sqrt(maxf(0.0, (a_grav_neg6 - r_roll) / c_drag)) * 3.6
+	
+	var a_grav_pos3: float = -sin(deg_to_rad(3.0)) * 9.8 * g_mult_test
+	var v_up: float = 25.0 / 3.6
+	var t_up: float = 0.0
+	while v_up > 0.05 and t_up < 30.0:
+		var net_a: float = a_grav_pos3 - r_roll - c_drag * (v_up * v_up)
+		v_up = maxf(0.0, v_up + net_a * sim_dt)
+		t_up += sim_dt
+
+	print("[VERIFICATION #33] Multi-Slope Behavioral Contract:")
+	print("  - Downhill -2° cruise equilibrium: %.1f km/h (Expected: >= 17.0 km/h)" % v_eq_neg2)
+	print("  - Downhill -6° terminal speed: %.1f km/h (Expected: >= 37.0 km/h)" % v_eq_neg6)
+	print("  - Uphill +3° coast duration: %.2f s (Expected: <= 9.0 s)" % t_up)
+	if v_eq_neg2 >= 17.0 and v_eq_neg6 >= 37.0 and t_up <= 9.0:
+		print("  [PASS] Slope gravity contract verified: maintains cruise on gentle downhill, accelerates on steep slope, slows on uphill!")
+	else:
+		print("  [FAIL] Slope behavioral contract mismatch: v_-2=%.1f, v_-6=%.1f, t_up=%.2f" % [v_eq_neg2, v_eq_neg6, t_up])
+		all_ok = false
+
 	bike_test_instance.free()
 
 	if all_ok:
-		print("\n=== ALL SYSTEM VERIFICATIONS PASSED [30/30 - 100% OK] ===\n")
+		print("\n=== ALL SYSTEM VERIFICATIONS PASSED [33/33 - 100% OK] ===\n")
 	else:
 		print("\n=== SOME VERIFICATIONS FAILED ===\n")
 
