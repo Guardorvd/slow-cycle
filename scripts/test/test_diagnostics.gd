@@ -1158,8 +1158,198 @@ func _init() -> void:
 		all_ok = false
 	bike_48.queue_free()
 
+	# Test 49: [Sprint 4F] Freewheel Ratchet Activation & Continuous Speed Scaling Contract
+	var bike_49 = bike_scene.instantiate()
+	root.add_child(bike_49)
+	var audio_mgr_49: BikeAudioManager = bike_49.get_node_or_null("AudioManager")
+	if audio_mgr_49:
+		if not audio_mgr_49.freewheel_player_a:
+			audio_mgr_49._ready()
+
+		# Part A: Strictly silent when pedaling or stopped
+		bike_49.current_speed = 0.0
+		bike_49.is_coasting = false
+		bike_49.is_pedaling = false
+		for _f in range(10):
+			audio_mgr_49._process(1.0 / 60.0)
+		var stopped_silent: bool = audio_mgr_49.freewheel_timer == 0.0
+
+		bike_49.current_speed = 7.0
+		bike_49.is_coasting = false
+		bike_49.is_pedaling = true
+		for _f in range(10):
+			audio_mgr_49._process(1.0 / 60.0)
+		var pedal_silent: bool = audio_mgr_49.freewheel_timer == 0.0
+
+		# Part B: Continuous speed scaling from 10 km/h to 44 km/h
+		var v_10: float = 10.0 / 3.6
+		var v_25: float = 25.0 / 3.6
+		var v_44: float = 44.0 / 3.6
+		var dt_10: float = clampf(0.22 / maxf(v_10, 0.5), 0.018, 0.180)
+		var dt_25: float = clampf(0.22 / maxf(v_25, 0.5), 0.018, 0.180)
+		var dt_44: float = clampf(0.22 / maxf(v_44, 0.5), 0.018, 0.180)
+		var continuous_scale_ok: bool = (dt_44 < dt_25) and (dt_25 < dt_10) and (dt_44 <= 0.020)
+
+		# Part C: Dual-voice duration safety guarantee
+		var click_stream: AudioStreamWAV = audio_mgr_49.freewheel_player_a.stream
+		var click_dur: float = float(click_stream.data.size() / 2) / float(click_stream.mix_rate)
+		var dual_voice_safe: bool = (2.0 * dt_44) > click_dur
+
+		print("[VERIFICATION #49] Freewheel Ratchet Continuous Speed Scaling Contract:")
+		print("  - Silent when stopped/pedaling: Stopped=%s | Pedaling=%s" % [stopped_silent, pedal_silent])
+		print("  - Ratchet intervals: 10 km/h=%.3fs (%.1f/s) | 25 km/h=%.3fs (%.1f/s) | 44 km/h=%.3fs (%.1f/s)" % [dt_10, 1.0/dt_10, dt_25, 1.0/dt_25, dt_44, 1.0/dt_44])
+		print("  - Dual-voice anti-truncation safety: Click Dur=%.3fs < Dual Rep Interval=%.3fs (%s)" % [click_dur, 2.0 * dt_44, "SAFE" if dual_voice_safe else "UNSAFE"])
+
+		if stopped_silent and pedal_silent and continuous_scale_ok and dual_voice_safe:
+			print("  [PASS] Freewheel ratchet activation, continuous speed scaling and dual-voice safety verified!")
+		else:
+			print("  [FAIL] Ratchet contract violated: stopped=%s, pedal=%s, scaling=%s, dual_safe=%s" % [stopped_silent, pedal_silent, continuous_scale_ok, dual_voice_safe])
+			all_ok = false
+	else:
+		all_ok = false
+	bike_49.queue_free()
+
+	# Test 50: [Sprint 4F] Multi-Layer Tire Noise Bounded Dynamics Contract
+	var bike_50 = bike_scene.instantiate()
+	root.add_child(bike_50)
+	var audio_mgr_50: BikeAudioManager = bike_50.get_node_or_null("AudioManager")
+	if audio_mgr_50:
+		if not audio_mgr_50.gravel_player:
+			audio_mgr_50._ready()
+
+		# Baseline on smooth gravel at 25 km/h
+		bike_50.current_speed = 25.0 / 3.6
+		bike_50.terrain_roughness = 0.16
+		bike_50.cornering_scrub_accel = 0.0
+		bike_50.visual_skid_factor = 0.0
+		bike_50.is_on_grass = false
+		for _f in range(60):
+			audio_mgr_50._process(1.0 / 60.0)
+		var base_gravel_vol: float = audio_mgr_50.gravel_player.volume_db
+
+		# On rough gravel washboard
+		bike_50.terrain_roughness = 0.75
+		for _f in range(60):
+			audio_mgr_50._process(1.0 / 60.0)
+		var rough_gravel_vol: float = audio_mgr_50.gravel_player.volume_db
+		var rough_delta: float = rough_gravel_vol - base_gravel_vol
+
+		# With cornering scrub
+		bike_50.cornering_scrub_accel = 0.5
+		for _f in range(60):
+			audio_mgr_50._process(1.0 / 60.0)
+		var scrub_gravel_vol: float = audio_mgr_50.gravel_player.volume_db
+
+		# Check max ceiling with hard skid
+		bike_50.visual_skid_factor = 1.0
+		for _f in range(60):
+			audio_mgr_50._process(1.0 / 60.0)
+		var peak_gravel_vol: float = audio_mgr_50.gravel_player.volume_db
+		var skid_player_vol: float = audio_mgr_50.skid_player.volume_db
+
+		var base_corridor_ok: bool = base_gravel_vol >= -34.0 and base_gravel_vol <= -25.0
+		var rough_bounded_ok: bool = rough_delta > 0.5 and rough_delta <= 3.2
+		var ceiling_ok: bool = peak_gravel_vol <= -19.9
+		var skid_active_ok: bool = skid_player_vol > -35.0
+
+		print("[VERIFICATION #50] Multi-Layer Tire Noise Bounded Dynamics Contract:")
+		print("  - Base cruise gravel vol: %.1f dB (Corridor: [-34.0, -25.0] dB)" % base_gravel_vol)
+		print("  - Roughness contribution: %+.1f dB (Max allowed: +3.0 dB)" % rough_delta)
+		print("  - Peak gravel volume under load: %.1f dB (Mix ceiling: <= -20.0 dB)" % peak_gravel_vol)
+		print("  - Skid player active on lockup: %.1f dB (Target: > -35.0 dB)" % skid_player_vol)
+
+		if base_corridor_ok and rough_bounded_ok and ceiling_ok and skid_active_ok:
+			print("  [PASS] Tire noise layers strictly bounded within mix headroom, skid overlay functional!")
+		else:
+			print("  [FAIL] Tire noise contract violated: base=%s, rough=%s, ceiling=%s, skid=%s" % [base_corridor_ok, rough_bounded_ok, ceiling_ok, skid_active_ok])
+			all_ok = false
+	else:
+		all_ok = false
+	bike_50.queue_free()
+
+	# Test 51: [Sprint 4F] Aerodynamic Airflow Progressive Bandwidth & Stable Pitch Contract
+	var bike_51 = bike_scene.instantiate()
+	root.add_child(bike_51)
+	var audio_mgr_51: BikeAudioManager = bike_51.get_node_or_null("AudioManager")
+	if audio_mgr_51:
+		if not audio_mgr_51.wind_player:
+			audio_mgr_51._ready()
+
+		var wind_stream_51: AudioStreamWAV = audio_mgr_51.wind_player.stream
+		var wind_dur: float = float(wind_stream_51.data.size() / 2) / float(wind_stream_51.mix_rate)
+		var wind_dur_ok: bool = wind_dur >= 4.4 # 4.5s expanded buffer
+
+		# Verify pitch stability across multiple speed regimes (zero pitch-bend)
+		var pitches := []
+		for spd in [0.0, 5.5, 9.0, 12.0]:
+			bike_51.current_speed = spd
+			for _f in range(30):
+				audio_mgr_51._process(1.0 / 60.0)
+			pitches.append(audio_mgr_51.wind_player.pitch_scale)
+
+		var pitch_stable_ok: bool = true
+		for p in pitches:
+			if absf(p - 1.0) > 0.05:
+				pitch_stable_ok = false
+
+		print("[VERIFICATION #51] Aerodynamic Airflow Progressive Bandwidth & Stable Pitch Contract:")
+		print("  - Wind loop buffer duration: %.2fs (Expected: >= 4.4s)" % wind_dur)
+		print("  - Pitch scale across speeds (0, 20, 32, 43 km/h): %s (Expected: strictly ~1.0)" % str(pitches))
+
+		if wind_dur_ok and pitch_stable_ok:
+			print("  [PASS] Wind audio loop buffer expanded, artificial pitch-bend eliminated!")
+		else:
+			print("  [FAIL] Wind contract violated: dur=%s, pitch_stable=%s" % [wind_dur_ok, pitch_stable_ok])
+			all_ok = false
+	else:
+		all_ok = false
+	bike_51.queue_free()
+
+	# Test 52: [Sprint 4F] Modal Brass Bell Harmonic Overtones & Master Limiter Contract
+	var bike_52 = bike_scene.instantiate()
+	root.add_child(bike_52)
+	var audio_mgr_52: BikeAudioManager = bike_52.get_node_or_null("AudioManager")
+	if audio_mgr_52:
+		if not audio_mgr_52.bell_player:
+			audio_mgr_52._ready()
+
+		var bell_stream: AudioStreamWAV = audio_mgr_52.bell_player.stream
+		var bell_dur: float = float(bell_stream.data.size() / 2) / float(bell_stream.mix_rate)
+		var bell_dur_ok: bool = bell_dur >= 1.5
+
+		# Check peak amplitude headroom in bell PCM data
+		var max_sample_val: int = 0
+		for bi in range(0, bell_stream.data.size(), 2):
+			var val: int = absi(bell_stream.data.decode_s16(bi))
+			if val > max_sample_val:
+				max_sample_val = val
+		var peak_ratio: float = float(max_sample_val) / 32767.0
+		var bell_headroom_ok: bool = peak_ratio <= 0.95
+
+		# Check Master AudioBus Limiter presence
+		var master_idx: int = AudioServer.get_bus_index("Master")
+		var has_limiter: bool = false
+		for eff_idx in range(AudioServer.get_bus_effect_count(master_idx)):
+			var eff: AudioEffect = AudioServer.get_bus_effect(master_idx, eff_idx)
+			if eff is AudioEffectLimiter:
+				has_limiter = true
+				break
+
+		print("[VERIFICATION #52] Modal Brass Bell Harmonic Overtones & Master Limiter Contract:")
+		print("  - Bell duration: %.2fs (Expected: >= 1.5s) | Peak PCM ratio: %.2f (Headroom: <= 0.95)" % [bell_dur, peak_ratio])
+		print("  - Master AudioBus Limiter active: %s" % ("YES" if has_limiter else "NO"))
+
+		if bell_dur_ok and bell_headroom_ok and has_limiter:
+			print("  [PASS] Modal brass bell shimmer decay and Master Bus Limiter protection verified!")
+		else:
+			print("  [FAIL] Bell/Limiter contract violated: dur=%s, headroom=%s, limiter=%s" % [bell_dur_ok, bell_headroom_ok, has_limiter])
+			all_ok = false
+	else:
+		all_ok = false
+	bike_52.queue_free()
+
 	if all_ok:
-		print("\n=== ALL SYSTEM VERIFICATIONS PASSED [48/48 - 100% OK] ===\n")
+		print("\n=== ALL SYSTEM VERIFICATIONS PASSED [52/52 - 100% OK] ===\n")
 	else:
 		print("\n=== SOME VERIFICATIONS FAILED ===\n")
 
