@@ -21,15 +21,20 @@ signal bell_rung()
 @export var grass_rolling_resistance: float = 0.45 ## Decisive rolling resistance when off-road on grass
 @export var air_drag_coeff: float = 0.0085 ## Quadratic aerodynamic drag
 @export var gravity_slope_mult: float = 1.10 ## Effect of slope gravity on downhill coasting
-@export var cornering_scrub_coeff: float = 0.18 ## Gentle speed bleed under high lateral cornering loads
-@export var scrub_lateral_threshold: float = 1.5 ## Lateral acceleration threshold (m/s^2) before scrub occurs
+@export var cornering_scrub_coeff: float = 0.22 ## Calibrated speed bleed under high lateral cornering loads
+@export var scrub_lateral_threshold: float = 1.8 ## Lateral acceleration threshold (m/s^2) before scrub occurs
 
 @export_group("Steering & Banking")
 @export var steer_sensitivity: float = 1.6 ## Turn rate (radians/sec)
 @export var max_steer_angle: float = 0.50 ## ~28.6 degrees max handlebar rotation at low speed
 @export var high_speed_steer_limit: float = 0.045 ## ~2.6 degrees max handlebar rotation at high speed (R >= 26-30m)
+@export var steer_attack_speed: float = 5.0 ## Active steering response when input is held
+@export var steer_centering_min: float = 8.0 ## Caster trail self-centering return speed at low speed
+@export var steer_centering_max: float = 16.0 ## Caster trail self-centering return speed at high speed
 @export var max_bank_angle: float = 0.42 ## ~24 degrees max frame lean into turns
-@export var bank_smoothness: float = 6.0 ## Lerp speed for frame roll into turn
+@export var bank_smoothness: float = 6.0 ## Baseline lerp speed for frame roll into turn
+@export var bank_response_speed: float = 6.0 ## Frame roll entry speed into turns
+@export var bank_recovery_speed: float = 8.5 ## Frame roll self-righting speed returning to vertical
 @export var pitch_attack_smoothness: float = 14.0 ## Responsive slope onset for visual frame pitch
 @export var pitch_decay_smoothness: float = 7.0 ## Smooth return to horizontal for visual frame pitch
 
@@ -69,6 +74,7 @@ var brake_dive_pitch: float = 0.0 # Visual-only nose dive in radians
 var yaw_turn_rate: float = 0.0 # Angular turn rate in rad/s
 var turn_radius: float = INF # Computed curve radius
 var lateral_acceleration: float = 0.0 # Current lateral load in m/s^2
+var cornering_scrub_accel: float = 0.0 # Current cornering scrub deceleration in m/s²
 var is_pedaling: bool = false
 var is_sprinting: bool = false
 var is_braking: bool = false
@@ -111,8 +117,8 @@ func _process(delta: float) -> void:
 func _physics_process(delta: float) -> void:
 	_handle_input()
 	_calculate_ground_and_slope(delta)
-	_calculate_forward_dynamics(delta)
 	_calculate_steering_and_banking(delta)
+	_calculate_forward_dynamics(delta)
 	_apply_motion(delta)
 	_update_visual_transforms(delta)
 
@@ -260,14 +266,14 @@ func _calculate_forward_dynamics(delta: float) -> void:
 	var target_dive: float = -deg_to_rad(brake_dive_angle_deg) * brake_input
 	brake_dive_pitch = lerpf(brake_dive_pitch, target_dive, 12.0 * delta)
 
-	# 5. Resistances: rolling friction + aerodynamic drag
+	# 5. Resistances: rolling friction + aerodynamic drag + cornering scrub
 	var a_rolling: float = active_roll_res
 	var a_drag: float = air_drag_coeff * (current_speed * current_speed)
 
 	# Continuous net longitudinal acceleration balance:
-	# Sigma a = a_cruise + a_sprint + a_gravity - a_rolling - a_drag - a_brake
+	# Sigma a = a_cruise + a_sprint + a_gravity - a_rolling - a_drag - a_brake - cornering_scrub_accel
 	var propulsive: float = a_cruise + a_sprint + a_gravity
-	var resistive: float = a_rolling + a_drag + a_brake
+	var resistive: float = a_rolling + a_drag + a_brake + cornering_scrub_accel
 
 	if current_speed <= 0.001 and propulsive <= resistive:
 		current_speed = 0.0
@@ -287,23 +293,24 @@ func _calculate_forward_dynamics(delta: float) -> void:
 	prev_hard_brake = is_hard_braking
 
 func _calculate_steering_and_banking(delta: float) -> void:
-	# 1. Soft-knee input filtering (gradual attack for micro-taps, firm return to center)
-	var steer_attack_speed: float = 4.5
-	var steer_decay_speed: float = 8.0
-	var filter_rate: float = steer_decay_speed if absf(raw_steer_input) < 0.01 else steer_attack_speed
+	var speed_norm: float = clampf((current_speed - 0.83) / 9.5, 0.0, 1.0)
+
+	# 1. Dual-phase input filtering: Active Steer vs Passive Trail Centering (CRITICAL 3)
+	var is_active_steer: bool = absf(raw_steer_input) > 0.01
+	var trail_centering_rate: float = lerpf(steer_centering_min, steer_centering_max, speed_norm)
+	var filter_rate: float = steer_attack_speed if is_active_steer else trail_centering_rate
 	filtered_steer_input = lerpf(filtered_steer_input, raw_steer_input, filter_rate * delta)
 	steer_input = filtered_steer_input
 
 	# 2. Hybrid Lean Steering & High-Speed Turn Radius Limiter
 	# Low speed (<= 0.83 m/s ~ 3 km/h): Direct steering for nimble maneuvers
 	# High speed (>= 11.5 m/s ~ 41 km/h): Clamped to high_speed_steer_limit (R >= 26-30m)
-	var speed_norm: float = clampf((current_speed - 0.83) / 10.67, 0.0, 1.0)
 	var dynamic_max_steer: float = lerpf(max_steer_angle, high_speed_steer_limit, speed_norm)
 	var target_steer: float = filtered_steer_input * dynamic_max_steer
 
-	# 3. Steering mass & centering moment
-	var steer_inertia_rate: float = lerpf(8.0, 14.0, speed_norm)
-	current_steer = lerpf(current_steer, target_steer, steer_inertia_rate * delta)
+	# 3. Steering mass & caster trail restoring moment
+	var steer_tracking_rate: float = 12.0 if is_active_steer else trail_centering_rate
+	current_steer = lerpf(current_steer, target_steer, steer_tracking_rate * delta)
 
 	# 4. Kinematic bicycle yaw rate: omega = (v / wheelbase) * tan(steer)
 	if current_speed > 0.3:
@@ -320,21 +327,24 @@ func _calculate_steering_and_banking(delta: float) -> void:
 
 	rotate_y(yaw_turn_rate * delta)
 
-	# 5. Physics-based banking from centrifugal lateral acceleration: a_c = v * omega_yaw
-	lateral_acceleration = current_speed * absf(yaw_turn_rate)
+	# 5. Physics-based banking from signed centrifugal lateral acceleration (CRITICAL 1)
 	var lateral_accel_signed: float = current_speed * yaw_turn_rate
+	lateral_acceleration = absf(lateral_accel_signed)
 	var physical_target_bank: float = atan2(lateral_accel_signed, 9.8)
 	physical_target_bank = clampf(physical_target_bank, -max_bank_angle, max_bank_angle)
 
-	current_bank = lerpf(current_bank, physical_target_bank, bank_smoothness * delta)
+	var is_rolling_in: bool = absf(physical_target_bank) > absf(current_bank) or (physical_target_bank * current_bank < 0.0)
+	var bank_rate: float = bank_response_speed if is_rolling_in else bank_recovery_speed
+	current_bank = lerpf(current_bank, physical_target_bank, bank_rate * delta)
 
-	# 6. Lateral-load cornering scrub:
-	# Only triggers when lateral load exceeds scrub_lateral_threshold (1.5 m/s^2 ~ 0.15g)
-	# Straightaways and micro-adjustments produce exactly 0 scrub
+	# 6. Continuous cornering scrub acceleration (integrated in longitudinal balance)
+	# Only triggers when lateral load exceeds scrub_lateral_threshold (1.8 m/s^2 ~ 0.18g)
+	# Sub-threshold cornering and straightaways produce strictly 0.0 scrub (CRITICAL 2)
 	if lateral_acceleration > scrub_lateral_threshold:
 		var excess_lateral: float = lateral_acceleration - scrub_lateral_threshold
-		var scrub_loss: float = excess_lateral * cornering_scrub_coeff * delta
-		current_speed = maxf(0.0, current_speed - scrub_loss)
+		cornering_scrub_accel = excess_lateral * cornering_scrub_coeff
+	else:
+		cornering_scrub_accel = 0.0
 
 	# 7. Visual steering ergonomics (FEAT-006.11 / Sprint 3C)
 	var dynamic_max_visual: float
@@ -394,6 +404,7 @@ func _execute_recovery_teleport() -> void:
 	global_transform = safe_transform
 	current_speed = 3.0 # Smooth resumption speed
 	longitudinal_acceleration = 0.0
+	cornering_scrub_accel = 0.0
 	sprint_boost = 0.0
 	current_bank = 0.0
 	current_steer = 0.0

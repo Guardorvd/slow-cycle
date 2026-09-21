@@ -235,7 +235,7 @@ func _init() -> void:
 	# Test 15: [3A.6 FEAT-006.9] Lateral-Load Cornering Scrub
 	var scrub_thresh: float = bike_test_instance.scrub_lateral_threshold
 	var scrub_coeff: float = bike_test_instance.cornering_scrub_coeff
-	if scrub_thresh == 1.5 and scrub_coeff > 0.10:
+	if (scrub_thresh == 1.5 or scrub_thresh == 1.8) and scrub_coeff > 0.10:
 		print("[VERIFICATION #15] [PASS] Lateral-load cornering scrub verified (Threshold: %.1f m/s², Coeff: %.2f)!" % [scrub_thresh, scrub_coeff])
 	else:
 		print("[VERIFICATION #15] [FAIL] Scrub parameters invalid")
@@ -634,10 +634,104 @@ func _init() -> void:
 		print("  [FAIL] Slope behavioral contract mismatch: v_-2=%.1f, v_-6=%.1f, t_up=%.2f" % [v_eq_neg2, v_eq_neg6, t_up])
 		all_ok = false
 
+	# Test 34: [Sprint 4B] Caster Trail Self-Centering Contract (FEAT-012.2)
+	bike_test_instance.current_speed = 25.0 / 3.6 # Cruising 25 km/h
+	bike_test_instance.raw_steer_input = 1.0 # Full steer left
+	for _f in range(30):
+		bike_test_instance._calculate_steering_and_banking(1.0 / 60.0)
+	var pre_release_steer: float = bike_test_instance.current_steer
+	var pre_release_bank: float = bike_test_instance.current_bank
+
+	# Release steering input -> Caster Trail Centering kicks in
+	bike_test_instance.raw_steer_input = 0.0
+	var centering_time: float = 0.0
+	var overshot_zero: bool = false
+	while (absf(bike_test_instance.current_steer) > 0.02 or absf(bike_test_instance.current_bank) > 0.03) and centering_time < 2.0:
+		bike_test_instance._calculate_steering_and_banking(1.0 / 60.0)
+		centering_time += 1.0 / 60.0
+		if bike_test_instance.current_steer < -0.01:
+			overshot_zero = true
+
+	print("[VERIFICATION #34] Sprint 4B Caster Trail Self-Centering Contract:")
+	print("  - Steer before release: %.3f rad | Bank before release: %.3f rad" % [pre_release_steer, pre_release_bank])
+	print("  - Time to return to neutral: %.2f s (Contract: <= 0.75 s)" % centering_time)
+	print("  - Overshot zero into opposite direction: %s (Contract: false)" % ("YES" if overshot_zero else "NO"))
+	if centering_time <= 0.75 and not overshot_zero and pre_release_steer > 0.1:
+		print("  [PASS] Trail self-centering rapidly and smoothly restores straight-line stability!")
+	else:
+		print("  [FAIL] Centering out of spec: time=%.2fs, overshoot=%s" % [centering_time, str(overshot_zero)])
+		all_ok = false
+
+	# Test 35: [Sprint 4B] High-Speed Turn Radius Safety & Limiter Contract (FEAT-012.2)
+	bike_test_instance.current_speed = 40.0 / 3.6 # High speed 40 km/h (11.11 m/s)
+	bike_test_instance.raw_steer_input = 1.0 # Crank full steer
+	for _f in range(60):
+		bike_test_instance._calculate_steering_and_banking(1.0 / 60.0)
+	var hs_radius: float = bike_test_instance.turn_radius
+	var hs_lat_accel: float = bike_test_instance.lateral_acceleration
+	var hs_bank: float = bike_test_instance.current_bank
+	print("[VERIFICATION #35] High-Speed Turn Radius Safety Contract (40 km/h full deflection):")
+	print("  - Turn Radius: %.1f m (Contract: >= 25.0 m)" % hs_radius)
+	print("  - Lateral Load: %.2f m/s² (Contract: <= 5.2 m/s²)" % hs_lat_accel)
+	print("  - Bank Angle: %.1f° (Max limit: %.1f°)" % [rad_to_deg(hs_bank), rad_to_deg(bike_test_instance.max_bank_angle)])
+	if hs_radius >= 25.0 and hs_lat_accel <= 5.2 and absf(hs_bank) <= bike_test_instance.max_bank_angle + 0.01:
+		print("  [PASS] High-speed steering safely clamps turn radius preventing knife-edge rollover!")
+	else:
+		print("  [FAIL] High-speed safety contract violated: R=%.1f, a_lat=%.2f" % [hs_radius, hs_lat_accel])
+		all_ok = false
+
+	# Test 36: [Sprint 4B] Cornering Scrub & Apex Flow Force Balance Contract (FEAT-012.2)
+	# Sub-test A: Sub-threshold coordinated turn (22 km/h, gentle curve, a_lat <= 1.8 m/s²)
+	bike_test_instance.current_speed = 22.0 / 3.6 # 6.11 m/s
+	bike_test_instance.physics_pitch = 0.0
+	bike_test_instance.visual_pitch = 0.0
+	bike_test_instance.is_on_grass = false
+	bike_test_instance.is_grounded = true
+	bike_test_instance.is_pedaling = false
+	bike_test_instance.is_braking = false
+	bike_test_instance.is_sprinting = false
+	bike_test_instance.sprint_boost = 0.0
+	bike_test_instance.raw_steer_input = 0.12 # Wide gentle curve (a_lat ~ 1.5 m/s² <= 1.8)
+	for _f in range(30):
+		bike_test_instance._calculate_steering_and_banking(1.0 / 60.0)
+	var sub_lat: float = bike_test_instance.lateral_acceleration
+	var sub_scrub: float = bike_test_instance.cornering_scrub_accel
+
+	# Sub-test B: Aggressive high-speed turn (38 km/h, full steer, a_lat > 1.8 m/s²)
+	bike_test_instance.current_speed = 38.0 / 3.6 # 10.56 m/s
+	bike_test_instance.physics_pitch = 0.0
+	bike_test_instance.raw_steer_input = 1.0 # Full steer
+	for _f in range(30):
+		bike_test_instance._calculate_steering_and_banking(1.0 / 60.0)
+	var sup_lat: float = bike_test_instance.lateral_acceleration
+	var sup_scrub: float = bike_test_instance.cornering_scrub_accel
+	
+	# Verify integration in forward dynamics force balance
+	var speed_before: float = bike_test_instance.current_speed
+	bike_test_instance._calculate_forward_dynamics(1.0 / 60.0)
+	var expected_drag: float = bike_test_instance.air_drag_coeff * (speed_before * speed_before)
+	var expected_net_resistive: float = bike_test_instance.road_rolling_resistance + expected_drag + sup_scrub
+	var actual_net_accel: float = bike_test_instance.longitudinal_acceleration
+
+	print("[VERIFICATION #36] Cornering Scrub & Apex Flow Physical Load Contract:")
+	print("  - Sub-threshold arc (22 km/h): a_lat=%.2f m/s² -> Scrub=%.3f m/s² (Expected: 0.0)" % [sub_lat, sub_scrub])
+	print("  - Super-threshold вираж (38 km/h): a_lat=%.2f m/s² -> Scrub=%.3f m/s² (Expected: >= 0.45)" % [sup_lat, sup_scrub])
+	print("  - Net resistive acceleration in force balance: %.3f m/s² (Expected: ~%.3f m/s²)" % [-actual_net_accel, expected_net_resistive])
+
+	var sub_ok: bool = (sub_lat <= bike_test_instance.scrub_lateral_threshold and sub_scrub == 0.0)
+	var sup_ok: bool = (sup_lat > bike_test_instance.scrub_lateral_threshold and sup_scrub >= 0.45)
+	var balance_ok: bool = absf(-actual_net_accel - expected_net_resistive) < 0.01
+
+	if sub_ok and sup_ok and balance_ok:
+		print("  [PASS] Cornering scrub cleanly rewards Apex Flow and penalizes aggressive over-speeding!")
+	else:
+		print("  [FAIL] Scrub contract mismatch: sub_ok=%s, sup_ok=%s, balance_ok=%s" % [sub_ok, sup_ok, balance_ok])
+		all_ok = false
+
 	bike_test_instance.free()
 
 	if all_ok:
-		print("\n=== ALL SYSTEM VERIFICATIONS PASSED [33/33 - 100% OK] ===\n")
+		print("\n=== ALL SYSTEM VERIFICATIONS PASSED [36/36 - 100% OK] ===\n")
 	else:
 		print("\n=== SOME VERIFICATIONS FAILED ===\n")
 

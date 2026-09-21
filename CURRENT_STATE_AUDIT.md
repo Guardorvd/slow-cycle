@@ -1,21 +1,9 @@
 # Технический отчёт и аудит проекта: Slow Cycle (Godot 4.7.2)
 
-> **Дата актуализации**: 20.09.2026  
+> **Дата актуализации**: 21.09.2026  
 > **Инженер-аудитор**: AI Lead Systems Architect & Senior Game Engineer  
-> **Статус проекта**: **Спринты 1, 2, 3 (3A, 3B, 3C) и Полный Технический Аудит (20 пунктов) завершены на 100%**.
-
----
-
-## 1. Сводная карточка проекта
-
-| Параметр | Значение |
-| :--- | :--- |
-| **Название** | Slow Cycle (Вело-дзен) |
-| **Жанр** | Медитативный процедурный симулятор поездки на велосипеде (в стиле *Slow Roads*) |
-| **Движок** | Godot Engine 4.7.2 Stable (Mono / .NET) |
-| **Рендерер** | Vulkan 1.3 Forward+ (Depth Fog, Volumetric Fog, SSAO, ACES Tonemap) |
-| **Тестовая конфигурация** | NVIDIA GeForce GTX 1650 SUPER, Windows 11/10 |
-| **Текущий этап** | **Спринт 3C и Технический Аудит успешно сданы**. Полностью устранены 20 архитектурных и функциональных дефектов: согласована посадка растительности на террейн, нормализован базис Recovery (строго горизонтальный курс, исключена прецессия руля), ликвидирован стробоскоп клавиши 'H', обеспечен математически бесшовный циклический кроссфейд процедурного звука ветра и гравия с защитой шва, внедрена шинная архитектура AudioBus (`SFX`, `Ambient`, `Music`), защищён ScreenFader от гонок спама клавиши `R`, SpringArm3D получил правильные маски коллизий (слои 2 и 3), добавлен CLI-аргумент `--seed=`. Автотест расширен до 30 проверок (100% PASS). |
+> **Статус проекта**: **Спринты 1, 2, 3 (3A, 3B, 3C), 4 (4A, 4B) и Полный Технический Аудит завершены на 100%**.
+> **Текущий этап**: **Спринт 4B сдан**. Внедрена кинематико-динамическая модель руления Steer-First / Lean-Coordinated с разделением активного ввода и упругого трейла передней вилки, знаковым креном рамы, интеграцией cornering scrub в единый непрерывный баланс продольных сил и механикой Apex Flow. Автотест расширен до 36 проверок (100% PASS). Следующий этап: **Спринт 4C (Реакция на рельеф и типы поверхностей)**.
 | **Главная сцена** | `res://scenes/main.tscn` |
 
 ---
@@ -110,7 +98,7 @@
 [VERIFICATION #12] Hybrid Lean Steering & Turn Radius Limits (High-speed steer: 2.58° -> Turn Radius: 25.5m)!
 [VERIFICATION #13] Progressive brake attack (0.15s) and visual dive (1.7°) verified!
 [VERIFICATION #14] Pedal power inertia ramp (0.50s) verified!
-[VERIFICATION #15] Lateral-load cornering scrub verified (Threshold: 1.5 m/s², Coeff: 0.18)!
+[VERIFICATION #15] Lateral-load cornering scrub verified (Threshold: 1.8 m/s², Coeff: 0.22)!
 [VERIFICATION #16] Terrain Micro-Motion Camera (Freq: 8.0 Hz, Base Amp: 0.0018m, Grass Mult: 1.6x)!
 [VERIFICATION #17] Bank & Steer Sign Alignment: Left (steer>0, yaw>0, bank>0, vis>0) | Right (steer<0, yaw<0, bank<0, vis<0)!
 [VERIFICATION #18] FrontAxle compensation preserved while FrontWheel spins freely!
@@ -118,16 +106,22 @@
 [VERIFICATION #20] Dynamic Speed FOV: Base 78.0° -> 82.9° at 43 km/h!
 [VERIFICATION #21] Sprint 3C Cockpit Visual Steering: Sign alignment verified, Visual ranges (Low: 22.0°, Cruise: 16.0°, High: 12.0°)!
 [VERIFICATION #22] Front Axle & Spin Geometry: Wheel spin rotates around hub axle under steering deflection!
-[VERIFICATION #23] Natural Muscular Acceleration: 0 -> 20 km/h in 5.57s (Target: 4.8 - 6.5s)!
+[VERIFICATION #23] Natural Muscular Acceleration: 0 -> 20 km/h in 4.95s (Target: 4.8 - 6.5s)!
 [VERIFICATION #24] Wind Acoustic Comfort: 12 km/h (-79 dB), 25 km/h (-41 dB), 43 km/h (-26 dB) gentle aerodynamic curve!
 [VERIFICATION #25] Recovery Basis Horizontal Orientation: Spawn Basis Y strictly (0, 1, 0), zero root precession!
 [VERIFICATION #26] Grass Two-Sided Rendering: CULL_DISABLED verified; blades visible from all camera angles!
-[VERIFICATION #27] Audio Loop Boundary Continuity: Wind seam delta 0.0009, Gravel seam delta 0.1765 (< 0.25 threshold)!
+[VERIFICATION #27] Audio Loop Boundary Continuity: Wind seam delta 0.0326, Gravel seam delta 0.0029 (< 0.25 threshold)!
 [VERIFICATION #28] ScreenFader Re-entrancy Protection: is_fading active lock prevents double teleportation!
 [VERIFICATION #29] SpringArm3D Collision Mask: Mask 6 (Road + Grass) verified, zero clipping underground!
 [VERIFICATION #30] AudioBus Architecture Routing: Bell (SFX), Freewheel (SFX), Wind (Ambient), Gravel (Ambient)!
+[VERIFICATION #31] Sprint 4A Flat Coasting Behavioral Contract: 32.63s duration!
+[VERIFICATION #32] Sprint Boost Buffer & Speed Cap: 3.00 m/s² cap, 43.9 km/h ceiling!
+[VERIFICATION #33] Multi-Slope Behavioral Contract: -2° (19.6 km/h), -6° (39.1 km/h), +3° (8.52s)!
+[VERIFICATION #34] Sprint 4B Caster Trail Self-Centering: 0.52s return to neutral without overshoot!
+[VERIFICATION #35] Sprint 4B High-Speed Turn Radius Safety: R = 25.8m (>= 25.0m), a_lat = 4.79 m/s² (<= 5.2 m/s²)!
+[VERIFICATION #36] Sprint 4B Cornering Scrub & Apex Flow: Sub-threshold scrub 0.000 m/s², Super-threshold scrub 0.475 m/s² cleanly integrated in force balance!
 
-=== ALL SYSTEM VERIFICATIONS PASSED [30/30 - 100% OK] ===
+=== ALL SYSTEM VERIFICATIONS PASSED [36/36 - 100% OK] ===
 ```
 
 ### 15-минутный стресс-тест на выносливость (Soak Test):

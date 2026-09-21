@@ -41,6 +41,8 @@ func _process(delta: float) -> void:
 	var radius_val: float = bike_controller.get("turn_radius") if bike_controller else INF
 	var radius_str: String = "INF" if is_inf(radius_val) else "%.1fm" % radius_val
 	var lat_accel: float = bike_controller.get("lateral_acceleration") if bike_controller else 0.0
+	var scrub_accel: float = bike_controller.get("cornering_scrub_accel") if bike_controller else 0.0
+	var apex_status: String = "SCRUB" if scrub_accel > 0.05 else "FLOW"
 	var pedal_pct: float = (bike_controller.get("pedal_power") if bike_controller else 0.0) * 100.0
 	var brake_pct: float = (bike_controller.get("brake_input") if bike_controller else 0.0) * 100.0
 	var dive_deg: float = rad_to_deg(bike_controller.get("brake_dive_pitch")) if bike_controller else 0.0
@@ -95,7 +97,7 @@ func _process(delta: float) -> void:
 	text += "Speed: %.1f km/h | Long Accel: %+.2f m/s² | Mode: %s\n" % [speed_kmh, long_accel, mode_str]
 	text += "Slope: %.1f° | Dive: %.1f° | Sprint Boost: %.2f m/s²\n" % [slope_deg, dive_deg, sprint_boost_val]
 	text += "Steer: %.1f° | Bank: %.1f° | Yaw: %.2f rad/s | Radius: %s\n" % [steer_deg, bank_deg, yaw_rate, radius_str]
-	text += "Lat Accel: %.2f m/s² | Pedals: %.0f%% | Brake: %.0f%%\n" % [lat_accel, pedal_pct, brake_pct]
+	text += "Lat Accel: %.2f m/s² | Scrub: %.2f m/s² [%s] | Pedals: %.0f%% | Brake: %.0f%%\n" % [lat_accel, scrub_accel, apex_status, pedal_pct, brake_pct]
 	text += "FPS: %d | Frame: %.1f ms | Max Spike: %.1f ms\n" % [Engine.get_frames_per_second(), frame_ms, max_frame_time_ms]
 	text += "RAM Static: %.1f MB\n" % [ram_mb]
 	text += "Surface: %s\n" % ("GRASS (High Drag)" if on_grass else "ROAD (Gravel)")
