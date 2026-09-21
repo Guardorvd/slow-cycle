@@ -433,11 +433,14 @@ func _build_chunks() -> void:
 		# Check if this chunk is located in grass-road sections (Section L or Section S6)
 		var chunk_center_s: float = (road_path.cumulative_distances[s_idx] + road_path.cumulative_distances[e_idx]) * 0.5
 		var is_grass_road: bool = (chunk_center_s >= 2051.95 and chunk_center_s <= 2202.90) or (chunk_center_s >= 2745.02 and chunk_center_s <= 2800.0)
+		var is_rough_road: bool = (chunk_center_s >= 1801.95 and chunk_center_s <= 2051.95) or (chunk_center_s >= 2572.90 and chunk_center_s <= 2632.90)
 
 		# 1. Build Road Mesh
 		var road_mat: Material = shared_materials.get("grass") if is_grass_road else shared_materials.get("road")
 		var road_col_layer: int = 4 if is_grass_road else 2 # Layer 3: Grass (4) or Layer 2: Road (2)
-		_build_road_mesh_for_chunk(chunk_node, s_idx, e_idx, road_mat, road_col_layer)
+		if is_rough_road and not is_grass_road:
+			road_col_layer = road_col_layer | 16 # Layer 5: Rough Gravel
+		_build_road_mesh_for_chunk(chunk_node, s_idx, e_idx, road_mat, road_col_layer, is_rough_road)
 
 		# 2. Build Terrain Strip
 		_build_terrain_mesh_for_chunk(chunk_node, s_idx, e_idx, shared_materials.get("grass"), noise)
@@ -445,7 +448,7 @@ func _build_chunks() -> void:
 		# 3. Populate Foliage
 		foliage_spawner.populate_chunk(chunk_node, road_path, s_idx, e_idx, shared_meshes, noise)
 
-func _build_road_mesh_for_chunk(parent: Node3D, s_idx: int, e_idx: int, mat: Material, col_layer: int) -> void:
+func _build_road_mesh_for_chunk(parent: Node3D, s_idx: int, e_idx: int, mat: Material, col_layer: int, is_rough: bool = false) -> void:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	if mat:
@@ -488,6 +491,9 @@ func _build_road_mesh_for_chunk(parent: Node3D, s_idx: int, e_idx: int, mat: Mat
 	var road_body := StaticBody3D.new()
 	road_body.collision_layer = col_layer
 	road_body.collision_mask = 0
+	if is_rough:
+		road_body.set_meta("surface_type", "rough_gravel")
+		road_body.add_to_group("surface_rough_gravel")
 	var col_shape := CollisionShape3D.new()
 	col_shape.shape = road_mesh.create_trimesh_shape()
 	road_body.add_child(col_shape)

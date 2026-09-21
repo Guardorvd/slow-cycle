@@ -2,8 +2,8 @@
 
 > **Дата актуализации**: 21.09.2026  
 > **Инженер-аудитор**: AI Lead Systems Architect & Senior Game Engineer  
-> **Статус проекта**: **Спринты 1, 2, 3 (3A, 3B, 3C), 4 (4A, 4B, 4G Test Track) и Полный Технический Аудит завершены на 100%**.
-> **Текущий этап**: **Riding Feel Test Track (Спринт 4G) реализован и принят**. Создан замкнутый детерминированный полигон (~2.8 км, 56 чанков, 1401 сэмпл) с 18 секциями (12 изолированных A–L + 6 композитных стресс-секций S1–S6), нулевой дельтой на шве ($\Delta p = 0.000\text{ мм}$), 3D-щитами, гоночными маркерами дистанции апекса, F3-телеметрией и селектором режимов. Автотесты пройдены на 100%. Следующий этап: **Спринт 4C (Реакция на рельеф и типы поверхностей)**.
+> **Статус проекта**: **Спринты 1, 2, 3 (3A, 3B, 3C), 4 (4A, 4B, 4C, 4D, 4G Test Track) и Полный Технический Аудит завершены на 100%**.
+> **Текущий этап**: **Спринт 4D (Слой визуального представления велосипеда) реализован и принят**. Внедрено полное разделение физики (`CharacterBody3D`) и визуального представления (`VisualsRoot`), 4-лучевые спицы колес по критерию Найквиста ($57.7\text{ км/ч} > 44\text{ км/ч}$), кинематическая компенсация оси передней втулки `FrontAxle`, нелинейный пороговый юз заднего колеса при экстренном торможении (`smoothstep(0.65, 1.0, brake_input)`), анимированная каретка с масштабированием каденса ($75\text{ RPM}$) и горизонтированием педалей на накате. Автотесты пройдены на 100% (44/44 PASS). Следующий этап: **Спринт 4E (Камера как сенсор движения)**.
 | **Главная сцена** | `res://scenes/main.tscn` |
 | **Тестовый полигон** | `res://scenes/test/riding_feel_test_track.tscn` |
 
@@ -90,10 +90,31 @@
   - 5 дистанционных щитов апекса в зоне S2.
   - Поддержка возврата на дорогу (клавиша `R`) в пределах $\le 1.1\text{ м}$ от осевой линии с горизонтальным курсом.
   - Интеграция в F3 Debug HUD: отображение кода секции, названия и контрольного параметра (`Track Section: [A] Flat Start (FLAT | ACCEL & COAST)`).
-  - Интеграция в `mode_select.gd`: кнопка 2 запускает полигон.
+### 2.5. Реакция на рельеф и типы поверхностей (Спринт 4C)
+- Модель поверхностей `enum SurfaceType { GRAVEL, GRASS, ROUGH_GRAVEL }` с раздельной калибровкой сопротивления качению ($0.125$, $0.450$, $0.220$).
+- Строгая выпуклая нормализация весов поверхностей ($\sum w_i \equiv 1.0, w_i \ge 0$).
+- Двухзонный RayCast ($1.6\text{ м}$, валидный физический контакт при $d \le 0.68\text{ м}$) с разделением `front_contact_valid` и `rear_contact_valid` и защитой от «магнита к земле».
+- Канал шероховатости `terrain_roughness` (0.0..1.0) с фильтрацией склона.
+- Мягкая микро-подвеска рамы (`VisualsRoot.position.y = 0.34 + suspension_compression`, ход $\pm 4\text{ см}$).
+
+### 2.6. Слой визуального представления велосипеда (Спринт 4D)
+- **Изоляция физического корня**: Корневой `CharacterBody3D` рассчитывает перемещение, баланс сил и коллизии. Крен рамы, тангаж рельефа, клевок при торможении и ход микро-подвески применяются строго к узлу `VisualsRoot`.
+- **Спицы колес и критерий Найквиста**: Созданы 4-лучевые крестовины `Mesh_SpokeBar` и втулки `Mesh_WheelHub` для переднего и заднего колеса. Шаг вращения за кадр при 60 FPS на скорости 44 км/ч составляет $34.33^\circ < 45.0^\circ$, что математически исключает стробоскопический реверс (Wagon-Wheel Aliasing) вплоть до $57.7\text{ км/ч}$.
+- **Кинематическая компенсация `FrontAxle`**: Наклон вилки ($+14^\circ \approx 0.24\text{ рад}$) скомпенсирован обратным наклоном локальной ноды `FrontAxle` ($-0.24\text{ рад}$). Колесо вращается строго вокруг горизонтальной оси ступицы без прецессии и биения обода при рулении.
+- **Анимированная каретка и педали (`Visuals/Crankset`)**:
+  - Вращение шатунов пропорционально скорости и каденсу ($75\text{ RPM}$ на крейсерской скорости).
+  - Автоматическое плавное горизонтирование шатунов при накате (`is_coasting`).
+  - Платформы педалей контр-вращаются (`-crank_rotation`), сохраняя строго горизонтальное положение под стопой.
+- **Пороговый Brake Skid заднего колеса (CRITICAL 3)**:
+  - Формула `visual_skid_factor = smoothstep(0.65, 1.0, brake_input)`.
+  - При мягком торможении ($0 \dots 60\%$) колеса вращаются $100\%$ синхронно с путевой скоростью.
+  - При жёстком торможении ($65 \dots 100\%$) нарастает тормозной юз, замедляя вращение заднего колеса до $10\%$ скорости (блокировка шины).
+- **Двухуровневое руление `visual_steer_gain` (CRITICAL 1)**:
+  - Физический угол `current_steer` ограничен безопасными $2.58^\circ$ на скорости $44\text{ км/ч}$.
+  - Визуальный угол `visual_steer` усиливается коэффициентом $3.5$ и ограничивается динамическим коридором от $22.0^\circ$ (низкая скорость) до $12.0^\circ$ (спринт), обеспечивая выразительный отклик руля в первом лице.
+- **F3 Debug HUD**: Добавлено отображение визуального руления, каденса (RPM) и процента тормозного юза.
 
 ---
-
 
 ## 3. Результаты аппаратного тестирования и телеметрия
 
@@ -137,7 +158,16 @@
 [VERIFICATION #35] Sprint 4B High-Speed Turn Radius Safety: R = 25.8m (>= 25.0m), a_lat = 4.79 m/s² (<= 5.2 m/s²)!
 [VERIFICATION #36] Sprint 4B Cornering Scrub & Apex Flow: Sub-threshold scrub 0.000 m/s², Super-threshold scrub 0.475 m/s² cleanly integrated in force balance!
 
-=== ALL SYSTEM VERIFICATIONS PASSED [36/36 - 100% OK] ===
+[VERIFICATION #37] Single-Ray Crest Dropout & Normal Pitch Fallback: +5.50° / -5.50° slope preserved without 0° pitch collapse!
+[VERIFICATION #38] Surface Model & Strict Convex Mixture: Sum == 1.0000, Gravel=0.000, Grass=0.583, Rough=0.417, drag 0.354 m/s²!
+[VERIFICATION #39] Crest & Dip Ground Adhesion & Pitch Smoothness: Max visual pitch jerk 0.395° (<= 0.85°), zero liftoff, zero snapping!
+[VERIFICATION #40] Terrain Roughness & Slope Independence: Delta_r on 6° slope = 0.0000, bump delta_r = 0.0152, chatter scales with speed!
+[VERIFICATION #41] Wheel Spin Kinematics & Nyquist Anti-Aliasing: 4-spoke crossbar step 34.33° (< 45.0°), cap 57.7 km/h > 44 km/h, no stroboscopic reverse!
+[VERIFICATION #42] Rear Wheel Non-Linear Brake Skid: 0.00 skid at 40% brake (synchronous), 90% lockup at 100% brake (0.10 slip ratio)!
+[VERIFICATION #43] Crankset Cadence & Coasting Leveling: 74.4 RPM cruise cadence, 3.16° horizontal coast leveling (< 4.0°), horizontal pedal platforms!
+[VERIFICATION #44] VisualsRoot Decoupling: Pitch/Roll/Suspension applied strictly to VisualsRoot, CharacterBody3D roll=0°, pitch=0°, Up=(0,1,0)!
+
+=== ALL SYSTEM VERIFICATIONS PASSED [44/44 - 100% OK] ===
 ```
 
 ### 15-минутный стресс-тест на выносливость (Soak Test):

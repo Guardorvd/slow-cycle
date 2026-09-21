@@ -1,4 +1,4 @@
-[gd_scene load_steps=19 format=3]
+[gd_scene load_steps=24 format=3]
 
 [ext_resource type="Script" path="res://scripts/player/bicycle_controller.gd" id="1_controller"]
 [ext_resource type="Script" path="res://scripts/camera/bike_camera.gd" id="2_camera"]
@@ -90,7 +90,36 @@ size = Vector3(0.045, 0.015, 0.04)
 material = SubResource("Mat_Rubber")
 size = Vector3(0.15, 0.05, 0.24)
 
-[node name="Bicycle" type="CharacterBody3D" node_paths=PackedStringArray("front_ray", "rear_ray", "visuals_root", "handlebar_pivot", "front_wheel", "rear_wheel")]
+[sub_resource type="CylinderMesh" id="Mesh_WheelHub"]
+material = SubResource("Mat_Silver")
+top_radius = 0.03
+bottom_radius = 0.03
+height = 0.06
+radial_segments = 12
+
+[sub_resource type="CylinderMesh" id="Mesh_SpokeBar"]
+material = SubResource("Mat_Silver")
+top_radius = 0.004
+bottom_radius = 0.004
+height = 0.58
+radial_segments = 6
+
+[sub_resource type="CylinderMesh" id="Mesh_BottomBracket"]
+material = SubResource("Mat_Silver")
+top_radius = 0.02
+bottom_radius = 0.02
+height = 0.14
+radial_segments = 12
+
+[sub_resource type="BoxMesh" id="Mesh_CrankArm"]
+material = SubResource("Mat_Silver")
+size = Vector3(0.015, 0.17, 0.025)
+
+[sub_resource type="BoxMesh" id="Mesh_PedalPlatform"]
+material = SubResource("Mat_Rubber")
+size = Vector3(0.08, 0.02, 0.09)
+
+[node name="Bicycle" type="CharacterBody3D" node_paths=PackedStringArray("front_ray", "rear_ray", "visuals_root", "handlebar_pivot", "front_wheel", "rear_wheel", "crankset_pivot", "left_pedal", "right_pedal")]
 collision_layer = 8
 collision_mask = 7
 script = ExtResource("1_controller")
@@ -100,6 +129,9 @@ visuals_root = NodePath("Visuals")
 handlebar_pivot = NodePath("Visuals/ForkAndHandlebar")
 front_wheel = NodePath("Visuals/ForkAndHandlebar/FrontAxle/FrontWheel")
 rear_wheel = NodePath("Visuals/RearWheel")
+crankset_pivot = NodePath("Visuals/Crankset")
+left_pedal = NodePath("Visuals/Crankset/LeftCrank/LeftPedal")
+right_pedal = NodePath("Visuals/Crankset/RightCrank/RightPedal")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.65, 0)
@@ -107,13 +139,13 @@ shape = SubResource("CapsuleShape3D_1")
 
 [node name="FrontRay" type="RayCast3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, -0.6)
-target_position = Vector3(0, -1.4, 0)
-collision_mask = 6
+target_position = Vector3(0, -1.6, 0)
+collision_mask = 22
 
 [node name="RearRay" type="RayCast3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0.6)
-target_position = Vector3(0, -1.4, 0)
-collision_mask = 6
+target_position = Vector3(0, -1.6, 0)
+collision_mask = 22
 
 [node name="Visuals" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.34, 0)
@@ -145,6 +177,52 @@ mesh = SubResource("Mesh_WheelTire")
 transform = Transform3D(-4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0, 1, 0, 0, 0)
 mesh = SubResource("Mesh_WheelRim")
 
+[node name="RearHub" type="MeshInstance3D" parent="Visuals/RearWheel"]
+transform = Transform3D(-4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("Mesh_WheelHub")
+
+[node name="RearSpokes" type="Node3D" parent="Visuals/RearWheel"]
+
+[node name="SpokeBar1" type="MeshInstance3D" parent="Visuals/RearWheel/RearSpokes"]
+mesh = SubResource("Mesh_SpokeBar")
+
+[node name="SpokeBar2" type="MeshInstance3D" parent="Visuals/RearWheel/RearSpokes"]
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, 0)
+mesh = SubResource("Mesh_SpokeBar")
+
+[node name="Crankset" type="Node3D" parent="Visuals"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.12, 0)
+
+[node name="BottomBracket" type="MeshInstance3D" parent="Visuals/Crankset"]
+transform = Transform3D(-4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("Mesh_BottomBracket")
+
+[node name="LeftCrank" type="Node3D" parent="Visuals/Crankset"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.07, 0, 0)
+
+[node name="LeftCrankArm" type="MeshInstance3D" parent="Visuals/Crankset/LeftCrank"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.085, 0)
+mesh = SubResource("Mesh_CrankArm")
+
+[node name="LeftPedal" type="Node3D" parent="Visuals/Crankset/LeftCrank"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.04, -0.17, 0)
+
+[node name="LeftPedalMesh" type="MeshInstance3D" parent="Visuals/Crankset/LeftCrank/LeftPedal"]
+mesh = SubResource("Mesh_PedalPlatform")
+
+[node name="RightCrank" type="Node3D" parent="Visuals/Crankset"]
+transform = Transform3D(1, 0, 0, 0, -1, 0, 0, 0, -1, 0.07, 0, 0)
+
+[node name="RightCrankArm" type="MeshInstance3D" parent="Visuals/Crankset/RightCrank"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.085, 0)
+mesh = SubResource("Mesh_CrankArm")
+
+[node name="RightPedal" type="Node3D" parent="Visuals/Crankset/RightCrank"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.04, -0.17, 0)
+
+[node name="RightPedalMesh" type="MeshInstance3D" parent="Visuals/Crankset/RightCrank/RightPedal"]
+mesh = SubResource("Mesh_PedalPlatform")
+
 [node name="ForkAndHandlebar" type="Node3D" parent="Visuals"]
 transform = Transform3D(1, 0, 0, 0, 0.97, -0.24, 0, 0.24, 0.97, 0, 0.38, -0.48)
 
@@ -160,6 +238,19 @@ mesh = SubResource("Mesh_WheelTire")
 [node name="FrontRim" type="MeshInstance3D" parent="Visuals/ForkAndHandlebar/FrontAxle/FrontWheel"]
 transform = Transform3D(-4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0, 1, 0, 0, 0)
 mesh = SubResource("Mesh_WheelRim")
+
+[node name="FrontHub" type="MeshInstance3D" parent="Visuals/ForkAndHandlebar/FrontAxle/FrontWheel"]
+transform = Transform3D(-4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("Mesh_WheelHub")
+
+[node name="FrontSpokes" type="Node3D" parent="Visuals/ForkAndHandlebar/FrontAxle/FrontWheel"]
+
+[node name="SpokeBar1" type="MeshInstance3D" parent="Visuals/ForkAndHandlebar/FrontAxle/FrontWheel/FrontSpokes"]
+mesh = SubResource("Mesh_SpokeBar")
+
+[node name="SpokeBar2" type="MeshInstance3D" parent="Visuals/ForkAndHandlebar/FrontAxle/FrontWheel/FrontSpokes"]
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, 0)
+mesh = SubResource("Mesh_SpokeBar")
 
 [node name="Stem" type="MeshInstance3D" parent="Visuals/ForkAndHandlebar"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.22, 0)

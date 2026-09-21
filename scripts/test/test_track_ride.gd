@@ -110,6 +110,22 @@ func _start() -> void:
 		return
 	print("[PASS] Section L grass verge triggers Layer 3 grass drag (0.45).")
 
+	# 5b. Teleport to Section J (Rough Gravel)
+	print("\n--- Testing Section J (Rough Gravel Washboard) ---")
+	var s_j: float = 1850.0
+	var sample_j: Dictionary = generator.road_path.get_sample_at_distance(s_j)
+	bike.global_position = sample_j.position + Vector3(0, 0.45, 0)
+	bike.velocity = Vector3.ZERO
+	bike.current_speed = 7.0
+	for frame in range(30):
+		await physics_frame
+	print("On Section J road surface: current_surface = %d (expected 2 = ROUGH_GRAVEL), roughness = %.2f" % [bike.current_surface, bike.terrain_roughness])
+	if bike.current_surface != 2 and bike.terrain_roughness < 0.5:
+		printerr("[FAIL] Section J did not detect rough gravel surface!")
+		quit(1)
+		return
+	print("[PASS] Section J rough gravel detects washboard surface (enum 2, roughness > 0.5).")
+
 	# 6. Test 'R' Recovery Key
 	print("\n--- Testing Recovery ('R' Key) ---")
 	# Move bike off track

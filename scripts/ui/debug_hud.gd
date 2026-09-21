@@ -98,13 +98,22 @@ func _process(delta: float) -> void:
 	text += "Global Chunk: #%d | Active Chunks: %d\n" % [chunk_id, active_chunks]
 	text += "Spline Buffer: %d pts (Pruned) | Chunk Gen: %.2f ms\n" % [spline_pts, chunk_gen_ms]
 
+	var vis_steer_deg: float = rad_to_deg(bike_controller.get("visual_steer")) if bike_controller else 0.0
+	var cadence_rpm: float = bike_controller.get("current_cadence_rpm") if bike_controller else 0.0
+	var skid_pct: float = (bike_controller.get("visual_skid_factor") if bike_controller else 0.0) * 100.0
+
 	text += "Speed: %.1f km/h | Long Accel: %+.2f m/s² | Mode: %s\n" % [speed_kmh, long_accel, mode_str]
-	text += "Slope: %.1f° | Dive: %.1f° | Sprint Boost: %.2f m/s²\n" % [slope_deg, dive_deg, sprint_boost_val]
-	text += "Steer: %.1f° | Bank: %.1f° | Yaw: %.2f rad/s | Radius: %s\n" % [steer_deg, bank_deg, yaw_rate, radius_str]
+	text += "Slope: %.1f° | Steer: %.1f° (Vis: %.1f°) | Bank: %.1f°\n" % [slope_deg, steer_deg, vis_steer_deg, bank_deg]
+	text += "Cadence: %.0f RPM | Skid: %.0f%% | Dive: %.1f° | Radius: %s\n" % [cadence_rpm, skid_pct, dive_deg, radius_str]
 	text += "Lat Accel: %.2f m/s² | Scrub: %.2f m/s² [%s] | Pedals: %.0f%% | Brake: %.0f%%\n" % [lat_accel, scrub_accel, apex_status, pedal_pct, brake_pct]
 	text += "FPS: %d | Frame: %.1f ms | Max Spike: %.1f ms\n" % [Engine.get_frames_per_second(), frame_ms, max_frame_time_ms]
-	text += "RAM Static: %.1f MB\n" % [ram_mb]
-	text += "Surface: %s\n" % ("GRASS (High Drag)" if on_grass else "ROAD (Gravel)")
+	var surface_enum: int = bike_controller.get("current_surface") if bike_controller else 0
+	var surface_name: String = "ROAD (Gravel)"
+	if surface_enum == 1: surface_name = "GRASS (High Drag)"
+	elif surface_enum == 2: surface_name = "ROUGH_GRAVEL (Washboard)"
+	var rough_pct: float = (bike_controller.get("terrain_roughness") if bike_controller else 0.16) * 100.0
+	var susp_mm: float = (bike_controller.get("suspension_compression") if bike_controller else 0.0) * 1000.0
+	text += "Surface: %s | Rough: %.0f%% | Susp: %+dmm\n" % [surface_name, rough_pct, int(round(susp_mm))]
 	text += "================================="
 
 	telemetry_label.text = text
