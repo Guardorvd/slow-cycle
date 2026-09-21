@@ -20,4 +20,5 @@ func _on_infinite_selected() -> void:
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
 
 func _on_sandbox_selected() -> void:
-	get_tree().change_scene_to_file("res://scenes/test/sandbox.tscn")
+	get_tree().change_scene_to_file("res://scenes/test/riding_feel_test_track.tscn")
+

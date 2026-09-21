@@ -92,8 +92,12 @@ func _process(delta: float) -> void:
 
 	var text := "=== SLOW CYCLE TELEMETRY (F3) ===\n"
 	text += "Time: %02d:%02d | Seed: %d | Distance: %.2f km\n" % [mins, secs, seed_val, dist_km]
+	if world_manager and world_manager.has_method("get_section_at_distance"):
+		var sec_info: Dictionary = world_manager.get_section_at_distance(dist_km * 1000.0)
+		text += "Track Section: [%s] %s (%s)\n" % [sec_info.get("code", "?"), sec_info.get("name", ""), sec_info.get("target", "")]
 	text += "Global Chunk: #%d | Active Chunks: %d\n" % [chunk_id, active_chunks]
 	text += "Spline Buffer: %d pts (Pruned) | Chunk Gen: %.2f ms\n" % [spline_pts, chunk_gen_ms]
+
 	text += "Speed: %.1f km/h | Long Accel: %+.2f m/s² | Mode: %s\n" % [speed_kmh, long_accel, mode_str]
 	text += "Slope: %.1f° | Dive: %.1f° | Sprint Boost: %.2f m/s²\n" % [slope_deg, dive_deg, sprint_boost_val]
 	text += "Steer: %.1f° | Bank: %.1f° | Yaw: %.2f rad/s | Radius: %s\n" % [steer_deg, bank_deg, yaw_rate, radius_str]

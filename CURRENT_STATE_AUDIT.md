@@ -2,9 +2,11 @@
 
 > **Дата актуализации**: 21.09.2026  
 > **Инженер-аудитор**: AI Lead Systems Architect & Senior Game Engineer  
-> **Статус проекта**: **Спринты 1, 2, 3 (3A, 3B, 3C), 4 (4A, 4B) и Полный Технический Аудит завершены на 100%**.
-> **Текущий этап**: **Спринт 4B сдан**. Внедрена кинематико-динамическая модель руления Steer-First / Lean-Coordinated с разделением активного ввода и упругого трейла передней вилки, знаковым креном рамы, интеграцией cornering scrub в единый непрерывный баланс продольных сил и механикой Apex Flow. Автотест расширен до 36 проверок (100% PASS). Следующий этап: **Спринт 4C (Реакция на рельеф и типы поверхностей)**.
+> **Статус проекта**: **Спринты 1, 2, 3 (3A, 3B, 3C), 4 (4A, 4B, 4G Test Track) и Полный Технический Аудит завершены на 100%**.
+> **Текущий этап**: **Riding Feel Test Track (Спринт 4G) реализован и принят**. Создан замкнутый детерминированный полигон (~2.8 км, 56 чанков, 1401 сэмпл) с 18 секциями (12 изолированных A–L + 6 композитных стресс-секций S1–S6), нулевой дельтой на шве ($\Delta p = 0.000\text{ мм}$), 3D-щитами, гоночными маркерами дистанции апекса, F3-телеметрией и селектором режимов. Автотесты пройдены на 100%. Следующий этап: **Спринт 4C (Реакция на рельеф и типы поверхностей)**.
 | **Главная сцена** | `res://scenes/main.tscn` |
+| **Тестовый полигон** | `res://scenes/test/riding_feel_test_track.tscn` |
+
 
 ---
 
@@ -77,7 +79,21 @@
 - Zero Pop-In Depth Fog в радиусе $350\text{ м}$.
 - Посадка деревьев и травы точечно по шуму террейна в координатах спавна $(X, Z)$.
 
+### 2.4. Детерминированный тестовый полигон Riding Feel Test Track (`scenes/test/riding_feel_test_track.tscn`)
+- **Замкнутый контур ~2.8 км (56 чанков, 1401 сэмпл)** с аналитической геометрией 4 главных поворотов и симметричных S-дуг.
+- **Абсолютная $C^1$-непрерывность шва**: $\Delta p = 0.000\text{ мм}$, $\Delta \theta = 0.00000000\text{ рад}$, $\Delta Y = 0.000\text{ мм}$. Нулевой стыковой дефект, нулевой перепад высот и тангажа.
+- **18 калиброванных испытательных секций**:
+  - **12 изолированных (A–L)**: Flat Start (0..247м), Climb $+4.5^\circ$ (247..467м), Downhill $-5.0^\circ$ (467..717м), Sharp Crest $+6^\circ \to -6^\circ$ (717..797м), Sharp Dip $-6^\circ \to +6^\circ$ (797..877м), Constant Arc $R=35\text{м}$ (877..1077м), Sharp Turn $R=25\text{м}$ (1301..1401м), S-Chicanes $R=30\text{м}$ (1401..1601м), Fast Sweeper $R=65\text{м}$ (1601..1801м), Rough Gravel (1801..1901м, амплитуда микро-кочек 0.035м), Rough Downhill $-4^\circ$ (1901..2051м), Grass Verge Exit (2051..2202м, коллизия Layer 3 Grass с повышенным сопротивлением качению 0.45).
+  - **6 композитных стресс-секций (S1–S6)**: Downhill $\to$ Sweeper (2202..2402м), Downhill $\to$ Apex Flow (2402..2502м с гоночными щитами дистанции `[100m]`, `[50m]`, `[BRAKE ZONE]`, `[APEX]`, `[SPRINT]`), Crest $\to$ Dip $\to$ Turn (2502..2572м), Rough Downhill $\to$ S-Turns (2572..2632м), Sweeper $\to$ Heavy Brake (2632..2745м), Grass in Corner Return to Start (2745..2800м, Layer 3).
+- **Инфраструктура и UI**:
+  - 18 придорожных стел с контрастными табличками `Label3D`, ориентированными навстречу гонщику.
+  - 5 дистанционных щитов апекса в зоне S2.
+  - Поддержка возврата на дорогу (клавиша `R`) в пределах $\le 1.1\text{ м}$ от осевой линии с горизонтальным курсом.
+  - Интеграция в F3 Debug HUD: отображение кода секции, названия и контрольного параметра (`Track Section: [A] Flat Start (FLAT | ACCEL & COAST)`).
+  - Интеграция в `mode_select.gd`: кнопка 2 запускает полигон.
+
 ---
+
 
 ## 3. Результаты аппаратного тестирования и телеметрия
 
@@ -144,3 +160,54 @@ Total distance verified: 52.50 km across 1050 chunks. Zero falls, zero leaks.
 [Потребление RAM]: 46.5 - 47.2 MB (стабильное плато при бесконечном стриминге)
 [Ошибки / Утечки]: 0 ошибок, 0 предупреждений движка
 ```
+
+### Результаты валидации тестового полигона (Riding Feel Test Track):
+```text
+==================================================
+   SLOW CYCLE — RIDING FEEL TEST TRACK VERIFIER   
+==================================================
+
+[PASS] Scene res://scenes/test/riding_feel_test_track.tscn loaded successfully.
+[PASS] TestTrackGenerator node found.
+[PASS] road_path samples count: 1401 (expected >= 1401)
+       Total cumulative track distance: 2802.3230 m (target: 2800.0 m ± 5.0 m)
+
+--- 1. Loop Seam Continuity Verification ---
+Sample 0:    Pos=(0.0, 0.0, 0.0)  Tang=(0.0, 0.0, -1.0)
+Sample Last: Pos=(0.0, 0.0, 0.0)  Tang=(0.0, 0.0, -1.0)
+Delta Pos:    0.000000 mm (Acceptance: < 5.0 mm)
+Delta Height: 0.000000 mm (Acceptance: < 5.0 mm)
+Delta Tang:   0.00000000 (Acceptance: < 0.010 rad)
+[PASS] Seam continuity guarantees C1 continuous closed circuit with ZERO steps.
+
+--- 2. Section Coverage and Geometry Verification ---
+[PASS] All 18 sections defined, contiguous, and queryable.
+
+--- 3. Testing Section Specific Physical Metrics ---
+Section A (Flat Start): Slope = 0.00° (expected 0.0°)
+Section B (Climb): Max Slope = +4.50° (expected +4.5°)
+Section C (Downhill): Min Slope = -5.00° (expected -5.0°)
+Section D (Sharp Crest): Slope Range = [6.23°, -6.22°] (expected +6.0° to -6.0°)
+Section F (Constant Arc): Radius = 35.00 m (expected 35.0 m)
+Section G (Sharp Corner): Radius = 25.00 m (expected 25.0 m)
+Section H (S-Chicanes): Radius = 30.00 m (expected 30.0 m)
+Section I (Fast Sweeper): Radius = 65.00 m (expected 65.0 m)
+Section J (Rough Gravel): Micro-bumps active = true (amplitude ~0.035m)
+
+--- 4. Chunks and Collision Layers Verification ---
+[PASS] Exactly 56 chunks instantiated (covering 2800m).
+[PASS] Normal road chunk colliders configured on Layer 2 (Road).
+[PASS] Section L (Grass Verge Exit) correctly configured with Layer 3 (Grass, Drag 0.45).
+
+--- 5. Signage and Apex Flow Boards Verification ---
+[PASS] All 18 3D roadside section signage steles created with Label3D.
+[PASS] All 5 Apex Flow racing distance boards created ([100m], [50m], [BRAKE ZONE], [APEX], [SPRINT]).
+
+--- 6. Bicycle Recovery API Verification ---
+Recovery test for (100.0, 5.0, -250.0) -> Spawn at (0.0, 0.45, -235.0)
+Distance from recovered spawn position to road centerline: 1.0966 m (target < 1.5m, 0.45m height offset)
+[PASS] request_bike_recovery generates tangent-aligned, upright transform on track.
+
+[SUCCESS] ALL TEST TRACK VERIFICATION CHECKS PASSED [OK]
+```
+

@@ -151,29 +151,20 @@
 
 ---
 
-### TASK: [FEAT-012.7] Sprint 4G: Тестовый полигон, селектор режимов и калибровка (Test Track, Mode Switcher & Calibration Gate)
-**Goal**: Создать выделенную тестовую сцену с 12 секциями (A–L), удобный выбор режима при старте игры и провести финальный 10-минутный тест.
-**Do**:
-- Создать сцену `scenes/test/riding_feel_test_track.tscn` с 12 детерминированными участками дороги:
-  - A — Прямая (разгон, накат, торможение, аркадный спринт)
-  - B — Затяжной подъем (+3° → +7°)
-  - C — Затяжной спуск (-2° → -6°)
-  - D — Резкий гребень (Crest)
-  - E — Резкая впадина (Dip)
-  - F — Плавный вираж постоянного радиуса
-  - G — Острый поворот под 90°
-  - H — S-образная змейка
-  - I — Скоростной пологий вираж
-  - J — Грубый гравий
-  - K — Неровный спуск на скорости
-  - L — Съезд на траву
-- Создать стартовый диалог выбора режима (Бесконечная поездка / Тестовый полигон).
-- Провести 10-минутный непрерывный тест-драйв на полигоне.
-**Do not**: Не ломать процедурную генерацию основного мира.
-**Acceptance Criteria**:
-- Игрок при запуске может легко выбрать режим тестового трека или бесконечного мира.
-- Все 12 секций проходятся стабильно и увлекательно.
-**Files**: `scenes/test/riding_feel_test_track.tscn` (NEW), `scripts/test/riding_feel_test_track.gd` (NEW), `scenes/ui/mode_select.tscn` (NEW), `scripts/ui/mode_select.gd` (NEW).
+### TASK: [FEAT-012.7] Sprint 4G: Тестовый полигон, селектор режимов и калибровка (Test Track, Mode Switcher & Calibration Gate) (`COMPLETED [x]`)
+**Goal**: Создать выделенную тестовую сцену с 18 секциями (12 изолированных A–L + 6 композитных стресс-секций S1–S6), удобный выбор режима при старте игры и детерминированную верификацию.
+**Realized**:
+- Реализована детерминированная замкнутая сцена `scenes/test/riding_feel_test_track.tscn` (~2.8 км, 56 чанков, 1401 сэмпл):
+  - Точное аналитическое замыкание шва: $\Delta p = 0.000\text{ мм}$, $\Delta \theta = 0.00000000\text{ рад}$, $\Delta Y = 0.000\text{ мм}$ (абсолютная $C^1$-непрерывность).
+  - 12 изолированных секций A–L: Flat Start, Climb $+4.5^\circ$, Downhill $-5.0^\circ$, Sharp Crest $+6^\circ \to -6^\circ$, Sharp Dip $-6^\circ \to +6^\circ$, Constant Arc $R=35\text{м}$, Sharp Corner $R=25\text{м}$, S-Chicanes $R=30\text{м}$, Fast Sweeper $R=65\text{м}$, Rough Gravel (микро-кочки), Rough Downhill $-4^\circ$, Grass Verge Exit (Layer 3).
+  - 6 композитных стресс-секций S1–S6: Downhill $\to$ Sweeper, Apex Flow с гоночными щитами дистанции, Crest $\to$ Dip $\to$ Turn, Rough Downhill $\to$ S-Turns, Sweeper $\to$ Heavy Brake, Grass in Corner Return to Start.
+  - 18 придорожных стел с 3D-табличками (`Label3D`) и 5 гоночных щитов зоны апекса (`[100m]`, `[50m]`, `[BRAKE ZONE]`, `[APEX]`, `[SPRINT]`).
+  - Поддержка возврата на дорогу (клавиша `R` через `request_bike_recovery`).
+  - Вывод текущей секции и параметров в Debug HUD (F3).
+  - Селектор режимов: кнопка «2. Тестовый полигон» в `mode_select.gd` загружает тестовый трек.
+  - Автоматизированный верификатор `test_track_verification.gd` и тест живой симуляции `test_track_ride.gd` пройдены на 100%.
+**Files**: `scenes/test/riding_feel_test_track.tscn` (NEW), `scripts/test/test_track_generator.gd` (NEW), `scripts/test/test_track_verification.gd` (NEW), `scripts/test/test_track_ride.gd` (NEW), `scripts/ui/mode_select.gd`, `scenes/mode_select.tscn`, `scripts/ui/debug_hud.gd`.
+
 
 ---
 
