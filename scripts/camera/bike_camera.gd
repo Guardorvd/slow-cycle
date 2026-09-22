@@ -127,7 +127,7 @@ func _process(delta: float) -> void:
 	# -------------------------------------------------------------
 	# 2. CORE PRIORITY 1: Longitudinal Surge (Inertial Torso Lag/Lead)
 	# -------------------------------------------------------------
-	var target_surge_z: float = -clampf(long_accel * surge_gain, -max_surge_backward, max_surge_forward)
+	var target_surge_z: float = clampf(long_accel * surge_gain, -max_surge_forward, max_surge_backward)
 	var is_surge_expanding: bool = absf(target_surge_z) > absf(current_surge_z) or (target_surge_z * current_surge_z < 0.0)
 	var surge_rate: float = surge_attack_speed if is_surge_expanding else surge_release_speed
 	var surge_t: float = 1.0 - exp(-surge_rate * delta)
@@ -224,7 +224,7 @@ func _process(delta: float) -> void:
 	# -------------------------------------------------------------
 	if first_person_cam:
 		# Position: base + lateral sway + shake_x, base_y + bob + dive_y + shake_y, base_z + surge_z + dive_tuck
-		var dive_forward_shift: float = -current_dive_pitch * 0.03 # Subtle forward tuck in braking
+		var dive_forward_shift: float = current_dive_pitch * 0.03 # Subtle forward tuck in braking (-Z towards handlebars)
 		first_person_cam.position.x = base_fp_pos.x + current_shake_x + sway_offset_x
 		first_person_cam.position.y = base_fp_pos.y + current_bob_y + current_dive_y + current_shake_y
 		first_person_cam.position.z = base_fp_pos.z + current_surge_z + dive_forward_shift
@@ -249,7 +249,7 @@ func _process(delta: float) -> void:
 
 		# Surge breathes spring length smoothly
 		if spring_arm:
-			var target_spring: float = base_tp_spring_length - current_surge_z * 1.5
+			var target_spring: float = base_tp_spring_length + current_surge_z * 1.5
 			var arm_t: float = 1.0 - exp(-6.0 * delta)
 			spring_arm.spring_length = lerpf(spring_arm.spring_length, target_spring, arm_t)
 

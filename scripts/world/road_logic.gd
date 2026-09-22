@@ -56,18 +56,22 @@ func plan_next_chunk() -> void:
 
 func _replenish_rhythm_queue() -> void:
 	var roll: float = rng.randf()
-	if roll < 0.35:
+	if roll < 0.30:
 		segment_queue.append(RoadPathDataClass.SegmentType.STRAIGHT)
 		segment_queue.append(RoadPathDataClass.SegmentType.STRAIGHT)
-	elif roll < 0.70:
+	elif roll < 0.60:
 		current_curve_dir = -1.0 if rng.randf() < 0.5 else 1.0
 		segment_queue.append(RoadPathDataClass.SegmentType.GENTLE_ENTRY)
 		segment_queue.append(RoadPathDataClass.SegmentType.FULL_CURVE)
 		segment_queue.append(RoadPathDataClass.SegmentType.GENTLE_EXIT)
-	elif roll < 0.85:
+	elif roll < 0.75:
 		segment_queue.append(RoadPathDataClass.SegmentType.DESCENT)
 		segment_queue.append(RoadPathDataClass.SegmentType.DESCENT)
 		segment_queue.append(RoadPathDataClass.SegmentType.MEADOW)
+	elif roll < 0.88:
+		# Rough gravel sector: rough washboard transition
+		segment_queue.append(RoadPathDataClass.SegmentType.ROUGH_GRAVEL)
+		segment_queue.append(RoadPathDataClass.SegmentType.STRAIGHT)
 	else:
 		current_curve_dir = -1.0 if rng.randf() < 0.5 else 1.0
 		segment_queue.append(RoadPathDataClass.SegmentType.GENTLE_ENTRY)
@@ -98,6 +102,9 @@ func _generate_chunk_geometry(seg_type: int) -> void:
 		RoadPathDataClass.SegmentType.MEADOW:
 			target_yaw_change = rng.randf_range(-4.0, 4.0)
 			target_slope = rng.randf_range(-0.5, 1.5)
+		RoadPathDataClass.SegmentType.ROUGH_GRAVEL:
+			target_yaw_change = rng.randf_range(-4.0, 4.0)
+			target_slope = rng.randf_range(-2.0, 1.0)
 
 	# Pre-validation clamp: max 26 deg per 50m guarantees radius >= 38.0m (typically >= 100m)
 	target_yaw_change = clampf(target_yaw_change, -26.0, 26.0)

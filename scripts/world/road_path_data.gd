@@ -10,7 +10,8 @@ enum SegmentType {
 	FULL_CURVE = 2,
 	GENTLE_EXIT = 3,
 	DESCENT = 4,
-	MEADOW = 5
+	MEADOW = 5,
+	ROUGH_GRAVEL = 6
 }
 
 var points: PackedVector3Array = PackedVector3Array()

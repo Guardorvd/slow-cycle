@@ -114,7 +114,13 @@ func _process(delta: float) -> void:
 				freewheel_timer = fmod(freewheel_timer, click_interval)
 			var active_player: AudioStreamPlayer3D = freewheel_player_a if freewheel_use_a else freewheel_player_b
 			freewheel_use_a = not freewheel_use_a
-			active_player.pitch_scale = randf_range(0.97, 1.03)
+			var base_pitch: float = randf_range(0.97, 1.03)
+			var base_vol: float = -5.0
+			if is_on_grass or current_surf == 1:
+				base_vol -= 2.5
+				base_pitch *= 0.90
+			active_player.volume_db = base_vol
+			active_player.pitch_scale = base_pitch
 			active_player.play()
 	else:
 		freewheel_timer = 0.0

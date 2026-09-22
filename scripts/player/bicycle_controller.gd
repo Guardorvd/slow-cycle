@@ -199,7 +199,7 @@ func _calculate_sprint_tap_impulse() -> float:
 		return lerpf(sprint_impulse * 0.44, sprint_impulse * 0.18, t)
 	elif speed_kmh < 44.0:
 		var t: float = (speed_kmh - 42.0) / 2.0
-		return lerpf(sprint_impulse * 0.18, 0.05, t)
+		return lerpf(sprint_impulse * 0.18, 0.0, t)
 	else:
 		return 0.0
 
@@ -332,7 +332,7 @@ func _calculate_forward_dynamics(delta: float) -> void:
 	var active_roll_res: float = surface_gravel_weight * road_rolling_resistance + surface_grass_weight * grass_rolling_resistance + surface_rough_weight * rough_gravel_rolling_resistance
 
 	if not is_grounded:
-		var air_resistance: float = active_roll_res + air_drag_coeff * (current_speed * current_speed)
+		var air_resistance: float = air_drag_coeff * (current_speed * current_speed)
 		current_speed = maxf(0.0, current_speed - air_resistance * delta)
 		longitudinal_acceleration = -air_resistance
 		return
@@ -366,12 +366,15 @@ func _calculate_forward_dynamics(delta: float) -> void:
 	# 2. Sprint boost acceleration (rhythmic tap Shift / X with diminishing returns)
 	var a_sprint: float = 0.0
 	var effective_sprint_speed: float = max_sprint_speed * speed_pen
-	if current_speed < effective_sprint_speed and sprint_boost > 0.001:
+	if is_braking:
+		a_sprint = 0.0
+		if brake_input > 0.4:
+			sprint_boost = 0.0
+	elif current_speed < effective_sprint_speed and sprint_boost > 0.001:
 		var sprint_ratio: float = clampf(current_speed / effective_sprint_speed, 0.0, 1.0)
 		var sprint_eff: float = clampf(1.0 - pow(sprint_ratio, 3.6), 0.0, 1.0)
 		a_sprint = sprint_boost * sprint_eff
 	elif current_speed >= effective_sprint_speed:
-		sprint_boost = 0.0
 		a_sprint = 0.0
 
 	# 3. Slope gravity acceleration using physics_pitch (instant slope response)

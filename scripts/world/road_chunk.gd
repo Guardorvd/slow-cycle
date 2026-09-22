@@ -2,6 +2,7 @@ class_name RoadChunk
 extends Node3D
 
 const ChunkFoliageClass = preload("res://scripts/world/chunk_foliage.gd")
+const RoadPathDataClass = preload("res://scripts/world/road_path_data.gd")
 
 const ROAD_HALF_WIDTH: float = 2.0 ## 4.0m road width
 const TERRAIN_WIDTH: float = 20.0 ## 20m roadside meadow strip
@@ -23,8 +24,16 @@ func build_chunk(path_data: RefCounted, s_idx: int, e_idx: int, id: int, shared_
 	if count < 2:
 		return
 
-	# 1. Build Road Mesh (Layer 2: Road)
-	_build_road_mesh(path_data, s_idx, e_idx, shared_materials.get("road"))
+	# Check if chunk contains ROUGH_GRAVEL segments
+	var is_rough: bool = false
+	if "segment_types" in path_data and path_data.segment_types.size() > e_idx:
+		for i in range(s_idx, e_idx + 1):
+			if path_data.segment_types[i] == RoadPathDataClass.SegmentType.ROUGH_GRAVEL:
+				is_rough = true
+				break
+
+	# 1. Build Road Mesh (Layer 2: Road, or Layer 2 | 16: Rough Gravel)
+	_build_road_mesh(path_data, s_idx, e_idx, shared_materials.get("road"), is_rough)
 
 	# 2. Build Roadside Terrain Strip (Layer 3: Grass)
 	var noise: FastNoiseLite = shared_materials.get("noise")
@@ -34,7 +43,7 @@ func build_chunk(path_data: RefCounted, s_idx: int, e_idx: int, id: int, shared_
 	var foliage_spawner = ChunkFoliageClass.new()
 	foliage_spawner.populate_chunk(self, path_data, s_idx, e_idx, shared_meshes, noise)
 
-func _build_road_mesh(path_data: RefCounted, s_idx: int, e_idx: int, mat: Material) -> void:
+func _build_road_mesh(path_data: RefCounted, s_idx: int, e_idx: int, mat: Material, is_rough: bool = false) -> void:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	if mat:
@@ -50,6 +59,13 @@ func _build_road_mesh(path_data: RefCounted, s_idx: int, e_idx: int, mat: Materi
 
 		var v_left: Vector3 = pt - binorm * ROAD_HALF_WIDTH
 		var v_right: Vector3 = pt + binorm * ROAD_HALF_WIDTH
+
+		if is_rough:
+			var t_chunk: float = float(i) / float(maxi(num_pts - 1, 1))
+			var envelope: float = smoothstep(0.0, 0.15, t_chunk) * smoothstep(1.0, 0.85, t_chunk)
+			var bump: float = 0.025 * sin(dist * 2.5) * envelope
+			v_left.y += bump
+			v_right.y += bump
 
 		var v_coord: float = dist * 0.25
 
@@ -80,10 +96,13 @@ func _build_road_mesh(path_data: RefCounted, s_idx: int, e_idx: int, mat: Materi
 	mesh_inst.mesh = road_mesh
 	add_child(mesh_inst)
 
-	# Build StaticBody3D on Layer 2 (Road = mask 2)
+	# Build StaticBody3D on Layer 2 (Road = mask 2) or Layer 2 | 16 (Rough Gravel)
 	road_body = StaticBody3D.new()
-	road_body.collision_layer = 2
+	road_body.collision_layer = (2 | 16) if is_rough else 2
 	road_body.collision_mask = 0
+	if is_rough:
+		road_body.set_meta("surface_type", "rough_gravel")
+		road_body.add_to_group("surface_rough_gravel")
 	var col_shape := CollisionShape3D.new()
 	col_shape.shape = road_mesh.create_trimesh_shape()
 	road_body.add_child(col_shape)

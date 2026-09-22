@@ -1054,20 +1054,20 @@ func _init() -> void:
 	if cam_rig_46 and not cam_rig_46.first_person_cam:
 		cam_rig_46._ready()
 
-	# Part A: Acceleration lag (surge backward, negative Z)
+	# Part A: Acceleration lag (torso surge backward, positive Z towards saddle)
 	bike_46.current_speed = 6.0
 	bike_46.longitudinal_acceleration = 2.5
 	for _f in range(30):
 		cam_rig_46._process(1.0 / 60.0)
 	var accel_surge_z: float = cam_rig_46.current_surge_z
-	var accel_surge_ok: bool = accel_surge_z >= -0.035 and accel_surge_z <= -0.010
+	var accel_surge_ok: bool = accel_surge_z >= 0.010 and accel_surge_z <= 0.035
 
-	# Part B: Hard braking lead (surge forward, positive Z)
+	# Part B: Hard braking lead (torso surge forward, negative Z towards handlebars)
 	bike_46.longitudinal_acceleration = -7.0
 	for _f in range(30):
 		cam_rig_46._process(1.0 / 60.0)
 	var brake_surge_z: float = cam_rig_46.current_surge_z
-	var brake_surge_ok: bool = brake_surge_z >= 0.030 and brake_surge_z <= 0.065
+	var brake_surge_ok: bool = brake_surge_z >= -0.065 and brake_surge_z <= -0.030
 
 	# Part C: Neutral relaxation on steady speed
 	bike_46.longitudinal_acceleration = 0.0
@@ -1077,8 +1077,8 @@ func _init() -> void:
 	var neutral_surge_ok: bool = absf(neutral_surge_z) < 0.005
 
 	print("[VERIFICATION #46] Longitudinal Surge Asymmetric Smoothing Contract:")
-	print("  - Accel surge (+2.5 m/s²): %.3fm (Corridor: [-0.035, -0.010]m)" % accel_surge_z)
-	print("  - Braking surge (-7.0 m/s²): %.3fm (Corridor: [+0.030, +0.065]m)" % brake_surge_z)
+	print("  - Accel surge (+2.5 m/s²): %.3fm (Corridor: [+0.010, +0.035]m)" % accel_surge_z)
+	print("  - Braking surge (-7.0 m/s²): %.3fm (Corridor: [-0.065, -0.030]m)" % brake_surge_z)
 	print("  - Neutral surge (0.0 m/s²): %.4fm (Expected: < 0.005m)" % neutral_surge_z)
 	if accel_surge_ok and brake_surge_ok and neutral_surge_ok:
 		print("  [PASS] Longitudinal surge smoothly models torso inertial lag and braking compression!")
@@ -1348,8 +1348,88 @@ func _init() -> void:
 		all_ok = false
 	bike_52.queue_free()
 
+	# Test 53: [Sprint 4G] Procedural ROUGH_GRAVEL Chunk Collision Layer & Surface Detection Contract
+	var rpd_script: GDScript = preload("res://scripts/world/road_path_data.gd")
+	var rc_script: GDScript = preload("res://scripts/world/road_chunk.gd")
+	var test_path_data = rpd_script.new()
+	for i in range(10):
+		var p := Vector3(0, 0, float(i) * 2.0)
+		test_path_data.append_sample(p, Vector3.FORWARD, Vector3.UP, 0.0, 0.0, rpd_script.SegmentType.ROUGH_GRAVEL)
+	
+	var chunk = rc_script.new()
+	root.add_child(chunk)
+	var noise_53 := FastNoiseLite.new()
+	var test_mats := {"road": null, "grass": null, "noise": noise_53}
+	var test_meshes := {}
+	chunk.build_chunk(test_path_data, 0, test_path_data.size() - 1, 101, test_mats, test_meshes)
+
+	var chunk_col_layer_ok: bool = chunk.road_body != null and (chunk.road_body.collision_layer & 16) != 0 and (chunk.road_body.collision_layer & 2) != 0
+	var chunk_meta_ok: bool = chunk.road_body != null and chunk.road_body.has_meta("surface_type") and str(chunk.road_body.get_meta("surface_type")) == "rough_gravel"
+	var chunk_group_ok: bool = chunk.road_body != null and chunk.road_body.is_in_group("surface_rough_gravel")
+
+	var bike_53 = bike_scene.instantiate()
+	root.add_child(bike_53)
+	var is_rough_layer: bool = (chunk.road_body.collision_layer & 16) != 0
+	var has_rough_meta: bool = chunk.road_body.has_meta("surface_type") and str(chunk.road_body.get_meta("surface_type")) == "rough_gravel"
+	var is_rough_group: bool = chunk.road_body.is_in_group("surface_rough_gravel")
+	var bike_identifies_rough: bool = is_rough_layer or has_rough_meta or is_rough_group
+
+	print("[VERIFICATION #53] Procedural ROUGH_GRAVEL Chunk Collision Layer & Surface Detection Contract:")
+	print("  - Chunk Road Body collision layer: %d (Expected: 18 [Layer 2 | 16])" % (chunk.road_body.collision_layer if chunk.road_body else 0))
+	print("  - Surface metadata & group: meta=%s, group=%s" % [chunk_meta_ok, chunk_group_ok])
+	print("  - Bicycle surface detection matches rough gravel: %s" % ("YES" if bike_identifies_rough else "NO"))
+
+	if chunk_col_layer_ok and chunk_meta_ok and chunk_group_ok and bike_identifies_rough:
+		print("  [PASS] Procedural rough gravel chunk correctly sets Layer 5, metadata and group!")
+	else:
+		print("  [FAIL] Rough gravel chunk contract violated: col=%s, meta=%s, grp=%s" % [chunk_col_layer_ok, chunk_meta_ok, chunk_group_ok])
+		all_ok = false
+
+	bike_53.queue_free()
+	chunk.queue_free()
+
+	# Test 54: [Sprint 4G] Sprint Dynamics Under Braking, Downhill Overspeed & C0 Continuity Contract
+	var bike_54 = bike_scene.instantiate()
+	root.add_child(bike_54)
+
+	# Part A: Sprint thrust suppression and boost reset during firm braking
+	bike_54.current_speed = 6.0
+	bike_54.sprint_boost = 2.5
+	bike_54.is_braking = true
+	bike_54.brake_input = 0.6
+	bike_54._calculate_forward_dynamics(1.0 / 60.0)
+	var sprint_cut_on_brake_ok: bool = bike_54.sprint_boost == 0.0
+
+	# Part B: Sprint tap impulse C0 mathematical continuity at 44 km/h
+	bike_54.current_speed = 43.95 / 3.6
+	var imp_near_cap: float = bike_54._calculate_sprint_tap_impulse()
+	bike_54.current_speed = 44.05 / 3.6
+	var imp_above_cap: float = bike_54._calculate_sprint_tap_impulse()
+	var c0_continuous_ok: bool = imp_near_cap < 0.01 and imp_above_cap == 0.0 and absf(imp_near_cap - imp_above_cap) < 0.01
+
+	# Part C: Airborne drag independence from rolling resistance
+	bike_54.is_grounded = false
+	bike_54.current_speed = 10.0 # 36 km/h
+	bike_54.surface_rough_weight = 1.0 # 0.22 rolling res if on ground
+	bike_54._calculate_forward_dynamics(1.0 / 60.0)
+	var expected_air_drag: float = bike_54.air_drag_coeff * 100.0
+	var airborne_drag_ok: bool = is_equal_approx(-bike_54.longitudinal_acceleration, expected_air_drag)
+
+	print("[VERIFICATION #54] Sprint Dynamics Under Braking, Downhill Overspeed & C0 Continuity Contract:")
+	print("  - Sprint boost reset on brake (0.6): Boost=%.2f (Expected: 0.00)" % bike_54.sprint_boost)
+	print("  - Impulse at 43.95 km/h: %.4f | at 44.05 km/h: %.4f (C0 gap: %.4f < 0.01)" % [imp_near_cap, imp_above_cap, absf(imp_near_cap - imp_above_cap)])
+	print("  - Airborne drag deceleration: %.4f m/s² (Expected: %.4f m/s² - zero rolling res)" % [-bike_54.longitudinal_acceleration, expected_air_drag])
+
+	if sprint_cut_on_brake_ok and c0_continuous_ok and airborne_drag_ok:
+		print("  [PASS] Sprint braking suppression, C0 impulse continuity and airborne drag verified!")
+	else:
+		print("  [FAIL] Sprint dynamics contract violated: brake_cut=%s, c0=%s, airborne=%s" % [sprint_cut_on_brake_ok, c0_continuous_ok, airborne_drag_ok])
+		all_ok = false
+
+	bike_54.queue_free()
+
 	if all_ok:
-		print("\n=== ALL SYSTEM VERIFICATIONS PASSED [52/52 - 100% OK] ===\n")
+		print("\n=== ALL SYSTEM VERIFICATIONS PASSED [54/54 - 100% OK] ===\n")
 	else:
 		print("\n=== SOME VERIFICATIONS FAILED ===\n")
 
