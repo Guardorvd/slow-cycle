@@ -102,20 +102,21 @@ func _process(delta: float) -> void:
 	if not bike:
 		return
 
-	var current_speed: float = bike.get("current_speed") if "current_speed" in bike else 0.0
-	var long_accel: float = bike.get("longitudinal_acceleration") if "longitudinal_acceleration" in bike else 0.0
-	var brake_in: float = bike.get("brake_input") if "brake_input" in bike else 0.0
-	var bike_bank: float = bike.get("current_bank") if "current_bank" in bike else 0.0
-	var vis_steer: float = bike.get("visual_steer") if "visual_steer" in bike else 0.0
-	var is_pedaling: bool = bike.get("is_pedaling") if "is_pedaling" in bike else false
-	var is_sprinting: bool = bike.get("is_sprinting") if "is_sprinting" in bike else false
-	var sprint_boost_val: float = bike.get("sprint_boost") if "sprint_boost" in bike else 0.0
-	var is_coasting: bool = bike.get("is_coasting") if "is_coasting" in bike else false
-	var crank_rot: float = bike.get("crank_rotation") if "crank_rotation" in bike else 0.0
-	var pedal_power: float = bike.get("pedal_power") if "pedal_power" in bike else 0.0
-	var terrain_rough: float = bike.get("terrain_roughness") if "terrain_roughness" in bike else 0.16
-	var is_on_grass: bool = bike.get("is_on_grass") if "is_on_grass" in bike else false
-	var current_surf: int = bike.get("current_surface") if "current_surface" in bike else 0
+	var ctrl: BicycleController = bike as BicycleController
+	var current_speed: float = ctrl.current_speed if ctrl else (bike.get("current_speed") if "current_speed" in bike else 0.0)
+	var long_accel: float = ctrl.longitudinal_acceleration if ctrl else (bike.get("longitudinal_acceleration") if "longitudinal_acceleration" in bike else 0.0)
+	var brake_in: float = ctrl.brake_input if ctrl else (bike.get("brake_input") if "brake_input" in bike else 0.0)
+	var bike_bank: float = ctrl.current_bank if ctrl else (bike.get("current_bank") if "current_bank" in bike else 0.0)
+	var vis_steer: float = ctrl.visual_steer if ctrl else (bike.get("visual_steer") if "visual_steer" in bike else 0.0)
+	var is_pedaling: bool = ctrl.is_pedaling if ctrl else (bike.get("is_pedaling") if "is_pedaling" in bike else false)
+	var is_sprinting: bool = ctrl.is_sprinting if ctrl else (bike.get("is_sprinting") if "is_sprinting" in bike else false)
+	var sprint_boost_val: float = ctrl.sprint_boost if ctrl else (bike.get("sprint_boost") if "sprint_boost" in bike else 0.0)
+	var is_coasting: bool = ctrl.is_coasting if ctrl else (bike.get("is_coasting") if "is_coasting" in bike else false)
+	var crank_rot: float = ctrl.crank_rotation if ctrl else (bike.get("crank_rotation") if "crank_rotation" in bike else 0.0)
+	var pedal_power: float = ctrl.pedal_power if ctrl else (bike.get("pedal_power") if "pedal_power" in bike else 0.0)
+	var terrain_rough: float = ctrl.terrain_roughness if ctrl else (bike.get("terrain_roughness") if "terrain_roughness" in bike else 0.16)
+	var is_on_grass: bool = ctrl.is_on_grass if ctrl else (bike.get("is_on_grass") if "is_on_grass" in bike else false)
+	var current_surf: int = ctrl.current_surface if ctrl else (bike.get("current_surface") if "current_surface" in bike else 0)
 
 	# -------------------------------------------------------------
 	# 1. CORE PRIORITY 1: Horizon Roll Stabilization (VOR Invariant <= 35%)

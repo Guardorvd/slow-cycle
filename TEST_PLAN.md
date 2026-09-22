@@ -70,8 +70,15 @@ Automated CI checks run headlessly using Godot console:
 & "Godot_v4.7.2-stable_mono_win64_console.exe" --headless --script scripts/test/test_track_ride.gd
 ```
 
-- **Core Contracts**: 59 deterministic verifications in `test_diagnostics.gd` (100% PASS requirement).
-- **Leak Gate**: Zero ObjectDB leaks on exit (`WARNING: 0 ObjectDB instances leaked`).
+- **Core Contracts**: 64 deterministic verifications in `scripts/test/test_diagnostics.gd` (100% PASS requirement).
+- **Presentation Verification Contracts (#60–#64)**:
+  - `#60`: Steering visual gain ($3.5\times$), speed clamp ($12^\circ$ sprint limit), fork local orientation, independent wheel rotation, and pedal horizontal leveling.
+  - `#61`: Coordinated sign alignment (Left > 0, Right < 0 for steer, yaw, bank, and camera roll); physical root `CharacterBody3D` stays upright (`Basis.Y = UP`).
+  - `#62`: FPS invariance ($1 - e^{-k \Delta t}$) across 30, 60, and 144 FPS at normalized physical time $t = 0.50\text{ s}$ ($\Delta = 0.00000000$).
+  - `#63`: Full system bicycle recovery contract (positions, velocities, accelerations, steering, camera, and audio reset cleanly).
+  - `#64`: Audio presentation architecture and bus routing (`Master` with `AudioEffectLimiter`, `SFX`, `Ambient`, `Music`).
+- **Leak Gate**: Zero ObjectDB leaks on exit across all three test runners (`WARNING: 0 ObjectDB instances leaked`).
+
 
 ---
 

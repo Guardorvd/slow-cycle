@@ -221,24 +221,22 @@
 
 ---
 
-### TASK: [FEAT-013.2] Sprint 4J: Presentation & Documentation Integrity
+### TASK: [FEAT-013.2] Sprint 4J: Presentation & Documentation Integrity (`COMPLETED [x]`)
 **Goal**: Синхронизировать слой презентации (визуальная модель велосипеда, камера, аудио) и документацию с фактической архитектурой системы.
-**Do**:
-- Проверить читаемость силуэта рамы, руля, седла, разделения колес и анимированных педалей без изменения пивот-архитектуры.
-- Валидировать анатомию руления: цепочка `Visuals` $\to$ `ForkAndHandlebar` $\to$ `FrontAxle` $\to$ `FrontWheel`, сохранение знаков ($A \to$ влево, $D \to$ вправо).
-- Проверить крен рамы (`VisualsRoot` roll/pitch/suspension) при нулевом крене капсулы `CharacterBody3D`.
-- Валидировать камеру: Horizon Roll $\le 35\%$, Surge Z, Dive Tuck, Apex Look, связный шум `FastNoiseLite`. Убедиться, что камера не маскирует физические дефекты.
-- Проверить соответствие аудио: ветер от скорости, трещотка на накате, текстура гравия, демпфирование на траве, визг юза skid.
-- Синхронизировать документацию (`CURRENT_STATE_AUDIT.md`, `ARCHITECTURE.md`, `AGENTS.md`, `TEST_PLAN.md`): удалить устаревшие рудименты сигналов и нереализованных систем.
-**Do not**:
-- Не создавать новый фреймворк скелетной анимации.
-- Не менять сигнатур стабильного публичного API `BicycleController`.
-- Не менять физику ради украшения камеры или визуала.
+**Realized**:
+- В `bike_camera.gd` и `bike_audio_manager.gd` внедрена безопасная строгая типизация `ctrl := bike as BicycleController` с мок-фоллбэком.
+- В `bike_audio_manager.gd` реализован `reset_audio_dynamics()` и явное освобождение потоков (`stream = null`) в `_exit_tree()`.
+- В `bicycle_controller.gd` метод `_execute_recovery_teleport()` защищен от вне-сценового вызова (`is_inside_tree()`), добавлен сброс звука.
+- В раннерах `test_track_verification.gd` и `test_track_ride.gd` внедрен flush очереди кадров и синхронизация завершения твина `ScreenFader`.
+- Достигнут инвариант **0 утечек ObjectDB instances** во всех 3 тестовых раннерах.
+- В `test_diagnostics.gd` добавлены и пройдены системные контракты #60–#64 (усиление руля $3.5\times$ и скорость, знак руления/крена и `Basis.Y = UP`, FPS-инвариантность 30/60/144, recovery contract, шины AudioBus).
+- Документация (`ARCHITECTURE.md`, `CURRENT_STATE_AUDIT.md`, `TEST_PLAN.md`, `README.md`, `AGENTS.md`, `BACKLOG.md`, `ROADMAP.md`) хирургически актуализирована.
 **Acceptance Criteria**:
 - Слой презентации полностью отражает физику без артефактов и рассинхронизации.
 - Документация на 100% совпадает с кодом и реальными сигналами (`telemetry_updated`, `bell_rung`).
-**Tests**: Визуальный тест в Godot, тесты 41–52 в `test_diagnostics.gd`.
-**Files**: `scenes/player/bicycle.tscn`, `scripts/camera/bike_camera.gd`, `scripts/audio/bike_audio_manager.gd`, `ARCHITECTURE.md`, `TEST_PLAN.md`, `CURRENT_STATE_AUDIT.md`.
+- Все 3 тестовых раннера завершаются со статусом 0 и строго 0 утечек ObjectDB.
+**Tests**: 64/64 PASS в `test_diagnostics.gd`, 100% PASS в `test_track_verification.gd` и `test_track_ride.gd`.
+**Files**: `scripts/camera/bike_camera.gd`, `scripts/audio/bike_audio_manager.gd`, `scripts/player/bicycle_controller.gd`, `scripts/test/test_diagnostics.gd`, `scripts/test/test_track_verification.gd`, `scripts/test/test_track_ride.gd`, `ARCHITECTURE.md`, `TEST_PLAN.md`, `CURRENT_STATE_AUDIT.md`, `README.md`, `AGENTS.md`, `BACKLOG.md`, `ROADMAP.md`.
 
 ---
 

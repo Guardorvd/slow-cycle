@@ -139,7 +139,7 @@ func _start() -> void:
 	Input.action_release("recover_ride")
 
 
-	for frame in range(30):
+	for frame in range(50):
 		await physics_frame
 
 	print("After recovery: Position = %s (repositioned on track centerline)" % bike.global_position)
@@ -165,6 +165,8 @@ func _start() -> void:
 		print("[PASS] Debug HUD dynamically tracks and displays test track sections.")
 
 	root_node.queue_free()
+	await process_frame
+	await physics_frame
 	await process_frame
 	print("\n[SUCCESS] ALL LIVE TEST TRACK RIDE CHECKS PASSED [OK]\n")
 	quit(0)

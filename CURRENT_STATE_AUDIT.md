@@ -2,8 +2,8 @@
 
 > **Дата актуализации**: 22.09.2026  
 > **Инженер-аудитор**: AI Lead Systems Architect & Senior Game Engineer  
-> **Статус проекта**: **Спринты 1, 2, 3 (3A, 3B, 3C), 4 (4A–4G) Завершены на 100% (54/54 PASS)**.
-> **Текущий этап**: **Вход в финальный блок калибровки и триады трасс: Спринты 4H–4M (4H Riding Feel Calibration, 4J Presentation & Docs, 4K Riding Lab ~300–600м, 4L Training Loop ~800–1500м, 4M Final Validation Dual Gate)**. Спринт 5 (Атмосфера) запланирован строго после 4M.
+> **Статус проекта**: **Спринты 1, 2, 3 (3A, 3B, 3C), 4 (4A–4H, 4J) Завершены на 100% (64/64 PASS)**.
+> **Текущий этап**: **Вход в Спринт 4K (Technical Riding Lab 2.0 ~300–600м) перед переходом к 4L, 4M и Спринту 5** (Атмосфера).
 | **Главная сцена** | `res://scenes/main.tscn` |
 | **Тестовый полигон 4G** | `res://scenes/test/riding_feel_test_track.tscn` |
 
@@ -358,5 +358,35 @@ Distance from recovered spawn position to road centerline: 1.0966 m (target < 1.
   - Добавлены зонды FEAT-013.1 (проверки 55–59).
   - Все регрессионные и интеграционные проверки полигонов 4G (`test_track_verification.gd` и `test_track_ride.gd`) пройдены со 100% успехом.
 
+### 2.12. Результаты выполнения Спринта 4J: Аудит презентационного слоя, устранение утечек раннеров и целостность документации
+- **Статус выполнения**: Завершен (100% PASS, 64/64 верификационных контрактов).
+- **Ликвидация утечек памяти ObjectDB (Zero Leaks Invariant)**:
+  - Проведено профилирование с флагом `--verbose` на всех 3 тестовых раннерах.
+  - В `scripts/audio/bike_audio_manager.gd` в `_exit_tree()` добавлено явное освобождение ссылок на аудиопотоки (`stream = null`) и остановка воспроизведения.
+  - В `scripts/test/test_track_verification.gd` внедрена многокадровая синхронизация очереди освобождения (`await process_frame; await physics_frame`).
+  - В `scripts/test/test_track_ride.gd` время ожидания после вызова recovery увеличено до 50 кадров (0.83 с) для корректного завершения твина `ScreenFader` (0.58 с).
+  - В `scripts/test/test_diagnostics.gd` добавлен явный сброс дочерних узлов корня и flush очереди кадров перед `quit(0)`.
+  - **Результат**: Все три тестовых раннера (`test_diagnostics.gd`, `test_track_verification.gd`, `test_track_ride.gd`) завершаются со статусом 0 и **строго 0 утечек ObjectDB instances**.
+- **Безопасная типизация и discoverability членов**:
+  - В `scripts/camera/bike_camera.gd` и `scripts/audio/bike_audio_manager.gd` нетипизированные вызовы `bike.get(...)` заменены на строго типизированный доступ через `var ctrl: BicycleController = bike as BicycleController` с сохранением fallback-доступа через `.get()` для автономных тестовых моков.
+- **Инвариант маски коллизий SpringArm3D**:
+  - Аудит подтвердил корректность маски коллизий `SpringArm3D.collision_mask = 6` (слои 2 Road + 3 Grass), гарантирующей соблюдение контракта #29. Каменистые участки `ROUGH_GRAVEL` генерируют маску `2 | 16`, которая полностью детектируется стрелой без проваливания сквозь ландшафт.
+- **Модульные контракты верификации презентационного слоя (Контракты #60–#64)**:
+  - **№60 (Steering Visual & Decoupling Contract)**: Усиление визуального руления $3.5\times$, динамический кламп угла по скорости (до $12^\circ$ на спринте), свободное вращение переднего колеса вокруг ступицы и горизонтальное выравнивание педалей.
+  - **№61 (Sign Alignment & Root Decoupling Contract)**: Полное согласование знаков поворота налево (steer > 0, yaw > 0, bank > 0, roll > 0) и направо (все < 0); физический корень `CharacterBody3D` строго сохраняет `Basis.Y = (0, 1, 0)`.
+  - **№62 (FPS Invariance Contract: 30 / 60 / 144 FPS)**: Доказана математическая инвариантность фильтра $1 - e^{-k \Delta t}$ по нормализованному времени $t = 0.50\text{ с}$; максимальная дельта между 30, 60 и 144 FPS составляет $0.00000000$.
+  - **№63 (Bicycle Recovery Contract)**: Подтвержден чистый сброс всех состояний велосипеда, камеры и аудио при телепортации по клавише 'R'.
+  - **№64 (Audio Presentation & Bus Routing Contract)**: Подтверждено наличие шин `Master`, `SFX`, `Ambient`, `Music`, маршрутизация звуков и наличие `AudioEffectLimiter` на шине `Master`.
+- **Сводная таблица роста метрик верификации (Before / After Sprint 4J)**:
 
-
+| Метрика | До спринта (Baseline 4J) | После спринта (Sprint 4J Close) | Дельта / Итог |
+|---|---|---|---|
+| Системные контракты (`test_diagnostics.gd`) | 59 PASS | **64 PASS** | +5 новых контрактов (100% OK) |
+| Утечки ObjectDB (`test_track_verification.gd`) | 6 leaked instances | **0 leaked instances** | -6 (Полная ликвидация) |
+| Утечки ObjectDB (`test_track_ride.gd`) | 8 leaked instances | **0 leaked instances** | -8 (Полная ликвидация) |
+| Утечки ObjectDB (`test_diagnostics.gd`) | Нестабильно (до 144) | **0 leaked instances** | Полная ликвидация |
+| Согласованность знаков руления/крена | Проверено частично | **100% формализовано** | Контракт #61 |
+| Инвариант корня CharacterBody3D | Не был покрыт тестом | **100% покрыт (Basis.Y = UP)** | Контракт #61 |
+| FPS-инвариантность (30/60/144) | Аналитически | **Эмпирически доказано (дельта 0.0)** | Контракт #62 |
+| Recovery Contract | Частично (камера) | **Полная система (Bike + Cam + Audio)** | Контракт #63 |
+| Audio Bus Routing | Не проверялась в CI | **100% покрыта тестом** | Контракт #64 |

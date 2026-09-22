@@ -76,12 +76,33 @@ func _ready() -> void:
 			bike_controller.connect("bell_rung", _on_bell_rung)
 
 func _exit_tree() -> void:
-	if bell_player: bell_player.stop()
-	if freewheel_player_a: freewheel_player_a.stop()
-	if freewheel_player_b: freewheel_player_b.stop()
-	if wind_player: wind_player.stop()
-	if gravel_player: gravel_player.stop()
-	if skid_player: skid_player.stop()
+	if bell_player:
+		bell_player.stop()
+		bell_player.stream = null
+	if freewheel_player_a:
+		freewheel_player_a.stop()
+		freewheel_player_a.stream = null
+	if freewheel_player_b:
+		freewheel_player_b.stop()
+		freewheel_player_b.stream = null
+	if wind_player:
+		wind_player.stop()
+		wind_player.stream = null
+	if gravel_player:
+		gravel_player.stop()
+		gravel_player.stream = null
+	if skid_player:
+		skid_player.stop()
+		skid_player.stream = null
+
+
+## Resets transient audio state upon recovery to prevent audio spikes
+func reset_audio_dynamics() -> void:
+	freewheel_timer = 0.0
+	freewheel_use_a = true
+	if skid_player:
+		skid_player.volume_db = -80.0
+
 
 func _process(delta: float) -> void:
 	if not bike_controller:
@@ -89,15 +110,16 @@ func _process(delta: float) -> void:
 	if not bike_controller:
 		return
 
-	var is_coasting: bool = bike_controller.get("is_coasting") if "is_coasting" in bike_controller else false
-	var is_pedaling: bool = bike_controller.get("is_pedaling") if "is_pedaling" in bike_controller else false
-	var is_braking: bool = bike_controller.get("is_braking") if "is_braking" in bike_controller else false
-	var current_speed: float = bike_controller.get("current_speed") if "current_speed" in bike_controller else 0.0
-	var is_on_grass: bool = bike_controller.get("is_on_grass") if "is_on_grass" in bike_controller else false
-	var current_surf: int = bike_controller.get("current_surface") if "current_surface" in bike_controller else 0
-	var terrain_rough: float = bike_controller.get("terrain_roughness") if "terrain_roughness" in bike_controller else 0.16
-	var corner_scrub: float = bike_controller.get("cornering_scrub_accel") if "cornering_scrub_accel" in bike_controller else 0.0
-	var visual_skid: float = bike_controller.get("visual_skid_factor") if "visual_skid_factor" in bike_controller else 0.0
+	var ctrl: BicycleController = bike_controller as BicycleController
+	var is_coasting: bool = ctrl.is_coasting if ctrl else (bike_controller.get("is_coasting") if "is_coasting" in bike_controller else false)
+	var is_pedaling: bool = ctrl.is_pedaling if ctrl else (bike_controller.get("is_pedaling") if "is_pedaling" in bike_controller else false)
+	var is_braking: bool = ctrl.is_braking if ctrl else (bike_controller.get("is_braking") if "is_braking" in bike_controller else false)
+	var current_speed: float = ctrl.current_speed if ctrl else (bike_controller.get("current_speed") if "current_speed" in bike_controller else 0.0)
+	var is_on_grass: bool = ctrl.is_on_grass if ctrl else (bike_controller.get("is_on_grass") if "is_on_grass" in bike_controller else false)
+	var current_surf: int = ctrl.current_surface if ctrl else (bike_controller.get("current_surface") if "current_surface" in bike_controller else 0)
+	var terrain_rough: float = ctrl.terrain_roughness if ctrl else (bike_controller.get("terrain_roughness") if "terrain_roughness" in bike_controller else 0.16)
+	var corner_scrub: float = ctrl.cornering_scrub_accel if ctrl else (bike_controller.get("cornering_scrub_accel") if "cornering_scrub_accel" in bike_controller else 0.0)
+	var visual_skid: float = ctrl.visual_skid_factor if ctrl else (bike_controller.get("visual_skid_factor") if "visual_skid_factor" in bike_controller else 0.0)
 
 	# -------------------------------------------------------------
 	# 1. Freewheel Ratchet (Dual alternating voices, continuously speed-scaled)

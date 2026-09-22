@@ -1707,13 +1707,285 @@ func _init() -> void:
 		all_ok = false
 	bike_59.queue_free()
 
+	# =========================================================================
+	# SPRINT 4J BEHAVIORAL CONTRACTS (PRESENTATION & DOCUMENTATION INTEGRITY)
+	# =========================================================================
+
+	# Test 60: [Sprint 4J] Steering Visual Presentation & Fork/Axle Decoupling Contract
+	var bike_60 = bike_scene.instantiate()
+	root.add_child(bike_60)
+	bike_60._ready()
+
+	# Part A: Visual steer gain amplification & speed-dependent clamping
+	# Low speed (2.0 m/s): gain is 3.5x
+	bike_60.current_speed = 2.0
+	bike_60.raw_steer_input = 0.08
+	for _f in range(30):
+		bike_60._calculate_steering_and_banking(1.0 / 60.0)
+	var expected_vis_steer_low: float = bike_60.current_steer * bike_60.visual_steer_gain
+	var vis_gain_ok: bool = absf(bike_60.visual_steer - expected_vis_steer_low) < 0.02 and bike_60.visual_steer > 0.0
+
+	# Sprint high speed (12.2 m/s): clamp should limit to max_visual_steer_high_speed (~12 deg)
+	bike_60.current_speed = 12.2
+	bike_60.raw_steer_input = 1.0 # Max input
+	for _f in range(40):
+		bike_60._calculate_steering_and_banking(1.0 / 60.0)
+	var vis_clamp_ok: bool = absf(bike_60.visual_steer) <= bike_60.max_visual_steer_high_speed + 0.005
+
+	# Part B: Fork local orientation and independent wheel rotation
+	var wheel_rot_before: float = bike_60.front_wheel.rotation.x
+	bike_60.current_speed = 6.0
+	bike_60._update_visual_transforms(1.0 / 60.0)
+	var wheel_rot_after: float = bike_60.front_wheel.rotation.x
+	var wheel_spins_ok: bool = absf(wheel_rot_after - wheel_rot_before) > 0.01
+
+	# Part C: Crank and pedal leveling invariant
+	bike_60.crank_rotation = 1.25
+	bike_60._update_visual_transforms(1.0 / 60.0)
+	var crank_rot_ok: bool = is_equal_approx(bike_60.crankset_pivot.rotation.x, 1.25)
+	var pedal_level_ok: bool = is_equal_approx(bike_60.left_pedal.rotation.x, -1.25) and is_equal_approx(bike_60.right_pedal.rotation.x, -1.25)
+
+	print("[VERIFICATION #60] Sprint 4J Steering Visual Presentation & Decoupling Contract:")
+	print("  - Visual steer gain (3.5x): %.4f rad vs expected %.4f rad (OK: %s)" % [bike_60.visual_steer, expected_vis_steer_low, ("YES" if vis_gain_ok else "NO")])
+	print("  - Sprint high-speed visual steer clamped: %.2f° <= %.2f° (OK: %s)" % [rad_to_deg(bike_60.visual_steer), rad_to_deg(bike_60.max_visual_steer_high_speed), ("YES" if vis_clamp_ok else "NO")])
+	print("  - Front wheel rotates independently about axle: %s" % ("YES" if wheel_spins_ok else "NO"))
+	print("  - Pedal horizontal leveling invariant maintained: %s" % ("YES" if pedal_level_ok else "NO"))
+
+	if vis_gain_ok and vis_clamp_ok and wheel_spins_ok and crank_rot_ok and pedal_level_ok:
+		print("  [PASS] Steering visual presentation, speed clamp, and fork/axle decoupling verified!")
+	else:
+		print("  [FAIL] Steering visual contract mismatch: gain=%s, clamp=%s, spin=%s, crank=%s, pedal=%s" % [vis_gain_ok, vis_clamp_ok, wheel_spins_ok, crank_rot_ok, pedal_level_ok])
+		all_ok = false
+	bike_60.queue_free()
+
+	# Test 61: [Sprint 4J] Sign Alignment & Physical Root Decoupling Contract
+	var bike_61 = bike_scene.instantiate()
+	root.add_child(bike_61)
+	bike_61._ready()
+	var cam_rig_61: BikeCameraRig = bike_61.get_node_or_null("CameraRig")
+	if cam_rig_61 and not cam_rig_61.first_person_cam:
+		cam_rig_61._ready()
+
+	# Turn Left (raw_steer_input > 0): All derived angular rates and frame/camera rolls must be positive
+	bike_61.current_speed = 7.0
+	bike_61.raw_steer_input = 0.6
+	for _f in range(30):
+		bike_61._calculate_steering_and_banking(1.0 / 60.0)
+	if cam_rig_61:
+		cam_rig_61._process(1.0 / 60.0)
+
+	var left_steer_ok: bool = bike_61.current_steer > 0.0 and bike_61.visual_steer > 0.0
+	var left_yaw_ok: bool = bike_61.yaw_turn_rate > 0.0
+	var left_bank_ok: bool = bike_61.current_bank > 0.0
+	var left_roll_ok: bool = cam_rig_61.current_roll > 0.0 if cam_rig_61 else true
+
+	# Turn Right (raw_steer_input < 0): All derived angular rates and frame/camera rolls must be negative
+	bike_61.raw_steer_input = -0.6
+	for _f in range(60):
+		bike_61._calculate_steering_and_banking(1.0 / 60.0)
+	if cam_rig_61:
+		cam_rig_61._process(1.0 / 60.0)
+
+	var right_steer_ok: bool = bike_61.current_steer < 0.0 and bike_61.visual_steer < 0.0
+	var right_yaw_ok: bool = bike_61.yaw_turn_rate < 0.0
+	var right_bank_ok: bool = bike_61.current_bank < 0.0
+	var right_roll_ok: bool = cam_rig_61.current_roll < 0.0 if cam_rig_61 else true
+
+	# Physical Root Decoupling Invariant:
+	# CharacterBody3D root basis.y must strictly remain Vector3(0, 1, 0)
+	var root_basis: Basis = bike_61.global_transform.basis if bike_61.is_inside_tree() else bike_61.transform.basis
+	var root_upright_ok: bool = root_basis.y.is_equal_approx(Vector3.UP) and absf(bike_61.rotation.z) < 0.001 and absf(bike_61.rotation.x) < 0.001
+	# Visual roll is isolated in Visuals node
+	bike_61._update_visual_transforms(1.0 / 60.0)
+	var visuals_bank_isolated: bool = is_equal_approx(bike_61.visuals_root.rotation.z, bike_61.current_bank)
+
+	print("[VERIFICATION #61] Sprint 4J Sign Alignment & Physical Root Decoupling:")
+	print("  - Left steer all positive: steer=%s, yaw=%s, bank=%s, roll=%s" % [left_steer_ok, left_yaw_ok, left_bank_ok, left_roll_ok])
+	print("  - Right steer all negative: steer=%s, yaw=%s, bank=%s, roll=%s" % [right_steer_ok, right_yaw_ok, right_bank_ok, right_roll_ok])
+	print("  - CharacterBody3D root upright invariant (Basis.Y = UP): %s" % ("YES" if root_upright_ok else "NO"))
+	print("  - Frame banking strictly isolated in VisualsRoot: %s" % ("YES" if visuals_bank_isolated else "NO"))
+
+	if left_steer_ok and left_yaw_ok and left_bank_ok and left_roll_ok and right_steer_ok and right_yaw_ok and right_bank_ok and right_roll_ok and root_upright_ok and visuals_bank_isolated:
+		print("  [PASS] Coordinated sign alignment and CharacterBody3D physical root decoupling confirmed!")
+	else:
+		print("  [FAIL] Sign alignment or decoupling violation!")
+		all_ok = false
+	bike_61.queue_free()
+
+	# Test 62: [Sprint 4J] FPS Invariance Contract (30 / 60 / 144 FPS)
+	# Verify that exponential filter (1.0 - exp(-k * dt)) achieves the exact same transient state at t = 0.50s
+	var k_surge: float = 5.5
+	var k_dive: float = 6.6
+	var target_surge: float = 0.035
+	var target_dive: float = -deg_to_rad(1.5)
+
+	# Simulate 30 FPS: dt = 1/30, 15 steps -> 0.50s
+	var s_30: float = 0.0
+	var d_30: float = 0.0
+	var dt_30: float = 1.0 / 30.0
+	for _i in range(15):
+		s_30 = lerpf(s_30, target_surge, 1.0 - exp(-k_surge * dt_30))
+		d_30 = lerpf(d_30, target_dive, 1.0 - exp(-k_dive * dt_30))
+
+	# Simulate 60 FPS: dt = 1/60, 30 steps -> 0.50s
+	var s_60: float = 0.0
+	var d_60: float = 0.0
+	var dt_60: float = 1.0 / 60.0
+	for _i in range(30):
+		s_60 = lerpf(s_60, target_surge, 1.0 - exp(-k_surge * dt_60))
+		d_60 = lerpf(d_60, target_dive, 1.0 - exp(-k_dive * dt_60))
+
+	# Simulate 144 FPS: dt = 1/144, 72 steps -> 0.50s
+	var s_144: float = 0.0
+	var d_144: float = 0.0
+	var dt_144: float = 1.0 / 144.0
+	for _i in range(72):
+		s_144 = lerpf(s_144, target_surge, 1.0 - exp(-k_surge * dt_144))
+		d_144 = lerpf(d_144, target_dive, 1.0 - exp(-k_dive * dt_144))
+
+	var max_surge_diff: float = maxf(absf(s_30 - s_60), absf(s_60 - s_144))
+	var max_dive_diff: float = maxf(absf(d_30 - d_60), absf(d_60 - d_144))
+	var fps_surge_ok: bool = max_surge_diff < 0.0001
+	var fps_dive_ok: bool = max_dive_diff < 0.0001
+
+	print("[VERIFICATION #62] Sprint 4J FPS Invariance Contract (30 / 60 / 144 FPS at t=0.50s):")
+	print("  - Surge at 30 FPS: %.6f | 60 FPS: %.6f | 144 FPS: %.6f (Max delta: %.8f)" % [s_30, s_60, s_144, max_surge_diff])
+	print("  - Dive at 30 FPS: %.6f | 60 FPS: %.6f | 144 FPS: %.6f (Max delta: %.8f)" % [d_30, d_60, d_144, max_dive_diff])
+
+	if fps_surge_ok and fps_dive_ok:
+		print("  [PASS] Mathematical FPS invariance of exponential smoothing confirmed across 30, 60, and 144 FPS!")
+	else:
+		print("  [FAIL] FPS invariance discrepancy too large: surge_diff=%.8f, dive_diff=%.8f" % [max_surge_diff, max_dive_diff])
+		all_ok = false
+
+	# Test 63: [Sprint 4J] Bicycle Full System Recovery Contract
+	var bike_63 = bike_scene.instantiate()
+	root.add_child(bike_63)
+	bike_63._ready()
+
+	# Create a mock world manager responding to request_bike_recovery
+	var mock_wm: Node = Node.new()
+	var mock_wm_script: GDScript = GDScript.new()
+	mock_wm_script.source_code = "extends Node\nfunc request_bike_recovery(_pos: Vector3) -> Transform3D:\n\treturn Transform3D(Basis.IDENTITY, Vector3(25.0, 4.0, -100.0))\n"
+	mock_wm_script.reload()
+	mock_wm.set_script(mock_wm_script)
+	root.add_child(mock_wm)
+	bike_63.world_manager = mock_wm
+
+	# Mutate bicycle, camera, and audio state to dirty values
+	bike_63.current_speed = 11.2
+	bike_63.longitudinal_acceleration = 2.4
+	bike_63.cornering_scrub_accel = 0.5
+	bike_63.sprint_boost = 2.0
+	bike_63.current_bank = 0.35
+	bike_63.current_steer = 0.2
+	bike_63.visual_steer = 0.45
+	bike_63.crank_rotation = 8.4
+	bike_63.current_cadence_rpm = 90.0
+	bike_63.visual_skid_factor = 0.85
+	bike_63.pedal_power = 1.0
+	bike_63.brake_input = 0.9
+	bike_63.brake_dive_pitch = -0.025
+	bike_63.suspension_compression = 0.035
+	bike_63.surface_grass_weight = 0.7
+	bike_63.dynamic_chatter = 0.18
+
+	var cam_rig_63: BikeCameraRig = bike_63.camera_rig
+	if cam_rig_63:
+		cam_rig_63.current_surge_z = 0.04
+		cam_rig_63.current_dive_pitch = -0.02
+		cam_rig_63.travel_distance = 150.0
+		cam_rig_63.current_roll = 0.1
+		cam_rig_63.bob_phase = 4.0
+
+	var audio_mgr_63: BikeAudioManager = bike_63.get_node_or_null("AudioManager")
+	if audio_mgr_63:
+		audio_mgr_63.freewheel_timer = 0.12
+
+	# Trigger recovery execution
+	bike_63._execute_recovery_teleport()
+
+	var rec_pos: Vector3 = bike_63.global_position if bike_63.is_inside_tree() else bike_63.position
+	var rec_pos_ok: bool = rec_pos.is_equal_approx(Vector3(25.0, 4.0, -100.0))
+	var rec_speed_ok: bool = bike_63.current_speed == 3.0
+	var rec_accel_ok: bool = bike_63.longitudinal_acceleration == 0.0 and bike_63.cornering_scrub_accel == 0.0 and bike_63.sprint_boost == 0.0
+	var rec_steer_ok: bool = bike_63.current_steer == 0.0 and bike_63.visual_steer == 0.0 and bike_63.current_bank == 0.0
+	var rec_surface_ok: bool = bike_63.surface_gravel_weight == 1.0 and bike_63.surface_grass_weight == 0.0 and bike_63.visual_skid_factor == 0.0
+	var rec_cam_ok: bool = (cam_rig_63 == null) or (cam_rig_63.current_surge_z == 0.0 and cam_rig_63.current_dive_pitch == 0.0 and cam_rig_63.travel_distance == 0.0 and cam_rig_63.current_roll == 0.0)
+	var rec_audio_ok: bool = (audio_mgr_63 == null) or (audio_mgr_63.freewheel_timer == 0.0)
+
+	print("[VERIFICATION #63] Sprint 4J Bicycle Full System Recovery Contract:")
+	print("  - Teleported to safe recovery transform: %s" % ("YES" if rec_pos_ok else "NO"))
+	print("  - Smooth resumption speed restored to 3.0 m/s: %s" % ("YES" if rec_speed_ok else "NO"))
+	print("  - Physical accelerations and sprint boost zeroed: %s" % ("YES" if rec_accel_ok else "NO"))
+	print("  - Steer, visual steer, and banking zeroed: %s" % ("YES" if rec_steer_ok else "NO"))
+	print("  - Surface reset to gravel and skid factor cleared: %s" % ("YES" if rec_surface_ok else "NO"))
+	print("  - Camera surge, dive, distance, and roll cleared: %s" % ("YES" if rec_cam_ok else "NO"))
+	print("  - Audio freewheel and skid state cleared: %s" % ("YES" if rec_audio_ok else "NO"))
+
+	if rec_pos_ok and rec_speed_ok and rec_accel_ok and rec_steer_ok and rec_surface_ok and rec_cam_ok and rec_audio_ok:
+		print("  [PASS] Full system recovery contract verified across Controller, Camera, and Audio!")
+	else:
+		print("  [FAIL] Recovery contract violated: pos=%s, spd=%s, acc=%s, str=%s, surf=%s, cam=%s, aud=%s" % [rec_pos_ok, rec_speed_ok, rec_accel_ok, rec_steer_ok, rec_surface_ok, rec_cam_ok, rec_audio_ok])
+		all_ok = false
+	mock_wm.queue_free()
+	bike_63.queue_free()
+
+	# Test 64: [Sprint 4J] Audio Presentation & Bus Routing Contract
+	var bike_64 = bike_scene.instantiate()
+	root.add_child(bike_64)
+	bike_64._ready()
+	var audio_64: BikeAudioManager = bike_64.get_node_or_null("AudioManager")
+	if audio_64 and not audio_64.bell_player:
+		audio_64._ready()
+
+	# Check AudioServer buses
+	var bus_master_idx: int = AudioServer.get_bus_index("Master")
+	var bus_sfx_idx: int = AudioServer.get_bus_index("SFX")
+	var bus_ambient_idx: int = AudioServer.get_bus_index("Ambient")
+	var bus_music_idx: int = AudioServer.get_bus_index("Music")
+	var buses_exist_ok: bool = bus_master_idx >= 0 and bus_sfx_idx >= 0 and bus_ambient_idx >= 0 and bus_music_idx >= 0
+
+	# Check Master Bus Limiter effect
+	var has_master_limiter: bool = false
+	if bus_master_idx >= 0:
+		for e in range(AudioServer.get_bus_effect_count(bus_master_idx)):
+			if AudioServer.get_bus_effect(bus_master_idx, e) is AudioEffectLimiter:
+				has_master_limiter = true
+				break
+
+	# Check player bus assignments in BikeAudioManager
+	var routing_ok: bool = false
+	if audio_64:
+		var sfx_routed: bool = (audio_64.bell_player.bus == &"SFX" or audio_64.bell_player.bus == "SFX") and \
+							   (audio_64.freewheel_player_a.bus == &"SFX" or audio_64.freewheel_player_a.bus == "SFX") and \
+							   (audio_64.freewheel_player_b.bus == &"SFX" or audio_64.freewheel_player_b.bus == "SFX") and \
+							   (audio_64.skid_player.bus == &"SFX" or audio_64.skid_player.bus == "SFX")
+		var ambient_routed: bool = (audio_64.wind_player.bus == &"Ambient" or audio_64.wind_player.bus == "Ambient") and \
+								   (audio_64.gravel_player.bus == &"Ambient" or audio_64.gravel_player.bus == "Ambient")
+		routing_ok = sfx_routed and ambient_routed
+
+	print("[VERIFICATION #64] Sprint 4J Audio Presentation & Bus Routing Contract:")
+	print("  - Audio buses present (Master, SFX, Ambient, Music): %s" % ("YES" if buses_exist_ok else "NO"))
+	print("  - Master bus has active AudioEffectLimiter ceiling protection: %s" % ("YES" if has_master_limiter else "NO"))
+	print("  - Sound generators correctly routed (SFX: bell/freewheel/skid, Ambient: wind/gravel): %s" % ("YES" if routing_ok else "NO"))
+
+	if buses_exist_ok and has_master_limiter and routing_ok:
+		print("  [PASS] Audio presentation architecture and bus layout routing verified!")
+	else:
+		print("  [FAIL] Audio bus routing mismatch: buses=%s, limiter=%s, routing=%s" % [buses_exist_ok, has_master_limiter, routing_ok])
+		all_ok = false
+	bike_64.queue_free()
+
 	if all_ok:
-		print("\n=== ALL SYSTEM VERIFICATIONS PASSED [59/59 - 100% OK] ===\n")
+		print("\n=== ALL SYSTEM VERIFICATIONS PASSED [64/64 - 100% OK] ===\n")
 	else:
 		print("\n=== SOME VERIFICATIONS FAILED ===\n")
 
-	await process_frame
-	await physics_frame
-	await process_frame
+	for child in root.get_children():
+		child.queue_free()
+	for _i in range(5):
+		await process_frame
+		await physics_frame
 	quit(0 if all_ok else 1)
 

@@ -12,6 +12,9 @@ func _start() -> void:
 	print("==================================================\n")
 	
 	var passed: bool = await run_verification()
+	for _i in range(5):
+		await process_frame
+		await physics_frame
 	if passed:
 		print("\n[SUCCESS] ALL TEST TRACK VERIFICATION CHECKS PASSED [OK]\n")
 		quit(0)
@@ -277,5 +280,7 @@ func run_verification() -> bool:
 
 	# Clean up instantiated scene
 	root_node.queue_free()
+	await process_frame
+	await physics_frame
 	await process_frame
 	return true

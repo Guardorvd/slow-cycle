@@ -566,8 +566,12 @@ func _trigger_recovery() -> void:
 		_execute_recovery_teleport()
 
 func _execute_recovery_teleport() -> void:
-	var safe_transform: Transform3D = world_manager.request_bike_recovery(global_position)
-	global_transform = safe_transform
+	var query_pos: Vector3 = global_position if is_inside_tree() else position
+	var safe_transform: Transform3D = world_manager.request_bike_recovery(query_pos)
+	if is_inside_tree():
+		global_transform = safe_transform
+	else:
+		transform = safe_transform
 	current_speed = 3.0 # Smooth resumption speed
 	longitudinal_acceleration = 0.0
 	cornering_scrub_accel = 0.0
@@ -590,7 +594,11 @@ func _execute_recovery_teleport() -> void:
 	dynamic_chatter = 0.0
 	if camera_rig and camera_rig.has_method("reset_camera_dynamics"):
 		camera_rig.reset_camera_dynamics()
-	velocity = -global_transform.basis.z * current_speed
+	var audio_mgr = get_node_or_null("AudioManager")
+	if audio_mgr and audio_mgr.has_method("reset_audio_dynamics"):
+		audio_mgr.reset_audio_dynamics()
+	var fwd_basis: Basis = global_transform.basis if is_inside_tree() else transform.basis
+	velocity = -fwd_basis.z * current_speed
 
 func _trigger_haptic(weak: float, strong: float, duration: float) -> void:
 	Input.start_joy_vibration(0, weak, strong, duration)
