@@ -1,0 +1,41 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Environment" path="res://scenes/environment/forest_env.tres" id="1_env"]
+[ext_resource type="Script" path="res://scripts/test/riding_lab_generator.gd" id="2_track"]
+[ext_resource type="PackedScene" path="res://scenes/player/bicycle.tscn" id="3_bike"]
+[ext_resource type="PackedScene" path="res://scenes/ui/screen_fader.tscn" id="4_fader"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="5_hud"]
+[ext_resource type="PackedScene" path="res://scenes/ui/debug_hud.tscn" id="6_debug"]
+
+[node name="RidingLabTrack" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = ExtResource("1_env")
+
+[node name="SunLight" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.819152, -0.321394, 0.474939, 0, 0.829038, 0.559193, -0.573576, -0.458064, 0.679106, 0, 40, 0)
+light_color = Color(1, 0.95, 0.88, 1)
+light_energy = 1.35
+shadow_enabled = true
+shadow_bias = 0.035
+directional_shadow_max_distance = 180.0
+
+[node name="RidingLabGenerator" type="Node3D" parent="." node_paths=PackedStringArray("player")]
+script = ExtResource("2_track")
+world_seed = 4000
+player = NodePath("../Bicycle")
+
+[node name="Bicycle" parent="." node_paths=PackedStringArray("world_manager", "screen_fader") instance=ExtResource("3_bike")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 0)
+world_manager = NodePath("../RidingLabGenerator")
+screen_fader = NodePath("../ScreenFader")
+
+[node name="ScreenFader" parent="." instance=ExtResource("4_fader")]
+
+[node name="HUD" parent="." node_paths=PackedStringArray("bike_controller") instance=ExtResource("5_hud")]
+bike_controller = NodePath("../Bicycle")
+
+[node name="DebugHUD" parent="." node_paths=PackedStringArray("world_manager", "bike_controller") instance=ExtResource("6_debug")]
+world_manager = NodePath("../RidingLabGenerator")
+bike_controller = NodePath("../Bicycle")
+show_on_start = true

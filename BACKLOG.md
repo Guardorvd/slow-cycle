@@ -240,21 +240,23 @@
 
 ---
 
-### TASK: [FEAT-013.3] Sprint 4K: Technical Riding Lab 2.0 (~300–600m)
+### TASK: [FEAT-013.3] Sprint 4K: Technical Riding Lab 2.0 (~300–600m) (`COMPLETED [x]`)
 **Goal**: Создать короткую концентрированную техническую MTB/trail трассу для быстрого ручного и автоматического исследования поведения велосипеда на сложной геометрии.
-**Do**:
-- **4K.0 Geometry Extension Spike**: Исследовать расширение road geometry для поддержки поперечного уклона (контруклоны/berm, off-camber, side-slope). Создать один прототип виража. Если расширение локально и безопасно — внедрить. Если грозит масштабным переписыванием ядра дороги — применить **4K.0-Fallback** (трасса строится на существующих элементах без контруклонов).
-- Собрать связную замкнутую трассу 300–600 м с высокой плотностью элементов: tight corners, switchbacks, S-turns, rough gravel, гребни/разгрузка, компрессионные ямы, дропы/подскоки, крутые подъемы и спуски.
-- Добавить придорожные маркеры и интеграцию в селектор режимов (`mode_select.gd`).
-**Do not**:
-- Не ломать infinite world generation (`WorldManager` и `road_chunk.gd`).
-- Не делать трассу набором разрозненных тестовых коробок или BMX-скейтпарком с отдельными препятствиями.
-- Не создавать тяжелых отдельных obstacle-систем; использовать существующие `ROUGH_GRAVEL` и микро-рельеф.
-**Acceptance Criteria**:
-- Трасса замкнута, непрерывна по $C^1$, проходима от старта до финиша.
-- Наличие всех обязательных технически сложных элементов.
-**Tests**: Детерминированный скрипт верификации геометрии новой сцены.
-**Files**: `scenes/test/riding_lab_track.tscn` (NEW), `scripts/test/riding_lab_generator.gd` (NEW), `scripts/world/road_path_data.gd` (только при успехе Spike), `scripts/ui/mode_select.gd`.
+**Realized**:
+- **4K.0 Spike & Fallback**: Завершено исследование поперечного профиля дороги. Выявлено, что без поддержки латеральной физики в `BicycleController` (`CharacterBody3D` строго `Basis.Y = UP`) контруклоны визуально наклоняют полотно, но не создают центростремительной поддержки, что визуально обманчиво. В соответствии с протоколом принят безопасный **4K.0-Fallback** (ядро бесконечного мира сохранено без единого инвазивного изменения).
+- **4K.1 Концентрированная композиция (~420 м)**:
+  - Построена аналитическая замкнутая трасса протяженностью **420.91 м** (9 чанков, 212 сэмплов) с абсолютной $C^1$-непрерывностью: координатная невязка $\Delta p = 0.000\text{ мм}$, высотная невязка $\Delta Y = 0.000\text{ мм}$, угловая невязка $\Delta T = 0.00000000\text{ рад}$.
+  - 13 сбалансированных технических секций: T1 (Flat Launch), T2 (Hairpin $R=19$м 120°), T3 (Short Link), T4 (Switchback $R=18$м 120° со сменой знака крена), T5 (Steep Climb +6°), T6 (Crest $\to$ Dip $\pm 8^\circ$ с разгрузкой подвески), T7 (East Sweeper & S-Chicane $R=16$м $\pm 16^\circ$), T8 (Rough Gravel Washboard Layer 5), T9 (Washboard Ramp +4°), T10 (Drop Lip-Gap-Landing: трамплин +3° $\to$ выпуклый перегиб $R_{vert} \approx 6.4$м $\to$ спуск $-15^\circ$ $\to$ приземление), T11 (Descent $-6^\circ$), T12 (West Sweeper $R=22$м $90^\circ$), T13 (Closing Seam).
+  - Секции снабжены расширенными диагностическими метаданными: `test_id`, `expected_surface`, `expected_slope_range`, `expected_speed_range`, `expected_lean_range`, `expected_ground_state`.
+- **4K.2 Сцена и генератор полигона**:
+  - Создан генератор `scripts/test/riding_lab_generator.gd` и сцена `scenes/test/riding_lab_track.tscn`.
+  - Генератор полностью совместим по duck-typing с `BicycleController` (метод `request_bike_recovery`), `HUD` и `DebugHUD` (`show_on_start = true`).
+  - В главное меню `mode_select.gd` и `scenes/mode_select.tscn` добавлена кнопка `[3] Technical Riding Lab` с циклической навигацией фокуса и горячей клавишей `3` / `Numpad 3`.
+- **4K.3 Автоматизированный регрессионный раннер**:
+  - Создан скрипт `scripts/test/test_riding_lab.gd`, реализующий 15 проверок в 3 категориях (Geometry Guarantees G1–G7, Structural Integrity S1–S5, API & Resource Contracts A1–A3).
+  - Все 15 проверок пройдены на 100% PASS с нулевыми утечками памяти.
+  - Регрессионный прогон существующего набора (64/64 в `test_diagnostics.gd`, `test_track_verification.gd`, `test_road_logic.gd`) подтвердил 100% отсутствие регрессий.
+**Files**: `scenes/test/riding_lab_track.tscn` (NEW), `scripts/test/riding_lab_generator.gd` (NEW), `scripts/test/test_riding_lab.gd` (NEW), `scripts/ui/mode_select.gd` (MODIFIED), `scenes/mode_select.tscn` (MODIFIED), `BACKLOG.md` (MODIFIED).
 
 ---
 

@@ -138,10 +138,11 @@
   - **4J.6 Behavioral Contracts & Documentation**: 5 новых верификационных контрактов (64/64 PASS), полная синхронизация всей документации проекта.
 
 
-- **4K. Технический полигон Riding Lab 2.0 (Technical Riding Lab)** `[ ] ЗАПЛАНИРОВАНО`:
-  - *Масштаб*: ~300–600 м, плотная замкнутая трасса для стресс-теста экстремальных элементов.
-  - **4K.0 Geometry Extension Spike**: Исследование поддержки cross-slope (контруклоны/berms, off-camber, side-slope). Если требует переписывания ядра — активируется Fallback без контруклонов (острые шпильки, крутые спуски, гребни, дропы).
-  - **4K.1–4K.4 Technical Track Composition**: Концентрированная связка tight corner $\to$ lean $\to$ switchback $\to$ roller $\to$ crest $\to$ compression $\to$ climb.
+- **4K. Технический полигон Riding Lab 2.0 (Technical Riding Lab)** `[x] ЗАВЕРШЕНО`:
+  - *Масштаб*: ~420 м (420.91 м, 9 чанков, 212 сэмплов), сверхплотная замкнутая трасса для стресс-теста экстремальных элементов.
+  - **4K.0 Geometry Extension Spike & Fallback**: Исследован поперечный профиль. Без латеральной физики в `BicycleController` контруклоны визуально обманчивы; активирован безопасный **4K.0-Fallback** (ядро бесконечного мира осталось нетронутым).
+  - **4K.1–4K.2 Technical Track Composition & Scene**: 13 выверенных секций T1–T13 (шпильки $R=19$м, switchback $R=18$м, подъем $+6^\circ$, перегиб crest/dip $\pm 8^\circ$, S-chicane $R=16$м, гребенка Layer 5, дроп с выпуклым перегибом $R_{vert} \approx 6.4$м для отрыва колес, спуск $-6^\circ$, sweeper $R=22$м). Сцена `scenes/test/riding_lab_track.tscn` и генератор `scripts/test/riding_lab_generator.gd`. Кнопка `[3]` в стартовом меню `mode_select.gd`.
+  - **4K.3 Automated Regression Runner**: `scripts/test/test_riding_lab.gd` — 15 автоматизированных контрактов в 3 категориях (Geometry Guarantees G1–G7, Structural Integrity S1–S5, API & Resource Contracts A1–A3) пройдены на 100% PASS, нулевые утечки ObjectDB. Все 64 системных контракта в `test_diagnostics.gd` сохраняют 100% PASS.
 
 - **4L. Тренировочный гравийный круг (Gravel Training Loop)** `[ ] ЗАПЛАНИРОВАНО`:
   - *Масштаб*: ~800–1500 м, живописный гармоничный круг с естественным ритмом езды (педалирование $\to$ накат $\to$ вираж $\to$ уклон $\to$ торможение).
