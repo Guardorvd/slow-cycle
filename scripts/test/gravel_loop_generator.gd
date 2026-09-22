@@ -191,14 +191,25 @@ func _define_sections() -> void:
 			"expected_ground_state": "GROUNDED"
 		},
 		{
-			"code": "L10", "name": "Shaded West Run & Return", "desc": "Sprint Straightaway into Return Sweeper R=60m",
-			"s0": 955.84, "s1": 1220.43,
-			"target": "WEST RUN -> RETURN | C1 SEAM",
-			"test_id": "4L_L10_RETURN",
+			"code": "L10", "name": "Shaded West Run", "desc": "Sprint Straightaway into Tree Shadows",
+			"s0": 955.84, "s1": 1126.18,
+			"target": "WEST RUN | OPTIONAL SPRINT",
+			"test_id": "4L_L10_WEST_RUN",
 			"expected_surface": "ROAD",
 			"expected_slope_range": [0.0, 0.8],
 			"expected_speed_range": [20.0, 42.0],
-			"expected_lean_range": [-10.0, 2.0],
+			"expected_lean_range": [-2.0, 2.0],
+			"expected_ground_state": "GROUNDED"
+		},
+		{
+			"code": "L11", "name": "Return Sweeper & Seam", "desc": "High Speed Finish Curve into Seam R=60m",
+			"s0": 1126.18, "s1": 1220.43,
+			"target": "RETURN R=60m | APEX & SEAM",
+			"test_id": "4L_L11_RETURN",
+			"expected_surface": "ROAD",
+			"expected_slope_range": [0.0, 0.0],
+			"expected_speed_range": [22.0, 34.0],
+			"expected_lean_range": [-10.0, -4.0],
 			"expected_ground_state": "GROUNDED"
 		}
 	]

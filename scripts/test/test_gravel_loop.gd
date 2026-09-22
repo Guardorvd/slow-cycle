@@ -107,7 +107,7 @@ func run_verification() -> bool:
 	print("[PASS G6] Anti-teleport gate: max inter-sample step is %.4f m (< 3.0m)." % max_step)
 
 	# G7: Curvature rate gate:
-	# - Horizontal turn rate <= 0.035 rad/m (guarantees R >= 55.0m across all training curves)
+	# - Horizontal turn rate <= 0.018 rad/m (strictly guarantees R >= 55.6m across all training curves, R_min = 60.0m analytical)
 	# - 3D total rate <= 0.060 rad/m (ensures smooth vertical transitions without sharp drop breaks)
 	var max_horiz_rate: float = 0.0
 	var max_3d_rate: float = 0.0
@@ -128,19 +128,19 @@ func run_verification() -> bool:
 		if rate_3d > max_3d_rate:
 			max_3d_rate = rate_3d
 
-		if rate_horiz > 0.035:
-			printerr("[FAIL G7] Horizontal curvature rate exceeds 0.035 rad/m at idx %d: %.4f rad/m" % [i, rate_horiz])
+		if rate_horiz > 0.0180:
+			printerr("[FAIL G7] Horizontal curvature rate exceeds 0.018 rad/m at idx %d: %.4f rad/m" % [i, rate_horiz])
 			return false
 		if rate_3d > 0.060:
 			printerr("[FAIL G7] 3D tangent rate exceeds 0.060 rad/m at idx %d: %.4f rad/m" % [i, rate_3d])
 			return false
 
-	print("[PASS G7] Curvature rate gate: max horizontal rate is %.5f rad/m (< 0.035), max 3D rate is %.5f rad/m (< 0.060)." % [max_horiz_rate, max_3d_rate])
+	print("[PASS G7] Curvature rate gate: max horizontal rate is %.5f rad/m (< 0.018 -> R >= 55.6m), max 3D rate is %.5f rad/m (< 0.060)." % [max_horiz_rate, max_3d_rate])
 
 	# --- TIER 2: STRUCTURAL INTEGRITY ---
 	print("\n--- TIER 2: STRUCTURAL INTEGRITY ---")
 
-	# S1: Slope bounds (all slopes stay within gentle training limits [-3.5°, +3.5°])
+	# S1: Slope bounds (all slopes stay within gentle training limits [-2.75°, +2.50°], zero overshoot)
 	var min_slope: float = INF
 	var max_slope: float = -INF
 	for s in path_data.slopes:
@@ -149,16 +149,16 @@ func run_verification() -> bool:
 		if s > max_slope:
 			max_slope = s
 	print("          Slope range observed: [%.2f°, %.2f°]" % [min_slope, max_slope])
-	if min_slope < -3.5 or max_slope > 3.5:
-		printerr("[FAIL S1] Slope exceeds training loop comfort bounds [-3.5°, +3.5°]: [%.2f°, %.2f°]" % [min_slope, max_slope])
+	if min_slope < -2.75 or max_slope > 2.50:
+		printerr("[FAIL S1] Slope exceeds training loop comfort bounds [-2.75°, +2.50°]: [%.2f°, %.2f°]" % [min_slope, max_slope])
 		return false
-	print("[PASS S1] All road slopes stay strictly within relaxed training limits.")
+	print("[PASS S1] All road slopes stay strictly within relaxed training limits (zero spline overshoot).")
 
-	# S2: Section definitions and coverage (10 sections L1-L10)
+	# S2: Section definitions and coverage (strictly 11 sections L1-L11)
 	var sections: Array = generator.sections
-	print("[PASS S2] Sections count: %d (expected 10)" % sections.size())
-	if sections.size() < 10:
-		printerr("[FAIL S2] Sections count less than 10: %d" % sections.size())
+	print("[PASS S2] Sections count: %d (strictly expected 11)" % sections.size())
+	if sections.size() != 11:
+		printerr("[FAIL S2] Sections count is %d, expected exactly 11" % sections.size())
 		return false
 
 	# Verify continuity and metadata of sections
@@ -249,12 +249,12 @@ func run_verification() -> bool:
 		return false
 	print("[PASS A1] request_bike_recovery contract verified: upright, on-road, looking forward.")
 
-	# A2: 3D roadside signage steles
+	# A2: 3D roadside signage steles (strictly 11 steles L1-L11)
 	var signage_node: Node = generator.get_node_or_null("LoopSignage")
-	if not signage_node or signage_node.get_child_count() < 10:
-		printerr("[FAIL A2] LoopSignage missing or has fewer than 10 steles: %s" % (signage_node.get_child_count() if signage_node else "null"))
+	if not signage_node or signage_node.get_child_count() != 11:
+		printerr("[FAIL A2] LoopSignage missing or has %s steles, expected exactly 11" % (signage_node.get_child_count() if signage_node else "null"))
 		return false
-	print("[PASS A2] All 10 3D section steles instantiated with Label3D signage.")
+	print("[PASS A2] All 11 3D section steles instantiated with Label3D signage.")
 
 	# A3: Clean teardown
 	root_node.queue_free()
