@@ -83,7 +83,7 @@ layout_mode = 2
 
 [node name="BtnInfinite" type="Button" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
-focus_neighbor_top = NodePath("../BtnLab")
+focus_neighbor_top = NodePath("../BtnTraining")
 focus_neighbor_bottom = NodePath("../BtnSandbox")
 theme_override_font_sizes/font_size = 20
 theme_override_styles/normal = SubResource("StyleBox_BtnNormal")
@@ -104,12 +104,22 @@ text = "2. Тестовый полигон (Riding Feel Test Track)"
 [node name="BtnLab" type="Button" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
 focus_neighbor_top = NodePath("../BtnSandbox")
-focus_neighbor_bottom = NodePath("../BtnInfinite")
+focus_neighbor_bottom = NodePath("../BtnTraining")
 theme_override_font_sizes/font_size = 20
 theme_override_styles/normal = SubResource("StyleBox_BtnNormal")
 theme_override_styles/hover = SubResource("StyleBox_BtnFocus")
 theme_override_styles/focus = SubResource("StyleBox_BtnFocus")
 text = "3. Техническая лаборатория (Technical Riding Lab)"
+
+[node name="BtnTraining" type="Button" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+focus_neighbor_top = NodePath("../BtnLab")
+focus_neighbor_bottom = NodePath("../BtnInfinite")
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("StyleBox_BtnNormal")
+theme_override_styles/hover = SubResource("StyleBox_BtnFocus")
+theme_override_styles/focus = SubResource("StyleBox_BtnFocus")
+text = "4. Тренировочный круг (Gravel Training Loop)"
 
 [node name="Spacer2" type="Control" parent="CenterContainer/VBoxContainer"]
 custom_minimum_size = Vector2(0, 15)
@@ -119,6 +129,7 @@ layout_mode = 2
 layout_mode = 2
 theme_override_colors/font_color = Color(0.5, 0.6, 0.55, 1)
 theme_override_font_sizes/font_size = 14
-text = "[1 / 2 / 3] Быстрый выбор | Стрелки / Стик + Enter / A | В игре: F3 - телеметрия"
+text = "[1 / 2 / 3 / 4] Быстрый выбор | Стрелки / Стик + Enter / A | В игре: F3 - телеметрия"
 horizontal_alignment = 1
+
 

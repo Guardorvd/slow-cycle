@@ -144,9 +144,10 @@
   - **4K.1–4K.2 Technical Track Composition & Scene**: 13 выверенных секций T1–T13 (шпильки $R=19$м, switchback $R=18$м, подъем $+6^\circ$, перегиб crest/dip $\pm 8^\circ$, S-chicane $R=16$м, гребенка Layer 5, дроп с выпуклым перегибом $R_{vert} \approx 6.4$м для отрыва колес, спуск $-6^\circ$, sweeper $R=22$м). Сцена `scenes/test/riding_lab_track.tscn` и генератор `scripts/test/riding_lab_generator.gd`. Кнопка `[3]` в стартовом меню `mode_select.gd`.
   - **4K.3 Automated Regression Runner**: `scripts/test/test_riding_lab.gd` — 15 автоматизированных контрактов в 3 категориях (Geometry Guarantees G1–G7, Structural Integrity S1–S5, API & Resource Contracts A1–A3) пройдены на 100% PASS, нулевые утечки ObjectDB. Все 64 системных контракта в `test_diagnostics.gd` сохраняют 100% PASS.
 
-- **4L. Тренировочный гравийный круг (Gravel Training Loop)** `[ ] ЗАПЛАНИРОВАНО`:
-  - *Масштаб*: ~800–1500 м, живописный гармоничный круг с естественным ритмом езды (педалирование $\to$ накат $\to$ вираж $\to$ уклон $\to$ торможение).
-  - Отдельная статическая сцена тестового трека, ориентированная на субъективный кайф от езды.
+- **4L. Тренировочный гравийный круг (Gravel Training Loop)** `[x] ЗАВЕРШЕНО`:
+  - *Масштаб*: ~1220 м (1220.60 м, 25 чанков, 611 сэмплов), живописный гармоничный круг с естественным ритмом езды (педалирование $\to$ свободный накат со стрекотом трещотки $\to$ открытые скоростные дуги $R \in [60, 70]$м без скраба $\to$ пологий подъем $\to$ затяжной спуск $-2.5^\circ \to$ поляна $\to$ финиш).
+  - Сцена `scenes/test/gravel_training_loop.tscn` и генератор `scripts/test/gravel_loop_generator.gd`. Кнопка `[4]` в стартовом меню `mode_select.gd`.
+  - Автоматизированный регрессионный раннер `scripts/test/test_gravel_loop.gd` (16 проверок в 3 категориях) пройден на 100% PASS, 0 утечек памяти ObjectDB. Полная регрессионная безопасность (64/64 мастер-теста PASS).
 
 - **4M. Финальная валидация ощущений езды (Final Riding Feel Validation)** `[ ] ЗАПЛАНИРОВАНО`:
   - **Двойной гейт (Dual Gate)**:

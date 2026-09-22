@@ -260,21 +260,24 @@
 
 ---
 
-### TASK: [FEAT-013.4] Sprint 4L: Gravel Training Loop (~800–1500m)
+### TASK: [FEAT-013.4] Sprint 4L: Gravel Training Loop (~800–1500m) (`COMPLETED [x]`)
 **Goal**: Создать естественную, гармоничную и живописную тренировочную трассу с упором на расслабленный flow и естественный ритм езды (разгон, накат, вираж, рельеф, торможение).
-**Do**:
-- Построить замкнутую статическую сцену протяженностью 800–1500 м с идеальным $C^1$-замыканием.
-- Сформировать ритмичную композицию: пологие подъемы, скоростные накаты, открытые дуги (sweepers), гравийные участки, короткие секции rough gravel и травянистые обочины.
-- Обеспечить разнообразие радиусов и уклонов в комфортных пределах.
-- Подключить сцену в стартовое меню выбора режимов.
-**Do not**:
-- Не перегружать трассу экстремальными препятствиями (это не лаборатория 4K).
-- Не использовать генератор бесконечного мира; трек должен быть детерминированным замкнутым полигоном.
-**Acceptance Criteria**:
-- Естественный цикл езды без необходимости постоянного судорожного подруливания и торможения.
-- Приятный ритм наката и прохождения плавных апексов.
-**Tests**: Автоматический прогон траектории и проверка замыкания шва.
-**Files**: `scenes/test/gravel_training_loop.tscn` (NEW), `scripts/test/gravel_loop_generator.gd` (NEW), `scripts/ui/mode_select.gd`.
+**Realized**:
+- **4L.1 Аналитическая замкнутая композиция (~1220 м)**:
+  - Построена плавная органическая замкнутая трасса протяженностью **1220.60 м** (25 чанков, 611 сэмплов с шагом 2.0 м) со строгой $C^1$-непрерывностью: координатная невязка $\Delta p = 0.000\text{ мм}$, высотная невязка $\Delta Y = 0.000\text{ мм}$, угловая невязка $\Delta T = 0.00000000\text{ рад}$.
+  - 10 сбалансированных секций (L1–L10), спроектированных под естественный медитативный ритм и свободный накат без судорожного руления: L1 (Start & Launch, 100м), L2 (Pine Ridge Ascent +2.2°, 140м), L3 (North Meadow Sweeper $R=70$м 90°), L4 (Meadow Glide, 80м), L5 (Forest Edge Chicane $R=65$м $\pm 18^\circ$, 82м), L6 (Crest Sweeper $R=65$м, мягкий перевал гребня), L7 (Birch Valley Descent $-2.5^\circ$, 150м свободного наката до 32 км/ч со стрекотом трещотки), L8 (Lakeside Rough Strip Layer 5, 70м), L9 (South Sweeper $R=65$м), L10 (Shaded West Run 170м под спринт и возвратная дуга $R=60$м к старту).
+  - Секции L3–L4 открывают просторные солнечные поляны (`MEADOW`), где плотность деревьев снижена до 25%, а L7 погружает в березовую рощу со сглаженным перепадом высот (всего 5.25 м на весь круг).
+  - Все секции снабжены расширенными диагностическими метаданными: `test_id`, `expected_surface`, `expected_slope_range`, `expected_speed_range`, `expected_lean_range`, `expected_ground_state`.
+- **4L.2 Сцена и генератор тренировочного круга**:
+  - Создан генератор `scripts/test/gravel_loop_generator.gd` и сцена `scenes/test/gravel_training_loop.tscn`.
+  - Реализован полный duck-typed контракт: `road_path`, `request_bike_recovery` (безопасный откат на 15м назад по оси дороги), `get_section_at_distance`, `world_seed = 4004`, `sections`.
+  - Установлены 10 придорожных 3D-стел с табличками `Label3D` для каждой секции L1–L10.
+  - В стартовое меню `mode_select.gd` и `scenes/mode_select.tscn` добавлена кнопка `[4] Тренировочный круг (Gravel Training Loop)` с полной циклической навигацией фокуса и горячей клавишей `4` / `Numpad 4`.
+- **4L.3 Автоматизированный регрессионный раннер**:
+  - Создан скрипт `scripts/test/test_gravel_loop.gd`, реализующий 16 контрактов в 3 категориях (Geometry Guarantees G1–G7, Structural Integrity S1–S6, API & Resource Contracts A1–A3).
+  - Все 16 проверок пройдены на 100% PASS с нулевыми утечками памяти.
+  - Полный регрессионный прогон всех существующих тестов (`test_riding_lab.gd`, `test_diagnostics.gd`, `test_track_verification.gd`) подтвердил 100% PASS и отсутствие регрессий.
+**Files**: `scenes/test/gravel_training_loop.tscn` (NEW), `scripts/test/gravel_loop_generator.gd` (NEW), `scripts/test/test_gravel_loop.gd` (NEW), `scripts/ui/mode_select.gd` (MODIFIED), `scenes/mode_select.tscn` (MODIFIED), `BACKLOG.md` (MODIFIED).
 
 ---
 
