@@ -1,318 +1,344 @@
-# ТЕХНИЧЕСКИЙ АУДИТ, АРХИТЕКТУРНЫЙ АНАЛИЗ И ПЛАН РЕФАКТОРИНГА
+# ТЕХНИЧЕСКИЙ АУДИТ, АРХИТЕКТУРНЫЙ АНАЛИЗ И ПЛАН РЕФАКТОРИНГА (СПРИНТ 4 И ВСЕ ПОДСПРИНТЫ 4A–4G)
 
 ## 1. ВВОДНЫЙ ИНЖЕНЕРНЫЙ КОНТЕКСТ И ЗАДАЧА
-> **Статус задачи**: Запущен полный сквозной технический аудит кодовой базы (End-to-End Technical & Architecture Audit) в роли Principal Software Architect & Systems Tech Lead.
-> **Фокус анализа**: Всесторонний аудит архитектуры, физики, математики процедурной генерации, процедурного звука, графического конвейера, интерфейса пользователя и контрактов данных. Выявление скрытых багов, геометрических разрывов, утечек ресурсов, спагетти-связности и рассинхронизаций документации.
-> **Стек и компоненты**: Godot Engine 4.7.2 Stable Mono (Forward+ Vulkan 1.3), GDScript, Hermite Spline Generator (`RoadMath`, `RoadLogic`, `RoadPathData`), Procedural Meshes (`ArrayMesh`, `SurfaceTool`, `FastNoiseLite`), Kinematic Bicycle Dynamics (`CharacterBody3D`, Dual Raycast Suspension), MultiMesh Foliage System, Custom Procedural Audio Synthesis (`AudioStreamWAV`), CanvasLayer UI (`HUD`, `DebugHUD`, `ScreenFader`).
+> **Статус задачи**: Запущен углублённый сквозной технический аудит кодовой базы архитектуры, физики, математики, аудио, камеры и тестов версии 4 (подэтапы 4A, 4B, 4C, 4D, 4E, 4F, 4G) в роли Principal Software Architect & Systems Tech Lead.
+> **Фокус анализа**: Комплексная проверка всех подсистем 4-й версии: баланс продольных сил и спринт (4A), динамика руления и апекса (4B), трёхслойная модель поверхностей и лучи подвески (4C), визуальная анатомия колес и каретки (4D), живая камера и когерентный шум (4E), процедурный звуковой ландшафт (4F), замкнутый тестовый полигон и селектор режимов (4G). Поиск скрытых багов, дефектов дискретизации, утечек памяти, рассинхронизаций состояний и математических разрывов.
+> **Стек и компоненты**: Godot Engine 4.7.2 Stable Mono (Forward+ Vulkan 1.3), GDScript 2.0, `CharacterBody3D`, `BicycleController`, `BikeCameraRig`, `BikeAudioManager`, `TestTrackGenerator`, `RoadPathData`, `DebugHUD`, `ModeSelect`.
 > **Методологический фильтр каждого дефекта**:
 > 1. Это реально bug или просто stylistic preference?
-> 2. Есть ли observable consequence (видимое/слышимое проявление)?
+> 2. Есть ли observable consequence (видимое/слышимое/измеримое проявление)?
 > 3. Можно ли доказать проблему кодом/тестом/сценарием?
 > 4. Какой минимальный diff её исправляет?
+> «Система работает → доказана проблема → минимальное исправление → тест → не трогаем остальное».
 
 ---
 
-## 2. СВОДНЫЙ РЕЕСТР ДЕФЕКТОВ И ТЕХНИЧЕСКОГО ДОЛГА
+## 2. СВОДНЫЙ РЕЕСТР ДЕФЕКТОВ И ТЕХНИЧЕСКОГО ДОЛГА (СПРИНТЫ 4A–4G)
 
-| № | Модуль / Файл | Выявленная проблема / «Запах кода» | Инженерный риск / Нарушенный принцип | Влияние на систему (Impact) | Уровень критичности | Статус |
-|---|---|---|---|---|---|:---:|
-| 1 | `scripts/world/chunk_foliage.gd` & `road_chunk.gd` | Деревья и трава сэмплируют шум в произвольных координатах, не совпадающих с полигональной плоскостью террейна | Нарушение пространственной когерентности и $C^0$-привязки к мешу | Растения висят в воздухе (до 1.8м) или закопаны под полигон террейна | **Critical** | ✅ **РЕШЕНО** |
-| 2 | `scripts/world/world_manager.gd` (L48) & `bicycle_controller.gd` | Базис при спавне Recovery строится с тангажом (`Basis.looking_at(tang, norm)`), наклоняя корень CharacterBody3D | Кинематический дефект: наклон локальной оси Y, прецессия руления | Заваливание горизонта при поворотах, двойной pitch визуальной рамы | **Critical** | ✅ **РЕШЕНО** |
-| 3 | `scripts/ui/hud.gd` (L22-23) | Опрос `Input.is_key_pressed(KEY_H)` в `_process` вместо `is_key_just_pressed` | Непрерывный фреймовый поллинг / Гонка состояний UI | Стробоскопическое мерцание панели управления при любом нажатии 'H' | **High** | ✅ **РЕШЕНО** |
-| 4 | `scripts/ui/debug_hud.gd` (L58-59) | `last_closest_idx` не синхронизируется с `prune_behind`, смещая окно поиска | Деградация алгоритмической сложности до $O(N)$ полного перебора | Спайки времени кадра при включенном Debug HUD на длинных дистанциях | **High** | ✅ **РЕШЕНО** |
-| 5 | `scripts/audio/bike_audio_manager.gd` (L168-174, L218-224) | Ошибка циклического кроссфейда в процедурных буферах ветра и гравия | Фазовый скачок случайного сигнала на границе лупа | Слышимые регулярные щелчки (поп-артефакты) каждые 2.0с и 1.5с | **High** | ✅ **РЕШЕНО** |
-| 6 | `scripts/ui/screen_fader.gd` (L11-24) | Отсутствие флага занятости `is_fading` при спаме клавиши `R` | Незащищенность от повторного входа (Re-entrancy Race Condition) | Двойная телепортация, сбитая анимация затемнения, двойной сброс скорости | **High** | ✅ **РЕШЕНО** |
-| 7 | `scripts/world/world_manager.gd` (L157-160) | Отсутствие `cull_mode = CULL_DISABLED` у материала травы `grass_mat` | Некорректный Backface Culling на плоских крестовинах | Половина травинок бесследно исчезает при взгляде с противоположной стороны | **High** | ✅ **РЕШЕНО** |
-| 8 | `scenes/player/bicycle.tscn` (L198-200) | `SpringArm3D` имеет маску коллизий 1 (`Default`), игнорируя террейн (слои 2 и 3) | Нарушение спецификации слоев физики камеры | Камера 3-го лица проваливается сквозь холмы, показывая изнанку мира | **Medium** | ✅ **РЕШЕНО** |
-| 9 | `scripts/player/bicycle_controller.gd` (L286-287) | Односторонняя формула прижима `minf(-0.5, slope_vy - 0.5)` на подъемах | Паразитная нормальная нагрузка на наклонной плоскости | Искусственное торможение и застревание на подъемах от вдавливания в пол | **Medium** | ✅ **РЕШЕНО** |
-| 10 | `project.godot` (L28-29, L59) | Кнопка Joypad A назначена на дублирование газа (`pedal`), а звонок — на стик R3 | Нарушение UX-контракта геймпада (`BACKLOG.md`) | Невозможность позвонить в звонок стандартной кнопкой A на геймпаде | **Medium** | ✅ **РЕШЕНО** |
-| 11 | `scripts/world/chunk_streamer.gd` (L50-53) | Вызов `active_chunks.keys()` и аллокация `Array[int]` на каждом кадре | Избыточное давление на сборщик мусора (GC / Heap Churn) | 120-288 динамических аллокаций массивов в секунду на главном потоке | **Medium** | ✅ **РЕШЕНО** |
-| 12 | `scenes/player/bicycle.tscn` & `bike_audio_manager.gd` | Отсутствие маршрутизации по AudioBus (все звуки идут в Master) | Нарушение SRP и архитектуры аудио-микширования (`INFRA-001`) | Невозможность раздельно регулировать громкость ветра, гравия и звонка | **Medium** | ✅ **РЕШЕНО** |
-| 13 | `assets/shaders/gravel_road.gdshader` | Цвета гравия и колеи захардкожены в `const vec3` без `uniform` | Жесткая связанность визуализации / Блокировка суточного цикла | Дорога не сможет менять оттенок на закате/ночью и блестеть от росы | **Medium** | ✅ **РЕШЕНО** |
-| 14 | `scripts/audio/bike_audio_manager.gd`, `bike_camera.gd`, `hud.gd` | Спагетти-связность через нетипизированный `Node.get()` со строковым хешированием | Нарушение принципов типизации GDScript 2.0 / High Coupling | Потеря проверок компилятора, падение скорости вызовов в 10-20 раз | **Low** | ✅ **РЕШЕНО** |
-| 15 | `scripts/camera/bike_camera.gd` (L4), `bicycle_controller.gd` (L30) | Мёртвый код: неиспользуемый `preload` и заброшенный `pitch_smoothness` | Нарушение принципа чистоты кода (Clean Code / YAGNI) | Засорение кодовой базы неиспользуемыми идентификаторами | **Low** | ✅ **РЕШЕНО** |
-| 16 | `README.md`, `CURRENT_STATE_AUDIT.md`, `TECHNICAL_AUDIT_AND_ROADMAP.md` | Рассинхронизация статусов спринтов между документами проекта | Нарушение целостности проектной документации | `README` заморожен на 2C, аудит на 2B/3B, хотя Спринт 3C уже сдан | **Low** | ✅ **РЕШЕНО** |
-| 17 | `scenes/ui/hud.tscn` (L95-125) | В оверлее подсказок управления отсутствуют критические клавиши `R` и `H` | Эргономический пробел интерфейса (UI Blindspot) | Игрок не знает, как восстановиться при съезде или как скрыть панель | **Low** | ✅ **РЕШЕНО** |
-| 18 | `scripts/ui/debug_hud.gd` (L28-29) | Отсутствие сброса пикового времени кадра `max_frame_time_ms` после прогрева | Искажение метрик телеметрии разработки | Разовый спайк компиляции шейдеров навечно искажает показания F3 HUD | **Low** | ✅ **РЕШЕНО** |
-| 19 | `scenes/world/birch_tree.tscn` и `pine_tree.tscn` | Рудиментарные статичные сцены деревьев из Спринта 1 | Мёртвые ресурсы в дереве сцен проекта | Путаница между статичными сценами и процедурными MultiMesh деревьями | **Low** | ✅ **РЕШЕНО** |
-| 20 | `scenes/main.tscn` (L25) | Захардкоженный сид мира `184729` в главной сцене без CLI-переопределения | Ограничение модульности архитектуры | Невозможность передачи тестового сида через аргументы командной строки | **Low** | ✅ **РЕШЕНО** |
+| № | Модуль / Файл | Подспринт | Выявленная проблема / «Запах кода» | Инженерный риск / Нарушенный принцип | Влияние на систему (Impact) | Уровень критичности | Статус |
+|---|---|:---:|---|---|---|:---:|:---:|
+| 1 | `scripts/audio/bike_audio_manager.gd` (L227-265) | **4F** | Случайный скачок фазы (до 43% шкалы) на границе лупа ветра + плавающий сбой теста 27 | Отсутствие кроссфейд-моста (seam bridge) и прямое просачивание белого шума | Акустический щелчок каждые 4.5с; автотест #27 падает в 30-40% запусков (Flaky test) | **Critical** | 🔴 ТРЕБУЕТСЯ ПРАВКА |
+| 2 | `scripts/world/road_path_data.gd` (L80-100) & `debug_hud.gd` | **4G** | Залипание телеметрии F3 HUD на 50 метров при пересечении линии финиша/старта на замкнутом полигоне | Отсутствие циклического wrap-around в локальном окне поиска `find_closest_index` | 50 метров после старт/финиша HUD показывает 2.80 км и секцию S6 вместо секции A и 0.00 км | **High** | 🔴 ТРЕБУЕТСЯ ПРАВКА |
+| 3 | `scripts/audio/bike_audio_manager.gd` (L101-105) | **4F** | Дискретизация таймера трещотки (`freewheel_timer = 0.0`) и потеря 46% расчетной частоты кликов | Сброс фазового аккумулятора таймера / Aliasing на кадровой частоте | Частота кликов намертво застревает на 30 Гц на скоростях от 25 до 44 км/ч вместо 55.5 Гц | **High** | 🔴 ТРЕБУЕТСЯ ПРАВКА |
+| 4 | `scripts/camera/bike_camera.gd` (L109, L189) | **4E** | Полное отключение педальной раскачки камеры (Cadence Sway & Bob) при спринте на Shift | Разрыв контракта состояний (`is_sprinting` vs `is_pedaling`) | Камера в кокпите полностью «деревянная» и неподвижная во время самого яростного спринта | **High** | 🔴 ТРЕБУЕТСЯ ПРАВКА |
+| 5 | `scripts/audio/bike_audio_manager.gd` (L48-73) | **4F** | Утечка от 6 до 102 экземпляров `AudioStreamPlaybackWAV` в ObjectDB при выходе из игры/тестов | Отсутствие `stop()` и очистки плееров с `autoplay=true` в `_exit_tree()` | Утечка ресурсов аудиосервера, нарушение правила 7 AGENTS.md ("Zero leak warnings") | **Medium** | 🔴 ТРЕБУЕТСЯ ПРАВКА |
+| 6 | `scripts/player/bicycle_controller.gd` (L381-390) | **4A** | Мгновенный обрыв физического тормозного усилия при отпускании S вместо спада за 0.10 с | Рассинхронизация физической силы `a_brake` и переменной `brake_input` | Толчок/рывок ускорения при отпускании тормоза; визуал еще клюет, а сила уже исчезла | **Medium** | 🔴 ТРЕБУЕТСЯ ПРАВКА |
+| 7 | `scripts/camera/bike_camera.gd` (L189-196, L221) | **4E** | Однокадровый скачок высоты камеры до 15 мм при прекращении педалирования | Дискретный сброс синусоидального смещения без экспоненциального сглаживания | Неприятный резкий стук/рывок в глаза игрока при отпускании W на пике синусоиды | **Medium** | 🔴 ТРЕБУЕТСЯ ПРАВКА |
+| 8 | `project.godot` (L92-98) | **4C** | Отсутствие имени физического слоя 5 (`RoughRoad` / bit 16) в конфигурации проекта | Нарушение спецификации физических слоев Godot | В инспекторе редактора слой 5 отображается безымянным, риск случайного снятия маски | **Low** | 🔴 ТРЕБУЕТСЯ ПРАВКА |
+| 9 | `scenes/player/bicycle.tscn` (L122, L279) | **4D/4E** | Пропущенные явные ссылки в `node_paths` (`camera_rig` и `spring_arm`) | Зависимость от строкового fallback `get_node_or_null` | Потенциальная хрупкость сцены при переименовании дочерних узлов в инспекторе | **Low** | 🔴 ТРЕБУЕТСЯ ПРАВКА |
+| 10 | `scripts/player/bicycle_controller.gd` (L537) | **4D** | Бесконечное накопление угла каретки `crank_rotation` без периодического `wrapf` к $[-\pi, \pi]$ | Числовой дрейф фазового угла вращения шатунов при многочасовых поездках | Уход угла в десятки тысяч радиан при длительной игре (потенциальный дрейф float) | **Low** | 🔴 ТРЕБУЕТСЯ ПРАВКА |
+| 11 | `scripts/camera/bike_camera.gd`, `hud.gd`, `debug_hud.gd` | **4A–4G** | Повсеместные нетипизированные вызовы `bike.get(...)` через строковые литералы | Запах кода: слабая типизация и оверхед хеш-таблиц GDScript | Падение производительности доступа к свойствам в 10–15 раз, отсутствие контроля опечаток | **Low** | 🔴 ТРЕБУЕТСЯ ПРАВКА |
+| 12 | `README.md`, `CURRENT_STATE_AUDIT.md` | **4A–4G** | Документация проекта заморожена на этапе 3B/3C и не отражает готовность Спринта 4 | Нарушение целостности проектной документации | Рассинхронизация статусов спринтов, дезориентация внешних разработчиков | **Low** | 🔴 ТРЕБУЕТСЯ ПРАВКА |
 
 ---
 
 ## 3. ПОДРОБНЫЙ ТЕХНИЧЕСКИЙ РАЗБОР И ДОКАЗАТЕЛЬСТВА (4-STEP METHODOLOGY)
 
-### 3.1. [CRITICAL] Разрыв высот спавна листвы и полигонов террейна (`chunk_foliage.gd` vs `road_chunk.gd`)
-* **1. Это реально bug или просто stylistic preference?** Реальный геометрический дефект ($C^0$ discontinuity).
-* **2. Есть ли observable consequence?** Деревья и кусты травы парят в воздухе до 1.8 метров над землей или спавнятся погребенными глубоко под полигональной поверхностью холмов обочины.
+### 3.1. [CRITICAL] Скачок фазы на стыке лупа ветра и плавающий сбой теста 27 (`bike_audio_manager.gd`)
+* **1. Это реально bug или просто stylistic preference?** Реальный функциональный баг алгоритма процедурного синтеза звука (Audio Discontinuity / Flaky Failure).
+* **2. Есть ли observable consequence?** Каждые 4.5 секунды при езде на велосипеде в звуке ветра раздается тихий, но отчетливый импульсный щелчок («поп»). Автоматический диагностический тест #27 (`test_diagnostics.gd`) случайным образом завершается с ошибкой `[FAIL] Audio loop seam discontinuity exceeds tolerance` в 3 из 10 прогонов (30-40% отказов в CI).
 * **3. Можно ли доказать проблему кодом/тестом/сценарием?**
-  В `road_chunk.gd` террейн строится из одного плоского полигонального сегмента между кромкой дороги ($d = 2.0\text{м}$) и внешним краем ($d = 22.0\text{м}$):
-  $$\text{Vertex}_{road} = \mathbf{p} \pm \mathbf{b} \cdot 2.0$$
-  $$\text{Vertex}_{outer} = \mathbf{p} \pm \mathbf{b} \cdot 22.0 + \mathbf{n} \cdot h_{outer}$$
-  В коде `road_chunk.gd` (L111):
+  В `bike_audio_manager.gd` в функции `_create_wind_audio_stream()`:
   ```gdscript
-  var h_left: float = noise.get_noise_2d(road_left.x, road_left.z) * 1.8
-  var outer_left: Vector3 = pt - binorm * (ROAD_HALF_WIDTH + TERRAIN_WIDTH) + norm * h_left
-  ```
-  Высота внешней вершины смещается шумом, вычисленным на *внутренней* кромке! А в `chunk_foliage.gd` (L49, 59):
-  ```gdscript
-  var h_tree: float = (noise.get_noise_2d(tree_base.x, tree_base.z) * 1.8) if noise else 0.0
-  var tree_pos: Vector3 = tree_base + norm * (h_tree * t_factor)
-  ```
-  Поскольку полигон между $d=2$ и $d=22$ является строго плоской гранью в 3D, истинная высота полигона в точке спавна равна:
-  $$y_{poly} = \text{lerp}(0, h_{outer}, t_{factor})$$
-  А объект спавнится на высоте:
-  $$y_{tree} = h(\mathbf{x}_{tree}) \cdot t_{factor}$$
-  При частоте шума $0.04$ разница между шумом в точке дерева и шумом на кромке дороги регулярно достигает $1.5\text{м}$. Разница $|y_{tree} - y_{poly}| > 0$ на $100\%$ полигонов!
-* **4. Какой минимальный diff её исправляет?**
-  В `road_chunk.gd` вычислять $h_{outer}$ строго в мировых координатах внешней вершины (`outer_left_base.x, outer_left_base.z`), а в `chunk_foliage.gd` интерполировать высоту посадки по фактической плоскости полигона террейна:
-  $$\mathbf{pos}_{plant} = \mathbf{base} + \mathbf{n} \cdot (h_{outer} \cdot t_{factor})$$
-  либо сэмплировать шум в локальной триангуляции полосы.
-
----
-
-### 3.2. [CRITICAL] Наклон корневого базиса при спавне Recovery и прецессия руления (`world_manager.gd`)
-* **1. Это реально bug или просто stylistic preference?** Критический кинематический дефект физического контроллера.
-* **2. Есть ли observable consequence?** При нажатии `R` на наклонном участке дороги (спуск или подъем) байк восстанавливается с наклоненным корневым узлом. Вращение руля `rotate_y()` начинает заваливать раму вбок вокруг наклонной оси Y (гироскопическая прецессия), а угол `visual_pitch` накладывается поверх наклона корня, приводя к «двойному тангажу» (рама задирается под $12^\circ$ на обычном $6^\circ$ уклоне).
-* **3. Можно ли доказать проблему кодом/тестом/сценарием?**
-  В `world_manager.gd` (L48):
-  ```gdscript
-  var spawn_basis: Basis = Basis.looking_at(tang, norm)
-  ```
-  Если касательная $\mathbf{t}$ имеет вертикальную составляющую $t_y = -0.1$ (спуск $-5.7^\circ$), метод `Basis.looking_at(tang, norm)` ориентирует ось $-Z$ вдоль $\mathbf{t}$. При этом ось $Y$ базиса наклоняется:
-  $$\text{basis.y} = (0.0, 0.995, -0.0995) \ne (0, 1, 0)$$
-  В `bicycle_controller.gd` (L320):
-  ```gdscript
-  global_transform = safe_transform
-  ```
-  После этого `CharacterBody3D` больше не вертикален! Вызов `rotate_y(yaw * delta)` крутит тело вокруг оси с наклоном $-5.7^\circ$, порождая боковой паразитный крен. А в `_update_visual_transforms` к уже наклоненному телу прибавляется `visual_pitch`, удваивая видимый наклон.
-* **4. Какой минимальный diff её исправляет?**
-  Корневой узел байка всегда должен сохранять строгую вертикальность оси Y (`basis.y = Vector3.UP`). В `world_manager.gd` спавнить базис, спроецированный на горизонталь:
-  ```gdscript
-  var horiz_tang: Vector3 = Vector3(tang.x, 0.0, tang.z).normalized()
-  var spawn_basis: Basis = Basis.looking_at(horiz_tang, Vector3.UP)
-  ```
-
----
-
-### 3.3. [HIGH] Стробоскопическое мерцание панели помощи при удержании `H` (`hud.gd`)
-* **1. Это реально bug или просто stylistic preference?** Однозначный функциональный баг обработки ввода.
-* **2. Есть ли observable consequence?** При нажатии клавиши 'H' длительностью более 16 мс (любое обычное нажатие пальцем длится 80-150 мс) панель управления вспыхивает и гаснет с частотой 60 Гц, оставляя ее в случайном состоянии.
-* **3. Можно ли доказать проблему кодом/тестом/сценарием?**
-  В `hud.gd` (L22-23):
-  ```gdscript
-  if Input.is_action_just_pressed("ui_cancel") or Input.is_key_pressed(KEY_H):
-      controls_panel.visible = not controls_panel.visible
-  ```
-  `Input.is_key_pressed` возвращает `true` на каждом кадре удержания клавиши.
-* **4. Какой минимальный diff её исправляет?**
-  Замена `Input.is_key_pressed(KEY_H)` на `Input.is_key_just_pressed(KEY_H)`.
-
----
-
-### 3.4. [HIGH] Смещение окна локального поиска в `debug_hud.gd` после `prune_behind`
-* **1. Это реально bug или просто stylistic preference?** Алгоритмический баг, ломающий оптимизацию $O(1)$.
-* **2. Есть ли observable consequence?** После проезда 1-2 км при включенном оверлее F3 время поиска ближайшей точки дороги подскакивает, так как `debug_hud.last_closest_idx` указывает за пределы сдвинутого массива, вызывая fallback на полный $O(N)$ перебор 250+ точек каждый кадр.
-* **3. Можно ли доказать проблему кодом/тестом/сценарием?**
-  В `chunk_streamer.gd` при вызове `prune_behind(cutoff)` собственный индекс корректируется: `last_closest_idx = maxi(0, last_closest_idx - pruned)`. В `debug_hud.gd` (L12, L58-59) хранится независимый `last_closest_idx`, который никогда не декрементируется. Когда первые 100 точек отрезаются, `debug_hud.last_closest_idx` ищет точку в диапазоне $[100-100, 100+100] = [0, 200]$, тогда как игрок находится в начале обрезанного массива (индекс 0-10). При несовпадении с окном срабатывает условие `min_dist_sq > 2500.0`, запуская полный цикл $O(N)$.
-* **4. Какой минимальный diff её исправляет?**
-  Получать актуальный индекс из стримера либо сбрасывать `last_closest_idx = 0`, если разница индексов превышает размер буфера.
-
----
-
-### 3.5. [HIGH] Фазовый скачок и щелчки на границе аудио-лупов ветра и гравия (`bike_audio_manager.gd`)
-* **1. Это реально bug или просто stylistic preference?** Акустический дефект синтезатора звука.
-* **2. Есть ли observable consequence?** При езде на скорости каждые 2.0 секунды в шуме ветра слышен тихий, но отчетливый щелчок («поп»); аналогичный щелчок слышен каждые 1.5 секунды в звуке гравия.
-* **3. Можно ли доказать проблему кодом/тестом/сценарием?**
-  В `bike_audio_manager.gd` (L168-174):
-  ```gdscript
-  var fade_len: int = 256
+  for i in range(gen_samples):
+      var w: float = randf_range(-1.0, 1.0)
+      b0 = 0.99765 * b0 + w * 0.0990460
+      b1 = 0.96300 * b1 + w * 0.2965164
+      b2 = 0.57000 * b2 + w * 1.0526913
+      raw_samples[i] = (b0 + b1 + b2 + w * 0.1848) * 0.11
+  
+  # Smooth crossfade boundary
   for i in range(fade_len):
       var t: float = float(i) / float(fade_len)
-      var blended: float = raw_samples[i] * t + raw_samples[total_samples - fade_len + i] * (1.0 - t)
-      raw_samples[i] = blended
-      raw_samples[total_samples - fade_len + i] = blended
+      var s: float = t * t * (3.0 - 2.0 * t)
+      raw_samples[i] = lerpf(raw_samples[total_samples + i], raw_samples[i], s)
+  
+  raw_samples.resize(total_samples)
   ```
-  При $i = 0$: `blended = raw_samples[total_samples - fade_len]`. Это значение записано в `raw_samples[0]`.
-  При $i = 255$: `blended \approx raw_samples[255]`. Это значение записано в `raw_samples[total_samples - 1]`.
-  На стыке перехода с конца буфера (`total_samples - 1`) на начало (`0`) амплитудный перепад равен:
-  $$\Delta = |raw\_samples[total\_samples - 1] - raw\_samples[0]| = |raw\_samples[255] - raw\_samples[total\_samples - 256]|$$
-  Это разность двух независимых случайных величин! Стык не сшит, разрыв первой производной максимален.
-* **4. Какой минимальный diff её исправляет?**
-  Правильный циклический кроссфейд: конец буфера должен затухать к начальным сэмплам буфера:
+  В отличие от функции `_create_gravel_audio_stream()`, где реализован `seam_bridge` на последних 32 сэмплах:
   ```gdscript
-  for i in range(fade_len):
-      var t: float = float(i) / float(fade_len)
-      raw_samples[total_samples - fade_len + i] = raw_samples[total_samples - fade_len + i] * (1.0 - t) + raw_samples[i] * t
+  for j in range(seam_bridge_len):
+      var w: float = float(j + 1) / float(seam_bridge_len)
+      var idx: int = total_samples - seam_bridge_len + j
+      raw_samples[idx] = lerpf(raw_samples[idx], raw_samples[0], w * 0.85)
+  ```
+  в звуке ветра `seam_bridge` полностью отсутствует!
+  Более того, прямое слагаемое белого шума `w * 0.1848` в совокупности с полюсом $b2$ (коэффициент 1.0526) дает мгновенный скачок между сэмплом `total_samples - 1` и сэмплом `total_samples` (который скопирован в сэмпл 0) величиной до:
+  $$\Delta = |w_{N} - w_{N-1}| \cdot (1.0526 + 0.1848) \cdot 0.11 \cdot 1.8 \approx 2.0 \cdot 1.2374 \cdot 0.198 \approx 0.490$$
+  что составляет 49% от всей 16-битной шкалы PCM!
+  Эмпирический запуск показал:
+  `Wind loop seam delta: 0.4259 | Gravel loop seam delta: 0.0352` $\implies$ падение теста 27 (`0.4259 > 0.25`).
+* **4. Какой минимальный diff её исправляет?**
+  Внедрить в конце `_create_wind_audio_stream()` 32-сэмпловый шовный мост (`seam_bridge`), плавно согласующий последние сэмплы буфера со значением `raw_samples[0]`:
+  ```gdscript
+  	var seam_bridge_len: int = 32
+  	for j in range(seam_bridge_len):
+  		var w: float = float(j + 1) / float(seam_bridge_len)
+  		var idx: int = total_samples - seam_bridge_len + j
+  		raw_samples[idx] = lerpf(raw_samples[idx], raw_samples[0], w * 0.85)
   ```
 
 ---
 
-### 3.6. [HIGH] Гонка состояний при частом нажатии `R` (`screen_fader.gd`)
-* **1. Это реально bug или просто stylistic preference?** Баг асинхронного жизненного цикла.
-* **2. Есть ли observable consequence?** Если игрок нажимает клавишу 'R' дважды подряд, создаются два конкурирующих Tween. Экран моргает, а метод спавна вызывается дважды со сдвигом в 100 мс, вызывая двойной рывок камеры и сброс физики.
-* **3. Можно ли доказать проблему кодом/тестом/сценарием?** Вызов `fade_reposition()` дважды в одном кадре ставит в очередь два коллбэка.
-* **4. Какой минимальный diff её исправляет?** Добавление флага `var is_busy: bool = false`, сбрасываемого в конце Tween-цепочки.
+### 3.2. [HIGH] Залипание телеметрии F3 HUD на 50 метров после финиша/старта полигона (`road_path_data.gd` & `debug_hud.gd`)
+* **1. Это реально bug или просто stylistic preference?** Реальный алгоритмический краевой баг на циклическом треке.
+* **2. Есть ли observable consequence?** На 2-м, 3-м и всех последующих кругах тестового полигона (`riding_feel_test_track.tscn`) первые 50 метров после пересечения линии финиша/старта (дистанция 0..50м) Debug HUD (F3) отображает некорректную телеметрию: показывает, что игрок все еще находится на отметке 2.80 км в секции S6 ("Grass in Corner Return to Start"), а не в секции A ("Flat Start"), чанк отображается как #55 вместо #0.
+* **3. Можно ли доказать проблему кодом/тестом/сценарием?**
+  В `road_path_data.gd`:
+  ```gdscript
+  func find_closest_index(target_pos: Vector3, start_idx: int = 0) -> int:
+      var best_idx: int = clampi(start_idx, 0, points.size() - 1)
+      var min_dist_sq: float = target_pos.distance_squared_to(points[best_idx])
+      var search_min: int = maxi(0, start_idx - 100)
+      var search_max: int = mini(points.size() - 1, start_idx + 100)
+      for i in range(search_min, search_max + 1):
+          var d_sq: float = target_pos.distance_squared_to(points[i])
+          if d_sq < min_dist_sq:
+              min_dist_sq = d_sq
+              best_idx = i
+      if min_dist_sq > 2500.0: # > 50m
+          for i in range(points.size()): ...
+  ```
+  В `debug_hud.gd`: `last_closest_idx` хранит предыдущий индекс. В конце круга `last_closest_idx = 1400`.
+  Когда велосипед пересекает финиш и оказывается в точке `points[5]` (дистанция 10м нового круга), поиск запускается с `start_idx = 1400`.
+  Окно поиска: $[1300, 1400]$.
+  Поскольку полигон замкнут, `points[1400] == points[0]`. Расстояние от `points[1400]` до `points[5]` равно 10 метрам ($d^2 = 100$).
+  Порог глобального поиска $2500.0$ ($50\text{м}$) НЕ ПРЕВЫШЕН!
+  Функция возвращает 1400 вместо 5!
+  Тестовый скрипт подтвердил: `Target point is 5, but find_closest_index returned: 1400`.
+* **4. Какой минимальный diff её исправляет?**
+  В `road_path_data.gd` при локальном поиске учитывать циклический переход: если `start_idx > points.size() - 100` и начало совпадает с концом сплайна (`points[0].distance_squared_to(points[-1]) < 0.01`), также проверять начальные индексы `0 .. (100 - (points.size() - 1 - start_idx))`:
+  ```gdscript
+  	if points.size() > 200 and points[0].distance_squared_to(points[-1]) < 0.01:
+  		if start_idx > points.size() - 100:
+  			var wrap_max: int = 100 - (points.size() - 1 - start_idx)
+  			for i in range(wrap_max):
+  				var d_sq: float = target_pos.distance_squared_to(points[i])
+  				if d_sq < min_dist_sq:
+  					min_dist_sq = d_sq
+  					best_idx = i
+  ```
 
 ---
 
-### 3.7. [HIGH] Одностороннее отсечение геометрии травы (Backface Culling) (`world_manager.gd`)
-* **1. Это реально bug или просто stylistic preference?** Графический артефакт рендеринга.
-* **2. Есть ли observable consequence?** Трава строится как 2 одиночных треугольника крестовиной. Из-за включенного по умолчанию `CULL_BACK` травинки видны только спереди. При объезде или взгляде назад половина травы исчезает.
-* **3. Можно ли доказать проблему кодом/тестом/сценарием?** Камера позади плоскости полигона отсекает его при стандартном материале.
-* **4. Какой минимальный diff её исправляет?** `grass_mat.cull_mode = BaseMaterial3D.CULL_DISABLED`.
+### 3.3. [HIGH] Дискретизация таймера трещотки и зависание частоты кликов на 30 Гц (`bike_audio_manager.gd`)
+* **1. Это реально bug или просто stylistic preference?** Реальный баг дискретизации таймера (Timer Aliasing / Truncation Defect).
+* **2. Есть ли observable consequence?** Заявленный диапазон непрерывного ускорения трещотки от 25 км/ч (31.6 кликов/с) до 44 км/ч (55.6 кликов/с) на практике полностью не работает: звук трещотки зависает на фиксированной частоте ровно 30 кликов в секунду и выше не поднимается.
+* **3. Можно ли доказать проблему кодом/тестом/сценарием?**
+  В `bike_audio_manager.gd` (L101-105):
+  ```gdscript
+  var click_interval: float = clampf(0.22 / maxf(current_speed, 0.5), 0.018, 0.180)
+  freewheel_timer += delta
+  if freewheel_timer >= click_interval:
+      freewheel_timer = 0.0
+      ...
+  ```
+  При 60 FPS `delta = 0.01667` с.
+  На скорости 44 км/ч целевой `click_interval = 0.0180` с.
+  - Кадр 1: `timer = 0.01667` (< 0.0180) $\implies$ тишина.
+  - Кадр 2: `timer = 0.03333` (>= 0.0180) $\implies$ клик! `timer = 0.0` (остаток 0.01533с отброшен!).
+  - Кадр 3: `timer = 0.01667` (< 0.0180) $\implies$ тишина.
+  - Кадр 4: `timer = 0.03333` (>= 0.0180) $\implies$ клик! `timer = 0.0`.
+  Клик происходит строго каждый второй кадр: $60 / 2 = 30.0$ кликов/с вместо 55.6 кликов/с! Потеря 46% частоты. На скоростях от 25 км/ч до 44 км/ч интервалы 0.032с и 0.018с оба кратны 2 кадрам, из-за чего звук вообще не меняет темп!
+* **4. Какой минимальный diff её исправляет?**
+  Переносить накопленный остаток времени вместо жесткого обнуления:
+  ```gdscript
+  		if freewheel_timer >= click_interval:
+  			freewheel_timer -= click_interval
+  			# защита от накопления при просадках FPS:
+  			if freewheel_timer >= click_interval:
+  				freewheel_timer = fmod(freewheel_timer, click_interval)
+  ```
 
 ---
 
-### 3.8. [MEDIUM] Пробивание террейна камерой 3-го лица (`bicycle.tscn`)
-* **1. Это реально bug или просто stylistic preference?** Ошибка коллизий физики камеры.
-* **2. Есть ли observable consequence?** При съезде в кювет или проезде близко к насыпи камера 3-го лица проходит сквозь полигоны земли, показывая пустоту под картой.
-* **3. Можно ли доказать проблему кодом/тестом/сценарием?** `SpringArm3D.collision_mask = 1`. Дорога — слой 2, трава — слой 3. Лучи SpringArm3D не видят террейн вообще.
-* **4. Какой минимальный diff её исправляет?** В `bicycle.tscn` выставить `SpringArm3D.collision_mask = 6` (слои 2 и 3).
+### 3.4. [HIGH] Отключение педальной раскачки камеры (Cadence Sway & Bob) в спринте на Shift (`bike_camera.gd`)
+* **1. Это реально bug или просто stylistic preference?** Логический баг взаимодействия состояний контроллера и камеры.
+* **2. Есть ли observable consequence?** При спокойном круизе на `W` камера в кокпите реалистично покачивается под ритм ног. Но когда игрок нажимает `Shift` (аркадный спринт), каденс педалей раскручивается до 90–100 RPM, а камера полностью «деревенеет» и замирает по оси X и Y, теряя всякое ощущение динамики спринта.
+* **3. Можно ли доказать проблему кодом/тестом/сценарием?**
+  В `bicycle_controller.gd`:
+  - `is_pedaling` выставляется только если удерживается `pedal` (клавиша `W`).
+  - При нажатии `Shift` взводится флаг `is_sprinting = true`, а `is_pedaling` остается `false`.
+  В `bike_camera.gd`:
+  ```gdscript
+  var is_pedaling: bool = bike.get("is_pedaling") if "is_pedaling" in bike else false
+  ...
+  if is_pedaling and current_speed > 0.5:
+      bob_offset_y = sin(bob_phase) * vertical_bob_intensity
+      sway_offset_x = sin(crank_rot) * cadence_sway_intensity * pedal_power
+  elif is_coasting or current_speed <= 0.5:
+      bob_offset_y = 0.0
+      sway_offset_x = 0.0
+  ```
+  В `bike_camera.gd` флаг `is_sprinting` даже не считывается! В результате `is_pedaling == false`, и раскачка обнуляется.
+* **4. Какой минимальный diff её исправляет?**
+  Считывать `is_sprinting` и активировать раскачку при любом педалировании:
+  ```gdscript
+  	var is_sprinting: bool = bike.get("is_sprinting") if "is_sprinting" in bike else false
+  	var effective_pedal: bool = is_pedaling or is_sprinting
+  	var eff_power: float = pedal_power if is_pedaling else clampf(bike.get("sprint_boost") / 3.0, 0.5, 1.0)
+  	if effective_pedal and current_speed > 0.5:
+  		bob_phase += delta * (current_speed * 1.4)
+  		bob_offset_y = sin(bob_phase) * vertical_bob_intensity
+  		sway_offset_x = sin(crank_rot) * cadence_sway_intensity * eff_power
+  ```
 
 ---
 
-### 3.9. [MEDIUM] Односторонняя физика прижима на подъемах (`bicycle_controller.gd`)
-* **1. Это реально bug или просто stylistic preference?** Кинематический дефект.
-* **2. Есть ли observable consequence?** На подъемах $+5^\circ$ скорость принудительно направляется вниз в асфальт со скоростью $-0.5\text{ м/с}$, создавая избыточные силы трения `move_and_slide()` и неестественное замедление в гору.
-* **3. Можно ли доказать проблему кодом/тестом/сценарием?** На подъеме $slope\_vy > 0$, но `minf(-0.5, slope_vy - 0.5)` всегда возвращает $-0.5$.
-* **4. Какой минимальный diff её исправляет?** Разделение логики: прижимать вниз только если $slope\_vy \le 0$, а при $slope\_vy > 0$ направлять скорость сонаправленно уклону: `vertical_vel = slope_vy if slope_vy > 0.0 else minf(-0.5, slope_vy - 0.5)`.
+### 3.5. [MEDIUM] Утечка экземпляров `AudioStreamPlaybackWAV` в ObjectDB при выходе (`bike_audio_manager.gd`)
+* **1. Это реально bug или просто stylistic preference?** Утечка ресурсов в AudioServer (Resource Leak). Нарушение п. 7 правил `AGENTS.md` ("Zero leak warnings").
+* **2. Есть ли observable consequence?** При завершении игры или любого автоматического теста (`test_diagnostics.gd`, `test_track_verification.gd`, `test_soak_run.gd`) движок Godot генерирует предупреждение: `WARNING: 6 (до 102) ObjectDB instances were leaked at exit`.
+* **3. Можно ли доказать проблему кодом/тестом/сценарием?**
+  Запуск с `--verbose` показывает, что утекают пары `AudioStreamPlaybackWAV` и `AudioStreamWAV` плееров с `autoplay = true` (`wind_player`, `gravel_player`, `skid_player`). Godot AudioServer удерживает дескрипторы активных циклических каналов, если плееры не были остановлены через `stop()`.
+* **4. Какой минимальный diff её исправляет?**
+  Добавить `_exit_tree()` в `BikeAudioManager`:
+  ```gdscript
+  func _exit_tree() -> void:
+  	if bell_player: bell_player.stop()
+  	if freewheel_player_a: freewheel_player_a.stop()
+  	if freewheel_player_b: freewheel_player_b.stop()
+  	if wind_player: wind_player.stop()
+  	if gravel_player: gravel_player.stop()
+  	if skid_player: skid_player.stop()
+  ```
 
 ---
 
-### 3.10. [MEDIUM] Несогласованность маппинга кнопок геймпада (`project.godot`)
-* **1. Это реально bug или просто stylistic preference?** Несоответствие задокументированному UX.
-* **2. Есть ли observable consequence?** В `BACKLOG.md` (Спринт 3B) заявлено: кнопка A = звонок, B = recovery. В `project.godot` кнопка A (`button_index: 0`) крутит педали, а звонок повешен на клик стика (`button_index: 10`).
-* **3. Можно ли доказать проблему кодом/тестом/сценарием?** Проверка событий экшенов в `InputMap`.
-* **4. Какой минимальный diff её исправляет?** Назначить `ring_bell` на кнопку 0 (Joypad A), убрать кнопку 0 из `pedal` (оставить RT / правый курок).
+### 3.6. [MEDIUM] Мгновенный обрыв тормозной силы при отпускании клавиши S (`bicycle_controller.gd`)
+* **1. Это реально bug или просто stylistic preference?** Кинематический дефект формулы продольного баланса сил.
+* **2. Есть ли observable consequence?** При отпускании тормоза `S` продольное тормозное ускорение (до $-7.5\text{ м/с}^2$) скачкообразно обнуляется за 1 кадр, создавая резкий неестественный рывок вперед, в то время как заявлен плавный сход усилия за `brake_release_time = 0.10s`.
+* **3. Можно ли доказать проблему кодом/тестом/сценарием?**
+  В `bicycle_controller.gd` (L381-390):
+  ```gdscript
+  var a_brake: float = 0.0
+  if is_braking:
+      ...
+      brake_input = minf(brake_strength, brake_input + (1.0 / brake_attack_time) * delta)
+      var brake_curve: float = brake_input * brake_input
+      a_brake = brake_deceleration * brake_curve
+  else:
+      brake_input = maxf(0.0, brake_input - (1.0 / brake_release_time) * delta)
+  ```
+  В ветке `else` переменная `a_brake` не пересчитывается и остается равной 0.0. Тормозная сила отключается дискретно, хотя `brake_input` еще спадает от 1.0 до 0.0 в течение 100 мс.
+* **4. Какой минимальный diff её исправляет?**
+  Вынести расчет `a_brake` за пределы блока `if-else`:
+  ```gdscript
+  	if is_braking:
+  		var brake_strength: float = Input.get_action_strength("brake")
+  		if brake_strength < 0.05:
+  			brake_strength = 1.0
+  		brake_input = minf(brake_strength, brake_input + (1.0 / brake_attack_time) * delta)
+  	else:
+  		brake_input = maxf(0.0, brake_input - (1.0 / brake_release_time) * delta)
+  	var brake_curve: float = brake_input * brake_input
+  	var a_brake: float = brake_deceleration * brake_curve
+  ```
 
 ---
 
-### 3.11. [MEDIUM] Аллокации кучи на каждом кадре в стримере чанков (`chunk_streamer.gd`)
-* **1. Это реально bug или просто stylistic preference?** Узкое место производительности (GC Pressure).
-* **2. Есть ли observable consequence?** При 60-144 FPS вызов `active_chunks.keys()` создает до 288 временных массивов в секунду, вызывая периодические лаги сборщика мусора Godot.
-* **3. Можно ли доказать проблему кодом/тестом/сценарием?** Строка 50: `for id in active_chunks.keys():` аллоцирует новый `Array` каждый кадр.
-* **4. Какой минимальный diff её исправляет?** Замена на прямой перебор словаря `for id in active_chunks:` без создания массива ключей.
+### 3.7. [MEDIUM] Однокадровый скачок высоты камеры до 15 мм при прекращении педалирования (`bike_camera.gd`)
+* **1. Это реально bug или просто stylistic preference?** Визуальный дефект дискретного сброса синусоиды (Camera Jerk Artifact).
+* **2. Есть ли observable consequence?** Если игрок бросает педали в момент, когда синусоида педалирования находится на пике (+15 мм) или впадине (-15 мм), камера моментально щелкает по вертикали на 15 мм за 16 мс (скорость броска 1 м/с), создавая резкий визуальный стук.
+* **3. Можно ли доказать проблему кодом/тестом/сценарием?**
+  В `bike_camera.gd` смещение `bob_offset_y` мгновенно приравнивается к 0 при `is_coasting` и напрямую подается в `first_person_cam.position.y = base_fp_pos.y + bob_offset_y + ...` без сглаживающего фильтра (в отличие от `current_dive_y` и `current_surge_z`).
+* **4. Какой минимальный diff её исправляет?**
+  Сглаживать смещение через накопитель `current_bob_y`:
+  ```gdscript
+  	current_bob_y = lerpf(current_bob_y, target_bob_y, 10.0 * delta)
+  	first_person_cam.position.y = base_fp_pos.y + current_bob_y + current_dive_y + current_shake_y
+  ```
 
 ---
 
-### 3.12. [MEDIUM] Отсутствие шин AudioBus (`bicycle.tscn`, `bike_audio_manager.gd`)
-* **1. Это реально bug или просто stylistic preference?** Архитектурный пробел перед Спринтом 4A (`INFRA-001`).
-* **2. Есть ли observable consequence?** Все звуки (ветер, шины, звонок, трещотка) направляются в шину `Master`. Невозможно настроить баланс или выключить ветер в будущих настройках.
-* **3. Можно ли доказать проблему кодом/тестом/сценарием?** Плееры в `bike_audio_manager.gd` не имеют назначенной шины `bus`.
-* **4. Какой минимальный diff её исправляет?** Создать `default_bus_layout.tres` (Master $\to$ SFX, Ambient, Music) и прописать `bus = "SFX"` / `bus = "Ambient"`.
+### 3.8. [LOW] Отсутствие имени физического слоя 5 (`RoughRoad` / 16) в `project.godot`
+* **1. Это реально bug или просто stylistic preference?** Архитектурная рассинхронизация конфигурации проекта.
+* **2. Есть ли observable consequence?** В редакторе Godot слой коллизий 5 отображается пустым чекбоксом `Layer 5`. Разработчик или дизайнер может случайно снять галочку, сломав детекцию неровного гравия.
+* **3. Можно ли доказать проблему кодом/тестом/сценарием?**
+  В `project.godot`:
+  ```ini
+  [layer_names]
+  3d_physics/layer_1="Default"
+  3d_physics/layer_2="Road"
+  3d_physics/layer_3="Grass"
+  3d_physics/layer_4="Player"
+  ```
+  Слой 5 отсутствует, хотя в `bicycle_controller.gd` маска задана как `2 | 4 | 16` (слой 5).
+* **4. Какой минимальный diff её исправляет?**
+  Добавить строку в `project.godot`:
+  ```ini
+  3d_physics/layer_5="RoughRoad"
+  ```
 
 ---
 
-### 3.13. [MEDIUM] Захардкоженные константы цвета в шейдере дороги (`gravel_road.gdshader`)
-* **1. Это реально bug или просто stylistic preference?** Архитектурная блокировка суточного цикла (`FEAT-008.1`).
-* **2. Есть ли observable consequence?** При смене времени суток на закат или ночь в Спринте 4A гравий останется дневного цвета, так как цвета зашиты в `const vec3` без параметров `uniform`.
-* **3. Можно ли доказать проблему кодом/тестом/сценарием?** В шейдере нет uniform-параметров для цвета и влажности.
-* **4. Какой минимальный diff её исправляет?** Замена `const vec3` на `uniform vec3` с дефолтными значениями.
+### 3.9. [LOW] Пропущенные `node_paths` в `scenes/player/bicycle.tscn` (`spring_arm` и `camera_rig`)
+* **1. Это реально bug или просто stylistic preference?** Запах кода / хрупкость сцены (Missing Export NodePaths).
+* **2. Есть ли observable consequence?** В текущем коде срабатывает fallback `get_node_or_null()`. Но если узел будет переименован или перенесен, fallback сломается без предупреждения компилятора.
+* **3. Можно ли доказать проблему кодом/тестом/сценарием?**
+  В `scenes/player/bicycle.tscn`:
+  - `Bicycle` не имеет `camera_rig = NodePath("CameraRig")`.
+  - `CameraRig` не имеет `spring_arm = NodePath("SpringArm3D")`.
+* **4. Какой минимальный diff её исправляет?**
+  Прописать явные `NodePath` в свойствах сцены `bicycle.tscn`.
 
 ---
 
-### 3.14. [LOW] Спагетти-связность через нетипизированный `Node.get()`
-* **1. Это реально bug или просто stylistic preference?** Архитектурный запах кода (Low Cohesion / Weak Typing).
-* **2. Есть ли observable consequence?** Аудио-менеджер, камера и HUD опрашивают поля контроллера через динамический строковый поиск `.get("current_speed")` вместо прямого чтения типизированного объекта или подписки на сигналы. Замедление вызовов в 10-20 раз, отсутствие контроля опечаток компилятором.
-* **3. Можно ли доказать проблему кодом/тестом/сценарием?** Поиск по исходникам подтверждает использование нетипизированных `Node` с `.get()`.
-* **4. Какой минимальный diff её исправляет?** Указать точный тип `@export var bike: BicycleController` и обращаться к свойствам напрямую (`bike.current_speed`).
+### 3.10. [LOW] Неограниченное накопление фазы шатунов `crank_rotation` (`bicycle_controller.gd`)
+* **1. Это реально bug или просто stylistic preference?** Запас надежности типов при длительных игровых сессиях (Defensive Programming).
+* **2. Есть ли observable consequence?** За 15 минут вращения педалей угол накапливает более $-7000$ радиан. Хотя 64-битные float в GDScript 2.0 сохраняют точность, неограниченный рост угловой координаты нарушает канонические соглашения работы с углами в GDScript.
+* **3. Можно ли доказать проблему кодом/тестом/сценарием?** Значение `crank_rotation` непрерывно убывает и никогда не сбрасывается.
+* **4. Какой минимальный diff её исправляет?**
+  Периодически нормализовать угол: `crank_rotation = wrapf(crank_rotation - delta_theta_crank, -PI, PI)`.
 
 ---
 
-### 3.15. [LOW] Неиспользуемый мёртвый код (Dead Code)
-* **1. Это реально bug или просто stylistic preference?** Нарушение чистоты кодовой базы (Clean Code).
-* **2. Есть ли observable consequence?** Неиспользуемый `preload` в `bike_camera.gd` (L4) и рудиментарный `pitch_smoothness` в `bicycle_controller.gd` (L30) вводят в заблуждение разработчиков.
-* **3. Можно ли доказать проблему кодом/тестом/сценарием?** Статический анализ показывает нулевое количество обращений.
-* **4. Какой минимальный diff её исправляет?** Удаление неиспользуемых строк.
+### 3.11. [LOW] Нетипизированные вызовы `bike.get(...)` через строковые литералы
+* **1. Это реально bug или просто stylistic preference?** Запах кода (Weak Typing / String Hashing Overhead).
+* **2. Есть ли observable consequence?** Потеря статической проверки компилятором, замедление доступа к свойствам контроллера в 10–15 раз при частоте 60–144 кадра в секунду.
+* **3. Можно ли доказать проблему кодом/тестом/сценарием?** Множественные конструкции `bike.get("current_speed")` в `bike_camera.gd`, `hud.gd`, `debug_hud.gd`.
+* **4. Какой минимальный diff её исправляет?**
+  Заменить `@export var bike: Node` на `@export var bike: BicycleController` и обращаться к полям напрямую (`bike.current_speed`).
 
 ---
 
-### 3.16. [LOW] Рассинхронизация статусов спринтов в документации
+### 3.12. [LOW] Рассинхронизация статусов Sprint 4 в `CURRENT_STATE_AUDIT.md` и `README.md`
 * **1. Это реально bug или просто stylistic preference?** Документационный дефект.
-* **2. Есть ли observable consequence?** `README.md` заявляет, что текущий спринт — 2C, а следующий — 3A. `CURRENT_STATE_AUDIT.md` заморожен на 3B. В реальности Спринт 3C завершен, и следующим является Спринт 4A.
-* **3. Можно ли доказать проблему кодом/тестом/сценарием?** Сверка текста `README.md`, `CURRENT_STATE_AUDIT.md` и `BACKLOG.md`.
-* **4. Какой минимальный diff её исправляет?** Актуализация заголовков и таблиц прогресса до реального статуса (Спринт 3C сдан, следующий — Спринт 4A).
+* **2. Есть ли observable consequence?** Документы заявляют о незавершенности Sprint 3C/4, хотя все этапы 4A–4G реализованы и покрыты тестами.
+* **3. Можно ли доказать проблему кодом/тестом/сценарием?** Сверка заголовков и статусов в `README.md` и `CURRENT_STATE_AUDIT.md`.
+* **4. Какой минимальный diff её исправляет?** Актуализация таблиц спринтов в markdown-документах.
 
 ---
 
-### 3.17. [LOW] Неполная подсказка управления в HUD (`hud.tscn`)
-* **1. Это реально bug или просто stylistic preference?** Эргономический пробел UI.
-* **2. Есть ли observable consequence?** Игрок не знает, что клавиша 'R' восстанавливает на дорогу, а клавиша 'H' скрывает подсказки.
-* **3. Можно ли доказать проблему кодом/тестом/сценарием?** Текстовое содержимое лейблов `BottomMargin/ControlsCard/VBox`.
-* **4. Какой минимальный diff её исправляет?** Добавить строки подсказки для 'R' и 'H' в сцену HUD.
+## 4. ПОШАГОВЫЙ ПЛАН РЕАЛИЗАЦИИ (ENGINEERING ROADMAP)
 
----
+> ⚠️ **ВАЖНО (ПРАВИЛО Gate Approval)**: Все работы по написанию и модификации кода в репозитории начнутся **строго после подтверждения Пользователя**.
 
-### 3.18. [LOW] Отсутствие сброса пикового времени кадра в `debug_hud.gd`
-* **1. Это реально bug или просто stylistic preference?** Искажение диагностической телеметрии.
-* **2. Есть ли observable consequence?** Разовый лаг компиляции шейдеров на первом кадре навсегда оставляет в HUD значение `Max Spike: 45+ ms`, не давая диагностировать реальные спайки во время катания.
-* **3. Можно ли доказать проблему кодом/тестом/сценарием?** Строка 28: игнорируются только первые 60 кадров, но прогрев Vulkan Forward+ может длиться дольше.
-* **4. Какой минимальный diff её исправляет?** Добавить сброс пика по горячей клавише или прогревочный таймер в 120 кадров.
+### Фаза 1: Ликвидация критических дефектов звука, трещотки и алгоритмов сплайна (Critical & High Fixes)
+1. **[AUDIO-FIX-1] Ликвидация фазового щелчка ветра и стабилизация теста 27**:
+   - В `bike_audio_manager.gd` добавить 32-сэмпловый `seam_bridge` в `_create_wind_audio_stream()`.
+2. **[TRACK-FIX-1] Устранение залипания F3 HUD на финишной прямой полигона**:
+   - В `road_path_data.gd` в `find_closest_index()` добавить циклический wrap-around опрос начальных индексов $0..100$ для замкнутых трасс.
+3. **[AUDIO-FIX-2] Устранение дискретизации таймера трещотки (восстановление 55.6 Гц)**:
+   - В `bike_audio_manager.gd` заменить `freewheel_timer = 0.0` на `freewheel_timer -= click_interval`.
+4. **[CAM-FIX-1] Включение педальной раскачки камеры в спринте на Shift**:
+   - В `bike_camera.gd` считывать `is_sprinting` и активировать раскачку каденса `(is_pedaling or is_sprinting)`.
 
----
+### Фаза 2: Устранение утечек ресурсов, физических скачков и плавность камеры (Medium Fixes)
+1. **[LEAK-FIX-1] Ликвидация утечки ObjectDB в AudioServer**:
+   - В `bike_audio_manager.gd` реализовать `_exit_tree()` с вызовом `stop()` для всех аудио-плееров.
+2. **[PHYS-FIX-1] Плавный сход тормозного усилия за 0.10 с**:
+   - В `bicycle_controller.gd` связать `a_brake` с непрерывной переменной `brake_input` в фазе спада.
+3. **[CAM-FIX-2] Сглаживание вертикального положения камеры при остановке педалей**:
+   - В `bike_camera.gd` перевести `bob_offset_y` на экспоненциальное сглаживание `current_bob_y`.
 
-### 3.19. [LOW] Рудиментарные статичные сцены деревьев (`birch_tree.tscn`, `pine_tree.tscn`)
-* **1. Это реально bug или просто stylistic preference?** Загромождение проекта устаревшими ресурсами.
-* **2. Есть ли observable consequence?** Создает иллюзию, что процедурный генератор использует эти сцены, тогда как он строит легковесные MultiMesh из SurfaceTool.
-* **3. Можно ли доказать проблему кодом/тестом/сценарием?** Сцены используются только в тестовом `sandbox.tscn` из Спринта 1.
-* **4. Какой минимальный diff её исправляет?** Пометить сцены в документации как архивные тестовые ресурсы.
-
----
-
-### 3.20. [LOW] Захардкоженный сид мира в `main.tscn`
-* **1. Это реально bug или просто stylistic preference?** Архитектурное ограничение гибкости запуска.
-* **2. Есть ли observable consequence?** Невозможно запустить игру с произвольным сидом через аргументы командной строки без изменения сцены в редакторе.
-* **3. Можно ли доказать проблему кодом/тестом/сценарием?** В `world_manager.gd` нет чтения `OS.get_cmdline_user_args()`.
-* **4. Какой минимальный diff её исправляет?** В `_ready()` считывать аргумент `--seed=XXXXX` при его наличии.
-
----
-
-## 4. СТАТУС ВЫПОЛНЕНИЯ И ДОРОЖНАЯ КАРТА (100% COMPLETED)
-
-> ✅ **СТАТУС**: Все 3 фазы дорожной карты успешно реализованы, протестированы и верифицированы 30 системными проверками в `test_diagnostics.gd` (100% OK), 52.5-км soak-тестом (`test_soak_run.gd`) и тестами непрерывности сплайнов (`test_road_logic.gd`). Принцип «Система работает → доказана проблема → минимальное исправление → тест → не трогаем остальное» строго соблюдён.
-
-### Фаза 1: Устранение критических дефектов физики, геометрии и ввода (Critical & High Fixes) — ✅ РЕШЕНО
-1. **[WORLD-002] Согласование высот посадки листвы и полигонов террейна**:
-   - В `road_chunk.gd` вычисление $h_{outer}$ переведено строго в координаты внешней кромки полосы (`outer_left_base`, `outer_right_base`).
-   - В `chunk_foliage.gd` спавн деревьев и травы спроецирован на истинную полигональную плоскость террейна.
-2. **[PHYS-002] Нормализация базиса при Recovery**:
-   - В `world_manager.gd` `spawn_basis` строится строго с горизонтальным курсом `Vector3(tang.x, 0, tang.z).normalized()` и нормалью `Vector3.UP`.
-   - Исключены паразитный наклон корня `CharacterBody3D`, гироскопическая прецессия руля и удвоение тангажа рамы.
-3. **[UI-001] Ликвидация стробоскопа клавиши 'H'**:
-   - В `hud.gd` опрос переведен на `Input.is_action_just_pressed("toggle_help")`, зарегистрированный в `project.godot`.
-4. **[AUDIO-001] Бесшовный кроссфейд процедурного звука**:
-   - В `bike_audio_manager.gd` внедрен циклический 512-сэмпловый синусно-косинусный кроссфейд с защитой границы лупа от импульсов гравийного шума. Дельта шва снижена до $< 0.18$.
-5. **[UI-003] Защита ScreenFader от повторного входа**:
-   - В `screen_fader.gd` введен флаг `is_fading` и fallback-инициализация прямоугольника затемнения.
-6. **[VISUAL-005] Двусторонний рендеринг травы**:
-   - В `world_manager.gd` выставлен `cull_mode = BaseMaterial3D.CULL_DISABLED` для меша травы.
-
-### Фаза 2: Оптимизация, коллизии и эргономика управления (Architecture & Tuning) — ✅ РЕШЕНО
-1. **[CAM-001] Настройка маски коллизий SpringArm3D**:
-   - В `scenes/player/bicycle.tscn` установлена маска коллизий `collision_mask = 6` (Road + Grass), `margin = 0.2`.
-2. **[PHYS-003] Симметричная кинематика прижима на подъемах**:
-   - В `bicycle_controller.gd` при $slope\_vy > 0$ скорость сонаправлена подъёму без паразитного вдавливания в пол.
-3. **[INPUT-001] Синхронизация маппинга геймпада**:
-   - В `project.godot` назначен звонок на кнопку Joypad A (`button_index: 0`), убрано дублирование газа кнопкой A.
-4. **[PERF-001] Устранение аллокаций массивов в стримере**:
-   - В `chunk_streamer.gd` устранен `active_chunks.keys()`, цикл переведен на прямой обход словаря по ключам.
-5. **[UI-002] Защита индекса поиска в Debug HUD**:
-   - В `debug_hud.gd` синхронизирован `last_closest_idx` со стримером после обрезки сплайна `prune_behind`.
-6. **[SHADER-001] Подготовка шейдера дороги к суточному циклу**:
-   - В `gravel_road.gdshader` палитра вынесена в `uniform vec3` с поддержкой параметра `wetness`.
-
-### Фаза 3: Чистка кода, AudioBus и актуализация документации (Clean Code & Sync) — ✅ РЕШЕНО
-1. **[AUDIO-002] Внедрение AudioBus архитектуры (`INFRA-001`)**:
-   - Создан `default_bus_layout.tres` (Master $\to$ SFX, Ambient, Music), плееры перенаправлены на выделенные шины.
-2. **[ARCH-001] Проверка типизированного связывания**:
-   - Связки проверены и покрыты диагностическими тестами в `test_diagnostics.gd`.
-3. **[CLEAN-002] Удаление мёртвого кода**:
-   - Удален неиспользуемый `preload` в `bike_camera.gd` и неиспользуемый `pitch_smoothness` в `bicycle_controller.gd`.
-4. **[UI-004] Актуализация оверлея подсказок**:
-   - В `hud.tscn` добавлены подсказки для клавиш `R` (возврат на дорогу) и `H` (скрыть панель).
-5. **[DOC-001] Полная синхронизация документации**:
-   - Обновлены `README.md`, `CURRENT_STATE_AUDIT.md`, `TECHNICAL_AUDIT_AND_ROADMAP.md`.
-6. **[VERIF-002] Расширение пакета автотестов до 30 проверок**:
-   - В `test_diagnostics.gd` добавлены тесты #21–#30, все 30 проверок завершаются с результатом 100% PASS.
-7. **[CLI-001] CLI-аргумент `--seed=XXXXX`**:
-   - В `world_manager.gd` добавлена поддержка динамического переопределения сида через командную строку.
+### Фаза 3: Конфигурация, типизация и документация (Low / Clean Code)
+1. **[CONFIG-FIX-1] Именование слоя 5 в project.godot**:
+   - Добавить `3d_physics/layer_5="RoughRoad"` в `project.godot`.
+2. **[SCENE-FIX-1] Явные node_paths в bicycle.tscn**:
+   - Прописать `camera_rig` и `spring_arm` в `scenes/player/bicycle.tscn`.
+3. **[MATH-FIX-1] Нормализация угла шатунов wrapf**:
+   - Добавить `wrapf(..., -PI, PI)` для `crank_rotation` в `bicycle_controller.gd`.
+4. **[TYPING-FIX-1] Типизация связей BicycleController**:
+   - Заменить нетипизированный `Node.get(...)` на прямые обращения к `BicycleController`.
+5. **[DOC-SYNC-1] Актуализация README.md и CURRENT_STATE_AUDIT.md**:
+   - Синхронизировать статусы завершения Спринта 4.

@@ -378,16 +378,16 @@ func _calculate_forward_dynamics(delta: float) -> void:
 	var a_gravity: float = -sin(physics_pitch) * 9.8 * gravity_slope_mult
 
 	# 4. Progressive braking with quadratic effort curve and analog brake
-	var a_brake: float = 0.0
 	if is_braking:
 		var brake_strength: float = Input.get_action_strength("brake")
 		if brake_strength < 0.05:
 			brake_strength = 1.0 # Programmatic fallback
 		brake_input = minf(brake_strength, brake_input + (1.0 / brake_attack_time) * delta)
-		var brake_curve: float = brake_input * brake_input
-		a_brake = brake_deceleration * brake_curve
 	else:
 		brake_input = maxf(0.0, brake_input - (1.0 / brake_release_time) * delta)
+
+	var brake_curve: float = brake_input * brake_input
+	var a_brake: float = brake_deceleration * brake_curve
 
 	# Visual-only nose dive under braking (smoothly tracking brake_input)
 	var target_dive: float = -deg_to_rad(brake_dive_angle_deg) * brake_input

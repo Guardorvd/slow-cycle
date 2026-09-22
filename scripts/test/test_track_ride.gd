@@ -165,5 +165,6 @@ func _start() -> void:
 		print("[PASS] Debug HUD dynamically tracks and displays test track sections.")
 
 	root_node.queue_free()
+	await process_frame
 	print("\n[SUCCESS] ALL LIVE TEST TRACK RIDE CHECKS PASSED [OK]\n")
 	quit(0)

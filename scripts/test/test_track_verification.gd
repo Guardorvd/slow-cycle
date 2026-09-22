@@ -277,4 +277,5 @@ func run_verification() -> bool:
 
 	# Clean up instantiated scene
 	root_node.queue_free()
+	await process_frame
 	return true

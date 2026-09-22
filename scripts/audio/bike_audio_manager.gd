@@ -75,6 +75,14 @@ func _ready() -> void:
 		if not bike_controller.is_connected("bell_rung", _on_bell_rung):
 			bike_controller.connect("bell_rung", _on_bell_rung)
 
+func _exit_tree() -> void:
+	if bell_player: bell_player.stop()
+	if freewheel_player_a: freewheel_player_a.stop()
+	if freewheel_player_b: freewheel_player_b.stop()
+	if wind_player: wind_player.stop()
+	if gravel_player: gravel_player.stop()
+	if skid_player: skid_player.stop()
+
 func _process(delta: float) -> void:
 	if not bike_controller:
 		bike_controller = get_parent()
@@ -101,7 +109,9 @@ func _process(delta: float) -> void:
 		var click_interval: float = clampf(0.22 / maxf(current_speed, 0.5), 0.018, 0.180)
 		freewheel_timer += delta
 		if freewheel_timer >= click_interval:
-			freewheel_timer = 0.0
+			freewheel_timer -= click_interval
+			if freewheel_timer >= click_interval:
+				freewheel_timer = fmod(freewheel_timer, click_interval)
 			var active_player: AudioStreamPlayer3D = freewheel_player_a if freewheel_use_a else freewheel_player_b
 			freewheel_use_a = not freewheel_use_a
 			active_player.pitch_scale = randf_range(0.97, 1.03)
@@ -257,6 +267,13 @@ func _create_wind_audio_stream() -> AudioStreamWAV:
 		raw_samples[i] = lerpf(raw_samples[total_samples + i], raw_samples[i], s)
 
 	raw_samples.resize(total_samples)
+
+	# Seam bridge continuity
+	var seam_bridge_len: int = 32
+	for j in range(seam_bridge_len):
+		var w: float = float(j + 1) / float(seam_bridge_len)
+		var idx: int = total_samples - seam_bridge_len + j
+		raw_samples[idx] = lerpf(raw_samples[idx], raw_samples[0], w * 0.85)
 
 	var pcm_data := PackedByteArray()
 	pcm_data.resize(total_samples * 2)

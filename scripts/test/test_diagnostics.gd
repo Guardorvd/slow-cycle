@@ -1353,4 +1353,7 @@ func _init() -> void:
 	else:
 		print("\n=== SOME VERIFICATIONS FAILED ===\n")
 
+	await process_frame
+	await physics_frame
+	await process_frame
 	quit(0 if all_ok else 1)

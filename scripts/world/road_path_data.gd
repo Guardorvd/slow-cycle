@@ -94,6 +94,23 @@ func find_closest_index(target_pos: Vector3, start_idx: int = 0) -> int:
 			min_dist_sq = d_sq
 			best_idx = i
 
+	# Wrap-around search for closed-circuit tracks (when track start and end points coincide)
+	if points.size() > 200 and points[0].distance_squared_to(points[-1]) < 0.04:
+		if start_idx > points.size() - 100:
+			var wrap_max: int = mini(100 - (points.size() - 1 - start_idx), points.size() - 1)
+			for i in range(wrap_max + 1):
+				var d_sq: float = target_pos.distance_squared_to(points[i])
+				if d_sq < min_dist_sq:
+					min_dist_sq = d_sq
+					best_idx = i
+		elif start_idx < 100:
+			var wrap_min: int = maxi(0, points.size() - (100 - start_idx))
+			for i in range(wrap_min, points.size()):
+				var d_sq: float = target_pos.distance_squared_to(points[i])
+				if d_sq < min_dist_sq:
+					min_dist_sq = d_sq
+					best_idx = i
+
 	# If too far from local window, search full array
 	if min_dist_sq > 2500.0: # > 50m
 		for i in range(points.size()):

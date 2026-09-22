@@ -59,6 +59,7 @@ var current_look_yaw: float = 0.0
 var current_shake_x: float = 0.0
 var current_shake_y: float = 0.0
 var current_shake_rot: float = 0.0
+var current_bob_y: float = 0.0
 var bob_phase: float = 0.0
 var travel_distance: float = 0.0
 var shake_time: float = 0.0 ## Backward compatibility alias
@@ -107,6 +108,8 @@ func _process(delta: float) -> void:
 	var bike_bank: float = bike.get("current_bank") if "current_bank" in bike else 0.0
 	var vis_steer: float = bike.get("visual_steer") if "visual_steer" in bike else 0.0
 	var is_pedaling: bool = bike.get("is_pedaling") if "is_pedaling" in bike else false
+	var is_sprinting: bool = bike.get("is_sprinting") if "is_sprinting" in bike else false
+	var sprint_boost_val: float = bike.get("sprint_boost") if "sprint_boost" in bike else 0.0
 	var is_coasting: bool = bike.get("is_coasting") if "is_coasting" in bike else false
 	var crank_rot: float = bike.get("crank_rotation") if "crank_rotation" in bike else 0.0
 	var pedal_power: float = bike.get("pedal_power") if "pedal_power" in bike else 0.0
@@ -185,14 +188,19 @@ func _process(delta: float) -> void:
 	# 6. SECONDARY PRIORITY 2: Cadence Sway & Vertical Pedal Bob
 	# -------------------------------------------------------------
 	var sway_offset_x: float = 0.0
-	var bob_offset_y: float = 0.0
-	if is_pedaling and current_speed > 0.5:
+	var target_bob_y: float = 0.0
+	var is_working_pedals: bool = is_pedaling or is_sprinting
+	var eff_pedal_power: float = pedal_power if is_pedaling else clampf(sprint_boost_val / 3.0, 0.5, 1.0)
+	if is_working_pedals and current_speed > 0.5:
 		bob_phase += delta * (current_speed * 1.4)
-		bob_offset_y = sin(bob_phase) * vertical_bob_intensity
-		sway_offset_x = sin(crank_rot) * cadence_sway_intensity * pedal_power
+		target_bob_y = sin(bob_phase) * vertical_bob_intensity
+		sway_offset_x = sin(crank_rot) * cadence_sway_intensity * eff_pedal_power
 	elif is_coasting or current_speed <= 0.5:
-		bob_offset_y = 0.0
+		target_bob_y = 0.0
 		sway_offset_x = 0.0
+
+	var bob_t: float = 1.0 - exp(-10.0 * delta)
+	current_bob_y = lerpf(current_bob_y, target_bob_y, bob_t)
 
 	# -------------------------------------------------------------
 	# 7. Speed FOV & Speed Breathing (Breathing OFF by default)
@@ -218,7 +226,7 @@ func _process(delta: float) -> void:
 		# Position: base + lateral sway + shake_x, base_y + bob + dive_y + shake_y, base_z + surge_z + dive_tuck
 		var dive_forward_shift: float = -current_dive_pitch * 0.03 # Subtle forward tuck in braking
 		first_person_cam.position.x = base_fp_pos.x + current_shake_x + sway_offset_x
-		first_person_cam.position.y = base_fp_pos.y + bob_offset_y + current_dive_y + current_shake_y
+		first_person_cam.position.y = base_fp_pos.y + current_bob_y + current_dive_y + current_shake_y
 		first_person_cam.position.z = base_fp_pos.z + current_surge_z + dive_forward_shift
 
 		# Rotation: base_pitch + dive_pitch, look_yaw, current_roll + shake_rot
@@ -259,6 +267,7 @@ func reset_camera_dynamics() -> void:
 	current_shake_x = 0.0
 	current_shake_y = 0.0
 	current_shake_rot = 0.0
+	current_bob_y = 0.0
 	current_roll = 0.0
 	bob_phase = 0.0
 	travel_distance = 0.0
