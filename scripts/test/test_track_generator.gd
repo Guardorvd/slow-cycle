@@ -96,19 +96,19 @@ func _define_sections() -> void:
 		{"code": "C", "name": "Long Downhill", "desc": "Gravity Accel & Downhill Brake -5.0°", "s0": 467.61, "s1": 717.61, "target": "DOWNHILL -5.0° | BRAKE DIVE"},
 		{"code": "D", "name": "Sharp Crest", "desc": "Pitch +6° to -6° Pitch Change", "s0": 717.61, "s1": 797.61, "target": "CREST +6° -> -6° | UNWEIGHTING"},
 		{"code": "E", "name": "Sharp Dip", "desc": "Pitch -6° to +6° Compression", "s0": 797.61, "s1": 877.61, "target": "DIP -6° -> +6° | COMPRESSION"},
-		{"code": "F", "name": "Constant Arc R=35m", "desc": "Steady-State Lean Angle", "s0": 877.61, "s1": 1077.61, "target": "CORNER R=35m | LEAN 22°"},
-		{"code": "G", "name": "Sharp Turn R=25m", "desc": "Max Lean Angle & Steering Damping", "s0": 1301.95, "s1": 1401.95, "target": "SHARP TURN R=25m | LEAN 30°"},
-		{"code": "H", "name": "S-Chicanes R=30m", "desc": "Rapid Roll/Bank Reversals", "s0": 1401.95, "s1": 1601.95, "target": "S-CHICANES R=30m | ROLL REVERSAL"},
-		{"code": "I", "name": "Fast Sweeper R=65m", "desc": "High Speed Equilibrium", "s0": 1601.95, "s1": 1801.95, "target": "SWEEPER R=65m | HIGH SPEED"},
-		{"code": "J", "name": "Rough Gravel", "desc": "Vertical Micro-Bumps (0.035m)", "s0": 1801.95, "s1": 1901.95, "target": "ROUGH GRAVEL | MICRO-BUMPS"},
-		{"code": "K", "name": "Rough Downhill", "desc": "Downhill -4.0° with Bumps", "s0": 1901.95, "s1": 2051.95, "target": "ROUGH DOWNHILL -4° | CHATTER"},
-		{"code": "L", "name": "Grass Verge Exit", "desc": "Layer 3 Grass Drag (0.45)", "s0": 2051.95, "s1": 2202.90, "target": "GRASS VERGE | HIGH DRAG (0.45)"},
-		{"code": "S1", "name": "Downhill -> Sweeper", "desc": "High Speed Entry into R=65m Arc", "s0": 2202.90, "s1": 2402.90, "target": "STRESS 1 | HIGH SPEED ENTRY"},
-		{"code": "S2", "name": "Downhill -> Apex Flow", "desc": "Braking Boards into R=25m Apex", "s0": 2402.90, "s1": 2502.90, "target": "STRESS 2 | APEX FLOW & BOARDS"},
-		{"code": "S3", "name": "Crest -> Dip -> Turn", "desc": "Compression into Steering Input", "s0": 2502.90, "s1": 2572.90, "target": "STRESS 3 | CREST -> DIP -> TURN"},
-		{"code": "S4", "name": "Rough Downhill -> S-Turns", "desc": "Combined Chatter & Roll Transition", "s0": 2572.90, "s1": 2632.90, "target": "STRESS 4 | BUMPS -> S-TURNS"},
-		{"code": "S5", "name": "Sweeper -> Heavy Brake", "desc": "Threshold Emergency Braking", "s0": 2632.90, "s1": 2745.02, "target": "STRESS 5 | THRESHOLD BRAKE"},
-		{"code": "S6", "name": "Grass in Corner Return", "desc": "Layer 3 Low Grip Turn to Start", "s0": 2745.02, "s1": 2800.00, "target": "STRESS 6 | GRASS CORNER -> START"}
+		{"code": "F", "name": "Constant Arc R=35m", "desc": "Steady-State Lean Angle", "s0": 877.61, "s1": 1356.93, "target": "CORNER R=35m | LEAN 22°"},
+		{"code": "G", "name": "Sharp Turn R=25m", "desc": "Max Lean Angle & Steering Damping", "s0": 1356.93, "s1": 1456.93, "target": "SHARP TURN R=25m | LEAN 30°"},
+		{"code": "H", "name": "S-Chicanes R=30m", "desc": "Rapid Roll/Bank Reversals", "s0": 1456.93, "s1": 1656.93, "target": "S-CHICANES R=30m | ROLL REVERSAL"},
+		{"code": "I", "name": "Fast Sweeper R=65m", "desc": "High Speed Equilibrium", "s0": 1656.93, "s1": 1856.93, "target": "SWEEPER R=65m | HIGH SPEED"},
+		{"code": "J", "name": "Rough Gravel", "desc": "Vertical Micro-Bumps (0.035m)", "s0": 1856.93, "s1": 1956.93, "target": "ROUGH GRAVEL | MICRO-BUMPS"},
+		{"code": "K", "name": "Rough Downhill", "desc": "Downhill -4.0° with Bumps", "s0": 1956.93, "s1": 2106.93, "target": "ROUGH DOWNHILL -4° | CHATTER"},
+		{"code": "L", "name": "Grass Verge Exit", "desc": "Layer 3 Grass Drag (0.45)", "s0": 2106.93, "s1": 2257.88, "target": "GRASS VERGE | HIGH DRAG (0.45)"},
+		{"code": "S1", "name": "Downhill -> Sweeper", "desc": "High Speed Entry into R=65m Arc", "s0": 2257.88, "s1": 2457.88, "target": "STRESS 1 | HIGH SPEED ENTRY"},
+		{"code": "S2", "name": "Downhill -> Apex Flow", "desc": "Braking Boards into R=25m Apex", "s0": 2457.88, "s1": 2557.88, "target": "STRESS 2 | APEX FLOW & BOARDS"},
+		{"code": "S3", "name": "Crest -> Dip -> Turn", "desc": "Compression into Steering Input", "s0": 2557.88, "s1": 2627.88, "target": "STRESS 3 | CREST -> DIP -> TURN"},
+		{"code": "S4", "name": "Rough Downhill -> S-Turns", "desc": "Combined Chatter & Roll Transition", "s0": 2627.88, "s1": 2687.88, "target": "STRESS 4 | BUMPS -> S-TURNS"},
+		{"code": "S5", "name": "Sweeper -> Heavy Brake", "desc": "Threshold Emergency Braking", "s0": 2687.88, "s1": 2745.26, "target": "STRESS 5 | THRESHOLD BRAKE"},
+		{"code": "S6", "name": "Grass in Corner Return", "desc": "Layer 3 Low Grip Turn to Start", "s0": 2745.26, "s1": 2800.00, "target": "STRESS 6 | GRASS CORNER -> START"}
 	]
 
 func get_section_at_distance(dist_m: float) -> Dictionary:
@@ -248,15 +248,30 @@ func _build_path_data() -> void:
 	r = _add_line(cur_pos, cur_dir, cur_s, 100.0 - (cur_s - s_S2_start))
 	cur_pos = r[0]; cur_dir = r[1]; cur_s = r[2]
 
-	# Section S3: Crest -> Dip -> Turn combo
-	r = _add_line(cur_pos, cur_dir, cur_s, 70.0)
+	# Section S3: Crest -> Dip -> Turn combo (70.0m)
+	var s_S3_start: float = cur_s
+	r = _add_line(cur_pos, cur_dir, cur_s, 20.0)
+	cur_pos = r[0]; cur_dir = r[1]; cur_s = r[2]
+	r = _add_symmetric_chicane(cur_pos, cur_dir, cur_s, 45.0, 8.0, 1)
+	cur_pos = r[0]; cur_dir = r[1]; cur_s = r[2]
+	r = _add_line(cur_pos, cur_dir, cur_s, 70.0 - (cur_s - s_S3_start))
 	cur_pos = r[0]; cur_dir = r[1]; cur_s = r[2]
 
-	# Section S4: Rough Downhill into S-turns
-	r = _add_line(cur_pos, cur_dir, cur_s, 60.0)
+	# Section S4: Rough Downhill into S-turns (60.0m)
+	var s_S4_start: float = cur_s
+	r = _add_line(cur_pos, cur_dir, cur_s, 15.0)
+	cur_pos = r[0]; cur_dir = r[1]; cur_s = r[2]
+	r = _add_symmetric_chicane(cur_pos, cur_dir, cur_s, 30.0, 10.0, 1)
+	cur_pos = r[0]; cur_dir = r[1]; cur_s = r[2]
+	r = _add_line(cur_pos, cur_dir, cur_s, 60.0 - (cur_s - s_S4_start))
 	cur_pos = r[0]; cur_dir = r[1]; cur_s = r[2]
 
-	# Section S5: Sweeper into Heavy Brake (remaining to reach X = 35.0)
+	# Section S5: Sweeper into Heavy Brake
+	var s_S5_start: float = cur_s
+	r = _add_line(cur_pos, cur_dir, cur_s, 15.0)
+	cur_pos = r[0]; cur_dir = r[1]; cur_s = r[2]
+	r = _add_symmetric_chicane(cur_pos, cur_dir, cur_s, 65.0, 6.0, 1)
+	cur_pos = r[0]; cur_dir = r[1]; cur_s = r[2]
 	var rem_X: float = cur_pos.x - 35.0
 	r = _add_line(cur_pos, cur_dir, cur_s, rem_X)
 	cur_pos = r[0]; cur_dir = r[1]; cur_s = r[2]
@@ -350,20 +365,35 @@ func _setup_elevation() -> void:
 	elev_keys.append(ElevKey.new(857.61, -5.93, 6.0))      # E dip ascent
 	elev_keys.append(ElevKey.new(877.61, -4.36, 0.0))      # E end
 	
-	# Leg 2 & first part of Leg 3: Flat at Y = -4.36m
-	elev_keys.append(ElevKey.new(1901.95, -4.36, 0.0))     # K start (Rough Downhill)
-	elev_keys.append(ElevKey.new(1926.95, -5.23, -4.0))     # K downhill blend
-	elev_keys.append(ElevKey.new(2026.95, -12.21, -4.0))    # K steady
-	elev_keys.append(ElevKey.new(2051.95, -13.08, 0.0))     # K end / L start
+	# Leg 2 & first part of Leg 3: Flat at Y = -4.36m up to Section K start (1956.93)
+	elev_keys.append(ElevKey.new(1956.93, -4.36, 0.0))     # K start (Rough Downhill)
+	elev_keys.append(ElevKey.new(1981.93, -5.23, -4.0))     # K downhill blend -4.0°
+	elev_keys.append(ElevKey.new(2021.93, -8.02, -4.0))     # K steady
+	elev_keys.append(ElevKey.new(2046.93, -8.90, 0.0))      # K level out
+	elev_keys.append(ElevKey.new(2106.93, -8.90, 0.0))      # K end / L start
 	
-	# Flat through L and S1
-	elev_keys.append(ElevKey.new(2402.90, -13.08, 0.0))     # S1 end / S2 start
-	
-	# Return climb back to 0m through S3, S4, S5, S6
-	elev_keys.append(ElevKey.new(2502.90, -10.00, 3.5))     # S2 end / S3 climb
-	elev_keys.append(ElevKey.new(2600.00, -5.00, 3.5))      # S4 climb
-	elev_keys.append(ElevKey.new(2720.00, -1.00, 1.8))      # S5 climb
-	elev_keys.append(ElevKey.new(2800.00, 0.0, 0.0))        # S6 end -> wrap to 0.0m exact!
+	# Flat through L, S1, and S2
+	elev_keys.append(ElevKey.new(2257.88, -8.90, 0.0))      # S1 start
+	elev_keys.append(ElevKey.new(2457.88, -8.90, 0.0))      # S2 start
+	elev_keys.append(ElevKey.new(2557.88, -8.90, 0.0))      # S3 start
+
+	# S3: Crest -> Dip -> Turn combo (2557.88 .. 2627.88)
+	elev_keys.append(ElevKey.new(2575.00, -8.30, 4.0))      # Crest ascent +4°
+	elev_keys.append(ElevKey.new(2590.00, -7.78, 0.0))      # Crest apex
+	elev_keys.append(ElevKey.new(2610.00, -8.48, -4.0))     # Dip descent -4°
+	elev_keys.append(ElevKey.new(2627.88, -8.90, 0.0))      # S3 end / S4 start
+
+	# S4: Rough Downhill into S-turns (2627.88 .. 2687.88)
+	elev_keys.append(ElevKey.new(2645.00, -9.42, -3.5))     # Downhill entry -3.5°
+	elev_keys.append(ElevKey.new(2670.00, -10.95, -3.5))    # Downhill sustained -3.5°
+	elev_keys.append(ElevKey.new(2687.88, -11.47, 0.0))     # S4 end / S5 start
+
+	# S5: Sweeper into Heavy Brake (2687.88 .. 2745.26)
+	elev_keys.append(ElevKey.new(2700.00, -9.75, 17.0))     # Recovery climb
+	elev_keys.append(ElevKey.new(2723.00, -2.71, 17.0))     # Sustained climb
+	elev_keys.append(ElevKey.new(2735.00, 0.00, 0.0))       # Level off at 0.00m into heavy braking zone
+	elev_keys.append(ElevKey.new(2745.26, 0.00, 0.0))       # S5 end / S6 start
+	elev_keys.append(ElevKey.new(2800.00, 0.00, 0.0))       # S6 end -> wrap to 0.0m exact!
 
 func _eval_elevation(s: float) -> Dictionary:
 	if elev_keys.is_empty():
@@ -406,9 +436,9 @@ func _eval_elevation(s: float) -> Dictionary:
 	var dyds: float = (dh00 * k0.y + dh10 * m0 + dh01 * k1.y + dh11 * m1) / ds_k
 	var slope_deg: float = rad_to_deg(atan(dyds))
 	
-	# Micro-bumps for J (1801.95..1901.95), K (1901.95..2051.95), S4 (2572.90..2632.90)
+	# Micro-bumps for J (1856.93..1956.93), K (1956.93..2106.93), S4 (2627.88..2687.88)
 	var bump: float = 0.0
-	if (s >= 1801.95 and s <= 1901.95) or (s >= 1901.95 and s <= 2051.95) or (s >= 2572.90 and s <= 2632.90):
+	if (s >= 1856.93 and s <= 1956.93) or (s >= 1956.93 and s <= 2106.93) or (s >= 2627.88 and s <= 2687.88):
 		bump = 0.035 * sin(2.0 * PI * s / 2.5)
 	
 	return {"y": y, "slope_deg": slope_deg, "bump": bump}
@@ -432,8 +462,8 @@ func _build_chunks() -> void:
 
 		# Check if this chunk is located in grass-road sections (Section L or Section S6)
 		var chunk_center_s: float = (road_path.cumulative_distances[s_idx] + road_path.cumulative_distances[e_idx]) * 0.5
-		var is_grass_road: bool = (chunk_center_s >= 2051.95 and chunk_center_s <= 2202.90) or (chunk_center_s >= 2745.02 and chunk_center_s <= 2800.0)
-		var is_rough_road: bool = (chunk_center_s >= 1801.95 and chunk_center_s <= 2051.95) or (chunk_center_s >= 2572.90 and chunk_center_s <= 2632.90)
+		var is_grass_road: bool = (chunk_center_s >= 2106.93 and chunk_center_s <= 2257.88) or (chunk_center_s >= 2745.26 and chunk_center_s <= 2800.0)
+		var is_rough_road: bool = (chunk_center_s >= 1856.93 and chunk_center_s <= 2106.93) or (chunk_center_s >= 2627.88 and chunk_center_s <= 2687.88)
 
 		# 1. Build Road Mesh
 		var road_mat: Material = shared_materials.get("grass") if is_grass_road else shared_materials.get("road")
@@ -628,9 +658,9 @@ func _build_distance_boards() -> void:
 	boards_root.name = "ApexFlowBoards"
 	add_child(boards_root)
 
-	# Section S2: 2402.90m to 2502.90m
-	# Apex is at s = 2402.90 + 20.0 + 34.20 / 2 = ~2437.0m
-	var s_apex: float = 2437.0
+	# Section S2: 2457.88m to 2557.88m
+	# Apex is at s = 2457.88 + 20.0 + 34.91 / 2 = ~2495.33m
+	var s_apex: float = 2495.33
 	var board_defs: Array[Dictionary] = [
 		{"dist": s_apex - 100.0, "text": "[ 100 m ]", "color": Color(0.9, 0.9, 0.9)},
 		{"dist": s_apex - 50.0, "text": "[ 50 m ]", "color": Color(0.95, 0.85, 0.2)},

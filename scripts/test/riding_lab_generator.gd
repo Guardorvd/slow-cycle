@@ -42,18 +42,31 @@ class TrackSegment:
 	var radius: float
 	var start_angle: float
 	var delta_angle: float
+	var bank_deg: float = 0.0
 
 	func eval_2d(s: float) -> Dictionary:
 		var u: float = clampf(s - s_start, 0.0, length)
 		if type == SegType.LINE:
 			var p: Vector2 = p_start + dir_start * u
-			return {"pos": p, "tang": dir_start, "curv": 0.0}
+			return {"pos": p, "tang": dir_start, "curv": 0.0, "bank": 0.0}
 		else:
 			var ang: float = start_angle + delta_angle * (u / length)
 			var p: Vector2 = Vector2(center.x + radius * cos(ang), center.y + radius * sin(ang))
 			var sign_turn: float = signf(delta_angle)
 			var tang: Vector2 = Vector2(-sin(ang), cos(ang)) * sign_turn
-			return {"pos": p, "tang": tang, "curv": 1.0 / radius}
+			var cur_bank: float = 0.0
+			if bank_deg != 0.0:
+				var trans_len: float = minf(6.0, length * 0.25)
+				if trans_len > 0.001:
+					if u < trans_len:
+						cur_bank = bank_deg * smoothstep(0.0, trans_len, u)
+					elif u > length - trans_len:
+						cur_bank = bank_deg * smoothstep(length, length - trans_len, u)
+					else:
+						cur_bank = bank_deg
+				else:
+					cur_bank = bank_deg
+			return {"pos": p, "tang": tang, "curv": 1.0 / radius, "bank": cur_bank}
 
 class ElevKey:
 	var s: float
@@ -255,7 +268,7 @@ func _add_line(cur_pos: Vector2, cur_dir: Vector2, cur_s: float, length: float) 
 	segments.append(seg)
 	return [seg.p_end, seg.dir_end, cur_s + length]
 
-func _add_arc(cur_pos: Vector2, cur_dir: Vector2, cur_s: float, radius: float, turn_deg: float) -> Array:
+func _add_arc(cur_pos: Vector2, cur_dir: Vector2, cur_s: float, radius: float, turn_deg: float, bank_deg: float = 0.0) -> Array:
 	var seg := TrackSegment.new()
 	seg.type = SegType.ARC
 	seg.s_start = cur_s
@@ -265,6 +278,7 @@ func _add_arc(cur_pos: Vector2, cur_dir: Vector2, cur_s: float, radius: float, t
 	seg.length = radius * absf(delta_rad)
 	seg.p_start = cur_pos
 	seg.dir_start = cur_dir
+	seg.bank_deg = bank_deg * signf(turn_deg)
 
 	var normal_right: Vector2 = Vector2(-cur_dir.y, cur_dir.x)
 	var center_dir: Vector2 = normal_right if turn_deg > 0 else -normal_right
@@ -280,16 +294,16 @@ func _add_arc(cur_pos: Vector2, cur_dir: Vector2, cur_s: float, radius: float, t
 	segments.append(seg)
 	return [seg.p_end, seg.dir_end, cur_s + seg.length]
 
-func _add_symmetric_chicane(cur_pos: Vector2, cur_dir: Vector2, cur_s: float, radius: float, swing_deg: float, reps: int = 1) -> Array:
+func _add_symmetric_chicane(cur_pos: Vector2, cur_dir: Vector2, cur_s: float, radius: float, swing_deg: float, reps: int = 1, bank_deg: float = 0.0) -> Array:
 	var p: Vector2 = cur_pos
 	var d: Vector2 = cur_dir
 	var s: float = cur_s
 	for i in range(reps):
-		var res: Array = _add_arc(p, d, s, radius, swing_deg)
+		var res: Array = _add_arc(p, d, s, radius, swing_deg, bank_deg)
 		p = res[0]; d = res[1]; s = res[2]
-		res = _add_arc(p, d, s, radius, -2.0 * swing_deg)
+		res = _add_arc(p, d, s, radius, -2.0 * swing_deg, bank_deg)
 		p = res[0]; d = res[1]; s = res[2]
-		res = _add_arc(p, d, s, radius, swing_deg)
+		res = _add_arc(p, d, s, radius, swing_deg, bank_deg)
 		p = res[0]; d = res[1]; s = res[2]
 	return [p, d, s]
 
@@ -303,16 +317,16 @@ func _build_path_data() -> void:
 	var r: Array = _add_line(cur_pos, cur_dir, cur_s, 18.0)
 	cur_pos = r[0]; cur_dir = r[1]; cur_s = r[2]
 
-	# T2: Hairpin R=19m Right 120°
-	r = _add_arc(cur_pos, cur_dir, cur_s, 19.0, 120.0)
+	# T2: Hairpin R=19m Right 120° (8° Banking)
+	r = _add_arc(cur_pos, cur_dir, cur_s, 19.0, 120.0, 8.0)
 	cur_pos = r[0]; cur_dir = r[1]; cur_s = r[2]
 
 	# T3: Short Link
 	r = _add_line(cur_pos, cur_dir, cur_s, 8.0)
 	cur_pos = r[0]; cur_dir = r[1]; cur_s = r[2]
 
-	# T4: Switchback Left R=18m 120° (returns to North)
-	r = _add_arc(cur_pos, cur_dir, cur_s, 18.0, -120.0)
+	# T4: Switchback Left R=18m 120° (8° Banking)
+	r = _add_arc(cur_pos, cur_dir, cur_s, 18.0, -120.0, 8.0)
 	cur_pos = r[0]; cur_dir = r[1]; cur_s = r[2]
 
 	# T5: Steep Climb +6° (North)
@@ -323,16 +337,16 @@ func _build_path_data() -> void:
 	r = _add_line(cur_pos, cur_dir, cur_s, 16.0)
 	cur_pos = r[0]; cur_dir = r[1]; cur_s = r[2]
 
-	# Corner 1: East R=15m 90° right
-	r = _add_arc(cur_pos, cur_dir, cur_s, 15.0, 90.0)
+	# Corner 1: East R=15m 90° right (6° Banking)
+	r = _add_arc(cur_pos, cur_dir, cur_s, 15.0, 90.0, 6.0)
 	cur_pos = r[0]; cur_dir = r[1]; cur_s = r[2]
 
-	# T7: S-Chicane on East (dir = (1, 0))
-	r = _add_symmetric_chicane(cur_pos, cur_dir, cur_s, 16.0, 16.0, 1)
+	# T7: S-Chicane on East (dir = (1, 0)) (6° Banking)
+	r = _add_symmetric_chicane(cur_pos, cur_dir, cur_s, 16.0, 16.0, 1, 6.0)
 	cur_pos = r[0]; cur_dir = r[1]; cur_s = r[2]
 
-	# Corner 2: South R=15m 90° right
-	r = _add_arc(cur_pos, cur_dir, cur_s, 15.0, 90.0)
+	# Corner 2: South R=15m 90° right (6° Banking)
+	r = _add_arc(cur_pos, cur_dir, cur_s, 15.0, 90.0, 6.0)
 	cur_pos = r[0]; cur_dir = r[1]; cur_s = r[2]
 
 	# T8: Rough Gravel (South)
@@ -355,8 +369,8 @@ func _build_path_data() -> void:
 	r = _add_line(cur_pos, cur_dir, cur_s, rem_Y)
 	cur_pos = r[0]; cur_dir = r[1]; cur_s = r[2]
 
-	# Corner 3: West R=16m 90° right
-	r = _add_arc(cur_pos, cur_dir, cur_s, R_corner_west, 90.0)
+	# Corner 3: West R=16m 90° right (6° Banking)
+	r = _add_arc(cur_pos, cur_dir, cur_s, R_corner_west, 90.0, 6.0)
 	cur_pos = r[0]; cur_dir = r[1]; cur_s = r[2]
 
 	# Leg West: Approach to X = R_final
@@ -364,8 +378,8 @@ func _build_path_data() -> void:
 	r = _add_line(cur_pos, cur_dir, cur_s, rem_X)
 	cur_pos = r[0]; cur_dir = r[1]; cur_s = r[2]
 
-	# T12: Return Sweeper Arc R=22m 90° right -> leads straight to (0, 0)!
-	r = _add_arc(cur_pos, cur_dir, cur_s, R_final, 90.0)
+	# T12: Return Sweeper Arc R=22m 90° right (6° Banking)
+	r = _add_arc(cur_pos, cur_dir, cur_s, R_final, 90.0, 6.0)
 	cur_pos = r[0]; cur_dir = r[1]; cur_s = r[2]
 
 	_setup_elevation()
@@ -398,6 +412,7 @@ func _build_path_data() -> void:
 		var y: float = elev.y + elev.bump
 		var slope_deg: float = elev.slope_deg
 		var slope_rad: float = deg_to_rad(slope_deg)
+		var bank_deg: float = s2d.get("bank", 0.0)
 
 		var p3d := Vector3(p2d.x, y, p2d.y)
 		var t3d := Vector3(t2d.x * cos(slope_rad), sin(slope_rad), t2d.y * cos(slope_rad)).normalized()
@@ -407,11 +422,16 @@ func _build_path_data() -> void:
 			p3d = road_path.points[0]
 			t3d = road_path.tangents[0]
 			slope_deg = road_path.slopes[0]
+			bank_deg = 0.0
 
 		var norm_tangent: Vector3 = t3d
 		var horiz_right := Vector3(-t2d.y, 0.0, t2d.x).normalized()
-		var norm_normal: Vector3 = horiz_right.cross(norm_tangent).normalized()
-		var binorm: Vector3 = norm_tangent.cross(norm_normal).normalized()
+		var base_normal: Vector3 = horiz_right.cross(norm_tangent).normalized()
+
+		# Unified Orthonormal Road Frame with banking beta
+		var bank_rad: float = deg_to_rad(bank_deg)
+		var binorm: Vector3 = (horiz_right * cos(bank_rad) - base_normal * sin(bank_rad)).normalized()
+		var norm_normal: Vector3 = (horiz_right * sin(bank_rad) + base_normal * cos(bank_rad)).normalized()
 
 		var dist: float = 0.0
 		if not road_path.cumulative_distances.is_empty():
@@ -446,11 +466,13 @@ func _setup_elevation() -> void:
 	elev_keys.append(ElevKey.new(116.49, 1.36, 6.0))
 	elev_keys.append(ElevKey.new(121.49, 1.88, 0.0))
 
-	# T6: Crest -> Dip
-	elev_keys.append(ElevKey.new(125.49, 2.30, 8.0)) # Crest ascent
-	elev_keys.append(ElevKey.new(129.49, 2.50, 0.0)) # Crest apex
-	elev_keys.append(ElevKey.new(133.49, 2.10, -8.0)) # Dip descent
-	elev_keys.append(ElevKey.new(137.49, 1.88, 0.0)) # Flat exit
+	# T6: Crest -> Dip (+8.0° sustained climb and -8.0° sustained descent)
+	elev_keys.append(ElevKey.new(123.49, 2.021, 8.0))   # Entry transition to +8°
+	elev_keys.append(ElevKey.new(127.49, 2.583, 8.0))   # Sustained +8° climb (Delta y = 0.562m)
+	elev_keys.append(ElevKey.new(129.49, 2.723, 0.0))   # Crest apex
+	elev_keys.append(ElevKey.new(131.49, 2.583, -8.0))  # Apex exit to -8°
+	elev_keys.append(ElevKey.new(135.49, 2.021, -8.0))  # Sustained -8° descent (Delta y = -0.562m)
+	elev_keys.append(ElevKey.new(137.49, 1.88, 0.0))    # Exit back to plateau
 
 	# T7 - T8: Flat plateau
 	elev_keys.append(ElevKey.new(220.69, 1.88, 0.0))

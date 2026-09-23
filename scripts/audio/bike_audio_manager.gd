@@ -138,9 +138,7 @@ func _process(delta: float) -> void:
 			freewheel_use_a = not freewheel_use_a
 			var base_pitch: float = randf_range(0.97, 1.03)
 			var base_vol: float = -5.0
-			if current_surf == 2:
-				pass # Preserve bright click on rough stony road
-			elif is_on_grass or current_surf == 1:
+			if current_surf != 2 and (is_on_grass or current_surf == 1):
 				base_vol -= 2.5
 				base_pitch *= 0.90
 			active_player.volume_db = base_vol
@@ -171,7 +169,7 @@ func _process(delta: float) -> void:
 		var target_gravel_pitch: float = 1.0
 		if current_speed > 0.2:
 			var speed_ratio: float = clampf(current_speed / 8.0, 0.0, 1.0)
-			var base_vol: float = lerpf(-38.0, -26.0, speed_ratio)
+			var base_vol: float = lerpf(-34.0, -25.0, speed_ratio)
 
 			# Strictly bounded additive contributions
 			var rough_add: float = clampf(4.0 * terrain_rough, 0.0, 3.0)

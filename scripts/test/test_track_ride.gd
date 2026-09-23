@@ -112,7 +112,7 @@ func _start() -> void:
 
 	# 5b. Teleport to Section J (Rough Gravel)
 	print("\n--- Testing Section J (Rough Gravel Washboard) ---")
-	var s_j: float = 1850.0
+	var s_j: float = 1900.0
 	var sample_j: Dictionary = generator.road_path.get_sample_at_distance(s_j)
 	bike.global_position = sample_j.position + Vector3(0, 0.45, 0)
 	bike.velocity = Vector3.ZERO

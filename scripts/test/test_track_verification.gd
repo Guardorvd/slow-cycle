@@ -210,6 +210,97 @@ func run_verification() -> bool:
 		printerr("[FAIL] Section J micro-bumps are missing!")
 		return false
 
+	# Section K (Rough Downhill -4.0° with Bumps)
+	var sec_K = generator.sections[10]
+	var k_min_slope: float = 999.0
+	for i in range(int(sec_K.s0 / 2.0), int(sec_K.s1 / 2.0)):
+		k_min_slope = minf(k_min_slope, path_data.slopes[i])
+	var k_has_bumps: bool = absf(generator._eval_elevation(sec_K.s0 + 20.0).bump) > 0.001
+	print("Section K (Rough Downhill): Min Slope = %.2f° (expected -4.0°), Bumps = %s" % [k_min_slope, k_has_bumps])
+	if absf(k_min_slope - (-4.0)) > 0.4 or not k_has_bumps:
+		printerr("[FAIL] Section K physical downhill metrics out of tolerance!")
+		return false
+
+	# Section S1 (Downhill -> Sweeper R=65m)
+	var sec_S1 = generator.sections[12]
+	var s1_min_r: float = 9999.0
+	for i in range(int(sec_S1.s0 / 2.0), int(sec_S1.s1 / 2.0)):
+		var curv: float = path_data.curvatures[i]
+		if curv > 0.001:
+			s1_min_r = minf(s1_min_r, 1.0 / curv)
+	print("Section S1 (Sweeper R=65m): Min Radius = %.2f m (expected 65.0 m)" % s1_min_r)
+	if absf(s1_min_r - 65.0) > 0.5:
+		printerr("[FAIL] Section S1 radius deviates from 65m: %f" % s1_min_r)
+		return false
+
+	# Section S2 (Apex Flow R=25m)
+	var sec_S2 = generator.sections[13]
+	var s2_min_r: float = 9999.0
+	for i in range(int(sec_S2.s0 / 2.0), int(sec_S2.s1 / 2.0)):
+		var curv: float = path_data.curvatures[i]
+		if curv > 0.001:
+			s2_min_r = minf(s2_min_r, 1.0 / curv)
+	print("Section S2 (Apex Flow R=25m): Min Radius = %.2f m (expected 25.0 m)" % s2_min_r)
+	if absf(s2_min_r - 25.0) > 0.5:
+		printerr("[FAIL] Section S2 radius deviates from 25m: %f" % s2_min_r)
+		return false
+
+	# Section S3 (Crest -> Dip -> Turn combo)
+	var sec_S3 = generator.sections[14]
+	var s3_max_slope: float = -999.0
+	var s3_min_slope: float = 999.0
+	var s3_min_r: float = 9999.0
+	for i in range(int(sec_S3.s0 / 2.0), int(sec_S3.s1 / 2.0)):
+		s3_max_slope = maxf(s3_max_slope, path_data.slopes[i])
+		s3_min_slope = minf(s3_min_slope, path_data.slopes[i])
+		var curv: float = path_data.curvatures[i]
+		if curv > 0.001:
+			s3_min_r = minf(s3_min_r, 1.0 / curv)
+	print("Section S3 (Crest/Dip/Turn): Slope Range = [%.2f°, %.2f°], Turn Radius = %.2f m (expected R=45m)" % [s3_min_slope, s3_max_slope, s3_min_r])
+	if s3_max_slope < 3.5 or s3_min_slope > -3.5 or absf(s3_min_r - 45.0) > 1.0:
+		printerr("[FAIL] Section S3 crest/dip/turn metrics out of tolerance!")
+		return false
+
+	# Section S4 (Rough Downhill -> S-Turns)
+	var sec_S4 = generator.sections[15]
+	var s4_min_slope: float = 999.0
+	var s4_min_r: float = 9999.0
+	for i in range(int(sec_S4.s0 / 2.0), int(sec_S4.s1 / 2.0)):
+		s4_min_slope = minf(s4_min_slope, path_data.slopes[i])
+		var curv: float = path_data.curvatures[i]
+		if curv > 0.001:
+			s4_min_r = minf(s4_min_r, 1.0 / curv)
+	var s4_has_bumps: bool = absf(generator._eval_elevation(sec_S4.s0 + 15.0).bump) > 0.001
+	print("Section S4 (Downhill S-Turns): Min Slope = %.2f°, S-Turn Radius = %.2f m (expected R=30m), Bumps = %s" % [s4_min_slope, s4_min_r, s4_has_bumps])
+	if s4_min_slope > -3.0 or absf(s4_min_r - 30.0) > 1.0 or not s4_has_bumps:
+		printerr("[FAIL] Section S4 downhill S-turns metrics out of tolerance!")
+		return false
+
+	# Section S5 (Sweeper -> Heavy Brake)
+	var sec_S5 = generator.sections[16]
+	var s5_min_r: float = 9999.0
+	for i in range(int(sec_S5.s0 / 2.0), int(sec_S5.s1 / 2.0)):
+		var curv: float = path_data.curvatures[i]
+		if curv > 0.001:
+			s5_min_r = minf(s5_min_r, 1.0 / curv)
+	var s5_exit_slope: float = path_data.slopes[int(sec_S5.s1 / 2.0) - 1]
+	print("Section S5 (Sweeper & Brake): Radius = %.2f m (expected R=65m), Exit Slope = %.2f° (expected 0.0°)" % [s5_min_r, s5_exit_slope])
+	if absf(s5_min_r - 65.0) > 1.0 or absf(s5_exit_slope) > 0.5:
+		printerr("[FAIL] Section S5 sweeper or brake zone exit slope out of tolerance!")
+		return false
+
+	# Section S6 (Corner 4 Grass Return Arc R=35m)
+	var sec_S6 = generator.sections[17]
+	var s6_min_r: float = 9999.0
+	for i in range(int(sec_S6.s0 / 2.0), int(sec_S6.s1 / 2.0)):
+		var curv: float = path_data.curvatures[i]
+		if curv > 0.001:
+			s6_min_r = minf(s6_min_r, 1.0 / curv)
+	print("Section S6 (Corner 4 Return): Radius = %.2f m (expected 35.0 m)" % s6_min_r)
+	if absf(s6_min_r - 35.0) > 0.5:
+		printerr("[FAIL] Section S6 radius deviates from 35m: %f" % s6_min_r)
+		return false
+
 	# 5. Check Chunk Instancing and Collision Layers
 	print("\n--- 4. Chunks and Collision Layers Verification ---")
 	if generator.chunks.size() != 56:

@@ -492,7 +492,8 @@ func _calculate_steering_and_banking(delta: float) -> void:
 
 func _apply_motion(delta: float) -> void:
 	var forward_dir: Vector3 = -global_transform.basis.z
-	var motion_horizontal: Vector3 = forward_dir * current_speed
+	var horiz_scalar: float = current_speed * cos(physics_pitch) if is_grounded else current_speed
+	var motion_horizontal: Vector3 = forward_dir * horiz_scalar
 
 	var vertical_vel: float = velocity.y
 	if is_grounded:

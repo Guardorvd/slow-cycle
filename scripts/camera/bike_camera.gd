@@ -48,7 +48,6 @@ extends Node3D
 var base_fp_pos: Vector3 = Vector3(0.0, 1.12, 0.05)
 var base_fp_rot: Vector3 = Vector3.ZERO
 var base_tp_spring_length: float = 2.8
-const BASE_FP_HEIGHT: float = 1.12 ## Backward compatibility alias
 
 # Smoothed dynamic state
 var current_roll: float = 0.0

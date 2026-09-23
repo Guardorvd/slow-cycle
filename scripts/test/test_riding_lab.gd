@@ -140,7 +140,7 @@ func run_verification() -> bool:
 	# --- TIER 2: STRUCTURAL INTEGRITY ---
 	print("\n--- TIER 2: STRUCTURAL INTEGRITY ---")
 
-	# S1: Slope bounds (all slopes within [-16°, +16°] including drop lip)
+	# S1: Slope bounds & technical profile verification
 	var min_slope: float = INF
 	var max_slope: float = -INF
 	for s in path_data.slopes:
@@ -152,7 +152,43 @@ func run_verification() -> bool:
 	if min_slope < -16.0 or max_slope > 16.0:
 		printerr("[FAIL S1] Slope exceeds allowed bounds [-16°, +16°]: [%.2f°, %.2f°]" % [min_slope, max_slope])
 		return false
-	print("[PASS S1] All road slopes stay strictly within designed technical limits.")
+
+	# Section-specific normative checks (D-07 hardened):
+	# T6 (Crest/Dip): verify climb >= +7.5° and descent <= -7.5°
+	var sec_t6 = generator.sections[5]
+	var t6_max_slope: float = -999.0
+	var t6_min_slope: float = 999.0
+	for i in range(int(sec_t6.s0 / 2.0), int(sec_t6.s1 / 2.0)):
+		t6_max_slope = maxf(t6_max_slope, path_data.slopes[i])
+		t6_min_slope = minf(t6_min_slope, path_data.slopes[i])
+	print("          Section T6 (Crest/Dip): Slope range = [%.2f°, %.2f°] (target: >= +7.5°, <= -7.5°)" % [t6_min_slope, t6_max_slope])
+	if t6_max_slope < 7.5 or t6_min_slope > -7.5:
+		printerr("[FAIL S1] Section T6 did not achieve required technical crest/dip slope range: [%f, %f]" % [t6_min_slope, t6_max_slope])
+		return false
+
+	# T10 (Drop): verify drop steepness <= -13.0°
+	var sec_t10 = generator.sections[9]
+	var t10_min_slope: float = 999.0
+	for i in range(int(sec_t10.s0 / 2.0), int(sec_t10.s1 / 2.0)):
+		t10_min_slope = minf(t10_min_slope, path_data.slopes[i])
+	print("          Section T10 (Drop): Min slope = %.2f° (target: <= -13.0°)" % t10_min_slope)
+	if t10_min_slope > -13.0:
+		printerr("[FAIL S1] Section T10 drop slope insufficient: %f" % t10_min_slope)
+		return false
+
+	# Banking verification on T2/T4 (D-02 hardened):
+	var sec_t2 = generator.sections[1]
+	var max_bank_tilt: float = 0.0
+	for i in range(int(sec_t2.s0 / 2.0), int(sec_t2.s1 / 2.0)):
+		var norm: Vector3 = path_data.normals[i]
+		var tilt_deg: float = rad_to_deg(acos(clampf(norm.dot(Vector3.UP), -1.0, 1.0)))
+		max_bank_tilt = maxf(max_bank_tilt, tilt_deg)
+	print("          Section T2 (Hairpin): Max road surface banking tilt = %.2f° (target: >= 4.0°)" % max_bank_tilt)
+	if max_bank_tilt < 4.0:
+		printerr("[FAIL S1] Section T2 road banking tilt insufficient: %f" % max_bank_tilt)
+		return false
+
+	print("[PASS S1] All road slopes and banking stay strictly within designed technical limits.")
 
 	# S2: Section definitions and coverage
 	var sections: Array = generator.sections

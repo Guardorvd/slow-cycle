@@ -123,9 +123,10 @@ func _generate_chunk_geometry(seg_type: int) -> void:
 		cos(heading_rad) * cos(slope_rad)
 	).normalized()
 
-	var chord_dir: Vector3 = (last_tangent + end_tangent).normalized()
+	var horiz_chord := Vector2(last_tangent.x + end_tangent.x, last_tangent.z + end_tangent.z).normalized()
+	var horiz_len: float = CHUNK_LENGTH * cos(slope_rad)
 	var height_gain: float = sin(slope_rad) * CHUNK_LENGTH
-	var end_point: Vector3 = last_point + Vector3(chord_dir.x * CHUNK_LENGTH, height_gain, chord_dir.z * CHUNK_LENGTH)
+	var end_point: Vector3 = last_point + Vector3(horiz_chord.x * horiz_len, height_gain, horiz_chord.y * horiz_len)
 
 	var h_t0: Vector3 = last_tangent * CHUNK_LENGTH
 	var h_t1: Vector3 = end_tangent * CHUNK_LENGTH
@@ -144,7 +145,10 @@ func _generate_chunk_geometry(seg_type: int) -> void:
 		if radius < MIN_RADIUS:
 			radius = MIN_RADIUS
 		var curvature: float = 1.0 / maxf(radius, 0.001)
-		var norm: Vector3 = Vector3.UP
+		
+		# Compute orthonormal road normal
+		var bitangent: Vector3 = Vector3(-tang.z, 0.0, tang.x).normalized()
+		var norm: Vector3 = bitangent.cross(tang).normalized()
 		
 		# Record actual geometric slope from unit tangent vertical component
 		var actual_geom_slope_deg: float = rad_to_deg(asin(clampf(tang.y, -0.999, 0.999)))
@@ -154,5 +158,6 @@ func _generate_chunk_geometry(seg_type: int) -> void:
 
 	last_point = end_point
 	last_tangent = end_tangent
-	last_normal = Vector3.UP
+	var end_bitang: Vector3 = Vector3(-end_tangent.z, 0.0, end_tangent.x).normalized()
+	last_normal = end_bitang.cross(end_tangent).normalized()
 
