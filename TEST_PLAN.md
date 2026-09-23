@@ -65,19 +65,20 @@ Every physics change in 4H–4M must be measured against the 12 KPI baseline:
 Automated CI checks run headlessly using Godot console:
 
 ```powershell
-& "Godot_v4.7.2-stable_mono_win64_console.exe" --headless --script scripts/test/test_diagnostics.gd
-& "Godot_v4.7.2-stable_mono_win64_console.exe" --headless --script scripts/test/test_track_verification.gd
-& "Godot_v4.7.2-stable_mono_win64_console.exe" --headless --script scripts/test/test_track_ride.gd
+# Unified Sprint 4M Master Validation Suite (Runs all 7 Tiers, 121 Assertions, 0 Leaks)
+& "Godot_v4.7.2-stable_mono_win64_console.exe" --headless --script scripts/test/test_sprint_4m_master.gd
 ```
 
-- **Core Contracts**: 64 deterministic verifications in `scripts/test/test_diagnostics.gd` (100% PASS requirement).
-- **Presentation Verification Contracts (#60–#64)**:
-  - `#60`: Steering visual gain ($3.5\times$), speed clamp ($12^\circ$ sprint limit), fork local orientation, independent wheel rotation, and pedal horizontal leveling.
-  - `#61`: Coordinated sign alignment (Left > 0, Right < 0 for steer, yaw, bank, and camera roll); physical root `CharacterBody3D` stays upright (`Basis.Y = UP`).
-  - `#62`: FPS invariance ($1 - e^{-k \Delta t}$) across 30, 60, and 144 FPS at normalized physical time $t = 0.50\text{ s}$ ($\Delta = 0.00000000$).
-  - `#63`: Full system bicycle recovery contract (positions, velocities, accelerations, steering, camera, and audio reset cleanly).
-  - `#64`: Audio presentation architecture and bus routing (`Master` with `AudioEffectLimiter`, `SFX`, `Ambient`, `Music`).
-- **Leak Gate**: Zero ObjectDB leaks on exit across all three test runners (`WARNING: 0 ObjectDB instances leaked`).
+- **Master Suite Tiers**:
+  - `Tier 1`: 64 deterministic core verifications in `scripts/test/test_diagnostics.gd`.
+  - `Tier 2`: 4G Test Track Baseline (geometry verification & live ride simulation).
+  - `Tier 3`: 4K Technical Riding Lab (15 geometry & structure contracts).
+  - `Tier 4`: 4L Gravel Training Loop (16 rhythm & Zen Flow contracts).
+  - `Tier 5`: 4K T10 Ballistic Airborne & Landing Invariant Fixture (detachment, ballistic curve, recontact, suspension compression).
+  - `Tier 6`: 5-Seed Procedural Determinism Battery (15 chunks, $\Delta p \le 10^{-6}$ m).
+  - `Tier 7`: Multi-Scene Switching Memory Soak (7 transitions, 0 dangling nodes).
+- **Leak Gate**: Strictly 0 ObjectDB leaks on exit across all runners.
+- **Human Perception Gate**: 15 observed gameplay points conducted without F3 HUD, 3x repetition for critical mechanics, and Blind Human Perception Pass. Full report in `docs/sprints/sprint_4m_validation_report.md`.
 
 
 ---

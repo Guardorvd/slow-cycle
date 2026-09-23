@@ -20,6 +20,8 @@ func _process(delta: float) -> void:
 
 	if Input.is_action_just_pressed("toggle_debug"):
 		visible = not visible
+		if visible:
+			max_frame_time_ms = 0.0
 
 	if not visible:
 		return
@@ -130,4 +132,56 @@ func _process(delta: float) -> void:
 	text += "================================="
 
 	telemetry_label.text = text
+ 
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_F4:
+			_capture_telemetry_snapshot()
+
+func _capture_telemetry_snapshot() -> void:
+	var speed_val: float = bike_controller.get("current_speed") if bike_controller else 0.0
+	var speed_kmh: float = speed_val * 3.6
+	var slope_deg: float = rad_to_deg(bike_controller.get("current_pitch")) if bike_controller else 0.0
+	var bank_deg: float = rad_to_deg(bike_controller.get("current_bank")) if bike_controller else 0.0
+	var steer_deg: float = rad_to_deg(bike_controller.get("current_steer")) if bike_controller else 0.0
+	var lat_accel: float = bike_controller.get("lateral_acceleration") if bike_controller else 0.0
+	var scrub_accel: float = bike_controller.get("cornering_scrub_accel") if bike_controller else 0.0
+	var cadence_rpm: float = bike_controller.get("current_cadence_rpm") if bike_controller else 0.0
+	var fps: int = Engine.get_frames_per_second()
+	var ram_mb: float = float(OS.get_static_memory_usage()) / 1048576.0
+
+	var sec_code: String = "N/A"
+	var sec_name: String = "N/A"
+	if world_manager and world_manager.has_method("get_section_at_distance"):
+		var road_path: RefCounted = world_manager.get("road_path") if world_manager else null
+		if road_path and last_closest_idx >= 0 and last_closest_idx < road_path.cumulative_distances.size():
+			var cur_s: float = road_path.cumulative_distances[last_closest_idx]
+			var sec_info: Dictionary = world_manager.get_section_at_distance(cur_s)
+			sec_code = sec_info.get("code", "?")
+			sec_name = sec_info.get("name", "")
+
+	var snapshot: Dictionary = {
+		"timestamp_ms": Time.get_ticks_msec(),
+		"section_code": sec_code,
+		"section_name": sec_name,
+		"speed_kmh": roundf(speed_kmh * 10.0) / 10.0,
+		"slope_deg": roundf(slope_deg * 10.0) / 10.0,
+		"bank_deg": roundf(bank_deg * 10.0) / 10.0,
+		"steer_deg": roundf(steer_deg * 10.0) / 10.0,
+		"lat_accel": roundf(lat_accel * 100.0) / 100.0,
+		"scrub_accel": roundf(scrub_accel * 100.0) / 100.0,
+		"cadence_rpm": roundf(cadence_rpm),
+		"fps": fps,
+		"static_ram_mb": roundf(ram_mb * 10.0) / 10.0
+	}
+
+	var json_line: String = JSON.stringify(snapshot)
+	var file: FileAccess = FileAccess.open("user://playtest_snapshots.json", FileAccess.READ_WRITE)
+	if not file:
+		file = FileAccess.open("user://playtest_snapshots.json", FileAccess.WRITE)
+	if file:
+		file.seek_end()
+		file.store_line(json_line)
+		file.close()
+		print("[PLAYTEST_SNAPSHOT F4] Saved: [%s] %.1f km/h | Bank: %.1f° | FPS: %d" % [sec_code, speed_kmh, bank_deg, fps])
 
