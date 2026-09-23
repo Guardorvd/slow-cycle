@@ -304,7 +304,105 @@
 
 ---
 
-## 🌅 Спринт 5: Атмосфера, Суточный Цикл и Фара
+## 🏔️ Спринт 5: Процедурный Горный Мир, Развилки и MTB-Топология
+
+### TASK: [FEAT-014.0] Road Generation & Airborne Contract, Validity Validator & Data Foundation (`COMPLETED [x]`)
+**Goal**: Создать строгий машинно-проверяемый контракт геометрии трассы и парадигмы MTB-рельефа (с поддержкой естественных микро-дропов, контролируемых прыжков и безопасных зон приземления) перед генерацией мешей и коллизий, гарантирующий плавность и безопасность для существующей физики велосипеда.
+**Realized**:
+- В `scripts/world/road_generation_contract.gd` (v5.1.0):
+  - Формализованы математические границы: `MAX_GRADE_UPHILL = +5.0°`, `MAX_GRADE_DOWNHILL = -14.0°`, `CRUISE_GRADE = -6.0°`, `MIN_RADIUS = 18.0m`, `MAX_CURVATURE = 0.0556 m⁻¹`.
+  - Производные по реальной длине дуги: $\Delta \text{grade}/\Delta s \le 1.2^\circ/\text{м}$, $\Delta \kappa/\Delta s \le 0.003\text{ м}^{-2}$.
+  - Дискретизация: `NOMINAL_SAMPLE_SPACING = 2.0m`, `MAX_SAMPLE_SPACING = 2.5m`.
+  - Допуски швов: $\Delta p < 0.001$ м ($C^0$), $\Delta \theta < 0.2^\circ$ ($C^1$), $\Delta \text{slope} < 0.1^\circ$.
+  - Формулы динамической видимости: `calculate_required_turn_sight_distance`, `calculate_required_drop_sight_distance`.
+- В `scripts/world/road_airborne_contract.gd`:
+  - Введено перечисление `SurfaceContactMode`: `GROUNDED`, `MICRO_DROP`, `AIRBORNE`, `LANDING`.
+  - На основе эмпирического физического гейта зафиксированы пороги: `MICRO_DROP_MAX_HEIGHT = 0.35m`, `MICRO_DROP_MAX_DIST = 2.0m`, `AIRBORNE_MAX_HEIGHT = 1.2m`, `AIRBORNE_MAX_DIST = 6.0m`.
+  - Контракт зоны посадки: $\Delta \text{grade}_{\text{landing}} \le 4.0^\circ$, $R \ge 50$ м, $\text{banking} \le 2.0^\circ$, $\text{RECOVERY\_LENGTH} \ge 15$ м.
+  - FSM-проверка переходов: `is_valid_transition()`.
+- В `scripts/world/road_validity_validator.gd`:
+  - Выдача структурированного отчета `ValidityReport` с подробной классификацией (`VALID_GROUNDED`, `VALID_MICRO_DROP`, `VALID_AIRBORNE`, `VALID_LANDING`, `INVALID_GEOMETRY`, `INVALID_UNCONTROLLED_GAP`).
+  - Трассировка 3 видов видимости (`calculate_sight_distance_at`).
+  - Валидация швов чанков (`validate_seam`).
+  - Проверка комбинационных ограничений (Interaction Limits).
+- В `scripts/world/road_path_data.gd`:
+  - Расширена структура данных: добавлены `surface_contact_states`, `banking_angles`, `sight_distances`, `branch_id` с сохранением 100% обратной совместимости.
+- В `scripts/test/test_airborne_empirical_gate.gd`:
+  - Проведен эмпирический замер поведения существующего `BicycleController` на Section T6, Section T10 и синтетических дропах ($0.35$ м, $0.6$ м, $1.2$ м), подтвердивший стабильность (PASS [STABLE]).
+- В `scripts/test/test_road_contract.gd`:
+  - Батарея T01–T16 (8 валидных сценариев, 8 невалидных с инъекцией дефектов), проверка 5 сидов генератора и микро-бенчмарк (7.6 мс на 100 чанков) пройдены на 100% (18/18 PASS).
+- Регрессионный мастер-сьют `test_sprint_4m_master.gd`: строго 124 / 124 assertions PASS, 0 утечек ObjectDB.
+**Files**: `scripts/world/road_generation_contract.gd` (NEW), `scripts/world/road_airborne_contract.gd` (NEW), `scripts/world/road_validity_validator.gd` (NEW), `scripts/world/road_path_data.gd` (MODIFIED), `scripts/test/test_airborne_empirical_gate.gd` (NEW), `scripts/test/test_road_contract.gd` (NEW), `BACKLOG.md` (MODIFIED).
+
+### TASK: [FEAT-014.1] Road Data & Graph Foundation
+**Goal**: Разделить топологическую структуру сети дорог и конкретную сплайновую геометрию, создав фундамент для ветвления.
+**Do**: Создать `scripts/world/road_graph.gd` и структуру узлов развилок `RoadForkNode`:
+- `RoadGraph` хранит направленный ациклический граф участков (Edges) и узлов (Nodes) в чистой памяти без создания нод Godot.
+- `RoadForkNode` включает кинематический контекст: скорость входа, уклон, радиус, необходимую дистанцию торможения, предварительный обзор обеих ветвей.
+- Интеграция с `RoadPathData`: генерация независимых массивов точек для каждой ветви.
+**Do not**: Не выполнять расчет геометрии в `_physics_process()`.
+**Acceptance Criteria**:
+- Граф корректно строит и связывает расходящиеся ветви с сохранением координат развилочного узла.
+**Files**: `scripts/world/road_graph.gd` (NEW), `scripts/world/road_path_data.gd`.
+
+### TASK: [FEAT-014.2] Road Grammar & MTB Profiles
+**Goal**: Создать выделенный слой драматургии трассы, управляющий чередованием фаз спуска, виражей, торможения и отдыха по правилам MTB.
+**Do**: Создать `scripts/world/road_grammar.gd`:
+- Детерминированный конечный автомат (FSM) с взвешенной таблицей переходов (`Weighted Transition Table`).
+- Типизированная структура фаз `FlowPhase` с параметрами: `preferred_grade`, `grade_range`, `curvature_range`, `target_speed`, `min_length`, `max_length`, `sight_distance`, `allowed_next_phases`.
+- Профили: `NORMAL_DOWNHILL` ($-5^\circ \dots -9^\circ$), `FAST_DOWNHILL` ($-9^\circ \dots -12^\circ$), редкий `EXTREME_DOWNHILL` ($-12^\circ \dots -14^\circ$, только с обязательной последующей `BRAKING_ZONE`), `SWITCHBACK` ($R \in [18, 22]$м), `RIDGE_LINE`, `RECOVERY_FLAT`, `FORK_APPROACH`.
+**Do not**: Не генерировать крутые шпильки без предшествующей зоны торможения и гарантированной видимости (`sight_distance`).
+**Acceptance Criteria**:
+- Последовательность фаз трассы формирует естественный, гармоничный горный ритм без внезапных слепых препятствий.
+**Files**: `scripts/world/road_grammar.gd` (NEW), `scripts/world/road_logic.gd`.
+
+### TASK: [FEAT-014.3] Fork Topology & Branch Decision Model
+**Goal**: Реализовать физически корректную и надежную модель выбора пути игроком на развилке с защитой от пограничных скачков и дребезга.
+**Do**: Создать `scripts/world/fork_decision_model.gd`:
+- 4-фазный стейт развилки: `APPROACH` $\to$ `FORK_PREVIEW` $\to$ `FORK_COMMIT_ZONE` $\to$ `BRANCH_LOCKED`.
+- Многофакторная оценка выбора с гистерезисом: взвешивание расстояния до осевых линий ветвей (`centerline_dist`), совпадения вектора скорости с курсом ветки (`heading_alignment`) и поступательного прогресса вперед (`forward_progress`).
+- Построение Y-образной геометрии: расширение полотна перед развилкой, плавное расхождение кромок.
+**Do not**: Не фиксировать выбор игрока по единичному мгновенному пересечению триггера; игрок должен иметь возможность передумать в фазе `FORK_PREVIEW`.
+**Acceptance Criteria**:
+- В пограничных случаях (колебание по центру, возврат назад на развилке) выбор определяется устойчиво, без срывов и повторных переключений.
+**Files**: `scripts/world/fork_decision_model.gd` (NEW), `scripts/world/road_chunk.gd`, `scripts/world/road_math.gd`.
+
+### TASK: [FEAT-014.4] Mountain Terrain Carving & Surface Physics
+**Goal**: Сформировать горный рельеф, органично врезанный в полотно дороги (скальные полки, ущелья, обрывы), и разграничить физические свойства поверхностей.
+**Do**: Обновить `scripts/world/road_chunk.gd` и `scripts/world/terrain_carver.gd`:
+- Road-Centric Carving: адаптация горного шума под полотно дороги (скальная выемка Cut, полка серпантина Shelf, крутой обрыв Cliff).
+- Архитектурное разделение: `Collision Layer` (фильтрация физических масок Godot: Layer 2 Road, Layer 3 Grass/Rock, Layer 5 RoughRoad) строго отделен от `SurfaceType` (механические параметры сопротивления, сцепления, звука и микро-вибраций).
+- Установка процедурных защитных столбиков и отбойников на опасных внешних кромках обрывов.
+**Do not**: Не модифицировать код `BicycleController`; передавать параметры покрытий через существующий API поверхностей.
+**Acceptance Criteria**:
+- Дорога естественно вписана в горный рельеф; съезд к обрыву честно распознается шинами и звуком.
+**Files**: `scripts/world/terrain_carver.gd` (NEW), `scripts/world/road_chunk.gd`, `assets/materials/`.
+
+### TASK: [FEAT-014.5] Branch Streaming & Greybox Dressing
+**Goal**: Обеспечить стриминг активных и дремлющих ветвей без просадок кадров с минимальным greybox-оформлением.
+**Do**: Обновить `scripts/world/chunk_streamer.gd` и `scripts/world/world_manager.gd`:
+- Жизненный цикл ветвей: `ACTIVE` $\to$ `PRELOADED` $\to$ `DORMANT` $\to$ `UNLOADED`. Альтернативная ветвь переводится в `DORMANT` и выгружается только при удалении игрока за пределы дистанции отката.
+- Вынос тяжелой математики генерации за пределы `_physics_process`: асинхронная подготовка массивов геометрии, быстрый синхронный коммит в сцену.
+- Минимальное Greybox-окружение: простые лоуполи-валуны, деревянные столбики, стрелочные указатели направлений.
+**Do not**: Не вводить в Спринте 5 тяжелые PBR-материалы, сложные модели деревьев и LOD-системы.
+**Acceptance Criteria**:
+- Стриминг чанков на развилках стабилен, время коммита в главном потоке $\le 1.0$ мс, Zero Pop-In тумана сохранен.
+**Files**: `scripts/world/chunk_streamer.gd`, `scripts/world/world_manager.gd`, `scripts/world/chunk_foliage.gd`.
+
+### TASK: [FEAT-014.6] Dual Stress Validation & Plateau Gate
+**Goal**: Комплексно верифицировать топологическую устойчивость графа развилок, стриминг и отсутствие утечек ресурсов.
+**Do**: Создать мастер-раннер `scripts/test/test_mountain_validation.gd`:
+- **Topology Stress Test**: генерация 50 развилок подряд на 5 различных сидах, строгая проверка отсутствия геометрических ступенек ($\Delta p < 0.001$м, $\Delta \theta < 0.2^\circ$, $\Delta \kappa$ bounded).
+- **Streaming Stress Test**: 30-минутный заезд при естественной плотности развилок (1 развилка на 600–900м, ~20 развилок на 17.5 км).
+- **Многофакторный контроль стабильности (Plateau Gate)**: мониторинг плато для Node count, ObjectDB count, Active RoadChunk count, Active branch count, CollisionShape count, frame time.
+- **Firewall Verification**: прогон всех 121 контракта езды из Спринта 4M — 100% PASS без единой регрессии.
+**Acceptance Criteria**:
+- Все тесты топологии и стриминга завершаются со статусом 0, память выходит на стабильное плато, 121 контракт физики сохранены.
+**Files**: `scripts/test/test_mountain_validation.gd` (NEW), `scripts/test/test_diagnostics.gd`.
+
+---
+
+## 🌅 Спринт 6: Атмосфера, Суточный Цикл и Фара
 
 ### TASK: [FEAT-008.1] Суточный цикл с горячими клавишами (Day/Night Presets)
 **Goal**: Смена времени суток с 4 атмосферными пресетами: Утро (золотистый туман), День (яркое солнце), Вечер (закатные лучи), Ночь (лунный свет и звёзды).
@@ -364,14 +462,14 @@
 - Сигнал `state_changed(old_state, new_state)`.
 - Методы: `pause_game()`, `resume_game()`, `enter_photo_mode()`.
 - Управление `get_tree().paused`.
-**Do not**: Не внедрять сложный UI до Спринта 6; только чистый стейт-контроллер.
+**Do not**: Не внедрять сложный UI до Спринта 7; только чистый стейт-контроллер.
 **Acceptance Criteria**:
 - При переходе в `PAUSED` мир замирает; при `resume_game` движение продолжается без рывков.
 **Files**: `scripts/core/game_state.gd` (NEW), `project.godot`.
 
 ---
 
-## 🎨 Спринт 6: Визуальная Полировка, UI и Меню
+## 🎨 Спринт 7: Визуальная Полировка, UI и Меню
 
 ### `[ ] [OPT-001]` LOD для MultiMesh растительности
 - **Goal**: FPS ≥ 60 при 400+ чанков.
@@ -425,7 +523,7 @@
 
 ---
 
-## ☁️ Спринт 7: Steam Build и Интеграция (отдельный этап)
+## ☁️ Спринт 8: Steam Build и Интеграция (отдельный этап)
 
 ### `[ ] [FEAT-011.1]` Export и Standalone Build
 - **Goal**: `SlowCycle.exe` запускается без Godot Editor.

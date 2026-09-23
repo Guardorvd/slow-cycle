@@ -22,6 +22,10 @@ var cumulative_distances: PackedFloat32Array = PackedFloat32Array()
 var slopes: PackedFloat32Array = PackedFloat32Array()
 var curvatures: PackedFloat32Array = PackedFloat32Array()
 var segment_types: PackedInt32Array = PackedInt32Array()
+var surface_contact_states: PackedByteArray = PackedByteArray()
+var banking_angles: PackedFloat32Array = PackedFloat32Array()
+var sight_distances: PackedFloat32Array = PackedFloat32Array()
+var branch_id: int = 0
 
 func size() -> int:
 	return points.size()
@@ -31,7 +35,17 @@ func get_total_distance() -> float:
 		return 0.0
 	return cumulative_distances[-1]
 
-func append_sample(pos: Vector3, tang: Vector3, norm: Vector3, slope_deg: float, curv: float, seg_type: int) -> void:
+func append_sample(
+	pos: Vector3,
+	tang: Vector3,
+	norm: Vector3,
+	slope_deg: float,
+	curv: float,
+	seg_type: int,
+	contact_state: int = 0,
+	banking_deg: float = 0.0,
+	sight_dist: float = 50.0
+) -> void:
 	var norm_tangent: Vector3 = tang.normalized()
 	var norm_normal: Vector3 = norm.normalized()
 	var binorm: Vector3 = norm_tangent.cross(norm_normal).normalized()
@@ -49,6 +63,9 @@ func append_sample(pos: Vector3, tang: Vector3, norm: Vector3, slope_deg: float,
 	slopes.append(slope_deg)
 	curvatures.append(curv)
 	segment_types.append(seg_type)
+	surface_contact_states.append(contact_state)
+	banking_angles.append(banking_deg)
+	sight_distances.append(sight_dist)
 
 ## Prunes historical spline samples further than cutoff_distance behind the player.
 ## Returns number of pruned samples so callers can adjust cached indices.
@@ -73,6 +90,9 @@ func prune_behind(cutoff_distance: float) -> int:
 	slopes = slopes.slice(prune_count)
 	curvatures = curvatures.slice(prune_count)
 	segment_types = segment_types.slice(prune_count)
+	surface_contact_states = surface_contact_states.slice(prune_count)
+	banking_angles = banking_angles.slice(prune_count)
+	sight_distances = sight_distances.slice(prune_count)
 
 	return prune_count
 
