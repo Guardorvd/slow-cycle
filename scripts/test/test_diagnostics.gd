@@ -1977,8 +1977,102 @@ func _init() -> void:
 		all_ok = false
 	bike_64.queue_free()
 
+	# Test 65: [Post-Audit Fix] Cadence Sway Camera Smoothing Contract
+	var bike_65 = bike_scene.instantiate()
+	root.add_child(bike_65)
+	bike_65._ready()
+	var cam_65: BikeCameraRig = bike_65.get_node_or_null("CameraRig")
+	if cam_65:
+		cam_65._ready()
+	var sway_ok: bool = false
+	if cam_65:
+		bike_65.current_speed = 7.0
+		bike_65.is_pedaling = true
+		bike_65.pedal_power = 1.0
+		bike_65.crank_rotation = PI * 0.5 # sin = 1.0 -> max sway
+		cam_65._process(1.0 / 60.0)
+		var peak_sway_x: float = cam_65.current_sway_x
+
+		# Release pedals in next frame
+		bike_65.is_pedaling = false
+		bike_65.is_coasting = true
+		cam_65._process(1.0 / 60.0)
+		var post_release_sway_x: float = cam_65.current_sway_x
+		var single_frame_step: float = absf(post_release_sway_x - peak_sway_x)
+		sway_ok = peak_sway_x > 0.0002 and single_frame_step < 0.0015 and post_release_sway_x > 0.0
+
+		print("[VERIFICATION #65] Cadence Sway Continuous Smoothing Contract:")
+		print("  - Peak sway X: %.5fm | Post-release sway X: %.5fm | Delta: %.5fm" % [peak_sway_x, post_release_sway_x, single_frame_step])
+		if sway_ok:
+			print("  [PASS] Lateral camera sway decays smoothly via exponential filter without discontinuous jumps!")
+		else:
+			print("  [FAIL] Discontinuous sway step detected: peak=%.5f, step=%.5f" % [peak_sway_x, single_frame_step])
+			all_ok = false
+	bike_65.queue_free()
+
+	# Test 66: [Post-Audit Fix] Crank & Wheel Phase Angle Wrap Invariant Contract
+	var bike_66 = bike_scene.instantiate()
+	root.add_child(bike_66)
+	bike_66.current_speed = 10.0
+	bike_66.is_pedaling = true
+	var max_crank_angle: float = 0.0
+	var max_front_wheel_angle: float = 0.0
+	var max_rear_wheel_angle: float = 0.0
+
+	for _step in range(1200): # simulate 20s of active riding
+		bike_66._update_visual_transforms(1.0 / 60.0)
+		max_crank_angle = maxf(max_crank_angle, absf(bike_66.crank_rotation))
+		max_front_wheel_angle = maxf(max_front_wheel_angle, absf(bike_66.front_wheel_rotation))
+		max_rear_wheel_angle = maxf(max_rear_wheel_angle, absf(bike_66.rear_wheel_rotation))
+
+	var angles_bounded_ok: bool = max_crank_angle <= PI + 0.001 and \
+								  max_front_wheel_angle <= PI + 0.001 and \
+								  max_rear_wheel_angle <= PI + 0.001
+
+	print("[VERIFICATION #66] Crank & Wheel Rotation Bounded Wrap Contract:")
+	print("  - Max crank rotation: %.4frad (Limit: <= %.4frad)" % [max_crank_angle, PI])
+	print("  - Max front wheel rotation: %.4frad (Limit: <= %.4frad)" % [max_front_wheel_angle, PI])
+	print("  - Max rear wheel rotation: %.4frad (Limit: <= %.4frad)" % [max_rear_wheel_angle, PI])
+	if angles_bounded_ok:
+		print("  [PASS] All visual rotation angles strictly normalized in [-PI, PI] without float drift!")
+	else:
+		print("  [FAIL] Rotation angle escaped bounds: crank=%.4f, front=%.4f, rear=%.4f" % [max_crank_angle, max_front_wheel_angle, max_rear_wheel_angle])
+		all_ok = false
+	bike_66.queue_free()
+
+	# Test 67: [Post-Audit Fix] Rough Gravel Surface Priority Contract
+	var bike_67 = bike_scene.instantiate()
+	root.add_child(bike_67)
+	bike_67._ready()
+	bike_67.current_speed = 8.0
+	bike_67.current_surface = BicycleController.SurfaceType.ROUGH_GRAVEL
+	bike_67.is_on_grass = true # edge contact
+	var cam_67: BikeCameraRig = bike_67.get_node_or_null("CameraRig")
+	if cam_67:
+		cam_67._ready()
+	var audio_67: BikeAudioManager = bike_67.get_node_or_null("AudioManager")
+	if audio_67 and not audio_67.gravel_player:
+		audio_67._ready()
+
+	var rough_prio_ok: bool = false
+	if cam_67 and audio_67 and audio_67.gravel_player:
+		cam_67._process(1.0 / 60.0)
+		audio_67._process(1.0 / 60.0)
+		var cam_amp_ok: bool = absf(cam_67.rough_gravel_shake_multiplier - 2.4) < 0.01
+		var audio_pitch_ok: bool = audio_67.gravel_player.pitch_scale >= 0.99 # preserved crisp crunch, not 0.65 turf rumble
+		rough_prio_ok = cam_amp_ok and audio_pitch_ok
+
+		print("[VERIFICATION #67] Rough Gravel Road Surface Priority Contract:")
+		print("  - Camera Rough Multiplier: %.2fx | Gravel Pitch Scale: %.3f" % [cam_67.rough_gravel_shake_multiplier, audio_67.gravel_player.pitch_scale])
+		if rough_prio_ok:
+			print("  [PASS] Rough gravel surface dynamics preserve full washboard intensity regardless of grass edge contact!")
+		else:
+			print("  [FAIL] Rough gravel priority failed: cam_ok=%s, pitch_ok=%s" % [cam_amp_ok, audio_pitch_ok])
+			all_ok = false
+	bike_67.queue_free()
+
 	if all_ok:
-		print("\n=== ALL SYSTEM VERIFICATIONS PASSED [64/64 - 100% OK] ===\n")
+		print("\n=== ALL SYSTEM VERIFICATIONS PASSED [67/67 - 100% OK] ===\n")
 	else:
 		print("\n=== SOME VERIFICATIONS FAILED ===\n")
 

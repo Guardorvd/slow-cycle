@@ -328,10 +328,24 @@ func _calculate_forward_dynamics(delta: float) -> void:
 	# Decay sprint boost over time (move_toward zero)
 	sprint_boost = move_toward(sprint_boost, 0.0, sprint_decay * delta)
 
+	# Progressive braking with quadratic effort curve and analog brake
+	if is_braking:
+		var brake_strength: float = Input.get_action_strength("brake")
+		if brake_strength < 0.05:
+			brake_strength = 1.0 # Programmatic fallback
+		brake_input = minf(brake_strength, brake_input + (1.0 / brake_attack_time) * delta)
+	else:
+		brake_input = maxf(0.0, brake_input - (1.0 / brake_release_time) * delta)
+
+	# Visual-only nose dive under braking (smoothly tracking brake_input)
+	var target_dive: float = -deg_to_rad(brake_dive_angle_deg) * brake_input
+	brake_dive_pitch = lerpf(brake_dive_pitch, target_dive, 12.0 * delta)
+
 	# Active rolling resistance: continuous convex combination (Gravel, Grass, Rough Gravel)
 	var active_roll_res: float = surface_gravel_weight * road_rolling_resistance + surface_grass_weight * grass_rolling_resistance + surface_rough_weight * rough_gravel_rolling_resistance
 
 	if not is_grounded:
+		pedal_power = 0.0
 		var air_resistance: float = air_drag_coeff * (current_speed * current_speed)
 		current_speed = maxf(0.0, current_speed - air_resistance * delta)
 		longitudinal_acceleration = -air_resistance
@@ -380,21 +394,9 @@ func _calculate_forward_dynamics(delta: float) -> void:
 	# 3. Slope gravity acceleration using physics_pitch (instant slope response)
 	var a_gravity: float = -sin(physics_pitch) * 9.8 * gravity_slope_mult
 
-	# 4. Progressive braking with quadratic effort curve and analog brake
-	if is_braking:
-		var brake_strength: float = Input.get_action_strength("brake")
-		if brake_strength < 0.05:
-			brake_strength = 1.0 # Programmatic fallback
-		brake_input = minf(brake_strength, brake_input + (1.0 / brake_attack_time) * delta)
-	else:
-		brake_input = maxf(0.0, brake_input - (1.0 / brake_release_time) * delta)
-
+	# 4. Progressive braking force application
 	var brake_curve: float = brake_input * brake_input
 	var a_brake: float = brake_deceleration * brake_curve
-
-	# Visual-only nose dive under braking (smoothly tracking brake_input)
-	var target_dive: float = -deg_to_rad(brake_dive_angle_deg) * brake_input
-	brake_dive_pitch = lerpf(brake_dive_pitch, target_dive, 12.0 * delta)
 
 	# 5. Resistances: rolling friction + aerodynamic drag + cornering scrub
 	var a_rolling: float = active_roll_res
@@ -516,14 +518,14 @@ func _update_visual_transforms(delta: float) -> void:
 
 	# 1. Wheel rotation & Non-linear Brake Skid (CRITICAL 3)
 	var delta_theta_f: float = (current_speed / WHEEL_RADIUS) * delta
-	front_wheel_rotation -= delta_theta_f
+	front_wheel_rotation = wrapf(front_wheel_rotation - delta_theta_f, -PI, PI)
 	wheel_rotation = front_wheel_rotation
 
 	# Thresholded rear wheel skid: smoothstep from 0.65 to 1.0 brake_input
 	visual_skid_factor = smoothstep(0.65, 1.0, brake_input)
 	var wheel_slip: float = lerpf(1.0, 0.10, visual_skid_factor)
 	var delta_theta_r: float = delta_theta_f * wheel_slip
-	rear_wheel_rotation -= delta_theta_r
+	rear_wheel_rotation = wrapf(rear_wheel_rotation - delta_theta_r, -PI, PI)
 
 	if front_wheel:
 		front_wheel.rotation.x = front_wheel_rotation
@@ -537,11 +539,12 @@ func _update_visual_transforms(delta: float) -> void:
 		var target_rpm: float = base_cadence_rpm * speed_factor * sprint_factor
 		current_cadence_rpm = lerpf(current_cadence_rpm, target_rpm, 8.0 * delta)
 		var delta_theta_crank: float = (current_cadence_rpm * TAU / 60.0) * delta
-		crank_rotation -= delta_theta_crank
+		crank_rotation = wrapf(crank_rotation - delta_theta_crank, -PI, PI)
 	elif is_coasting:
 		# Smooth leveling to nearest horizontal stance (multiples of PI)
 		var target_crank_level: float = roundf(crank_rotation / PI) * PI
 		crank_rotation = lerpf(crank_rotation, target_crank_level, 6.0 * delta)
+		crank_rotation = wrapf(crank_rotation, -PI, PI)
 		current_cadence_rpm = lerpf(current_cadence_rpm, 0.0, 8.0 * delta)
 	else:
 		# Braking or stopped

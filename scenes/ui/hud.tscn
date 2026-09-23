@@ -135,6 +135,12 @@ theme_override_colors/font_color = Color(0.95, 0.65, 0.65, 1)
 theme_override_font_sizes/font_size = 13
 text = "• R / B — Вернуться на дорогу"
 
+[node name="Line8" type="Label" parent="BottomMargin/ControlsCard/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.85, 0.8, 1)
+theme_override_font_sizes/font_size = 13
+text = "• Esc — В главное меню"
+
 [node name="CenterNotice" type="CenterContainer" parent="."]
 layout_mode = 1
 anchors_preset = 8

@@ -138,7 +138,9 @@ func _process(delta: float) -> void:
 			freewheel_use_a = not freewheel_use_a
 			var base_pitch: float = randf_range(0.97, 1.03)
 			var base_vol: float = -5.0
-			if is_on_grass or current_surf == 1:
+			if current_surf == 2:
+				pass # Preserve bright click on rough stony road
+			elif is_on_grass or current_surf == 1:
 				base_vol -= 2.5
 				base_pitch *= 0.90
 			active_player.volume_db = base_vol
@@ -179,7 +181,9 @@ func _process(delta: float) -> void:
 			# Combined tire volume capped at safe ceiling (-20.0 dB)
 			target_gravel_vol = minf(base_vol + rough_add + scrub_add + skid_add, -20.0)
 
-			if is_on_grass or current_surf == 1:
+			if current_surf == 2:
+				target_gravel_pitch = lerpf(0.96, 1.06, speed_ratio) # Bright gravel crunch
+			elif is_on_grass or current_surf == 1:
 				target_gravel_vol -= 3.0
 				target_gravel_pitch = 0.65 # Deep muffled turf rumble
 			else:

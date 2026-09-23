@@ -31,23 +31,24 @@ func _process(delta: float) -> void:
 		max_frame_time_ms = frame_ms
 
 	var seed_val: int = world_manager.get("world_seed") if world_manager else 0
-	var speed_val: float = bike_controller.get("current_speed") if bike_controller else 0.0
+	var ctrl: BicycleController = bike_controller as BicycleController
+	var speed_val: float = ctrl.current_speed if ctrl else (bike_controller.get("current_speed") if bike_controller else 0.0)
 	var speed_kmh: float = speed_val * 3.6
-	var pitch_val: float = bike_controller.get("current_pitch") if bike_controller else 0.0
+	var pitch_val: float = ctrl.current_pitch if ctrl else (bike_controller.get("current_pitch") if bike_controller else 0.0)
 	var slope_deg: float = rad_to_deg(pitch_val)
-	var on_grass: bool = bike_controller.get("is_on_grass") if bike_controller else false
+	var on_grass: bool = ctrl.is_on_grass if ctrl else (bike_controller.get("is_on_grass") if bike_controller else false)
 
-	var steer_deg: float = rad_to_deg(bike_controller.get("current_steer")) if bike_controller else 0.0
-	var bank_deg: float = rad_to_deg(bike_controller.get("current_bank")) if bike_controller else 0.0
-	var yaw_rate: float = bike_controller.get("yaw_turn_rate") if bike_controller else 0.0
-	var radius_val: float = bike_controller.get("turn_radius") if bike_controller else INF
+	var steer_deg: float = rad_to_deg(ctrl.current_steer if ctrl else (bike_controller.get("current_steer") if bike_controller else 0.0))
+	var bank_deg: float = rad_to_deg(ctrl.current_bank if ctrl else (bike_controller.get("current_bank") if bike_controller else 0.0))
+	var yaw_rate: float = ctrl.yaw_turn_rate if ctrl else (bike_controller.get("yaw_turn_rate") if bike_controller else 0.0)
+	var radius_val: float = ctrl.turn_radius if ctrl else (bike_controller.get("turn_radius") if bike_controller else INF)
 	var radius_str: String = "INF" if is_inf(radius_val) else "%.1fm" % radius_val
-	var lat_accel: float = bike_controller.get("lateral_acceleration") if bike_controller else 0.0
-	var scrub_accel: float = bike_controller.get("cornering_scrub_accel") if bike_controller else 0.0
+	var lat_accel: float = ctrl.lateral_acceleration if ctrl else (bike_controller.get("lateral_acceleration") if bike_controller else 0.0)
+	var scrub_accel: float = ctrl.cornering_scrub_accel if ctrl else (bike_controller.get("cornering_scrub_accel") if bike_controller else 0.0)
 	var apex_status: String = "SCRUB" if scrub_accel > 0.05 else "FLOW"
-	var pedal_pct: float = (bike_controller.get("pedal_power") if bike_controller else 0.0) * 100.0
-	var brake_pct: float = (bike_controller.get("brake_input") if bike_controller else 0.0) * 100.0
-	var dive_deg: float = rad_to_deg(bike_controller.get("brake_dive_pitch")) if bike_controller else 0.0
+	var pedal_pct: float = (ctrl.pedal_power if ctrl else (bike_controller.get("pedal_power") if bike_controller else 0.0)) * 100.0
+	var brake_pct: float = (ctrl.brake_input if ctrl else (bike_controller.get("brake_input") if bike_controller else 0.0)) * 100.0
+	var dive_deg: float = rad_to_deg(ctrl.brake_dive_pitch if ctrl else (bike_controller.get("brake_dive_pitch") if bike_controller else 0.0))
 	
 	var active_chunks: int = 0
 	var chunk_gen_ms: float = 0.0
@@ -80,12 +81,12 @@ func _process(delta: float) -> void:
 	var mins: int = int(session_elapsed_sec) / 60
 	var secs: int = int(session_elapsed_sec) % 60
 
-	var long_accel: float = bike_controller.get("longitudinal_acceleration") if bike_controller else 0.0
-	var sprint_boost_val: float = bike_controller.get("sprint_boost") if bike_controller else 0.0
-	var is_sprint: bool = bike_controller.get("is_sprinting") if bike_controller else false
-	var is_pedal: bool = bike_controller.get("is_pedaling") if bike_controller else false
-	var is_brake: bool = bike_controller.get("is_braking") if bike_controller else false
-	var is_coast: bool = bike_controller.get("is_coasting") if bike_controller else false
+	var long_accel: float = ctrl.longitudinal_acceleration if ctrl else (bike_controller.get("longitudinal_acceleration") if bike_controller else 0.0)
+	var sprint_boost_val: float = ctrl.sprint_boost if ctrl else (bike_controller.get("sprint_boost") if bike_controller else 0.0)
+	var is_sprint: bool = ctrl.is_sprinting if ctrl else (bike_controller.get("is_sprinting") if bike_controller else false)
+	var is_pedal: bool = ctrl.is_pedaling if ctrl else (bike_controller.get("is_pedaling") if bike_controller else false)
+	var is_brake: bool = ctrl.is_braking if ctrl else (bike_controller.get("is_braking") if bike_controller else false)
+	var is_coast: bool = ctrl.is_coasting if ctrl else (bike_controller.get("is_coasting") if bike_controller else false)
 	var mode_str := "IDLE"
 	if is_brake: mode_str = "BRAKE"
 	elif is_sprint: mode_str = "SPRINT"
@@ -100,24 +101,24 @@ func _process(delta: float) -> void:
 	text += "Global Chunk: #%d | Active Chunks: %d\n" % [chunk_id, active_chunks]
 	text += "Spline Buffer: %d pts (Pruned) | Chunk Gen: %.2f ms\n" % [spline_pts, chunk_gen_ms]
 
-	var vis_steer_deg: float = rad_to_deg(bike_controller.get("visual_steer")) if bike_controller else 0.0
-	var cadence_rpm: float = bike_controller.get("current_cadence_rpm") if bike_controller else 0.0
-	var skid_pct: float = (bike_controller.get("visual_skid_factor") if bike_controller else 0.0) * 100.0
+	var vis_steer_deg: float = rad_to_deg(ctrl.visual_steer if ctrl else (bike_controller.get("visual_steer") if bike_controller else 0.0))
+	var cadence_rpm: float = ctrl.current_cadence_rpm if ctrl else (bike_controller.get("current_cadence_rpm") if bike_controller else 0.0)
+	var skid_pct: float = (ctrl.visual_skid_factor if ctrl else (bike_controller.get("visual_skid_factor") if bike_controller else 0.0)) * 100.0
 
 	text += "Speed: %.1f km/h | Long Accel: %+.2f m/s² | Mode: %s\n" % [speed_kmh, long_accel, mode_str]
 	text += "Slope: %.1f° | Steer: %.1f° (Vis: %.1f°) | Bank: %.1f°\n" % [slope_deg, steer_deg, vis_steer_deg, bank_deg]
 	text += "Cadence: %.0f RPM | Skid: %.0f%% | Dive: %.1f° | Radius: %s\n" % [cadence_rpm, skid_pct, dive_deg, radius_str]
 	text += "Lat Accel: %.2f m/s² | Scrub: %.2f m/s² [%s] | Pedals: %.0f%% | Brake: %.0f%%\n" % [lat_accel, scrub_accel, apex_status, pedal_pct, brake_pct]
 	text += "FPS: %d | Frame: %.1f ms | Max Spike: %.1f ms\n" % [Engine.get_frames_per_second(), frame_ms, max_frame_time_ms]
-	var surface_enum: int = bike_controller.get("current_surface") if bike_controller else 0
+	var surface_enum: int = ctrl.current_surface if ctrl else (bike_controller.get("current_surface") if bike_controller else 0)
 	var surface_name: String = "ROAD (Gravel)"
 	if surface_enum == 1: surface_name = "GRASS (High Drag)"
 	elif surface_enum == 2: surface_name = "ROUGH_GRAVEL (Washboard)"
-	var rough_pct: float = (bike_controller.get("terrain_roughness") if bike_controller else 0.16) * 100.0
-	var susp_mm: float = (bike_controller.get("suspension_compression") if bike_controller else 0.0) * 1000.0
+	var rough_pct: float = (ctrl.terrain_roughness if ctrl else (bike_controller.get("terrain_roughness") if bike_controller else 0.16)) * 100.0
+	var susp_mm: float = (ctrl.suspension_compression if ctrl else (bike_controller.get("suspension_compression") if bike_controller else 0.0)) * 1000.0
 	text += "Surface: %s | Rough: %.0f%% | Susp: %+dmm\n" % [surface_name, rough_pct, int(round(susp_mm))]
 
-	var cam_rig = bike_controller.get("camera_rig") if (bike_controller and "camera_rig" in bike_controller) else null
+	var cam_rig = ctrl.camera_rig if ctrl and ctrl.camera_rig else (bike_controller.get("camera_rig") if (bike_controller and "camera_rig" in bike_controller) else null)
 	if not cam_rig and bike_controller:
 		cam_rig = bike_controller.get_node_or_null("CameraRig")
 	if cam_rig:
@@ -139,14 +140,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			_capture_telemetry_snapshot()
 
 func _capture_telemetry_snapshot() -> void:
-	var speed_val: float = bike_controller.get("current_speed") if bike_controller else 0.0
+	var ctrl: BicycleController = bike_controller as BicycleController
+	var speed_val: float = ctrl.current_speed if ctrl else (bike_controller.get("current_speed") if bike_controller else 0.0)
 	var speed_kmh: float = speed_val * 3.6
-	var slope_deg: float = rad_to_deg(bike_controller.get("current_pitch")) if bike_controller else 0.0
-	var bank_deg: float = rad_to_deg(bike_controller.get("current_bank")) if bike_controller else 0.0
-	var steer_deg: float = rad_to_deg(bike_controller.get("current_steer")) if bike_controller else 0.0
-	var lat_accel: float = bike_controller.get("lateral_acceleration") if bike_controller else 0.0
-	var scrub_accel: float = bike_controller.get("cornering_scrub_accel") if bike_controller else 0.0
-	var cadence_rpm: float = bike_controller.get("current_cadence_rpm") if bike_controller else 0.0
+	var slope_deg: float = rad_to_deg(ctrl.current_pitch if ctrl else (bike_controller.get("current_pitch") if bike_controller else 0.0))
+	var bank_deg: float = rad_to_deg(ctrl.current_bank if ctrl else (bike_controller.get("current_bank") if bike_controller else 0.0))
+	var steer_deg: float = rad_to_deg(ctrl.current_steer if ctrl else (bike_controller.get("current_steer") if bike_controller else 0.0))
+	var lat_accel: float = ctrl.lateral_acceleration if ctrl else (bike_controller.get("lateral_acceleration") if bike_controller else 0.0)
+	var scrub_accel: float = ctrl.cornering_scrub_accel if ctrl else (bike_controller.get("cornering_scrub_accel") if bike_controller else 0.0)
+	var cadence_rpm: float = ctrl.current_cadence_rpm if ctrl else (bike_controller.get("current_cadence_rpm") if bike_controller else 0.0)
 	var fps: int = Engine.get_frames_per_second()
 	var ram_mb: float = float(OS.get_static_memory_usage()) / 1048576.0
 
@@ -176,9 +178,12 @@ func _capture_telemetry_snapshot() -> void:
 	}
 
 	var json_line: String = JSON.stringify(snapshot)
-	var file: FileAccess = FileAccess.open("user://playtest_snapshots.json", FileAccess.READ_WRITE)
-	if not file:
-		file = FileAccess.open("user://playtest_snapshots.json", FileAccess.WRITE)
+	var snap_path: String = "user://playtest_snapshots.json"
+	var file: FileAccess
+	if FileAccess.file_exists(snap_path):
+		file = FileAccess.open(snap_path, FileAccess.READ_WRITE)
+	else:
+		file = FileAccess.open(snap_path, FileAccess.WRITE)
 	if file:
 		file.seek_end()
 		file.store_line(json_line)

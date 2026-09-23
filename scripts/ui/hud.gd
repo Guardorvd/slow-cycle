@@ -18,8 +18,13 @@ func _ready() -> void:
 	bell_notice.modulate.a = 0.0
 
 func _process(delta: float) -> void:
-	# Toggle controls panel visibility
-	if Input.is_action_just_pressed("ui_cancel") or Input.is_action_just_pressed("toggle_help"):
+	# Return to mode select menu on Escape
+	if Input.is_action_just_pressed("ui_cancel"):
+		get_tree().change_scene_to_file("res://scenes/mode_select.tscn")
+		return
+
+	# Toggle controls panel visibility on H
+	if Input.is_action_just_pressed("toggle_help"):
 		controls_panel.visible = not controls_panel.visible
 
 	# Fade out bell notice

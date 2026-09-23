@@ -60,6 +60,7 @@ var current_shake_x: float = 0.0
 var current_shake_y: float = 0.0
 var current_shake_rot: float = 0.0
 var current_bob_y: float = 0.0
+var current_sway_x: float = 0.0
 var bob_phase: float = 0.0
 var travel_distance: float = 0.0
 var shake_time: float = 0.0 ## Backward compatibility alias
@@ -155,10 +156,10 @@ func _process(delta: float) -> void:
 		shake_time = travel_distance # Backward compatibility
 
 	var surface_mult: float = 1.0
-	if is_on_grass or current_surf == 1:
-		surface_mult = grass_shake_multiplier
-	elif current_surf == 2:
+	if current_surf == 2:
 		surface_mult = rough_gravel_shake_multiplier
+	elif is_on_grass or current_surf == 1:
+		surface_mult = grass_shake_multiplier
 
 	var speed_factor: float = clampf(current_speed / 8.0, 0.0, 1.25)
 	var roughness_factor: float = 1.0 + 1.8 * clampf(terrain_rough, 0.0, 1.0)
@@ -202,6 +203,8 @@ func _process(delta: float) -> void:
 
 	var bob_t: float = 1.0 - exp(-10.0 * delta)
 	current_bob_y = lerpf(current_bob_y, target_bob_y, bob_t)
+	var sway_t: float = 1.0 - exp(-10.0 * delta)
+	current_sway_x = lerpf(current_sway_x, sway_offset_x, sway_t)
 
 	# -------------------------------------------------------------
 	# 7. Speed FOV & Speed Breathing (Breathing OFF by default)
@@ -226,7 +229,7 @@ func _process(delta: float) -> void:
 	if first_person_cam:
 		# Position: base + lateral sway + shake_x, base_y + bob + dive_y + shake_y, base_z + surge_z + dive_tuck
 		var dive_forward_shift: float = current_dive_pitch * 0.03 # Subtle forward tuck in braking (-Z towards handlebars)
-		first_person_cam.position.x = base_fp_pos.x + current_shake_x + sway_offset_x
+		first_person_cam.position.x = base_fp_pos.x + current_shake_x + current_sway_x
 		first_person_cam.position.y = base_fp_pos.y + current_bob_y + current_dive_y + current_shake_y
 		first_person_cam.position.z = base_fp_pos.z + current_surge_z + dive_forward_shift
 
@@ -269,6 +272,7 @@ func reset_camera_dynamics() -> void:
 	current_shake_y = 0.0
 	current_shake_rot = 0.0
 	current_bob_y = 0.0
+	current_sway_x = 0.0
 	current_roll = 0.0
 	bob_phase = 0.0
 	travel_distance = 0.0
