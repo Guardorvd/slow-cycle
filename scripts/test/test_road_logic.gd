@@ -76,14 +76,14 @@ func _test_seed_constraints(seed_val: int) -> bool:
 			var r: float = 1.0 / curv
 			if r < min_radius: min_radius = r
 
-	print("  - Slopes observed: [%.1f°, %.1f°] (Limits: [-6.5°, +5.5°])" % [min_slope, max_slope])
-	print("  - Minimum turn radius: %.1fm (Limit: >= 38.0m)" % min_radius)
+	print("  - Slopes observed: [%.1f°, %.1f°] (Contract Limits: [-14.0°, +5.0°])" % [min_slope, max_slope])
+	print("  - Minimum turn radius: %.1fm (Contract Limit: >= 18.0m)" % min_radius)
 
-	if max_slope > 5.51 or min_slope < -6.51:
+	if max_slope > 5.51 or min_slope < -14.51:
 		print("[FAIL] Slope out of safe bounds on Seed ", seed_val)
 		return false
 
-	if min_radius < 35.0: # 3m margin on curve samples
+	if min_radius < 17.5: # Margin on curve samples
 		print("[FAIL] Curvature radius violated on Seed ", seed_val)
 		return false
 

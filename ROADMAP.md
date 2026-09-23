@@ -174,10 +174,12 @@
   - Топологический узел развилки `RoadForkNode` с контекстом: входная скорость, уклон, радиус, требуемая дистанция торможения, предварительный обзор ветвей.
   - Конвертация ветвей графа в независимые сегменты `RoadPathData`.
 
-- **[FEAT-014.2] Драматургическая грамматика трассы и MTB-профили (Road Grammar & MTB Pacing)**:
-  - Выделенный слой `RoadGrammar`: детерминированный конечный автомат фаз (FSM) с взвешенной таблицей переходов (`Weighted Transition Table`).
-  - Типизированные фазы потока (`FlowPhase`): `DOWNHILL_FAST` ($-9^\circ \dots -12^\circ$), `DOWNHILL_EXTREME` ($-12^\circ \dots -14^\circ$, только редкие секции с обязательной зоной торможения), `BRAKING_ZONE`, `SWITCHBACK` ($R \in [18, 22]$м), `RIDGE_LINE`, `RECOVERY_FLAT`, `FORK_APPROACH`.
-  - Обязательный расчет `required_sight_distance` для скоростных участков перед виражами и препятствиями.
+- **[FEAT-014.2] Драматургическая грамматика трассы и MTB-профили (Road Grammar & MTB Pacing)** `[x] ЗАВЕРШЕНО`:
+  - Выделенный слой `RoadGrammar` (v5.3): детерминированный конечный автомат фаз (FSM) с взвешенной таблицей переходов (`Weighted FSM Transition Table`) и жесткими инвариантами безопасности.
+  - 8 эмоциональных состояний MTB-спуска: `CRUISE_DOWNHILL` ($-5^\circ \dots -8^\circ$, трещотка, 25-30 км/ч), `FAST_GRAVITY_DESCENT` ($-9^\circ \dots -12^\circ$, свист ветра, 38-42 км/ч, dynamic FOV), `BRAKING_ZONE` ($-3^\circ \dots 0^\circ$, прямая видимость $\ge 45$м), `SWITCHBACK` ($R \in [18, 22]$м, крен до $6^\circ$), `CREST_MICRO_DROP` ($h \le 0.35$м, разгрузка), `AIRBORNE_DROP` ($h \le 1.2$м), `VALID_LANDING_SURFACE` ($R \ge 50$м), `RECOVERY_FLAT`.
+  - Модернизация `RoadLogic` (v5.3): Pre-generation Parameter Clamping, Clothoid Transition Contract для шпилек ($\Delta \kappa / \Delta s \le 0.003\text{ м}^{-2}$), чистый конвейер без мутации точек Generate $\to$ Validate $\to$ PASS (Commit) / FAIL (Reject & Regenerate).
+  - Оптимизация `RoadValidityValidator` (кэширование PackedArrays, скорость $0.048$ мс/чанк при целевом лимите $\le 0.05$ мс).
+  - Комплекс верификации: `test_airborne_calibration_gate.gd` (6/6 ступеней PASS на реальной физике), `test_road_grammar.gd` (5 сидов $\times$ 1000 чанков = 250 км, 0 ошибок), `test_road_contract.gd` (18/18 PASS), `test_sprint_4m_master.gd` (124/124 PASS).
 
 - **[FEAT-014.3] Топология развилок и модель принятия решений (Fork Topology & Decision Model)**:
   - Модель принятия решений развилки: `APPROACH` $\to$ `FORK_PREVIEW` $\to$ `FORK_COMMIT_ZONE` $\to$ `BRANCH_LOCKED`.

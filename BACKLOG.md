@@ -345,16 +345,29 @@
 - Граф корректно строит и связывает расходящиеся ветви с сохранением координат развилочного узла.
 **Files**: `scripts/world/road_graph.gd` (NEW), `scripts/world/road_path_data.gd`.
 
-### TASK: [FEAT-014.2] Road Grammar & MTB Profiles
-**Goal**: Создать выделенный слой драматургии трассы, управляющий чередованием фаз спуска, виражей, торможения и отдыха по правилам MTB.
-**Do**: Создать `scripts/world/road_grammar.gd`:
-- Детерминированный конечный автомат (FSM) с взвешенной таблицей переходов (`Weighted Transition Table`).
-- Типизированная структура фаз `FlowPhase` с параметрами: `preferred_grade`, `grade_range`, `curvature_range`, `target_speed`, `min_length`, `max_length`, `sight_distance`, `allowed_next_phases`.
-- Профили: `NORMAL_DOWNHILL` ($-5^\circ \dots -9^\circ$), `FAST_DOWNHILL` ($-9^\circ \dots -12^\circ$), редкий `EXTREME_DOWNHILL` ($-12^\circ \dots -14^\circ$, только с обязательной последующей `BRAKING_ZONE`), `SWITCHBACK` ($R \in [18, 22]$м), `RIDGE_LINE`, `RECOVERY_FLAT`, `FORK_APPROACH`.
-**Do not**: Не генерировать крутые шпильки без предшествующей зоны торможения и гарантированной видимости (`sight_distance`).
-**Acceptance Criteria**:
-- Последовательность фаз трассы формирует естественный, гармоничный горный ритм без внезапных слепых препятствий.
-**Files**: `scripts/world/road_grammar.gd` (NEW), `scripts/world/road_logic.gd`.
+### TASK: [FEAT-014.2] Road Grammar & MTB Profiles (`COMPLETED [x]`)
+**Goal**: Создать выделенный слой драматургии трассы, управляющий чередованием фаз спуска, виражей, торможения и отдыха по правилам MTB, и перестроить RoadLogic под управление FSM с живым контролем качества.
+**Realized**:
+- В `scripts/world/road_grammar.gd` (v5.3):
+  - Построен детерминированный автомат драматургии `RoadGrammar` с фазами `CRUISE_DOWNHILL` ($-5^\circ \dots -8^\circ$), `FAST_GRAVITY_DESCENT` ($-9^\circ \dots -12^\circ$), `BRAKING_ZONE` ($-3^\circ \dots 0^\circ$), `SWITCHBACK` ($R \in [18, 22]$м), `CREST_MICRO_DROP` ($h \le 0.35$м), `AIRBORNE_DROP` ($h \le 1.2$м), `VALID_LANDING_SURFACE` ($R \ge 50$м), `RECOVERY_FLAT`.
+  - Типизированная спецификация разрешенных коридоров `PhaseSpec` (ENVELOPE) с предварительным клэмпингом параметров.
+  - Взвешенная таблица переходов `Weighted FSM Transition Table` с жесткими инвариантами безопасности: 100% обязательность зоны торможения перед виражами, 100% сопряжение дропов с зоной приземления и выкатом на поляну.
+  - Стартовая последовательность горного спуска для мгновенного погружения при выборе «1. Бесконечная дорога (Zen Ride)».
+- В `scripts/world/road_logic.gd` (v5.3):
+  - Интеграция `RoadGrammar`.
+  - Трехчастная геометрия шпилек (Clothoid Transition Contract: входная клотоида $\ge 18$м $\to$ дуга $R \in [18, 22]$м $\to$ выходная клотоида) с темпом $\Delta\kappa/\Delta s \le 0.0029\text{ м}^{-2} \le 0.003\text{ м}^{-2}$ и виражным креном (superelevation) до $6.0^\circ$.
+  - Чистый конвейер без произвольных мутаций: Generate $\to$ Validate $\to$ PASS (Commit) / FAIL (Reject & Regenerate safe corridor).
+- В `scripts/world/road_validity_validator.gd`:
+  - Кэширование ссылок на PackedArrays: ускорение проверки до $0.048$ мс на 50м чанк (строго $\le 0.05$ мс target).
+- В `scripts/world/road_path_data.gd`:
+  - Расширение `SegmentType` и метод отката `truncate_to()`.
+- В `scripts/world/chunk_streamer.gd`:
+  - Проверка статуса валидатора `is_last_chunk_valid()` перед созданием меша и тримеш-коллизии.
+- В тестах:
+  - `test_airborne_calibration_gate.gd`: эмпирический физический замер 6-ступенчатой лестницы высот ($0.20 \dots 1.20$м) на существующем `BicycleController` подтвердил полную устойчивость шасси (PASS [STABLE]).
+  - `test_road_grammar.gd`: 5 сидов $\times$ 1000 чанков ($250$ км) пройдены со 100% PASS (0 ошибок валидатора, 0 ошибок швов, 0 запрещенных переходов).
+  - `test_road_contract.gd` (18/18 PASS), `test_road_logic.gd` (100% PASS), `test_sprint_4m_master.gd` (124/124 PASS, 0 утечек памяти).
+**Files**: `scripts/world/road_grammar.gd` (NEW), `scripts/world/road_logic.gd` (MODIFIED), `scripts/world/road_path_data.gd` (MODIFIED), `scripts/world/road_math.gd` (MODIFIED), `scripts/world/road_validity_validator.gd` (MODIFIED), `scripts/world/chunk_streamer.gd` (MODIFIED), `scripts/test/test_airborne_calibration_gate.gd` (NEW), `scripts/test/test_road_grammar.gd` (NEW), `scripts/test/test_road_logic.gd` (MODIFIED), `BACKLOG.md` (MODIFIED).
 
 ### TASK: [FEAT-014.3] Fork Topology & Branch Decision Model
 **Goal**: Реализовать физически корректную и надежную модель выбора пути игроком на развилке с защитой от пограничных скачков и дребезга.

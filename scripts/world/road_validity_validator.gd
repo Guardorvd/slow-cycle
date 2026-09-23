@@ -67,19 +67,28 @@ static func validate_segment(path_data: RefCounted, start_idx: int = 0, end_idx:
 	var airborne_dist: float = 0.0
 	var airborne_start_height: float = 0.0
 
+	var p_points: PackedVector3Array = path_data.points
+	var p_tangents: PackedVector3Array = path_data.tangents
+	var p_normals: PackedVector3Array = path_data.normals
+	var p_distances: PackedFloat32Array = path_data.cumulative_distances
+	var p_slopes: PackedFloat32Array = path_data.slopes
+	var p_curvatures: PackedFloat32Array = path_data.curvatures
+	var p_states: PackedByteArray = path_data.surface_contact_states
+	var p_banking: PackedFloat32Array = path_data.banking_angles
+
 	var prev_mode: int = Airborne.SurfaceContactMode.GROUNDED
-	if path_data.surface_contact_states.size() > s_idx:
-		prev_mode = path_data.surface_contact_states[s_idx]
+	if p_states.size() > s_idx:
+		prev_mode = p_states[s_idx]
 
 	for i in range(s_idx + 1, e_idx + 1):
-		var p0: Vector3 = path_data.points[i - 1]
-		var p1: Vector3 = path_data.points[i]
+		var p0: Vector3 = p_points[i - 1]
+		var p1: Vector3 = p_points[i]
 		var ds: float = p0.distance_to(p1)
-		var s_dist: float = path_data.cumulative_distances[i]
+		var s_dist: float = p_distances[i]
 
 		var cur_mode: int = Airborne.SurfaceContactMode.GROUNDED
-		if path_data.surface_contact_states.size() > i:
-			cur_mode = path_data.surface_contact_states[i]
+		if p_states.size() > i:
+			cur_mode = p_states[i]
 
 		# 1. SAMPLING RESOLUTION
 		if ds > Contract.MAX_SAMPLE_SPACING:
@@ -92,8 +101,8 @@ static func validate_segment(path_data: RefCounted, start_idx: int = 0, end_idx:
 			continue
 
 		# 2. GRADE & GRADE DERIVATIVE BY ARC LENGTH Δs
-		var slope: float = path_data.slopes[i]
-		var prev_slope: float = path_data.slopes[i - 1]
+		var slope: float = p_slopes[i]
+		var prev_slope: float = p_slopes[i - 1]
 		min_slope = minf(min_slope, slope)
 		max_slope = maxf(max_slope, slope)
 
@@ -112,8 +121,8 @@ static func validate_segment(path_data: RefCounted, start_idx: int = 0, end_idx:
 					"Grade change rate %.2f°/m exceeds limit %.2f°/m" % [grade_rate, Contract.MAX_GRADE_CHANGE_PER_METER])
 
 		# 3. CURVATURE & CURVATURE DERIVATIVE BY ARC LENGTH Δs
-		var curv: float = path_data.curvatures[i]
-		var prev_curv: float = path_data.curvatures[i - 1]
+		var curv: float = p_curvatures[i]
+		var prev_curv: float = p_curvatures[i - 1]
 		var r: float = 1.0 / maxf(curv, 0.00001)
 		min_radius = minf(min_radius, r)
 
@@ -128,8 +137,8 @@ static func validate_segment(path_data: RefCounted, start_idx: int = 0, end_idx:
 				"Curvature change rate %.4f exceeds limit %.4f" % [curv_rate, Contract.MAX_CURVATURE_CHANGE_PER_METER])
 
 		# 4. NORMAL ORTHONORMALITY
-		var tang: Vector3 = path_data.tangents[i]
-		var norm: Vector3 = path_data.normals[i]
+		var tang: Vector3 = p_tangents[i]
+		var norm: Vector3 = p_normals[i]
 		var dot_tn: float = absf(tang.dot(norm))
 		if dot_tn > 0.05:
 			report.add_violation("ERR_NORMAL_SKEW", i, s_dist, dot_tn, 0.05,
@@ -164,7 +173,7 @@ static func validate_segment(path_data: RefCounted, start_idx: int = 0, end_idx:
 
 		# Landing ramp validation
 		if cur_mode == Airborne.SurfaceContactMode.LANDING:
-			var banking: float = path_data.banking_angles[i] if path_data.banking_angles.size() > i else 0.0
+			var banking: float = p_banking[i] if p_banking.size() > i else 0.0
 			var land_check := Airborne.validate_landing_parameters(slope, prev_slope, r, banking)
 			if not land_check["is_valid"]:
 				for v_msg in land_check["violations"]:

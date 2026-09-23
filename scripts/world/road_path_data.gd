@@ -11,7 +11,15 @@ enum SegmentType {
 	GENTLE_EXIT = 3,
 	DESCENT = 4,
 	MEADOW = 5,
-	ROUGH_GRAVEL = 6
+	ROUGH_GRAVEL = 6,
+	CRUISE_DOWNHILL = 7,
+	FAST_GRAVITY_DESCENT = 8,
+	BRAKING_ZONE = 9,
+	SWITCHBACK = 10,
+	CREST_MICRO_DROP = 11,
+	AIRBORNE_DROP = 12,
+	VALID_LANDING_SURFACE = 13,
+	RECOVERY_FLAT = 14
 }
 
 var points: PackedVector3Array = PackedVector3Array()
@@ -95,6 +103,24 @@ func prune_behind(cutoff_distance: float) -> int:
 	sight_distances = sight_distances.slice(prune_count)
 
 	return prune_count
+
+## Truncates all sample arrays to new_size (used for rejecting invalid candidate chunks)
+func truncate_to(new_size: int) -> void:
+	if new_size < 0:
+		new_size = 0
+	if points.size() <= new_size:
+		return
+	points = points.slice(0, new_size)
+	tangents = tangents.slice(0, new_size)
+	normals = normals.slice(0, new_size)
+	binormals = binormals.slice(0, new_size)
+	cumulative_distances = cumulative_distances.slice(0, new_size)
+	slopes = slopes.slice(0, new_size)
+	curvatures = curvatures.slice(0, new_size)
+	segment_types = segment_types.slice(0, new_size)
+	surface_contact_states = surface_contact_states.slice(0, new_size)
+	banking_angles = banking_angles.slice(0, new_size)
+	sight_distances = sight_distances.slice(0, new_size)
 
 
 ## Finds the closest centerline sample index to a given world position

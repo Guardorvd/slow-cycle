@@ -71,6 +71,9 @@ func _spawn_next_chunk() -> void:
 	road_logic.plan_next_chunk()
 	var end_idx: int = road_path.size() - 1
 
+	if road_logic.has_method("is_last_chunk_valid") and not road_logic.is_last_chunk_valid():
+		push_error("ChunkStreamer: chunk %d failed validity gate!" % next_chunk_id)
+
 	var t_start: int = Time.get_ticks_usec()
 
 	# Build and add RoadChunk node
