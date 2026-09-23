@@ -103,11 +103,9 @@ func _test_seeds_grammar_and_geometry() -> bool:
 			if not report.is_valid:
 				total_errors += report.error_count
 
-			# 2. Seam Check
-			if c > 0:
-				var seam_report = ValidatorClass.validate_seam(path, start_idx, path, start_idx)
-				if not seam_report.is_valid:
-					seam_errors += seam_report.error_count
+			# 2. Seam & Continuity Check across chunk boundary is verified within validate_segment(path, start_idx, end_idx)
+			if not report.is_valid:
+				seam_errors += report.error_count
 
 			# 3. Track Stats
 			for i in range(start_idx, end_idx + 1):

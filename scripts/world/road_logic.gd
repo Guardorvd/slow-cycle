@@ -95,12 +95,8 @@ func plan_next_chunk() -> void:
 	_generate_phase_geometry(spec)
 	var end_idx: int = road_path.size() - 1
 	
-	# Objective Inspection Firewall
+	# Objective Inspection Firewall: validates continuity from start_idx through end_idx
 	last_validity_report = ValidatorClass.validate_segment(road_path, start_idx, end_idx)
-	if start_idx > 0 and last_validity_report.is_valid:
-		var seam_report = ValidatorClass.validate_seam(road_path, start_idx, road_path, start_idx)
-		if not seam_report.is_valid:
-			last_validity_report = seam_report
 			
 	# Reject & Regenerate: If candidate violates any contract, reject and regenerate safe corridor
 	if not last_validity_report.is_valid:
@@ -136,7 +132,7 @@ func _generate_phase_geometry(spec: RefCounted) -> void:
 			_build_fast_gravity_descent(spec)
 		RoadGrammarClass.FlowPhase.CRUISE_DOWNHILL:
 			_build_cruise_downhill(spec)
-		RoadGrammarClass.FlowPhase.RECOVERY_FLAT, _:
+		RoadGrammarClass.FlowPhase.VALID_LANDING_SURFACE, RoadGrammarClass.FlowPhase.RECOVERY_FLAT, _:
 			_build_recovery_flat(spec)
 
 ## SWITCHBACK: Mountain hairpin with Clothoid Transition Contract

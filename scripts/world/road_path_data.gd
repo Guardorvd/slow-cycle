@@ -158,8 +158,9 @@ func find_closest_index(target_pos: Vector3, start_idx: int = 0) -> int:
 					min_dist_sq = d_sq
 					best_idx = i
 
-	# If too far from local window, search full array
-	if min_dist_sq > 2500.0: # > 50m
+	# If local minimum is at window edge or too far, search full array
+	var at_window_edge: bool = (best_idx == search_min and search_min > 0) or (best_idx == search_max and search_max < points.size() - 1)
+	if min_dist_sq > 2500.0 or at_window_edge:
 		for i in range(points.size()):
 			var d_sq: float = target_pos.distance_squared_to(points[i])
 			if d_sq < min_dist_sq:

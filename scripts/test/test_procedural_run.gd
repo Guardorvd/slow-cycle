@@ -80,5 +80,8 @@ func _run_procedural_test(main_node: Node) -> void:
 
 
 	print("--- PROCEDURAL SIMULATION COMPLETED [OK] ---\n")
+	main_node.queue_free()
+	for _frame in range(5):
+		await process_frame
 	quit(0)
 

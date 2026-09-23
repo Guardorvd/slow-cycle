@@ -2071,8 +2071,23 @@ func _init() -> void:
 			all_ok = false
 	bike_67.queue_free()
 
+	# Test 68: [Sprint 5 Audit Fix D-16] Spatial Search Window Boundary Contract
+	var path_68 = load("res://scripts/world/road_path_data.gd").new()
+	for i in range(250):
+		path_68.append_sample(Vector3(0, 0, -float(i) * 2.0), Vector3(0, 0, -1), Vector3.UP, 0.0, 0.0, 0)
+	var target_pos_68: Vector3 = Vector3(0, 0, -220.0) # Sample 110 (previously failed with 100)
+	var found_idx_68: int = path_68.find_closest_index(target_pos_68, 0)
+	var window_boundary_ok: bool = (found_idx_68 == 110)
+	print("[VERIFICATION #68] Spatial Search Window Boundary Contract:")
+	print("  - Target index 110 found: %d (Expected: 110)" % found_idx_68)
+	if window_boundary_ok:
+		print("  [PASS] Spatial window boundary condition cleanly triggers full array search without 50m dead zone!")
+	else:
+		print("  [FAIL] find_closest_index stuck on boundary index %d" % found_idx_68)
+		all_ok = false
+
 	if all_ok:
-		print("\n=== ALL SYSTEM VERIFICATIONS PASSED [67/67 - 100% OK] ===\n")
+		print("\n=== ALL SYSTEM VERIFICATIONS PASSED [68/68 - 100% OK] ===\n")
 	else:
 		print("\n=== SOME VERIFICATIONS FAILED ===\n")
 

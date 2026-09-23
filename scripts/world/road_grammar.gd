@@ -103,7 +103,6 @@ func _replenish_phase_queue() -> void:
 				phase_queue.append(FlowPhase.RECOVERY_FLAT)
 			else:
 				phase_queue.append(FlowPhase.AIRBORNE_DROP)
-				phase_queue.append(FlowPhase.VALID_LANDING_SURFACE)
 				phase_queue.append(FlowPhase.RECOVERY_FLAT)
 
 		FlowPhase.SWITCHBACK:
@@ -114,8 +113,7 @@ func _replenish_phase_queue() -> void:
 				phase_queue.append(FlowPhase.CRUISE_DOWNHILL)
 
 		FlowPhase.AIRBORNE_DROP:
-			# Mandatory invariant: AIRBORNE must immediately transition to landing
-			phase_queue.append(FlowPhase.VALID_LANDING_SURFACE)
+			# Mandatory invariant: AIRBORNE chunk includes dedicated landing ramp; transition to rollout
 			phase_queue.append(FlowPhase.RECOVERY_FLAT)
 
 		FlowPhase.VALID_LANDING_SURFACE:

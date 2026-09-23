@@ -24,8 +24,8 @@ func _run_master_validation() -> void:
 	var exe_path: String = OS.get_executable_path()
 
 	# --- TIER 1: CORE SYSTEM CONTRACTS ---
-	print("[TIER 1] Running 67 Core System Contracts (test_diagnostics.gd)...")
-	var t1_ok: bool = _run_subprocess_tier(exe_path, "scripts/test/test_diagnostics.gd", 67, "Core Contracts")
+	print("[TIER 1] Running 68 Core System Contracts (test_diagnostics.gd)...")
+	var t1_ok: bool = _run_subprocess_tier(exe_path, "scripts/test/test_diagnostics.gd", 68, "Core Contracts")
 
 	# --- TIER 2: 4G TEST TRACK BASELINE ---
 	print("\n[TIER 2A] Running 4G Test Track Verification (test_track_verification.gd)...")
@@ -58,7 +58,7 @@ func _run_master_validation() -> void:
 	print("\n==================================================================")
 	print("                 SPRINT 4M MASTER VERIFICATION SUMMARY             ")
 	print("==================================================================")
-	print("  Tier 1 - Core System Contracts:            %s" % ("PASS (67/67)" if t1_ok else "FAIL"))
+	print("  Tier 1 - Core System Contracts:            %s" % ("PASS (68/68)" if t1_ok else "FAIL"))
 	print("  Tier 2A - 4G Track Verification:           %s" % ("PASS (6/6)" if t2a_ok else "FAIL"))
 	print("  Tier 2B - 4G Dynamic Ride Simulation:      %s" % ("PASS (8/8)" if t2b_ok else "FAIL"))
 	print("  Tier 3 - 4K Technical Lab Contracts:       %s" % ("PASS (15/15)" if t3_ok else "FAIL"))
