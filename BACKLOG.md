@@ -395,9 +395,9 @@
 - **Topology Stress Test**: генерация 50 развилок подряд на 5 различных сидах, строгая проверка отсутствия геометрических ступенек ($\Delta p < 0.001$м, $\Delta \theta < 0.2^\circ$, $\Delta \kappa$ bounded).
 - **Streaming Stress Test**: 30-минутный заезд при естественной плотности развилок (1 развилка на 600–900м, ~20 развилок на 17.5 км).
 - **Многофакторный контроль стабильности (Plateau Gate)**: мониторинг плато для Node count, ObjectDB count, Active RoadChunk count, Active branch count, CollisionShape count, frame time.
-- **Firewall Verification**: прогон всех 121 контракта езды из Спринта 4M — 100% PASS без единой регрессии.
+- **Firewall Verification**: прогон всех 124 контрактов езды из Спринта 4M — 100% PASS без единой регрессии.
 **Acceptance Criteria**:
-- Все тесты топологии и стриминга завершаются со статусом 0, память выходит на стабильное плато, 121 контракт физики сохранены.
+- Все тесты топологии и стриминга завершаются со статусом 0, память выходит на стабильное плато, 124 контракта физики сохранены.
 **Files**: `scripts/test/test_mountain_validation.gd` (NEW), `scripts/test/test_diagnostics.gd`.
 
 ---

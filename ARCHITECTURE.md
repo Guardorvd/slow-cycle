@@ -6,14 +6,17 @@
 Main Game Scene (res://scenes/main.tscn)
 │
 ├── WorldManager (Seed, Chunk streaming coordinator)
-│    ├── RoadGenerator (Deterministic spline math & mood logic)
+│    ├── RoadPathData (Core spline & surface state data contract)
+│    ├── RoadGenerationContract (Mathematical envelopes, derivatives by Δs, seam limits)
+│    ├── RoadAirborneContract (SurfaceContactMode FSM: GROUNDED, MICRO_DROP, AIRBORNE, LANDING)
+│    ├── RoadValidityValidator (Algorithmic C0/C1, curvature, slope & sight distance inspector)
+│    ├── RoadLogic / [Planned Phase 2] RoadGrammar (Deterministic MTB descent pacing & FSM)
 │    ├── ChunkStreamer (Active chunk window [N-1 ... N+5])
-│    ├── [Active RoadChunks]
-│    │     ├── RoadMesh (ArrayMesh: gravel road with micro-texture)
-│    │     ├── RoadCollision (Concave/Convex CollisionShape3D on layer "Road", bit 2)
-│    │     ├── StripTerrain (Roadside shoulders, verges, embankments on layer "Grass", bit 4)
-│    │     └── ChunkFoliage (Local MultiMeshInstance3D for pines, birches, grass)
-│    └── [Planned] DayNightCycle (Sprint 5: sun rotation, sky gradients, fog)
+│    └── [Active RoadChunks]
+│          ├── RoadMesh (ArrayMesh: gravel road with micro-texture)
+│          ├── RoadCollision (Concave CollisionShape3D on Layer 2 "Road" / Layer 5 "RoughRoad")
+│          ├── StripTerrain (Roadside shoulders, verges on Layer 3 "Grass")
+│          └── ChunkFoliage (Local MultiMeshInstance3D for pines, birches, grass)
 │
 ├── Bicycle (CharacterBody3D, layer "Player", bit 8; collision mask 7)
 │    ├── 2-Point Raycast Suspension (Pitch calculation, mask 22 = Road | Grass | RoughRoad)
@@ -21,18 +24,17 @@ Main Game Scene (res://scenes/main.tscn)
 │    ├── VisualsRoot (Decoupled Node3D: visual pitch, banking, dive, suspension compliance)
 │    ├── HandlebarCockpit (Mesh, grips, bell, steering pivot)
 │    ├── CameraRig (Stabilized 1st-person & 3rd-person spring-arm with 35% VOR limit)
-│    ├── AudioController (Procedural bell, freewheel ratchet, wind, gravel, skid)
-│    └── [Planned] Headlight SpotLight3D (Sprint 5: auto-on at dusk)
+│    └── AudioController (Procedural bell, freewheel ratchet, wind, gravel, skid)
 │
 ├── UI Layer (CanvasLayer)
 │    ├── MinimalHUD (Speed km/h, distance traveled)
 │    ├── DebugHUD (F3 toggle: Seed, Chunk ID, FPS, Slope, Curvature, Memory)
 │    ├── ModeSelect (Start screen: Zen Endless Road vs Riding Feel Test Track)
-│    └── [Planned] PauseMenu & MainMenu (Sprint 6: Esc overlay, settings, persistence)
+│    └── [Planned] PauseMenu & MainMenu (Sprint 7: Esc overlay, settings, persistence)
 │
 └── [Planned] Autoloads
-     ├── GameState (Sprint 5: enum RIDING/PAUSED/PHOTO_MODE)
-     └── SettingsManager (Sprint 6: ConfigFile persistence)
+     ├── GameState (Sprint 6: enum RIDING/PAUSED/PHOTO_MODE)
+     └── SettingsManager (Sprint 7: ConfigFile persistence)
 ```
 
 ---

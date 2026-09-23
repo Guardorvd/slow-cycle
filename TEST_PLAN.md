@@ -65,20 +65,40 @@ Every physics change in 4H–4M must be measured against the 12 KPI baseline:
 Automated CI checks run headlessly using Godot console:
 
 ```powershell
-# Unified Sprint 4M Master Validation Suite (Runs all 7 Tiers, 121 Assertions, 0 Leaks)
+# Unified Sprint 4M Master Validation Suite (Runs all 7 Tiers, 124 Assertions, 0 Leaks)
 & "Godot_v4.7.2-stable_mono_win64_console.exe" --headless --script scripts/test/test_sprint_4m_master.gd
 ```
 
-- **Master Suite Tiers**:
-  - `Tier 1`: 64 deterministic core verifications in `scripts/test/test_diagnostics.gd`.
-  - `Tier 2`: 4G Test Track Baseline (geometry verification & live ride simulation).
+- **Master Suite Tiers (124 / 124 Assertions Evaluated)**:
+  - `Tier 1`: 67 deterministic core verifications in `scripts/test/test_diagnostics.gd` (includes late Sprint 4J/4M additions #65–#67).
+  - `Tier 2A/2B`: 4G Test Track Baseline (6 geometry verification + 8 live ride simulation assertions).
   - `Tier 3`: 4K Technical Riding Lab (15 geometry & structure contracts).
   - `Tier 4`: 4L Gravel Training Loop (16 rhythm & Zen Flow contracts).
-  - `Tier 5`: 4K T10 Ballistic Airborne & Landing Invariant Fixture (detachment, ballistic curve, recontact, suspension compression).
-  - `Tier 6`: 5-Seed Procedural Determinism Battery (15 chunks, $\Delta p \le 10^{-6}$ m).
+  - `Tier 5`: 4K T10 Ballistic Airborne & Landing Invariant Fixture (6 invariants: detachment, flight duration, ballistic curve, recontact, continuous path, suspension compression).
+  - `Tier 6`: 5-Seed Procedural Determinism Battery (5 seeds bit-exact, $\Delta p \le 10^{-6}$ m).
   - `Tier 7`: Multi-Scene Switching Memory Soak (7 transitions, 0 dangling nodes).
 - **Leak Gate**: Strictly 0 ObjectDB leaks on exit across all runners.
 - **Human Perception Gate**: 15 observed gameplay points conducted without F3 HUD, 3x repetition for critical mechanics, and Blind Human Perception Pass. Full report in `docs/sprints/sprint_4m_validation_report.md`.
+
+---
+
+## 5.1. Sprint 5 Mountain World & Road Contract Suites
+
+### A. Airborne Empirical Physics Gate (`scripts/test/test_airborne_empirical_gate.gd`)
+Measures existing `BicycleController` dynamics over varied drop geometries without modifying bicycle kinematics:
+* Measures air time, flight distance, touchdown vertical velocity $v_y$, and suspension deflection across heights $0.2 \dots 1.2$ m.
+* Calibrates safety envelopes for `RoadAirborneContract`: `MICRO_DROP_MAX_HEIGHT = 0.35m`, `AIRBORNE_MAX_HEIGHT = 1.20m`.
+
+### B. Road Contract & Validator Suite (`scripts/test/test_road_contract.gd`)
+Runs full geometric validation against `RoadGenerationContract` (v5.1.0) and `RoadAirborneContract`:
+```powershell
+& "Godot_v4.7.2-stable_mono_win64_console.exe" --headless --script scripts/test/test_road_contract.gd
+```
+* **Synthetic Battery T01–T16**:
+  * T01–T08 (Valid cases): straight, constant downhill $-6^\circ$, switchback $R=19$m, micro-drop, short airborne with landing, full airborne chain, downhill with crest drop, downhill with recovery straight.
+  * T09–T16 (Invalid / Injected defects): uncontrolled gap (airborne without landing), excessive airborne length $>6$m, excessive drop height $>1.2$m, uphill landing, sharp landing curvature $R=18$m, missing landing FSM violation, sightline occlusion, and seam coordinate tear 5mm.
+* **Procedural Multi-Seed Validation**: 15 chunks across 5 deterministic seeds (10101–50505) verified 100% compliant.
+* **Micro-Benchmark**: 100 chunks (2500 samples, 5.0 km) validated in $\approx 7.6$ ms ($< 0.08$ ms per chunk).
 
 
 ---

@@ -2,13 +2,16 @@
 
 > **Дата актуализации**: 23.09.2026  
 > **Инженер-аудитор**: AI Lead Systems Architect & Senior Game Engineer  
-> **Статус проекта**: **Спринты 1, 2, 3 (3A, 3B, 3C), 4 (4A–4H, 4J, 4K, 4L, 4M) Завершены на 100% (121/121 Master PASS, 0 утечек ObjectDB, Human Gate PASS)**.
-> **Текущий этап**: **Готовность к старту Спринта 5 («Атмосфера, Суточный Цикл и Фара»)**.
+> **Статус проекта**: **Спринты 1, 2, 3 (3A, 3B, 3C), 4 (4A–4H, 4J, 4K, 4L, 4M) Завершены на 100% (124/124 Master PASS, 0 утечек ObjectDB, Human Gate PASS)**.  
+> **Спринт 5 (Фаза 1 — FEAT-014.0)**: **Завершена на 100% (18/18 Contract PASS, эмпирический гейт пройден)**.  
+> **Текущий этап**: **Готовность к старту Спринта 5, Фаза 2 («Road Grammar & MTB Flow Pacing»)**.
 | **Главная сцена** | `res://scenes/main.tscn` |
 | **Тестовый полигон 4G** | `res://scenes/test/riding_feel_test_track.tscn` |
 | **Технический лаб 4K** | `res://scenes/test/riding_lab_track.tscn` |
 | **Дзен-круг 4L** | `res://scenes/test/gravel_training_loop.tscn` |
 | **Мастер-валидатор 4M** | `res://scripts/test/test_sprint_4m_master.gd` |
+| **Тест контрактов Спринта 5**| `res://scripts/test/test_road_contract.gd` |
+| **Эмпирический гейт физики** | `res://scripts/test/test_airborne_empirical_gate.gd` |
 
 
 ---
@@ -393,3 +396,32 @@ Distance from recovered spawn position to road centerline: 1.0966 m (target < 1.
 | FPS-инвариантность (30/60/144) | Аналитически | **Эмпирически доказано (дельта 0.0)** | Контракт #62 |
 | Recovery Contract | Частично (камера) | **Полная система (Bike + Cam + Audio)** | Контракт #63 |
 | Audio Bus Routing | Не проверялась в CI | **100% покрыта тестом** | Контракт #64 |
+
+---
+
+### 2.13. Результаты выполнения Спринта 5, Фаза 1: Road Generation & Airborne Contract, Validity Validator, Data Foundation (FEAT-014.0)
+- **Статус выполнения**: Завершен на 100% (18/18 тестов контракта PASS, 124/124 мастер-регрессии PASS, 0 утечек ObjectDB).
+- **Смена парадигмы — Естественный MTB-рельеф**:
+  - Устранено неявное допущение «колёса всегда приклеены к земле». Введен инвариант: *«Запрещено не отрывание колёс. Запрещено неконтролируемое / непреднамеренное отрывание колёс»*.
+  - Введено перечисление `SurfaceContactMode`: `GROUNDED`, `MICRO_DROP` (разгрузка подвески над гребнями), `AIRBORNE` (спроектированный полет), `LANDING` (безопасный стол приземления).
+- **Машинный контракт трассы (`RoadGenerationContract` v5.1.0)**:
+  - Формализованы уклоны: `MAX_GRADE_UPHILL = +5.0°`, `MAX_GRADE_DOWNHILL = -14.0°`, `CRUISE_GRADE = -6.0°`, порог экстрима `-12.0°`.
+  - Производные по реальной длине дуги: $\Delta \text{grade}/\Delta s \le 1.2^\circ/\text{м}$, $\Delta \kappa/\Delta s \le 0.003\text{ м}^{-2}$.
+  - Дискретизация: `NOMINAL_SAMPLE_SPACING = 2.0m`, `MAX_SAMPLE_SPACING = 2.5m`.
+  - Стыки швов: $\Delta p < 0.001$ м ($C^0$), $\Delta \theta < 0.2^\circ$ ($C^1$), $\Delta \text{slope} < 0.1^\circ$.
+- **Контракт прыжков и дропов (`RoadAirborneContract`)**:
+  - Эмпирически калиброванные лимиты: `MICRO_DROP_MAX_HEIGHT = 0.35m`, `AIRBORNE_MAX_HEIGHT = 1.20m`, `AIRBORNE_MAX_DIST = 6.0m`.
+  - Правила зоны приземления `LANDING`: радиус $R \ge 50.0$ м (строго по прямой), крен $\le 2.0^\circ$, скат $\Delta \text{grade} \le 4.0^\circ$, зона стабилизации `RECOVERY` $\ge 15.0$ м.
+  - FSM переходов: исключены неконтролируемые обрывы в пустоту без стадии приземления.
+- **Алгоритмический валидатор (`RoadValidityValidator`)**:
+  - Полный аудит геометрии и отчёт `ValidityReport` (`VALID_GROUNDED`, `VALID_MICRO_DROP`, `VALID_AIRBORNE`, `VALID_LANDING`, `INVALID_GEOMETRY`, `INVALID_UNCONTROLLED_GAP`).
+  - Трассировка видимости: `calculate_sight_distance_at` для поворотов ($S_{\text{turn}} \ge 45$ м) и уступов ($S_{\text{drop}} \ge 35$ м).
+  - Проверка комбинационных рисков (крутой уклон без зоны торможения перед шпилькой).
+  - Микро-бенчмарк: проверка 100 чанков (2500 сэмплов, 5.0 км) занимает $7.67$ мс ($0.076$ мс на чанк при лимите 1.0 мс).
+- **Эмпирический физический гейт (`scripts/test/test_airborne_empirical_gate.gd`)**:
+  - Доказана устойчивость существующего `BicycleController` на дропах $0.2 \dots 1.2$ м без изменения уравнений физики:
+    - Секция T6 (Micro-Drop Crest): полет 0.250 с, сжатие подвески 39 мм $\implies$ PASS [STABLE].
+    - Секция T10 (MTB Drop $0.8$ м, $-15^\circ$): полет 0.550 с, $v_y = 0.74$ м/с $\implies$ PASS [STABLE].
+    - Синтетические дропы $0.35$ м, $0.60$ м, $1.20$ м $\implies$ 100% PASS [STABLE].
+- **Файрвол регрессии (`test_sprint_4m_master.gd`)**:
+  - 124 из 124 утверждений PASS. Физика велосипеда, камера, аудио и детерминизм 5 сидов сохранены на 100%. Ноль утечек ObjectDB instances.
