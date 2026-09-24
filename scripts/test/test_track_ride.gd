@@ -99,6 +99,10 @@ func _start() -> void:
 	var s_l: float = 2120.0
 	var sample_l: Dictionary = generator.road_path.get_sample_at_distance(s_l)
 	bike.global_position = sample_l.position + Vector3(0, 0.45, 0)
+	var tang_l: Vector3 = sample_l.tangent
+	var horiz_tang_l: Vector3 = Vector3(tang_l.x, 0.0, tang_l.z).normalized()
+	if not horiz_tang_l.is_zero_approx():
+		bike.global_transform.basis = Basis.looking_at(horiz_tang_l, Vector3.UP)
 	bike.velocity = Vector3.ZERO
 	bike.current_speed = 6.0
 	for frame in range(30):
@@ -115,6 +119,10 @@ func _start() -> void:
 	var s_j: float = 1900.0
 	var sample_j: Dictionary = generator.road_path.get_sample_at_distance(s_j)
 	bike.global_position = sample_j.position + Vector3(0, 0.45, 0)
+	var tang_j: Vector3 = sample_j.tangent
+	var horiz_tang_j: Vector3 = Vector3(tang_j.x, 0.0, tang_j.z).normalized()
+	if not horiz_tang_j.is_zero_approx():
+		bike.global_transform.basis = Basis.looking_at(horiz_tang_j, Vector3.UP)
 	bike.velocity = Vector3.ZERO
 	bike.current_speed = 7.0
 	for frame in range(30):

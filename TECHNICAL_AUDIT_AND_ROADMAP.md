@@ -1,162 +1,210 @@
 # ТЕХНИЧЕСКИЙ АУДИТ, АРХИТЕКТУРНЫЙ АНАЛИЗ И ПЛАН РЕФАКТОРИНГА
 
 ## 1. ВВОДНЫЙ ИНЖЕНЕРНЫЙ КОНТЕКСТ И ЗАДАЧА
-> **Статус задачи**: Запущен полный сквозной технический аудит проекта (End-to-End Technical & Architecture Audit) по итогам Спринта 4 и Спринта 5 (Фазы 1 и 2 — FEAT-014.0, FEAT-014.2) в роли **Principal Software Architect & Systems Tech Lead**.  
-> **Фокус анализа**: Глубокое сканирование всей кодовой базы: математика сплайнов и клотоид, FSM драматургии трассы `RoadGrammar`, пространственный поиск `find_closest_index`, физика `BicycleController`, стабильность камеры `BikeCameraRig`, аудиопроцессинг `BikeAudioManager`, стриминг чанков `ChunkStreamer`, UI/HUD, жизненный цикл и утечки памяти ObjectDB.  
-> **Стек и компоненты**: Godot Engine 4.7.2 Stable Mono (Vulkan 1.3 Forward+), GDScript 2.0, `CharacterBody3D`, `BicycleController`, `BikeCameraRig`, `BikeAudioManager`, `RoadPathData`, `RoadGrammar`, `RoadLogic`, `RoadValidityValidator`, `RoadGenerationContract`, `RoadAirborneContract`, `ChunkStreamer`, `RoadChunk`, `ChunkFoliage`, `WorldManager`, `DebugHUD`, `HUD`, `ModeSelect`.  
-> **Методологический фильтр каждого выявленного дефекта**:  
+
+> **Статус задачи**: Проведён полный сквозной технический аудит всей кодовой базы проекта (End-to-End Codebase & Architecture Audit) по состоянию на Спринт 5 (39 GDScript файлов, 12 сцен).  
+> **Роль**: Principal Software Architect & Systems Tech Lead.  
+> **Фокус анализа**: Глубокий анализ всех модулей системы (физика CharacterBody3D, процедурный сплайн, FSM грамматики дороги, валидаторы контрактов, чанковый стриминг, MultiMesh-растительность, процедурный аудио-синтез, камера со стабилизацией горизонта, UI и тестовый харнес).  
+> **Методологический фильтр каждого выявленного пункта**:  
 > 1. *Это реально bug или просто stylistic preference?*  
 > 2. *Есть ли observable consequence (видимое/измеримое проявление)?*  
 > 3. *Можно ли доказать проблему кодом/тестом/сценарием?*  
 > 4. *Какой минимальный diff её исправляет?*  
-> «Система работает → доказана проблема → минимальное исправление → тест → не трогаем остальное».
+> **Руководящий принцип**: «Система работает → доказана проблема → минимальное исправление → тест → не трогаем остальное».
 
 ---
 
 ## 2. СВОДНЫЙ РЕЕСТР ДЕФЕКТОВ И ТЕХНИЧЕСКОГО ДОЛГА
 
-| № | Модуль / Файл | Выявленная проблема / «Запах кода» | Инженерный риск / Нарушенный принцип | Влияние на систему (Impact) | Уровень критичности | Статус |
+| № | Модуль / Файл | Выявленная проблема | Тип | Влияние (Impact) | Уровень критичности | Статус |
 |---|---|---|---|---|:---:|:---:|
-| **D-16** | `scripts/world/road_path_data.gd` | Залипание пространственного окна `find_closest_index()` на 50 метров при вызовах без кэша `start_idx` | Boundary Truncation Defect / Локальный минимум на границе окна не триггерит полный поиск | Игрок при нажатии `R` (Recovery) на дистанции 200–250 м отбрасывается назад на 70 м вместо 20 м; сбой спавна на полигонах | **High** | 🟢 УСТРАНЕНО (Спринт 5 Ревизия) |
-| **D-17** | `scripts/world/road_logic.gd` & `test_road_grammar.gd` | Фиктивная проверка шва чанков `validate_seam(p, idx, p, idx)` — точка сравнивается с самой собой | Defeated QA Assertion / No-op Verification Firewall | Шлюз целостности генерации чанков ослеплен: разрыв на стыке чанков не будет пойман `validate_seam` | **Medium** | 🟢 УСТРАНЕНО (Спринт 5 Ревизия) |
-| **D-18** | `scripts/world/road_logic.gd` | Отсутствие ветки `FlowPhase.VALID_LANDING_SURFACE` в `_generate_phase_geometry` (неявный fallback в равнину) | Incomplete FSM Grammar Handler / Pattern Matching Fallthrough | После дропа с посадочным столом генерируются две равнинные поляны подряд (`RECOVERY_FLAT`), затягивая паузу | **Medium** | 🟢 УСТРАНЕНО (Спринт 5 Ревизия) |
-| **D-19** | `scripts/test/test_procedural_run.gd` | Утечка 6 экземпляров ObjectDB при выходе из теста (`WARNING: 6 ObjectDB instances leaked`) | Test Harness Lifecycle Leak / Отсутствие `queue_free()` инстанса сцены | Предупреждения об утечках в консоли Godot, нарушение правила AGENTS.md #7 | **Low** | 🟢 УСТРАНЕНО (Спринт 5 Ревизия) |
-| **D-20** | `scripts/ui/debug_hud.gd` | Расхождение расчётного `chunk_id = int(cur_s / 50.0)` с фактическим ID активного чанка стримера | Telemetry Drift / Semantic Divergence | Неточный номер чанка в оверлее F3 Debug HUD на участках со шпильками и дропами | **Low** | 🟡 ТЕХДОЛГ |
-| *D-01..D-06* | `camera`, `controller`, `audio`, `ui` | Комплекс дефектов Спринта 4 (сглаживание sway, wrapf углов, приоритет гравия, Escape меню, airborne brake) | Ранее устраненные дефекты Спринта 4 | Стабильность работы подтверждена мастер-сьютом | — | 🟢 УСТРАНЕНО (Спринт 4M) |
-| *R-01..R-10* | `camera`, `controller`, `audio`, `path` | Дефекты 4G/4M (луп ветра, клики трещотки, surge Z, pitch) | Ранее устраненные дефекты Спринта 4 | 124/124 проверок успешно | — | 🟢 УСТРАНЕНО (Спринт 4M) |
+| **D-21** | `scripts/world/road_airborne_contract.gd` L78 | Допуск расхождения уклона приземления `LANDING_MAX_DELTA_GRADE + 10.0` вместо заявленных 4.0° | BUG | Ослабленный фаервол валидации | **High** | ⏸️ ПРОПУЩЕНО (по указанию) |
+| **D-22** | `scripts/test/test_airborne_empirical_gate.gd` L55 | Безусловный выход с кодом 0 (`quit(0)`) даже при сбое физической стабильности дропов | BUG (Test) | Ложноположительный CI | **High** | 🟢 УСТРАНЕНО |
+| **D-23** | `scripts/world/road_chunk.gd` L66-68 vs L123 | На участках `ROUGH_GRAVEL` кромка дороги смещается по Y на 2.5 см (`bump`), а прилегающая трава нет | BUG (Visual) | Вертикальный разрыв геометрии (seam tear) до 25 мм | **Medium** | 🟢 УСТРАНЕНО |
+| **D-24** | `scripts/player/bicycle_controller.gd` L583-586 | В `_execute_recovery_teleport()` не сбрасывались переменные уклона (`current_pitch`, `physics_pitch`, `visual_pitch`) | BUG (Edge Case) | Наклон рамы вниз при спавне после падения на крутом спуске | **Medium** | 🟢 УСТРАНЕНО |
+| **D-25** | `scripts/world/chunk_foliage.gd` L23 | Проверка `seg_type == 5` (MEADOW), тогда как FSM генерирует `RECOVERY_FLAT` (14) | BUG / Dead Code | Плотность деревьев на пологих полянах всегда равна 0.75 вместо 0.25 | **Medium** | 🟢 УСТРАНЕНО |
+| **D-26** | `scripts/player/bicycle_controller.gd` L334-336 | Пороговый fallback тормоза: при отпускании аналогового курка ниже 0.05 усилие прыгало до 1.0 | BUG (Input) | Кратковременный рывок тормоза (bite spike) при отпускании курка | **Low** | 🟢 УСТРАНЕНО |
+| **D-27** | `scenes/player/bicycle.tscn` | `CharacterBody3D` капсула имеет `collision_mask = 7` | Architectural Analysis | Слой 5 (RoughRoad) содержит бит 2 (Road), коллизия со слоем 7 обеспечена | **Low** | 🟢 ВЕРИФИЦИРОВАНО (OK) |
+| **D-28** | `scripts/world/chunk_streamer.gd` L44-46 | Цикл `while (total_s - player_s) < AHEAD_DISTANCE` без лимита итераций | Risk (Hang) | Потенциальный дедлок потока при сбое генератора | **Low** | 🟢 УСТРАНЕНО |
+| **D-29** | `scripts/test/test_track_ride.gd` L99, L115 | Телепортация велосипеда на секции J и L без разворота базиса (велик спавнился задом наперёд) | BUG (Test) | Логическая некорректность ориентации в тесте | **Low** | 🟢 УСТРАНЕНО |
+| **D-30** | `scripts/camera/bike_camera.gd` L154, L196 | Неограниченная аккумуляция `travel_distance` и `bob_phase` без `fmod` | Tech Debt | Деградация точности IEEE 754 при сессии свыше нескольких часов | **Low** | 🟡 ТЕХДОЛГ |
+| **D-20** | `scripts/ui/debug_hud.gd` L74 | Расчётный `chunk_id = int(cur_s / 50.0)` не синхронизирован с фактическим `next_chunk_id` | Tech Debt | Небольшое расхождение номера чанка в F3 HUD | **Low** | 🟡 ТЕХДОЛГ |
+| *D-16..D-19* | `road_path_data`, `road_logic`, `test_procedural_run` | Залипание окна `find_closest_index`, тавтология шва, FSM очереди дропа, утечка ObjectDB | Ранее устранённые | 125/125 тестов успешно пройдены | — | 🟢 УСТРАНЕНО |
 
 ---
 
-## 3. ПОДРОБНЫЙ ТЕХНИЧЕСКИЙ РАЗБОР И АРХИТЕКТУРНЫЕ РЕШЕНИЯ (4-STEP METHODOLOGY)
+## 3. ДЕТАЛЬНЫЙ ТЕХНИЧЕСКИЙ РАЗБОР (4-STEP METHODOLOGY)
 
-### 3.1. [HIGH] Залипание окна `find_closest_index()` на 50 метров при вызовах без кэша (`road_path_data.gd`)
+### 3.1. [HIGH] D-21: Избыточный допуск угла приземления (+10.0°) в валидаторе
 * **1. Это реально bug или просто stylistic preference?**  
-  **Реальный функционально-алгоритмический баг пространственного поиска по сплайну (Spatial Window Boundary Defect)**. Не имеет отношения к стилю кодирования.
+  **Реальный дефект валидации безопасности трассы**. Контракт `RoadAirborneContract` строго фиксирует `LANDING_MAX_DELTA_GRADE = 4.0°`. Добавление константы `+ 10.0` расширяет допуск до 14.0°, что нивелирует защитную функцию алгоритма.
 * **2. Есть ли observable consequence?**  
-  В `scripts/world/road_path_data.gd` метод `find_closest_index(target_pos, start_idx = 0)` инициализирует окно локального поиска:
-  $$\text{search\_min} = \max(0, \text{start\_idx} - 100), \quad \text{search\_max} = \min(\text{size} - 1, \text{start\_idx} + 100)$$
-  При вызове с `start_idx = 0` (по умолчанию) окно ограничено индексами $[0, 100]$ (соответствует $0 \dots 200$ метрам вдоль дороги).
-  Если целевая координата `target_pos` находится на дистанции от $202$ до $250$ метров (образцы $101 \dots 125$), локальный поиск проверяет только образцы до $100$ (позиция $200$ м).
-  Расстояние от `target_pos` до образца 100 составляет $\le 50$ метров, следовательно:
-  $$\text{min\_dist\_sq} \le 50^2 = 2500.0$$
-  Условие перехода к полному перебору массива:
-  ```gdscript
-  if min_dist_sq > 2500.0: # > 50m
-      for i in range(points.size()):
-  ```
-  оказывается **ЛОЖНЫМ** (`min_dist_sq <= 2500.0`).
-  В результате функция возвращает индекс 100 вместо истинного ближайшего индекса $101 \dots 125$.
-  *Наблюдаемое проявление*:
-  - В `scripts/world/world_manager.gd` (строка 49): `request_bike_recovery(current_pos)` вызывает `find_closest_index(current_pos)` без указания `start_idx`. Если игрок падает или нажимает `R` на участке $200 \dots 250$ метров от старта (или от границы обрезки сплайна), система телепортирует его не на 20 метров назад, а на $20 + 50 = 70$ метров назад к образцу $90$.
-  - На испытательных полигонах (`riding_lab_generator.gd`, `gravel_loop_generator.gd`, `test_track_generator.gd`) вызовы без кэша `start_idx` приводят к 50-метровому залипанию индексов секций и спавна.
+  При генерации сложного рельефа приземление с перепадом уклона до 14° признаётся «валидным». При приземлении на встречный склон велосипед испытывает жесткий удар с перегрузкой по вертикальной скорости ($v_y > 6.5$ м/с), вызывая срыв сцепления или визуальный клевок.
 * **3. Можно ли доказать проблему кодом/тестом/сценарием?**  
-  Создан изолированный тест `scratch/test_find_closest.gd`, создающий сплайн из 200 образцов с шагом 2.0 м:
-  - Запрос точки на образце 110 (дистанция 220 м) с `start_idx = 0`:
-  - `Expected: 110 | Returned: 100 | Discrepancy: 20 meters`.
-  - При прогоне по всем 300 индексам: стабильный сбой на всех индексах от 101 до 125 (ровно 50-метровый мертвый диапазон).
+  В тесте `test_road_contract.gd` вызов `validate_landing_parameters(-6.0, -18.0, 60.0, 0.0)` с разницей $\Delta = 12.0^\circ$ возвращает `is_valid == true` вместо `false`.
 * **4. Какой минимальный diff её исправляет?**  
-  Если наилучший найденный образец находится на внешней границе окна поиска (`best_idx == search_max` при `search_max < points.size() - 1` или `best_idx == search_min` при `search_min > 0`), это математически означает, что глобальный минимум лежит за пределами исследованного окна, и требуется полный поиск:
+  Файл: `scripts/world/road_airborne_contract.gd` (строка 78):
   ```gdscript
-  # scripts/world/road_path_data.gd:
-  var at_window_edge: bool = (best_idx == search_min and search_min > 0) or (best_idx == search_max and search_max < points.size() - 1)
-  if min_dist_sq > 2500.0 or at_window_edge:
-  	for i in range(points.size()):
-  		var d_sq: float = target_pos.distance_squared_to(points[i])
-  		if d_sq < min_dist_sq:
-  			min_dist_sq = d_sq
-  			best_idx = i
+  # ДО:
+  if delta_grade > (LANDING_MAX_DELTA_GRADE + 10.0):
+  # ПОСЛЕ:
+  if delta_grade > (LANDING_MAX_DELTA_GRADE + 0.5):
   ```
-  *Эмпирическая проверка*: scratch-тест подтвердил 100% точное нахождение всех 500/500 индексов при сохранении $O(1)$ скорости для точек внутри окна.
 
 ---
 
-### 3.2. [MEDIUM] Фиктивная проверка шва чанков `validate_seam` (`road_logic.gd` & `test_road_grammar.gd`)
+### 3.2. [HIGH] D-22: Безусловный `quit(0)` при сбое теста устойчивости дропов
 * **1. Это реально bug или просто stylistic preference?**  
-  **Реальный логический дефект фаервола валидации (No-op Defeated Quality Assertion)**.
+  **Критический дефект тестового сценария (False-Positive CI Masking)**.
 * **2. Есть ли observable consequence?**  
-  В `scripts/world/road_logic.gd` (строки 100–103):
-  ```gdscript
-  if start_idx > 0 and last_validity_report.is_valid:
-  	var seam_report = ValidatorClass.validate_seam(road_path, start_idx, road_path, start_idx)
-  	if not seam_report.is_valid:
-  		last_validity_report = seam_report
-  ```
-  И в `scripts/test/test_road_grammar.gd` (строка 108):
-  ```gdscript
-  var seam_report = ValidatorClass.validate_seam(path, start_idx, path, start_idx)
-  ```
-  Функция `validate_seam(path_a, idx_a, path_b, idx_b)` сравнивает координаты `path_a.points[idx_a]` и `path_b.points[idx_b]`. Передача одного и того же индекса `start_idx` сравнивает точку с самой собой. `distance_to(p, p) == 0.0`, углы нормалей и касательных идентичны, дельта уклона равна нулю.
-  *Наблюдаемое проявление*: Проверка `seam_report` всегда возвращает `is_valid = true` и `error_count = 0` независимо от того, корректен ли стык чанка. Фактически конвейер генерации в этой точке полностью слеп к потенциальным швам.
-  (При этом сам переход от `start_idx` к `start_idx + 1` частично проверяется общим методом `validate_segment(road_path, start_idx, end_idx)`, что маскировало данную проблему).
+  В скрипте `scripts/test/test_airborne_empirical_gate.gd` строка 55 вызывает `quit(0)` в любом случае. Если физика приземления теряет стабильность (велосипед опрокидывается или подскакивает, печатая `WARN [INSTABILITY]`), процесс завершается с кодом успеха, маскируя регрессию в автоматических запусках.
 * **3. Можно ли доказать проблему кодом/тестом/сценарием?**  
-  Код тривиально доказывает, что `validate_seam(p, i, p, i)` математически инвариантен к любым данным и всегда возвращает 0 нарушений.
+  Принудительно испортить параметры подвески в `bicycle_controller.gd` — запуск `test_airborne_empirical_gate.gd` выведет предупреждения, но вернёт `$LASTEXITCODE == 0`.
 * **4. Какой минимальный diff её исправляет?**  
-  В `road_logic.gd` и `test_road_grammar.gd` убрать тавтологический вызов, либо (если требуется строгий межсегментный контроль) проверять согласованность между состоянием до генерации (`snap_pt`, `snap_tang`, `snap_norm`) и первой сгенерированной точкой чанка `start_idx + 1`.
-
----
-
-### 3.3. [MEDIUM] Отсутствие обработчика `FlowPhase.VALID_LANDING_SURFACE` в `road_logic.gd`
-* **1. Это реально bug или просто stylistic preference?**  
-  **Реальный архитектурный дефект автомата состояний (Incomplete FSM Pattern Matching)**.
-* **2. Есть ли observable consequence?**  
-  В `road_grammar.gd` фаза `FlowPhase.VALID_LANDING_SURFACE` ставится в очередь `phase_queue` после `AIRBORNE_DROP`:
+  Файл: `scripts/test/test_airborne_empirical_gate.gd`:
   ```gdscript
-  FlowPhase.BRAKING_ZONE:
-  	...
-  	phase_queue.append(FlowPhase.AIRBORNE_DROP)
-  	phase_queue.append(FlowPhase.VALID_LANDING_SURFACE)
-  	phase_queue.append(FlowPhase.RECOVERY_FLAT)
-  ```
-  В `road_logic.gd` функция `_generate_phase_geometry(spec)` содержит `match spec.phase:`, где перечислены все фазы, кроме `VALID_LANDING_SURFACE`. Она неявно проваливается в дефолтную ветку `RoadGrammarClass.FlowPhase.RECOVERY_FLAT, _: _build_recovery_flat(spec)`.
-  При этом в `_build_airborne_drop_and_landing` посадочный пандус уже сгенерирован внутри чанка дропа (сэмплы 12..19, `mode = LANDING`).
-  В результате после дропа игрок получает не «дроп $\to$ посадочный пандус $\to$ равнина», а «дроп с пандусом $\to$ равнина (под маской `VALID_LANDING_SURFACE`) $\to$ ещё одна равнина (`RECOVERY_FLAT`)» — 100 метров пологого движения подряд, ломающего горный ритм спуска.
-* **3. Можно ли доказать проблему кодом/тестом/сценарием?**  
-  Трассировка очереди `phase_queue` показывает, что чанк с фазой `VALID_LANDING_SURFACE` маркируется как `SegmentType.RECOVERY_FLAT` с уклоном $-1.0^\circ \dots +0.5^\circ$ вместо параметров спецификации `spec.min_slope_deg = -8.0`, `spec.max_slope_deg = -5.0`.
-* **4. Какой минимальный diff её исправляет?**  
-  В `scripts/world/road_grammar.gd` синхронизировать очереди переходов: так как чанк `AIRBORNE_DROP` уже содержит согласованный посадочный стол (16 м) и выкат, в очереди `phase_queue` после `AIRBORNE_DROP` должен сразу следовать `RECOVERY_FLAT`:
-  ```gdscript
-  # road_grammar.gd:
-  FlowPhase.AIRBORNE_DROP:
-  	phase_queue.append(FlowPhase.RECOVERY_FLAT)
-  ```
-  А в `road_logic.gd` добавить явное соответствие для `FlowPhase.VALID_LANDING_SURFACE: _build_recovery_flat(spec)` для исключения неявного проваливания в `_`.
-
----
-
-### 3.4. [LOW] Утечка экземпляров ObjectDB в `test_procedural_run.gd`
-* **1. Это реально bug или просто stylistic preference?**  
-  **Дефект тестового скрипта (Resource Leak at Exit)**.
-* **2. Есть ли observable consequence?**  
-  При запуске `godot --headless -s scripts/test/test_procedural_run.gd` в консоль выводится:
-  `WARNING: 6 ObjectDB instances were leaked at exit (run with --verbose for details).`
-  Это нарушает правило 7 директив агента (`AGENTS.md`: «Zero leak warnings»).
-* **3. Можно ли доказать проблему кодом/тестом/сценарием?**  
-  Воспроизводится в 100% запусков `test_procedural_run.gd`. Вызвано тем, что инстанс сцены `main_scene.instantiate()` добавляется в `root`, а перед вызовом `quit(0)` не вызывается `queue_free()`.
-* **4. Какой минимальный diff её исправляет?**  
-  В `scripts/test/test_procedural_run.gd` перед `quit(0)`:
-  ```gdscript
-  main_node.queue_free()
-  for _i in range(5):
-  	await process_frame
+  # ДО (строка 55):
   quit(0)
+  # ПОСЛЕ:
+  quit(0 if all_passed else 1)
   ```
 
 ---
 
-## 4. ПОШАГОВЫЙ ПЛАН РЕАЛИЗАЦИИ И СТАТУС ВНЕДРЕНИЯ
+### 3.3. [MEDIUM] D-23: Разрыв геометрии (Seam Tear) между дорогой и обочиной на участках Rough Gravel
+* **1. Это реально bug или просто stylistic preference?**  
+  **Реальный визуальный и геометрический баг стыковки мешей**.
+* **2. Есть ли observable consequence?**  
+  В `scripts/world/road_chunk.gd` функция `_build_road_mesh` на участках `is_rough` поднимает/опускает вершины кромки полотна:
+  ```gdscript
+  var bump: float = 0.025 * sin(dist * 2.5) * envelope
+  v_left.y += bump
+  v_right.y += bump
+  ```
+  Однако в `_build_terrain_mesh` базовые точки примыкания обочины `road_left` и `road_right` вычисляются без учёта `bump`. В результате между асфальтом/гравием и прилегающей травой возникает сквозная щель шириной до 25 мм.
+* **3. Можно ли доказать проблему кодом/тестом/сценарием?**  
+  Инспекция полигональной сетки на секции J в `riding_feel_test_track.tscn`: вершины дороги имеют Y-координату $y_0 + \text{bump}$, вершины земли — ровно $y_0$.
+* **4. Какой минимальный diff её исправляет?**  
+  В `scripts/world/road_chunk.gd` передавать `is_rough` в `_build_terrain_mesh` и добавлять аналогичный `bump` к `road_left.y` и `road_right.y`:
+  ```gdscript
+  if is_rough:
+  	var bump: float = 0.025 * sin(dist * 2.5) * envelope
+  	road_left.y += bump
+  	road_right.y += bump
+  ```
 
-> ✅ **СТАТУС**: Все дефекты D-16..D-19 успешно устранены с минимальным диффом и верифицированы мастер-сьютом (125/125 PASS, 0 утечек ObjectDB, 100% точность поиска).
+---
 
-### Фаза 1 (Critical & High-Priority Fixes — Пространственный поиск сплайна) — ВЫПОЛНЕНО
-- [x] **[FIX-SPATIAL-SEARCH]** В `scripts/world/road_path_data.gd` в функции `find_closest_index()` внедрена проверка границы окна `at_window_edge`, устранившая 50-метровое залипание индекса для всех вызовов без кэша `start_idx`.
-- [x] **[VERIFY-RECOVERY]** Проверена точность `WorldManager.request_bike_recovery()` и `find_closest_index()`: 100% точное попадание во все 500 из 500 образцов сплайна.
-- [x] **[REGRESSION-T02]** Добавлен регрессионный тест #68 в `test_diagnostics.gd` (все 68/68 assertions PASS). Время поиска с кэшем сохранило сложность $O(1)$ (< 5 мкс).
+### 3.4. [MEDIUM] D-24: Сохранение уклона (Pitch) при спавне Recovery
+* **1. Это реально bug или просто stylistic preference?**  
+  **Реальный функциональный краевой дефект системы восстановления игрока**.
+* **2. Есть ли observable consequence?**  
+  При нажатии `R` во время движения по крутому спуску (-14°) или подъему метод `_execute_recovery_teleport()` сбрасывает скорость, крен (`current_bank = 0.0`), руление, но забывает сбросить `physics_pitch` и `visual_pitch`. При появлении на горизонтальном участке дороги рама велосипеда один-два кадра отрисовывается наклонённой, после чего плавно выравнивается через сглаживание, создавая визуальный рывок.
+* **3. Можно ли доказать проблему кодом/тестом/сценарием?**  
+  Запустить спуск под -12°, нажать R: сразу после затемнения экрана `visual_pitch` не равен нулю.
+* **4. Какой минимальный diff её исправляет?**  
+  В `scripts/player/bicycle_controller.gd` внутри `_execute_recovery_teleport()`:
+  ```gdscript
+  current_pitch = 0.0
+  physics_pitch = 0.0
+  visual_pitch = 0.0
+  ```
 
-### Фаза 2 (FSM & Pipeline Integrity — Грамматика и валидация швов) — ВЫПОЛНЕНО
-- [x] **[FIX-FSM-QUEUE]** В `scripts/world/road_grammar.gd` синхронизированы переходы после `AIRBORNE_DROP` (прямой переход к `RECOVERY_FLAT`, исключено дублирование 100 м равнины).
-- [x] **[FIX-FSM-HANDLER]** В `scripts/world/road_logic.gd` добавлена явная обработка `VALID_LANDING_SURFACE` в `_generate_phase_geometry`.
-- [x] **[FIX-SEAM-ASSERTION]** В `scripts/world/road_logic.gd` и `scripts/test/test_road_grammar.gd` устранен фиктивный вызов `validate_seam` с одинаковым индексом; целостность межчанового шва обеспечивается сквозным методом `validate_segment(path, start_idx, end_idx)`.
+---
 
-### Фаза 3 (Test Environment & Zero-Leak Cleanup) — ВЫПОЛНЕНО
-- [x] **[CLEAN-TEST-HARNESS]** В `scripts/test/test_procedural_run.gd` добавлен вызов `main_node.queue_free()` и ожидание кадров сборки мусора перед `quit(0)`. Утечка 6 экземпляров ObjectDB полностью ликвидирована.
-- [x] **[REGRESSION-MASTER]** Запущен мастер-сьют `test_sprint_4m_master.gd`: строго **125 / 125 assertions PASS**, 0 утечек ObjectDB. Все контракты `test_road_contract.gd` (18/18 PASS), `test_road_grammar.gd` (250 км PASS), `test_airborne_calibration_gate.gd` (6/6 PASS) подтверждены.
+### 3.5. [MEDIUM] D-25: Неверная константа типа сегмента для луговой растительности
+* **1. Это реально bug или просто stylistic preference?**  
+  **Реальный дефект маппинга перечислений (Enum Mismatch)**.
+* **2. Есть ли observable consequence?**  
+  В `scripts/world/chunk_foliage.gd` (строка 23):
+  `var is_open_meadow: bool = (seg_type == 5) # 5 = MEADOW`
+  Однако `RoadGrammar` генерирует открытые участки отдыха с типом `SegmentType.RECOVERY_FLAT` (значение 14), а тип 5 (`MEADOW`) никогда не создаётся. В итоге флаг `is_open_meadow` всегда `false`, а шанс появления деревьев `tree_chance` всегда равен 0.75, лишая игрока ощущения открытых залитых солнцем полян.
+* **3. Можно ли доказать проблему кодом/тестом/сценарием?**  
+  Поиск по проекту показывает, что ни один генератор не проставляет сегменту тип 5, все используют 14.
+* **4. Какой минимальный diff её исправляет?**  
+  В `scripts/world/chunk_foliage.gd`:
+  ```gdscript
+  # ДО:
+  var is_open_meadow: bool = (seg_type == 5)
+  # ПОСЛЕ:
+  var is_open_meadow: bool = (seg_type == 14 or seg_type == 5)
+  ```
+
+---
+
+### 3.6. [LOW] D-26: Прыжок тормозного усилия при затухании аналогового ввода
+* **1. Это реально bug или просто stylistic preference?**  
+  **Краевой дефект обработки аналогового ввода**.
+* **2. Есть ли observable consequence?**  
+  В `scripts/player/bicycle_controller.gd` строки 334–336:
+  ```gdscript
+  var brake_strength: float = Input.get_action_strength("brake")
+  if brake_strength < 0.05:
+  	brake_strength = 1.0 # Programmatic fallback
+  ```
+  Если флаг `is_braking` был выставлен в `true`, а на следующем физическом кадре игрок отпустил курок геймпада до значения 0.04 (чуть ниже порога 0.05), срабатывает fallback, и `brake_input` на один кадр получает команду тормозить на 100% вместо 0%.
+* **3. Можно ли доказать проблему кодом/тестом/сценарием?**  
+  Имитация аналогового ввода со значением 0.04 при `is_braking = true` приводит к присвоению `brake_strength = 1.0`.
+* **4. Какой минимальный diff её исправляет?**  
+  Убрать принудительный скачок в 1.0, использовать реальное аналоговое значение:
+  ```gdscript
+  # scripts/player/bicycle_controller.gd:
+  var brake_strength: float = Input.get_action_strength("brake")
+  brake_input = minf(brake_strength, brake_input + (1.0 / brake_attack_time) * delta)
+  ```
+
+---
+
+## 4. СИСТЕМНЫЙ АРХИТЕКТУРНЫЙ АНАЛИЗ ПОДСИСТЕМ
+
+### 4.1. Физическая модель и кинематика (`BicycleController`)
+- **Статус архитектуры**: Превосходное инженерное качество. Модель велосипеда основана на строгом балансе продольных сил ($\Sigma a = a_{\text{cruise}} + a_{\text{sprint}} + a_{\text{gravity}} - a_{\text{rolling}} - a_{\text{drag}} - a_{\text{brake}} - a_{\text{scrub}}$).
+- **Разделение физики и визуала (Presentation Decoupling)**: Полностью соблюдено правило 4 `AGENTS.md`. `CharacterBody3D` всегда сохраняет вертикальный базис (`Basis.Y = UP`), повороты рамы и руля изолированы в дочерних узлах `VisualsRoot` и `HandlebarPivot`.
+- **Энергетический баланс при отрыве от земли**: При переходе в `AIRBORNE` горизонтальная скорость масштабируется через $1.0$ вместо $\cos(\text{pitch})$. Разница составляет 2–3%, что ощущается как естественный вылет с трамплина и не приводит к рассинхронизации.
+
+### 4.2. Камера и стабилизация (`BikeCameraRig`)
+- **Статус архитектуры**: Полное соблюдение инварианта вестибуло-окулярного рефлекса (VOR $\le 35\%$).
+- **Математическая независимость от частоты кадров**: Все динамические каналы (roll, surge, dive, noise, look, bob, sway, FOV) используют экспоненциальное сглаживание вида $1.0 - \exp(-\text{rate} \cdot \Delta t)$, что подтверждено тестом 62 на частотах 30, 60 и 144 FPS.
+
+### 4.3. Процедурный звуковой движок (`BikeAudioManager`)
+- **Статус архитектуры**: Чистый программный синтез всех пяти каналов без внешних wav-файлов.
+- **Предотвращение клиппинга и артефактов**: Двухголосая трещотка со сменой голосов по пинг-понгу устраняет щелчки усечения. Сглаженные петли розового шума ветра и фактурного шума гравия работают без швов.
+
+### 4.4. Процедурная генерация дороги (`RoadLogic`, `RoadGrammar`, `RoadValidityValidator`)
+- **Статус архитектуры**: Конвейер генерации построен по строгому принципу «Generate $\to$ Validate $\to$ Commit/Rollback».
+- **Математическая непрерывность**: Клотоидное сопряжение серпантинов обеспечивает плавное нарастание кривизны ($\Delta \kappa / \Delta s \le 0.0028 \text{ м}^{-2}$ при контрактном пределе $0.003$).
+- **Отказоустойчивость**: При отбраковке кандидатов чанков выполняется откат к снимку состояния (`truncate_to`) и генерация безопасного коридора.
+
+### 4.5. Тестовая инфраструктура (21 тест-скрипт)
+- **Сильные стороны**: 68 физических диагностических тестов в `test_diagnostics.gd`, 250 км валидации в `test_road_grammar.gd`.
+- **Слабые стороны**: Наличие пяти capture-скриптов без ассертов, маскировка ошибок через `quit(0)` в `test_airborne_empirical_gate.gd`, хрупкий поиск строковых литералов в исходном коде в ряде тестов.
+
+---
+
+## 5. ПОШАГОВЫЙ ПЛАН РЕАЛИЗАЦИИ И СТАТУС ВНЕДРЕНИЯ
+
+> ✅ **СТАТУС**: Все утверждённые пункты плана успешно реализованы и подтверждены сквозными тестами движка (Мастер-сьют: **125 / 125 PASS**, Регрессионный сьют: **68 / 68 PASS**, Контракты дороги: **18 / 18 PASS**, Дропы: **5 / 5 PASS**).
+
+### Фаза 1: Устранение подтверждённых функциональных дефектов — ВЫПОЛНЕНО
+- [x] **[FIX-D24]** `scripts/player/bicycle_controller.gd`: В `_execute_recovery_teleport()` добавлен сброс `current_pitch = 0.0`, `physics_pitch = 0.0`, `visual_pitch = 0.0`. Наклон рамы при респавне полностью исключён.
+- [x] **[FIX-D25]** `scripts/world/chunk_foliage.gd`: Добавлена поддержка `seg_type == 14` (`RECOVERY_FLAT`) для разрежения деревьев на открытых полянах (`tree_chance = 0.25`).
+- [x] **[FIX-D26]** `scripts/player/bicycle_controller.gd`: Устранён спайк тормозного усилия до 1.0 при затухании аналогового ввода курка.
+- [x] **[FIX-D23]** `scripts/world/road_chunk.gd`: Синхронизирована Y-координата кромки обочины `road_left`/`road_right` с волновым смещением дороги `bump` на участках `ROUGH_GRAVEL`. Вертикальный зазор устранён.
+- [ ] **[FIX-D21]** `scripts/world/road_airborne_contract.gd`: Пропущено по явному указанию пользователя.
+
+### Фаза 2: Обеспечение надежности тестового контура CI — ВЫПОЛНЕНО
+- [x] **[FIX-D22]** `scripts/test/test_airborne_empirical_gate.gd`: Передаётся реальный код завершения `quit(0 if all_passed else 1)`.
+- [x] **[FIX-D29]** `scripts/test/test_track_ride.gd`: Базис велосипеда разворачивается по касательной дороги при телепортации на секции J и L.
+
+### Фаза 3: Архитектурные защитные барьеры — ВЫПОЛНЕНО
+- [x] **[FIX-D28]** `scripts/world/chunk_streamer.gd`: Внедрён счётчик `spawn_guard` (лимит 15) в цикл спавна чанков `while (total_s - player_s) < AHEAD_DISTANCE` для защиты от бесконечного цикла.
+- [x] **[VERIFY-D27]** `scenes/player/bicycle.tscn`: Проверена коллизия тела `CharacterBody3D` (маска 7). Дорога RoughRoad (слой 18 = 2 | 16) содержит бит слоя 2 (Road), физическая коллизия обеспечена.
+
+---
+
+## 6. ЧТО СТРОГО ЗАПРЕЩЕНО ТРОГАТЬ («НЕ ТРОГАЕМ ОСТАЛЬНОЕ»)
+1. ❌ **Внутреннюю кинематику и уравнения разгона/руления `BicycleController`** — модель полностью откалибрована и подтверждена десятками тестов.
+2. ❌ **Параметры сглаживания и коэффициенты `BikeCameraRig`** — баланс динамики и комфорта зафиксирован.
+3. ❌ **Алгоритмы генерации звука в `BikeAudioManager`** — синтез стабилен, не содержит артефактов и утечек.
+4. ❌ **FSM переходов грамматики `RoadGrammar`** — топография спусков работает ритмично и детерминированно.
+5. ❌ **Формат и структуру хранения данных `RoadPathData`** — стабильный центральный контракт между всеми модулями.

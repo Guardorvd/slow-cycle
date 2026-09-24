@@ -38,21 +38,29 @@ func _run_measurements() -> void:
 	var all_results := [res_t6, res_t10]
 	all_results.append_array(res_synth)
 
+	var all_passed: bool = true
 	for r in all_results:
 		var name_str: String = str(r["name"])
 		var time_str: String = "%.3f s" % float(r["air_time_s"])
 		var dist_str: String = "%.2f m" % float(r["air_dist_m"])
 		var vy_str: String = "%.2f m/s" % float(r["landing_vy"])
 		var susp_str: String = "%d mm" % int(r["susp_compression_mm"])
-		var stab_str: String = "PASS [STABLE]" if bool(r["is_stable"]) else "WARN [INSTABILITY]"
+		var is_stable: bool = bool(r["is_stable"])
+		if not is_stable:
+			all_passed = false
+		var stab_str: String = "PASS [STABLE]" if is_stable else "WARN [INSTABILITY]"
 
 		print("%-28s | %-8s | %-9s | %-10s | %-12s | %s" % [
 			name_str, time_str, dist_str, vy_str, susp_str, stab_str
 		])
 
 	print("------------------------------------------------------------------")
-	print("[EMPIRICAL GATE COMPLETED SUCCESSFULLY: CALIBRATION READY]\n")
-	quit(0)
+	if all_passed:
+		print("[EMPIRICAL GATE COMPLETED SUCCESSFULLY: CALIBRATION READY]\n")
+		quit(0)
+	else:
+		printerr("[EMPIRICAL GATE FAILED: INSTABILITY DETECTED]\n")
+		quit(1)
 
 func _measure_riding_lab_t10() -> Dictionary:
 	var root_node = LabScene.instantiate()

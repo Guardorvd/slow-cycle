@@ -37,7 +37,7 @@ func build_chunk(path_data: RefCounted, s_idx: int, e_idx: int, id: int, shared_
 
 	# 2. Build Roadside Terrain Strip (Layer 3: Grass)
 	var noise: FastNoiseLite = shared_materials.get("noise")
-	_build_terrain_mesh(path_data, s_idx, e_idx, shared_materials.get("grass"), noise)
+	_build_terrain_mesh(path_data, s_idx, e_idx, shared_materials.get("grass"), noise, is_rough)
 
 	# 3. Populate Chunk-Local MultiMesh Foliage
 	var foliage_spawner = ChunkFoliageClass.new()
@@ -108,7 +108,7 @@ func _build_road_mesh(path_data: RefCounted, s_idx: int, e_idx: int, mat: Materi
 	road_body.add_child(col_shape)
 	add_child(road_body)
 
-func _build_terrain_mesh(path_data: RefCounted, s_idx: int, e_idx: int, mat: Material, noise: FastNoiseLite = null) -> void:
+func _build_terrain_mesh(path_data: RefCounted, s_idx: int, e_idx: int, mat: Material, noise: FastNoiseLite = null, is_rough: bool = false) -> void:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	if mat:
@@ -126,6 +126,13 @@ func _build_terrain_mesh(path_data: RefCounted, s_idx: int, e_idx: int, mat: Mat
 
 		var road_left: Vector3 = pt - binorm * ROAD_HALF_WIDTH
 		var road_right: Vector3 = pt + binorm * ROAD_HALF_WIDTH
+
+		if is_rough:
+			var t_chunk: float = float(i) / float(maxi(num_pts - 1, 1))
+			var envelope: float = smoothstep(0.0, 0.15, t_chunk) * smoothstep(1.0, 0.85, t_chunk)
+			var bump: float = 0.025 * sin(dist * 2.5) * envelope
+			road_left.y += bump
+			road_right.y += bump
 
 		var outer_left_base: Vector3 = pt - binorm * (ROAD_HALF_WIDTH + TERRAIN_WIDTH)
 		var outer_right_base: Vector3 = pt + binorm * (ROAD_HALF_WIDTH + TERRAIN_WIDTH)

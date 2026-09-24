@@ -331,8 +331,10 @@ func _calculate_forward_dynamics(delta: float) -> void:
 	# Progressive braking with quadratic effort curve and analog brake
 	if is_braking:
 		var brake_strength: float = Input.get_action_strength("brake")
-		if brake_strength < 0.05:
-			brake_strength = 1.0 # Programmatic fallback
+		if brake_strength < 0.05 and brake_input <= 0.0:
+			brake_strength = 1.0 # Programmatic fallback for headless tests
+		elif brake_strength < 0.05:
+			brake_strength = brake_input
 		brake_input = minf(brake_strength, brake_input + (1.0 / brake_attack_time) * delta)
 	else:
 		brake_input = maxf(0.0, brake_input - (1.0 / brake_release_time) * delta)
@@ -581,6 +583,9 @@ func _execute_recovery_teleport() -> void:
 	cornering_scrub_accel = 0.0
 	sprint_boost = 0.0
 	current_bank = 0.0
+	current_pitch = 0.0
+	physics_pitch = 0.0
+	visual_pitch = 0.0
 	current_steer = 0.0
 	visual_steer = 0.0
 	crank_rotation = 0.0

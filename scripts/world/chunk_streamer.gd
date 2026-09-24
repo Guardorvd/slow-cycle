@@ -41,9 +41,11 @@ func update_streaming(player_pos: Vector3) -> void:
 	var total_s: float = road_path.get_total_distance()
 
 	# 1. Spawn chunks ahead
-	while (total_s - player_s) < AHEAD_DISTANCE:
+	var spawn_guard: int = 0
+	while (total_s - player_s) < AHEAD_DISTANCE and spawn_guard < 15:
 		_spawn_next_chunk()
 		total_s = road_path.get_total_distance()
+		spawn_guard += 1
 
 	# 2. Despawn chunks behind
 	var ids_to_remove: Array[int] = []

@@ -20,7 +20,7 @@ func populate_chunk(parent_chunk: Node3D, path_data: RefCounted, s_idx: int, e_i
 	var grass_transforms: Array[Transform3D] = []
 
 	var seg_type: int = path_data.segment_types[s_idx]
-	var is_open_meadow: bool = (seg_type == 5) # 5 = MEADOW
+	var is_open_meadow: bool = (seg_type == 14 or seg_type == 5) # 14 = RECOVERY_FLAT, 5 = MEADOW
 	var tree_chance: float = 0.25 if is_open_meadow else 0.75
 
 	# Half-open interval [s_idx, e_idx) prevents duplicate foliage at chunk boundaries
