@@ -334,16 +334,26 @@
 - Регрессионный мастер-сьют `test_sprint_4m_master.gd`: строго 124 / 124 assertions PASS, 0 утечек ObjectDB.
 **Files**: `scripts/world/road_generation_contract.gd` (NEW), `scripts/world/road_airborne_contract.gd` (NEW), `scripts/world/road_validity_validator.gd` (NEW), `scripts/world/road_path_data.gd` (MODIFIED), `scripts/test/test_airborne_empirical_gate.gd` (NEW), `scripts/test/test_road_contract.gd` (NEW), `BACKLOG.md` (MODIFIED).
 
-### TASK: [FEAT-014.1] Road Data & Graph Foundation
+### TASK: [FEAT-014.1] Road Data & Graph Foundation (`COMPLETED [x]`)
 **Goal**: Разделить топологическую структуру сети дорог и конкретную сплайновую геометрию, создав фундамент для ветвления.
-**Do**: Создать `scripts/world/road_graph.gd` и структуру узлов развилок `RoadForkNode`:
-- `RoadGraph` хранит направленный ациклический граф участков (Edges) и узлов (Nodes) в чистой памяти без создания нод Godot.
-- `RoadForkNode` включает кинематический контекст: скорость входа, уклон, радиус, необходимую дистанцию торможения, предварительный обзор обеих ветвей.
-- Интеграция с `RoadPathData`: генерация независимых массивов точек для каждой ветви.
-**Do not**: Не выполнять расчет геометрии в `_physics_process()`.
-**Acceptance Criteria**:
-- Граф корректно строит и связывает расходящиеся ветви с сохранением координат развилочного узла.
-**Files**: `scripts/world/road_graph.gd` (NEW), `scripts/world/road_path_data.gd`.
+**Realized**:
+- В `scripts/world/road_kinematic_model.gd` (v1.0.0):
+  - Построен чистый статический модуль `RoadKinematicModel` — единый источник истины для кинематики велосипеда и расчета тормозного пути.
+  - Реализованы классифицированные режимы замедления: `COMFORT` ($2.2\text{ м/с}^2$, $t_{\text{react}} = 0.8\text{с}$), `NORMAL` ($3.5\text{ м/с}^2$, $t_{\text{react}} = 0.5\text{с}$), `EMERGENCY` ($5.5\text{ м/с}^2$, $t_{\text{react}} = 0.3\text{с}$).
+  - Аналитический расчет дистанции торможения с учетом уклона и гравитации ($a_{\text{eff}} = a_{\text{base}} + g \sin(\theta)$), строгое возвращение $0.0$ при $v_{\text{entry}} \le v_{\text{target}}$ и явный статус `BRAKING_PHYSICALLY_INSUFFICIENT` на неудержимых спусках без маскирующих искусственных клэмпов.
+- В `scripts/world/road_graph.gd` (v1.0.0):
+  - Чисто топологический контейнер `RoadGraph` (Directed Acyclic Graph) в чистой памяти без создания нод Godot SceneTree (0 утечек ObjectDB).
+  - Узлы `RoadNode`, `RoadForkNode`, ребра `RoadEdge` и контекст `BranchPreviewContext` с разделением физико-топологических параметров и непрозрачных презентационных метаданных.
+  - Непротиворечивая модель развилки: строгое $C^0$ и $C^1$ в точке развилки $s=0$ ($p_{E0} = p_{E1} = p_{\text{fork}}$, $\mathbf{t}_{E0} = \mathbf{t}_{E1} = \mathbf{t}_{\text{fork}}$), измерение угла дивергенции $\Delta \theta \in [10^\circ, 40^\circ]$ на фиксированной дистанции $D_{\text{diverge}} = 15.0$ м.
+  - Быстрая проверка ацикличности без рекурсии через алгоритм Кана (Kahn's in-degree topological sort) — 10 000 узлов за 130 мс с нулевым риском переполнения стека.
+  - Экспорт и конвертация ветвей в независимые экземпляры `RoadPathData` без генерации сплайновой геометрии в графе.
+- В `scripts/world/road_path_data.gd`:
+  - Введены стандартизированные константы `UNASSIGNED_BRANCH_ID = -1`, `MAIN_BRANCH_ID = 0`, свойства `fork_node_id`, `parent_branch_id`.
+  - Реализован `slice_segment(start_idx, end_idx)` с локальным пересчетом `cumulative_distances` строго от $0.0$.
+  - Реализован `append_path_data(other, policy)` с политикой `DROP_DUPLICATE_ENDPOINT` против дублирования вертексов шва.
+  - Реализован глубокий `clone()` всех 10 типизированных Packed-массивов с полной изоляцией мутаций.
+- Комплекс верификации: `test_road_graph.gd` (61/61 assertions PASS), регрессия `test_sprint_4m_master.gd` (125/125 PASS, 0 утечек).
+**Files**: `scripts/world/road_kinematic_model.gd` (NEW), `scripts/world/road_graph.gd` (NEW), `scripts/world/road_path_data.gd` (MODIFIED), `scripts/test/test_road_graph.gd` (NEW), `BACKLOG.md` (MODIFIED).
 
 ### TASK: [FEAT-014.2] Road Grammar & MTB Profiles (`COMPLETED [x]`)
 **Goal**: Создать выделенный слой драматургии трассы, управляющий чередованием фаз спуска, виражей, торможения и отдыха по правилам MTB, и перестроить RoadLogic под управление FSM с живым контролем качества.

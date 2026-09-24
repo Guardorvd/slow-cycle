@@ -22,6 +22,15 @@ enum SegmentType {
 	RECOVERY_FLAT = 14
 }
 
+const UNASSIGNED_BRANCH_ID: int = -1
+const MAIN_BRANCH_ID: int = 0
+
+enum AppendPolicy {
+	DROP_DUPLICATE_ENDPOINT = 0, ## If other[0] == self[-1] within tolerance, drop other[0]
+	KEEP_BOTH = 1,               ## Keep both points regardless
+	REQUIRE_CONTINUITY = 2       ## Push error and reject if seam distance > tolerance
+}
+
 var points: PackedVector3Array = PackedVector3Array()
 var tangents: PackedVector3Array = PackedVector3Array()
 var normals: PackedVector3Array = PackedVector3Array()
@@ -33,7 +42,9 @@ var segment_types: PackedInt32Array = PackedInt32Array()
 var surface_contact_states: PackedByteArray = PackedByteArray()
 var banking_angles: PackedFloat32Array = PackedFloat32Array()
 var sight_distances: PackedFloat32Array = PackedFloat32Array()
-var branch_id: int = 0
+var branch_id: int = MAIN_BRANCH_ID
+var fork_node_id: int = -1
+var parent_branch_id: int = UNASSIGNED_BRANCH_ID
 
 func size() -> int:
 	return points.size()
@@ -227,3 +238,139 @@ func get_sample_at_distance(target_dist: float) -> Dictionary:
 		"normal": interp_norm,
 		"slope": interp_slope
 	}
+
+## Extracts an independent deep-copy segment with local cumulative_distances starting strictly at 0.0.
+func slice_segment(start_idx: int, end_idx: int) -> RefCounted:
+	var result = get_script().new()
+	result.branch_id = branch_id
+	result.fork_node_id = fork_node_id
+	result.parent_branch_id = parent_branch_id
+
+	if points.is_empty() or start_idx > end_idx or start_idx < 0:
+		return result
+
+	var s_min: int = clampi(start_idx, 0, points.size() - 1)
+	var s_max: int = clampi(end_idx, 0, points.size() - 1)
+	var count: int = s_max - s_min + 1
+
+	result.points = points.slice(s_min, s_max + 1)
+	result.tangents = tangents.slice(s_min, s_max + 1)
+	result.normals = normals.slice(s_min, s_max + 1)
+	result.binormals = binormals.slice(s_min, s_max + 1)
+	result.slopes = slopes.slice(s_min, s_max + 1)
+	result.curvatures = curvatures.slice(s_min, s_max + 1)
+	result.segment_types = segment_types.slice(s_min, s_max + 1)
+	result.surface_contact_states = surface_contact_states.slice(s_min, s_max + 1)
+	result.banking_angles = banking_angles.slice(s_min, s_max + 1)
+	result.sight_distances = sight_distances.slice(s_min, s_max + 1)
+
+	# Local cumulative distances recalculation starting strictly at 0.0
+	result.cumulative_distances.resize(count)
+	result.cumulative_distances[0] = 0.0
+	for i in range(1, count):
+		result.cumulative_distances[i] = result.cumulative_distances[i - 1] + result.points[i - 1].distance_to(result.points[i])
+
+	return result
+
+## Appends another RoadPathData segment with duplicate seam protection
+func append_path_data(other: RefCounted, policy: int = AppendPolicy.DROP_DUPLICATE_ENDPOINT) -> void:
+	if other == null or other.points.is_empty():
+		return
+
+	if points.is_empty():
+		points = other.points.duplicate()
+		tangents = other.tangents.duplicate()
+		normals = other.normals.duplicate()
+		binormals = other.binormals.duplicate()
+		cumulative_distances = other.cumulative_distances.duplicate()
+		slopes = other.slopes.duplicate()
+		curvatures = other.curvatures.duplicate()
+		segment_types = other.segment_types.duplicate()
+		surface_contact_states = other.surface_contact_states.duplicate()
+		banking_angles = other.banking_angles.duplicate()
+		sight_distances = other.sight_distances.duplicate()
+		return
+
+	var seam_dist: float = points[-1].distance_to(other.points[0])
+	var start_src: int = 0
+
+	if policy == AppendPolicy.REQUIRE_CONTINUITY and seam_dist > 0.001:
+		push_error("RoadPathData.append_path_data: seam discontinuity %.4f m > 0.001 m!" % seam_dist)
+		return
+
+	if policy == AppendPolicy.DROP_DUPLICATE_ENDPOINT and seam_dist <= 0.001:
+		start_src = 1 # Skip first sample to prevent duplicate 0-distance vertex
+
+	for i in range(start_src, other.points.size()):
+		append_sample(
+			other.points[i],
+			other.tangents[i],
+			other.normals[i],
+			other.slopes[i],
+			other.curvatures[i],
+			other.segment_types[i],
+			other.surface_contact_states[i],
+			other.banking_angles[i],
+			other.sight_distances[i]
+		)
+
+## Complete deep-copy of all 10 PackedArrays and metadata
+func clone() -> RefCounted:
+	var c = get_script().new()
+	c.branch_id = branch_id
+	c.fork_node_id = fork_node_id
+	c.parent_branch_id = parent_branch_id
+	c.points = points.duplicate()
+	c.tangents = tangents.duplicate()
+	c.normals = normals.duplicate()
+	c.binormals = binormals.duplicate()
+	c.cumulative_distances = cumulative_distances.duplicate()
+	c.slopes = slopes.duplicate()
+	c.curvatures = curvatures.duplicate()
+	c.segment_types = segment_types.duplicate()
+	c.surface_contact_states = surface_contact_states.duplicate()
+	c.banking_angles = banking_angles.duplicate()
+	c.sight_distances = sight_distances.duplicate()
+	return c
+
+## Validates C0 position and C1 tangent continuity between the end of this path and start of next_path
+func validate_continuity_with(next_path: RefCounted, tol_p: float = 0.001, tol_deg: float = 0.2) -> Dictionary:
+	var res := {
+		"is_continuous": true,
+		"pos_error_m": 0.0,
+		"tangent_angle_deg": 0.0,
+		"normal_angle_deg": 0.0,
+		"error_message": ""
+	}
+
+	if points.is_empty() or next_path == null or next_path.points.is_empty():
+		res["is_continuous"] = false
+		res["error_message"] = "Empty path segment in continuity check"
+		return res
+
+	var p_last: Vector3 = points[-1]
+	var p_first: Vector3 = next_path.points[0]
+	var p_dist: float = p_last.distance_to(p_first)
+	res["pos_error_m"] = p_dist
+
+	var t_last: Vector3 = tangents[-1].normalized()
+	var t_first: Vector3 = next_path.tangents[0].normalized()
+	var dot_t: float = clampf(t_last.dot(t_first), -1.0, 1.0)
+	var t_angle_deg: float = rad_to_deg(acos(dot_t))
+	res["tangent_angle_deg"] = t_angle_deg
+
+	var n_last: Vector3 = normals[-1].normalized()
+	var n_first: Vector3 = next_path.normals[0].normalized()
+	var dot_n: float = clampf(n_last.dot(n_first), -1.0, 1.0)
+	var n_angle_deg: float = rad_to_deg(acos(dot_n))
+	res["normal_angle_deg"] = n_angle_deg
+
+	if p_dist > tol_p:
+		res["is_continuous"] = false
+		res["error_message"] = "C0 position error: %.4f m > tolerance %.4f m" % [p_dist, tol_p]
+	elif t_angle_deg > tol_deg:
+		res["is_continuous"] = false
+		res["error_message"] = "C1 tangent angle deviation: %.2f deg > tolerance %.2f deg" % [t_angle_deg, tol_deg]
+
+	return res
+
