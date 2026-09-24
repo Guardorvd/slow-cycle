@@ -57,8 +57,12 @@ func _build_road_mesh(path_data: RefCounted, s_idx: int, e_idx: int, mat: Materi
 		var norm: Vector3 = path_data.normals[idx]
 		var dist: float = path_data.cumulative_distances[idx]
 
-		var v_left: Vector3 = pt - binorm * ROAD_HALF_WIDTH
-		var v_right: Vector3 = pt + binorm * ROAD_HALF_WIDTH
+		var half_w: float = ROAD_HALF_WIDTH
+		if not path_data.road_widths.is_empty() and idx < path_data.road_widths.size():
+			half_w = path_data.road_widths[idx] * 0.5
+
+		var v_left: Vector3 = pt - binorm * half_w
+		var v_right: Vector3 = pt + binorm * half_w
 
 		if is_rough:
 			var t_chunk: float = float(i) / float(maxi(num_pts - 1, 1))
@@ -124,8 +128,12 @@ func _build_terrain_mesh(path_data: RefCounted, s_idx: int, e_idx: int, mat: Mat
 		var norm: Vector3 = path_data.normals[idx]
 		var dist: float = path_data.cumulative_distances[idx]
 
-		var road_left: Vector3 = pt - binorm * ROAD_HALF_WIDTH
-		var road_right: Vector3 = pt + binorm * ROAD_HALF_WIDTH
+		var half_w: float = ROAD_HALF_WIDTH
+		if not path_data.road_widths.is_empty() and idx < path_data.road_widths.size():
+			half_w = path_data.road_widths[idx] * 0.5
+
+		var road_left: Vector3 = pt - binorm * half_w
+		var road_right: Vector3 = pt + binorm * half_w
 
 		if is_rough:
 			var t_chunk: float = float(i) / float(maxi(num_pts - 1, 1))
@@ -134,8 +142,8 @@ func _build_terrain_mesh(path_data: RefCounted, s_idx: int, e_idx: int, mat: Mat
 			road_left.y += bump
 			road_right.y += bump
 
-		var outer_left_base: Vector3 = pt - binorm * (ROAD_HALF_WIDTH + TERRAIN_WIDTH)
-		var outer_right_base: Vector3 = pt + binorm * (ROAD_HALF_WIDTH + TERRAIN_WIDTH)
+		var outer_left_base: Vector3 = pt - binorm * (half_w + TERRAIN_WIDTH)
+		var outer_right_base: Vector3 = pt + binorm * (half_w + TERRAIN_WIDTH)
 
 		var h_left: float = noise.get_noise_2d(outer_left_base.x, outer_left_base.z) * 1.8
 		var h_right: float = noise.get_noise_2d(outer_right_base.x, outer_right_base.z) * 1.8

@@ -379,16 +379,19 @@
   - `test_road_contract.gd` (18/18 PASS), `test_road_logic.gd` (100% PASS), `test_sprint_4m_master.gd` (124/124 PASS, 0 утечек памяти).
 **Files**: `scripts/world/road_grammar.gd` (NEW), `scripts/world/road_logic.gd` (MODIFIED), `scripts/world/road_path_data.gd` (MODIFIED), `scripts/world/road_math.gd` (MODIFIED), `scripts/world/road_validity_validator.gd` (MODIFIED), `scripts/world/chunk_streamer.gd` (MODIFIED), `scripts/test/test_airborne_calibration_gate.gd` (NEW), `scripts/test/test_road_grammar.gd` (NEW), `scripts/test/test_road_logic.gd` (MODIFIED), `BACKLOG.md` (MODIFIED).
 
-### TASK: [FEAT-014.3] Fork Topology & Branch Decision Model
+### TASK: [FEAT-014.3] Fork Topology & Branch Decision Model [x] COMPLETED
 **Goal**: Реализовать физически корректную и надежную модель выбора пути игроком на развилке с защитой от пограничных скачков и дребезга.
 **Do**: Создать `scripts/world/fork_decision_model.gd`:
 - 4-фазный стейт развилки: `APPROACH` $\to$ `FORK_PREVIEW` $\to$ `FORK_COMMIT_ZONE` $\to$ `BRANCH_LOCKED`.
-- Многофакторная оценка выбора с гистерезисом: взвешивание расстояния до осевых линий ветвей (`centerline_dist`), совпадения вектора скорости с курсом ветки (`heading_alignment`) и поступательного прогресса вперед (`forward_progress`).
-- Построение Y-образной геометрии: расширение полотна перед развилкой, плавное расхождение кромок.
-**Do not**: Не фиксировать выбор игрока по единичному мгновенному пересечению триггера; игрок должен иметь возможность передумать в фазе `FORK_PREVIEW`.
+- Многофакторная оценка выбора с гистерезисом: взвешивание расстояния до осевых линий ветвей ($S_{\text{dist}}$), совпадения вектора скорости с курсом ветки ($S_{\text{heading}}$) в планарной системе координат развилки $(\mathbf{t}_{\text{fork}}, \mathbf{b}_{\text{fork}}, \mathbf{n}_{\text{fork}})$.
+- Построение Y-образной геометрии: расширение полотна перед развилкой ($4.0$м $\to 10.0$м), плавное расхождение кромок через smoothstep $C^1$, синхронизация меша дороги и кромок травы в `RoadChunk`.
+**Do not**: Не фиксировать выбор игрока по единичному мгновенному пересечению триггера; игрок имеет возможность свободно маневрировать в фазе `FORK_PREVIEW` ($s \in [-50\text{м}, -15\text{м}]$).
 **Acceptance Criteria**:
-- В пограничных случаях (колебание по центру, возврат назад на развилке) выбор определяется устойчиво, без срывов и повторных переключений.
-**Files**: `scripts/world/fork_decision_model.gd` (NEW), `scripts/world/road_chunk.gd`, `scripts/world/road_math.gd`.
+- [x] В пограничных случаях (колебание по центру, возврат назад на развилке) выбор определяется устойчиво, без срывов и повторных переключений.
+- [x] Детерминированный fallback при движении строго по центру ($s \ge 15$м, $|C| < 0.15 \implies \text{default\_branch}$).
+- [x] Инвариантность к FPS (30 / 60 / 120 FPS $\Delta s_{\text{lock}} < 0.5$м), скоростям (10..45 км/ч) и зеркальная симметрия.
+- [x] Регрессионный барьер пройден: `test_fork_decision.gd` (212/212 PASS), `test_road_graph.gd` (61/61 PASS), `test_sprint_4m_master.gd` (125/125 PASS).
+**Files**: `scripts/world/fork_decision_model.gd` (NEW), `scripts/world/road_math.gd` (MODIFIED), `scripts/world/road_path_data.gd` (MODIFIED), `scripts/world/road_chunk.gd` (MODIFIED), `scripts/test/test_fork_decision.gd` (NEW), `BACKLOG.md` (MODIFIED), `ROADMAP.md` (MODIFIED).
 
 ### TASK: [FEAT-014.4] Mountain Terrain Carving & Surface Physics
 **Goal**: Сформировать горный рельеф, органично врезанный в полотно дороги (скальные полки, ущелья, обрывы), и разграничить физические свойства поверхностей.

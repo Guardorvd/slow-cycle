@@ -184,10 +184,15 @@
   - Оптимизация `RoadValidityValidator` (кэширование PackedArrays, скорость $0.048$ мс/чанк при целевом лимите $\le 0.05$ мс).
   - Комплекс верификации: `test_airborne_calibration_gate.gd` (6/6 ступеней PASS на реальной физике), `test_road_grammar.gd` (5 сидов $\times$ 1000 чанков = 250 км, 0 ошибок), `test_road_contract.gd` (18/18 PASS), `test_sprint_4m_master.gd` (124/124 PASS).
 
-- **[FEAT-014.3] Топология развилок и модель принятия решений (Fork Topology & Decision Model)**:
-  - Модель принятия решений развилки: `APPROACH` $\to$ `FORK_PREVIEW` $\to$ `FORK_COMMIT_ZONE` $\to$ `BRANCH_LOCKED`.
-  - Устойчивая фиксация выбора через гистерезис: учет расстояния до осевой линии (`centerline_dist`), совпадения курса (`heading_alignment`) и прогресса вперед (`forward_progress`) вместо одноточечного триггера.
-  - Расширение полотна трассы в зоне бифуркации и плавное физическое расхождение кромок дорог.
+- **[FEAT-014.3] Топология развилок и модель принятия решений (Fork Topology & Decision Model)** `[x] ЗАВЕРШЕНО`:
+  - 4-фазный стейт-автомат `ForkDecisionModel`: `APPROACH` $\to$ `FORK_PREVIEW` $\to$ `FORK_COMMIT_ZONE` $\to$ `BRANCH_LOCKED`.
+  - Модель намерения без единичных триггеров: экспоненциальное сглаживание намерения ($\lambda = 8.0\text{ с}^{-1}$) + гистерезис фиксации (порог $|C| \ge 0.65$ при $s \ge 8$м).
+  - Единая знаковая конвенция ($\text{LEFT} < 0$, $\text{RIGHT} > 0$) для бокового смещения $S_{\text{dist}} = (d_L - d_R)/\max(0.5, d_L + d_R)$ и планарного курса $S_{\text{heading}} = \text{clamp}(\theta_{\text{vel}}/\theta_{\text{ref}}, -1, 1)$.
+  - Планарная система координат развилки $(\mathbf{t}_{\text{fork}}, \mathbf{b}_{\text{fork}}, \mathbf{n}_{\text{fork}})$: полное исключение влияния вертикальной гравитации и микро-подскоков на выбор ветки.
+  - Детерминированное разрешение неоднозначности по центру ($s \ge 15$м, $|C| < 0.15 \implies \text{default\_branch}$).
+  - $C^1$-геометрия Y-развилки в `RoadMath` ($W(s): 4.0\text{м} \to 10.0\text{м}$ через smoothstep) и полная синхронизация кромки полотна с границами меша травы в `RoadChunk`.
+  - Массив `road_widths: PackedFloat32Array` в `RoadPathData` со сквозным сохранением при `slice_segment`, `clone`, `prune_behind`.
+  - Верификация: `test_fork_decision.gd` (212/212 PASS, 0 дефектов), `test_road_graph.gd` (61/61 PASS), `test_road_grammar.gd` (100% PASS), `test_road_contract.gd` (18/18 PASS), `test_diagnostics.gd` (68/68 PASS), `test_sprint_4m_master.gd` (125/125 PASS, 0 утечек).
 
 - **[FEAT-014.4] Горный рельеф, выемки и физические типы поверхностей (Terrain Carving & Surface Physics)**:
   - Road-Centric Carving: адаптация горного шума под полотно дороги (выемки в скале, полки серпантина, обрывы, насыпи).

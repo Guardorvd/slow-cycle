@@ -47,3 +47,36 @@ static func compute_ortho_normal(tangent: Vector3, bank_deg: float = 0.0) -> Vec
 		# Rotate normal around tangent vector
 		return base_norm.rotated(t, bank_rad).normalized()
 	return base_norm
+
+## Computes continuous road width approaching and through a fork using C1 smoothstep expansion.
+## s_rel: longitudinal distance relative to fork point (negative approaching, 0 at fork).
+## When s_rel <= -approach_len: returns standard width (4.0m).
+## When s_rel >= 0.0: returns expanded width (10.0m).
+static func compute_fork_width(
+	s_rel: float,
+	approach_len: float = 25.0,
+	w_std: float = 4.0,
+	w_exp: float = 10.0
+) -> float:
+	if s_rel <= -approach_len:
+		return w_std
+	if s_rel >= 0.0:
+		return w_exp
+	var t: float = clampf((s_rel + approach_len) / maxf(0.0001, approach_len), 0.0, 1.0)
+	return w_std + (w_exp - w_std) * smoothstep(0.0, 1.0, t)
+
+## Computes branch centerline lateral offset along a smooth transition curve past the fork point.
+## s_past_fork: longitudinal distance past the fork point (>= 0).
+## Returns lateral offset magnitude (meters) from the approach centerline.
+static func compute_fork_branch_center_offset(
+	s_past_fork: float,
+	div_len: float = 15.0,
+	max_offset: float = 2.5
+) -> float:
+	if s_past_fork <= 0.0:
+		return 0.0
+	if s_past_fork >= div_len:
+		return max_offset
+	var t: float = clampf(s_past_fork / maxf(0.0001, div_len), 0.0, 1.0)
+	return max_offset * smoothstep(0.0, 1.0, t)
+
