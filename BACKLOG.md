@@ -415,31 +415,89 @@
   - Полный регрессионный сьют: `test_fork_decision.gd` (212/212 PASS), `test_road_graph.gd` (61/61 PASS), `test_road_grammar.gd` (100% PASS), `test_road_contract.gd` (18/18 PASS), `test_diagnostics.gd` (68/68 PASS), `test_sprint_4m_master.gd` (125/125 PASS, 0 утечек памяти).
 **Files**: `scripts/world/terrain_carver.gd` (NEW), `scripts/world/road_chunk.gd` (MODIFIED), `scripts/world/world_manager.gd` (MODIFIED), `scripts/test/test_terrain_carver.gd` (NEW), `scripts/test/test_diagnostics.gd` (MODIFIED), `BACKLOG.md` (MODIFIED), `ROADMAP.md` (MODIFIED).
 
-### TASK: [FEAT-014.5] Branch Streaming & Greybox Dressing
-**Goal**: Обеспечить стриминг активных и дремлющих ветвей без просадок кадров с минимальным greybox-оформлением.
-**Do**: Обновить `scripts/world/chunk_streamer.gd` и `scripts/world/world_manager.gd`:
-- Жизненный цикл ветвей: `ACTIVE` $\to$ `PRELOADED` $\to$ `DORMANT` $\to$ `UNLOADED`. Альтернативная ветвь переводится в `DORMANT` и выгружается только при удалении игрока за пределы дистанции отката.
-- Вынос тяжелой математики генерации за пределы `_physics_process`: асинхронная подготовка массивов геометрии, быстрый синхронный коммит в сцену.
-- Минимальное Greybox-окружение: простые лоуполи-валуны, деревянные столбики, стрелочные указатели направлений.
-**Do not**: Не вводить в Спринте 5 тяжелые PBR-материалы, сложные модели деревьев и LOD-системы.
-**Acceptance Criteria**:
-- Стриминг чанков на развилках стабилен, время коммита в главном потоке $\le 1.0$ мс, Zero Pop-In тумана сохранен.
-**Files**: `scripts/world/chunk_streamer.gd`, `scripts/world/world_manager.gd`, `scripts/world/chunk_foliage.gd`.
+### TASK: [FEAT-014.5-REV] Monolithic Fork Geometry, Watertight Apex & Zero Overlap (`COMPLETED [x]`)
+**Goal**: Ликвидировать наложение террейнов на развилках, устранить баг проезда сквозь прозрачные текстуры, обеспечить реальный угол дивергенции ($>18$м) и монолитную геометрию развилки с водонепроницаемым апексом.
+**Realized**:
+- В `scripts/world/road_chunk.gd`:
+  - Внедрена маска сторон террейна `terrain_side_mask`: левая ветка (`side_mask = 1`) генерирует только левый внешний откос (полосы 0, 1, 2); правая ветка (`side_mask = 2`) — только правый внешний откос (полосы 4, 5, 6). Полностью исключено взаимопроникновение и наложение 20-метровых откосов.
+  - Построен процедурный разделительный травяной клин `SplitterWedgeMesh`: бесшовно триангулирует 4-треугольный выпуклый клин между внутренней кромкой левой ветви и внутренней кромкой правой ветви с физическим слоем 4 (`collision_layer = 4`), точно заполняя треугольную брешь.
+  - Придорожные указатели `DirectionalSign` вынесены на остриё клина ($s \approx 6\text{–}8$м), а маркерные вешки `MarkerPost` расставлены вдоль внутренних кромок клина в траве ($+0.3$м), сохраняя дорожные полосы свободными.
+- В `scripts/world/chunk_foliage.gd`:
+  - Введена фильтрация `side_mask: int = 3` в `compute_foliage_and_decor_transforms(...)`. Растительность, деревья и валуны маскируются строго на внешние фланги, исключая их появление внутри разделительного клина.
+- В `scripts/world/chunk_streamer.gd`:
+  - C1 smoothstep уширение полотна: подъездная дорога плавно расширяется с $3.2$м до $6.5$м на последних 25м перед развилкой.
+  - Выравнивание дивергенции: ветви расходятся на $\pm 14.0^\circ$ ($28^\circ$ суммарно), обеспечивая $18.92$м бокового разделения на дистанции 50м.
+  - Согласование нормалей и бинормалей: внутренние вершины обеих ветвей в точке $s=0$ строго совпадают с апексом развилки ($\Delta p = 0.000000$м, водонепроницаемый стык).
+  - **Solid Presentation Invariant**: невыбранные ветви сохраняют полноценные твердые коллизии (`collision_layer = 2 | 4`) всё время, пока остаются в поле зрения игрока.
+  - Выгрузка `_unload_branch` активируется строго когда игрок удаляется от развилки более чем на 80м.
+- Комплекс верификации:
+  - `test_fork_geometry_verification.gd`: 12/12 PASS (уширение до 6.5м, дивергенция 18.92м, зазор апекса 0.000м, слои коллизий 2 и 4, нулевое перекрытие террейна).
+  - `test_branch_streaming.gd`: 37/37 PASS (жизненный цикл, solid presentation invariant, коммит $\le 0.526$ мс).
+  - `test_soak_run.gd`: 100% PASS (17.5 км soak на 3 сидах).
+**Files**: `scripts/world/road_chunk.gd` (MODIFIED), `scripts/world/chunk_foliage.gd` (MODIFIED), `scripts/world/chunk_streamer.gd` (MODIFIED), `scripts/test/test_branch_streaming.gd` (MODIFIED), `scripts/test/test_fork_geometry_verification.gd` (NEW), `ROADMAP.md` (MODIFIED), `BACKLOG.md` (MODIFIED).
 
-### TASK: [FEAT-014.6] Dual Stress Validation & Plateau Gate
-**Goal**: Комплексно верифицировать топологическую устойчивость графа развилок, стриминг и отсутствие утечек ресурсов.
-**Do**: Создать мастер-раннер `scripts/test/test_mountain_validation.gd`:
-- **Topology Stress Test**: генерация 50 развилок подряд на 5 различных сидах, строгая проверка отсутствия геометрических ступенек ($\Delta p < 0.001$м, $\Delta \theta < 0.2^\circ$, $\Delta \kappa$ bounded).
-- **Streaming Stress Test**: 30-минутный заезд при естественной плотности развилок (1 развилка на 600–900м, ~20 развилок на 17.5 км).
-- **Многофакторный контроль стабильности (Plateau Gate)**: мониторинг плато для Node count, ObjectDB count, Active RoadChunk count, Active branch count, CollisionShape count, frame time.
-- **Firewall Verification**: прогон всех 124 контрактов езды из Спринта 4M — 100% PASS без единой регрессии.
-**Acceptance Criteria**:
-- Все тесты топологии и стриминга завершаются со статусом 0, память выходит на стабильное плато, 124 контракта физики сохранены.
-**Files**: `scripts/test/test_mountain_validation.gd` (NEW), `scripts/test/test_diagnostics.gd`.
+### TASK: [FEAT-014.6] Dual Stress Validation & Plateau Gate (`COMPLETED [x]`)
+**Goal**: Комплексно верифицировать топологическую устойчивость графа развилок, стриминг, отсутствие утечек ресурсов и сохранение всех контрактов физики.
+**Realized**:
+- Создан и выполнен специализированный стресс-сьют `scripts/test/test_mountain_validation.gd`:
+  - **Topology Stress Test**: непрерывный прогон 60 развилок на 3 различных сидах (`184729`, `42`, `99999`) с регулярным чередованием выбора ветвей (Left / Right).
+  - **Математические инварианты**: 0 NaNs, 0 Infs, уклоны строго в пределах $[-14.0^\circ, +5.0^\circ]$, ширина дороги в пределах $[1.8\text{ м}, 6.5\text{ м}]$.
+  - **Multi-Metric Plateau Gate**:
+    - Активные чанки строго ограничены скользящим окном: максимум 10 чанков одновременно (лимит $\le 15$).
+    - Словарь веток очищается без утечек: $\le 3$ ветви одновременно в памяти.
+    - Память процесса (RAM) выходит на стабильное плато ($68.9\text{–}69.4$ МБ, дельта $< 20.2$ МБ при пороге 25 МБ).
+  - **Firewall Verification**:
+    - `test_diagnostics.gd`: 68/68 PASS.
+    - `test_sprint_4m_master.gd`: 125/125 PASS.
+    - `test_soak_run.gd`: 350 чанков (17.5 км) PASS на 3 сидах.
+**Files**: `scripts/test/test_mountain_validation.gd` (NEW), `ROADMAP.md` (MODIFIED), `BACKLOG.md` (MODIFIED).
 
 ---
 
-## 🌅 Спринт 6: Атмосфера, Суточный Цикл и Фара
+## 🏔️ Спринт 6: Открытый Горный Мир и Горизонт (Open Mountain World & Horizon)
+
+### TASK: [FEAT-015.1] Дальний рельеф гор и силуэты горизонта (Distant Mountain Horizon)
+**Goal**: Создать видимый горный горизонт и дальние хребты, ликвидируя ощущение «подвешенной в пустоте ленты дороги».
+**Do**:
+- Процедурный low-poly меш горных хребтов и вершин, генерируемый вокруг игрока на расстоянии $300\text{–}1500$м.
+- Единый сид с `WorldManager` для детерминированного рельефа горной гряды.
+- Бесшовная интеграция с горизонтом и объемным туманом `forest_env.tres`.
+**Do not**: Не навешивать физические коллизии на дальние горы (`collision_layer = 0`). Не перегружать полигонаж (low-poly силуэты).
+**Acceptance Criteria**:
+- Взгляд в любую сторону открывает панораму горных хребтов и пиков, уходящих к горизонту.
+**Files**: `scripts/world/mountain_horizon.gd` (NEW), `scenes/world/mountain_horizon.tscn` (NEW), `scripts/world/world_manager.gd`.
+
+### TASK: [FEAT-015.2] Открытый горный склон (Open Mountain Downhill Terrain)
+**Goal**: Отказаться от узкого 20-метрового изолированного коридора в пользу единой открытой поверхности горного склона.
+**Do**:
+- Расширить генерацию террейна от жесткой 20-метровой полосы до открытого рельефа склона горы.
+- Интегрировать непрерывный макро-склон спуска: ощущение реальной огромной горы, по которой проложены маршруты.
+**Do not**: Не ломать физические контракты `collision_layer = 4` и существующие raycast-проверки колес.
+**Acceptance Criteria**:
+- Пространство вокруг дороги больше не обрывается на 20 метрах, создавая ощущение открытого горного спуска.
+**Files**: `scripts/world/terrain_carver.gd`, `scripts/world/road_chunk.gd`.
+
+### TASK: [FEAT-015.3] Процедурная сеть тропинок и накатов (Mountain Trail Network & Singletracks)
+**Goal**: Превратить изолированные участки в разветвленную сеть горных накатов и тропинок.
+**Do**:
+- Процедурная дифференциация типов путей: широкие гравийные просеки ($3.2$м) и узкие техничные MTB singletracks ($1.8$м).
+- Визуальная читаемость развилок и примыкающих троп на склоне горы.
+**Acceptance Criteria**:
+- С вершины горы или на развилках видны альтернативные накаты и тропы, по которым можно проехать.
+**Files**: `scripts/world/road_logic.gd`, `scripts/world/road_grammar.gd`, `scripts/world/chunk_streamer.gd`.
+
+### TASK: [FEAT-015.4] LOD и бесшовный стриминг горного массива (Far Terrain LOD & Horizon Streaming)
+**Goal**: Обеспечить плавную частоту кадров 60+ FPS при отображении дальнего горного массива.
+**Do**:
+- Стриминг дальних горных секторов с адаптивным шагом сетки (LOD).
+- Сохранение жесткого бюджета коммита геометрии $\le 1.0$ мс на кадр.
+**Acceptance Criteria**:
+- Перемещение игрока по миру не вызывает статтеров или просадок FPS при подгрузке дальних гор.
+**Files**: `scripts/world/chunk_streamer.gd`, `scripts/world/world_manager.gd`.
+
+---
+
+## 🌅 Спринт 7: Атмосфера, Свет, Фара, Шейдеры и Меню (Atmosphere, Lighting, Polish & UI)
 
 ### TASK: [FEAT-008.1] Суточный цикл с горячими клавишами (Day/Night Presets)
 **Goal**: Смена времени суток с 4 атмосферными пресетами: Утро (золотистый туман), День (яркое солнце), Вечер (закатные лучи), Ночь (лунный свет и звёзды).

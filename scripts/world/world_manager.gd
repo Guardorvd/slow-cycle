@@ -44,14 +44,20 @@ func _process(_delta: float) -> void:
 		chunk_streamer.update_streaming(player_pos)
 
 func request_bike_recovery(current_pos: Vector3) -> Transform3D:
-	if not road_path or road_path.size() < 2:
+	var active_path: RefCounted = road_path
+	if chunk_streamer and chunk_streamer.has_method("get_active_road_path"):
+		var p = chunk_streamer.get_active_road_path()
+		if p != null and p.size() >= 2:
+			active_path = p
+
+	if not active_path or active_path.size() < 2:
 		return Transform3D(Basis(), Vector3(0, 4.0, 0))
 
-	var closest_idx: int = road_path.find_closest_index(current_pos)
-	var current_dist: float = road_path.cumulative_distances[closest_idx]
+	var closest_idx: int = active_path.find_closest_index(current_pos)
+	var current_dist: float = active_path.cumulative_distances[closest_idx]
 	var target_dist: float = maxf(0.0, current_dist - 20.0)
 
-	var sample: Dictionary = road_path.get_sample_at_distance(target_dist)
+	var sample: Dictionary = active_path.get_sample_at_distance(target_dist)
 	var pos: Vector3 = sample.get("position", Vector3.ZERO)
 	var tang: Vector3 = sample.get("tangent", Vector3.FORWARD)
 	var norm: Vector3 = sample.get("normal", Vector3.UP)
@@ -80,6 +86,9 @@ func _init_shared_resources() -> void:
 	shared_meshes["birch"] = _build_birch_mesh()
 	shared_meshes["grass"] = _build_grass_mesh()
 	shared_meshes["guard_post"] = _build_guard_post_mesh()
+	shared_meshes["boulder"] = _build_boulder_mesh()
+	shared_meshes["marker_post"] = _build_marker_post_mesh()
+	shared_meshes["directional_sign"] = _build_directional_sign_mesh()
 
 func _build_pine_mesh() -> ArrayMesh:
 	var st := SurfaceTool.new()
@@ -215,3 +224,152 @@ func _build_guard_post_mesh() -> ArrayMesh:
 
 	st.generate_normals()
 	return st.commit()
+
+func _build_boulder_mesh() -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var rock_mat := StandardMaterial3D.new()
+	rock_mat.albedo_color = Color(0.42, 0.40, 0.38) # Weathered granite / slate
+	rock_mat.roughness = 0.92
+	st.set_material(rock_mat)
+
+	# Low-poly faceted boulder (6-segment base ring, 6-segment mid ring, apex)
+	var base_r: float = 0.55
+	var mid_r: float = 0.70
+	var mid_y: float = 0.40
+	var top_y: float = 0.75
+	var segs: int = 6
+
+	var rad_perturb: Array[float] = [1.0, 0.85, 1.15, 0.90, 1.10, 0.95]
+	var y_perturb: Array[float] = [0.0, 0.08, -0.05, 0.06, -0.04, 0.05]
+
+	var base_pts: Array[Vector3] = []
+	var mid_pts: Array[Vector3] = []
+
+	for i in range(segs):
+		var a: float = (float(i) / float(segs)) * TAU
+		var p_base := Vector3(cos(a) * base_r * rad_perturb[i], 0.0, sin(a) * base_r * rad_perturb[i])
+		var p_mid := Vector3(cos(a) * mid_r * rad_perturb[(i + 2) % segs], mid_y + y_perturb[i], sin(a) * mid_r * rad_perturb[(i + 2) % segs])
+		base_pts.append(p_base)
+		mid_pts.append(p_mid)
+
+	var apex := Vector3(0.05, top_y, -0.04)
+
+	# Quads between base and mid
+	for i in range(segs):
+		var i_next: int = (i + 1) % segs
+		st.add_vertex(base_pts[i]); st.add_vertex(mid_pts[i]); st.add_vertex(base_pts[i_next])
+		st.add_vertex(base_pts[i_next]); st.add_vertex(mid_pts[i]); st.add_vertex(mid_pts[i_next])
+
+	# Triangles from mid to apex
+	for i in range(segs):
+		var i_next: int = (i + 1) % segs
+		st.add_vertex(mid_pts[i]); st.add_vertex(apex); st.add_vertex(mid_pts[i_next])
+
+	st.generate_normals()
+	return st.commit()
+
+func _build_marker_post_mesh() -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var post_mat := StandardMaterial3D.new()
+	post_mat.albedo_color = Color(0.52, 0.42, 0.30) # Light mountain stake
+	post_mat.roughness = 0.90
+	st.set_material(post_mat)
+
+	var segs: int = 5
+	var r: float = 0.05
+	var h: float = 1.10
+	var tip_h: float = 1.18
+
+	for i in range(segs):
+		var a0: float = (float(i) / float(segs)) * TAU
+		var a1: float = (float(i + 1) / float(segs)) * TAU
+		var p0 := Vector3(cos(a0) * r, 0.0, sin(a0) * r)
+		var p1 := Vector3(cos(a1) * r, 0.0, sin(a1) * r)
+		var p2 := Vector3(cos(a0) * r, h, sin(a0) * r)
+		var p3 := Vector3(cos(a1) * r, h, sin(a1) * r)
+
+		# Side quad
+		st.add_vertex(p0); st.add_vertex(p2); st.add_vertex(p1)
+		st.add_vertex(p1); st.add_vertex(p2); st.add_vertex(p3)
+
+		# Tapered pointed tip
+		var tip := Vector3(0.0, tip_h, 0.0)
+		st.add_vertex(p2); st.add_vertex(tip); st.add_vertex(p3)
+
+	st.generate_normals()
+	return st.commit()
+
+func _build_directional_sign_mesh() -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var wood_mat := StandardMaterial3D.new()
+	wood_mat.albedo_color = Color(0.44, 0.34, 0.24) # Weathered cedar
+	wood_mat.roughness = 0.88
+	st.set_material(wood_mat)
+
+	# 1. Main vertical post
+	var post_r: float = 0.06
+	var post_h: float = 1.65
+	var segs: int = 6
+	for i in range(segs):
+		var a0: float = (float(i) / float(segs)) * TAU
+		var a1: float = (float(i + 1) / float(segs)) * TAU
+		var p0 := Vector3(cos(a0) * post_r, 0.0, sin(a0) * post_r)
+		var p1 := Vector3(cos(a1) * post_r, 0.0, sin(a1) * post_r)
+		var p2 := Vector3(cos(a0) * post_r, post_h, sin(a0) * post_r)
+		var p3 := Vector3(cos(a1) * post_r, post_h, sin(a1) * post_r)
+
+		st.add_vertex(p0); st.add_vertex(p2); st.add_vertex(p1)
+		st.add_vertex(p1); st.add_vertex(p2); st.add_vertex(p3)
+
+	# Helper to build a directional arrow board pointing along an angle
+	var make_arrow_board = func(y_center: float, angle_rad: float, length_val: float):
+		var b_w: float = length_val
+		var b_h: float = 0.16
+		var b_t: float = 0.035
+		var rot := Transform3D(Basis(Vector3.UP, angle_rad), Vector3(0, y_center, 0))
+
+		var p_root_bot := rot * Vector3(0.0, -b_h * 0.5, -b_t * 0.5)
+		var p_root_top := rot * Vector3(0.0, b_h * 0.5, -b_t * 0.5)
+		var p_shaft_bot := rot * Vector3(b_w * 0.75, -b_h * 0.5, -b_t * 0.5)
+		var p_shaft_top := rot * Vector3(b_w * 0.75, b_h * 0.5, -b_t * 0.5)
+		var p_tip := rot * Vector3(b_w, 0.0, -b_t * 0.5)
+
+		# Front face
+		st.add_vertex(p_root_bot); st.add_vertex(p_root_top); st.add_vertex(p_shaft_bot)
+		st.add_vertex(p_shaft_bot); st.add_vertex(p_root_top); st.add_vertex(p_shaft_top)
+		st.add_vertex(p_shaft_bot); st.add_vertex(p_shaft_top); st.add_vertex(p_tip)
+
+		# Back face
+		var f_offset := rot.basis * Vector3(0, 0, b_t)
+		var b_root_bot: Vector3 = p_root_bot + f_offset
+		var b_root_top: Vector3 = p_root_top + f_offset
+		var b_shaft_bot: Vector3 = p_shaft_bot + f_offset
+		var b_shaft_top: Vector3 = p_shaft_top + f_offset
+		var b_tip: Vector3 = p_tip + f_offset
+
+		st.add_vertex(b_root_bot); st.add_vertex(b_shaft_bot); st.add_vertex(b_root_top)
+		st.add_vertex(b_shaft_bot); st.add_vertex(b_shaft_top); st.add_vertex(b_root_top)
+		st.add_vertex(b_shaft_bot); st.add_vertex(b_tip); st.add_vertex(b_shaft_top)
+
+		# Edge quads
+		st.add_vertex(p_root_top); st.add_vertex(b_root_top); st.add_vertex(p_shaft_top)
+		st.add_vertex(p_shaft_top); st.add_vertex(b_root_top); st.add_vertex(b_shaft_top)
+		st.add_vertex(p_shaft_top); st.add_vertex(b_shaft_top); st.add_vertex(p_tip)
+		st.add_vertex(p_tip); st.add_vertex(b_shaft_top); st.add_vertex(b_tip)
+
+		st.add_vertex(p_shaft_bot); st.add_vertex(p_tip); st.add_vertex(b_shaft_bot)
+		st.add_vertex(b_shaft_bot); st.add_vertex(p_tip); st.add_vertex(b_tip)
+		st.add_vertex(p_root_bot); st.add_vertex(p_shaft_bot); st.add_vertex(b_root_bot)
+		st.add_vertex(b_root_bot); st.add_vertex(p_shaft_bot); st.add_vertex(b_shaft_bot)
+
+	# Left board pointing Left (-X, angle ~ PI - 0.25)
+	make_arrow_board.call(1.35, PI - 0.25, 0.65)
+	# Right board pointing Right (+X, angle ~ 0.25)
+	make_arrow_board.call(1.10, 0.25, 0.65)
+
+	st.generate_normals()
+	return st.commit()
+
