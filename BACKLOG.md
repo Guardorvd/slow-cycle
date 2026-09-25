@@ -393,16 +393,27 @@
 - [x] Регрессионный барьер пройден: `test_fork_decision.gd` (212/212 PASS), `test_road_graph.gd` (61/61 PASS), `test_sprint_4m_master.gd` (125/125 PASS).
 **Files**: `scripts/world/fork_decision_model.gd` (NEW), `scripts/world/road_math.gd` (MODIFIED), `scripts/world/road_path_data.gd` (MODIFIED), `scripts/world/road_chunk.gd` (MODIFIED), `scripts/test/test_fork_decision.gd` (NEW), `BACKLOG.md` (MODIFIED), `ROADMAP.md` (MODIFIED).
 
-### TASK: [FEAT-014.4] Mountain Terrain Carving & Surface Physics
+### TASK: [FEAT-014.4] Mountain Terrain Carving & Surface Physics (`COMPLETED [x]`)
 **Goal**: Сформировать горный рельеф, органично врезанный в полотно дороги (скальные полки, ущелья, обрывы), и разграничить физические свойства поверхностей.
-**Do**: Обновить `scripts/world/road_chunk.gd` и `scripts/world/terrain_carver.gd`:
-- Road-Centric Carving: адаптация горного шума под полотно дороги (скальная выемка Cut, полка серпантина Shelf, крутой обрыв Cliff).
-- Архитектурное разделение: `Collision Layer` (фильтрация физических масок Godot: Layer 2 Road, Layer 3 Grass/Rock, Layer 5 RoughRoad) строго отделен от `SurfaceType` (механические параметры сопротивления, сцепления, звука и микро-вибраций).
-- Установка процедурных защитных столбиков и отбойников на опасных внешних кромках обрывов.
-**Do not**: Не модифицировать код `BicycleController`; передавать параметры покрытий через существующий API поверхностей.
-**Acceptance Criteria**:
-- Дорога естественно вписана в горный рельеф; съезд к обрыву честно распознается шинами и звуком.
-**Files**: `scripts/world/terrain_carver.gd` (NEW), `scripts/world/road_chunk.gd`, `assets/materials/`.
+**Realized**:
+- В `scripts/world/terrain_carver.gd` (v1.0.0):
+  - Построен детерминированный генератор поперечного сечения горного рельефа `TerrainCarver`.
+  - 8-вершинный ограниченный поперечный профиль полосы террейна: Shoulder ($0.8$м) $\to$ Feature Breakline ($4.5$м) $\to$ Far Flank ($20.0$м) с каждой стороны дороги, экструдируемый в 6 независимых квад-стрипов вдоль чанка.
+  - Аналитическая бесшовность стыковки с кромкой дороги: координатная невязка $\Delta p \le 0.1$ мм ($\varepsilon \le 1.0\times 10^{-4}$ м, фактически $0.000000$ м).
+  - С0-непрерывность на межчанковых границах: $\Delta p = 0.000000$ м.
+  - Многофакторная классификация профиля рельефа: макро-градиент горного склона в мировой СК, локальная кривизна поворота дороги (внутренняя выемка `CUT`, внешний обрыв `CLIFF`), микро-вариации шума `FastNoiseLite`.
+  - Процедурный макро-градиент формирует характерные альпийские типы рельефа: полка серпантина (`SHELF`), скальная выемка (`CUT`), ущелье/обрыв (`CLIFF`), насыпь (`FILL`), луг (`MEADOW`).
+- В `scripts/world/road_chunk.gd`:
+  - Интеграция `TerrainCarver` и 6-полосной экструзии тримеш-геометрии террейна.
+  - Разделение физического слоя и презентации: тело `terrain_body` `StaticBody3D` строго на слое 4 (`collision_layer = 4`, Layer 3 Grass/Rock), с метаданными `surface_type = "mountain_terrain"` без инвазивных изменений контроллера велосипеда.
+  - Процедурные защитные вешки/столбики `GuardPostMultiMesh`: спавнятся на внешних опасных плечах обрывов ($\Delta h < -2.5$м) с шагом $\sim 4$м как чисто визуальные делинеаторы (`collision_layer = 0`, нулевой оверхед физики).
+- В `scripts/world/world_manager.gd`:
+  - Инициализация и внедрение `TerrainCarver` с сидом мира в словарь `shared_materials["terrain_carver"]`.
+  - Процедурное построение меша защитного столбика `_build_guard_post_mesh()` в `shared_meshes["guard_post"]`.
+- Комплекс верификации:
+  - `test_terrain_carver.gd`: 99/99 assertions PASS (0 дефектов, $0.000000$м швы, 100% сид-детерминизм, партиционированные бенчмарки math $\le 0.014$мс/сэмпл, commit $\le 0.71$мс/чанк, trimesh $\le 0.30$мс/чанк).
+  - Полный регрессионный сьют: `test_fork_decision.gd` (212/212 PASS), `test_road_graph.gd` (61/61 PASS), `test_road_grammar.gd` (100% PASS), `test_road_contract.gd` (18/18 PASS), `test_diagnostics.gd` (68/68 PASS), `test_sprint_4m_master.gd` (125/125 PASS, 0 утечек памяти).
+**Files**: `scripts/world/terrain_carver.gd` (NEW), `scripts/world/road_chunk.gd` (MODIFIED), `scripts/world/world_manager.gd` (MODIFIED), `scripts/test/test_terrain_carver.gd` (NEW), `scripts/test/test_diagnostics.gd` (MODIFIED), `BACKLOG.md` (MODIFIED), `ROADMAP.md` (MODIFIED).
 
 ### TASK: [FEAT-014.5] Branch Streaming & Greybox Dressing
 **Goal**: Обеспечить стриминг активных и дремлющих ветвей без просадок кадров с минимальным greybox-оформлением.

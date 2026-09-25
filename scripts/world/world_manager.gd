@@ -4,6 +4,7 @@ extends Node3D
 const RoadPathDataClass = preload("res://scripts/world/road_path_data.gd")
 const RoadLogicClass = preload("res://scripts/world/road_logic.gd")
 const ChunkStreamerClass = preload("res://scripts/world/chunk_streamer.gd")
+const TerrainCarverClass = preload("res://scripts/world/terrain_carver.gd")
 
 @export var world_seed: int = 184729
 @export var player: Node3D
@@ -73,10 +74,12 @@ func _init_shared_resources() -> void:
 	terrain_noise.seed = world_seed
 	terrain_noise.frequency = 0.04
 	shared_materials["noise"] = terrain_noise
+	shared_materials["terrain_carver"] = TerrainCarverClass.new(world_seed)
 
 	shared_meshes["pine"] = _build_pine_mesh()
 	shared_meshes["birch"] = _build_birch_mesh()
 	shared_meshes["grass"] = _build_grass_mesh()
+	shared_meshes["guard_post"] = _build_guard_post_mesh()
 
 func _build_pine_mesh() -> ArrayMesh:
 	var st := SurfaceTool.new()
@@ -178,6 +181,37 @@ func _build_grass_mesh() -> ArrayMesh:
 	var w: float = 0.35
 	st.add_vertex(Vector3(-w, 0, 0)); st.add_vertex(Vector3(0, h, 0)); st.add_vertex(Vector3(w, 0, 0))
 	st.add_vertex(Vector3(0, 0, -w)); st.add_vertex(Vector3(0, h, 0)); st.add_vertex(Vector3(0, 0, w))
+
+	st.generate_normals()
+	return st.commit()
+
+func _build_guard_post_mesh() -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var post_mat := StandardMaterial3D.new()
+	post_mat.albedo_color = Color(0.48, 0.38, 0.28) # Weathered mountain wood
+	post_mat.roughness = 0.92
+	st.set_material(post_mat)
+
+	var segs: int = 6
+	var r: float = 0.08
+	var h: float = 0.85
+
+	for i in range(segs):
+		var a0: float = (float(i) / float(segs)) * TAU
+		var a1: float = (float(i + 1) / float(segs)) * TAU
+		var p0 := Vector3(cos(a0) * r, 0.0, sin(a0) * r)
+		var p1 := Vector3(cos(a1) * r, 0.0, sin(a1) * r)
+		var p2 := Vector3(cos(a0) * r, h, sin(a0) * r)
+		var p3 := Vector3(cos(a1) * r, h, sin(a1) * r)
+
+		# Side quad
+		st.add_vertex(p0); st.add_vertex(p2); st.add_vertex(p1)
+		st.add_vertex(p1); st.add_vertex(p2); st.add_vertex(p3)
+
+		# Top cap
+		var top_center := Vector3(0.0, h, 0.0)
+		st.add_vertex(top_center); st.add_vertex(p2); st.add_vertex(p3)
 
 	st.generate_normals()
 	return st.commit()

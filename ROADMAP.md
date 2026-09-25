@@ -194,10 +194,13 @@
   - Массив `road_widths: PackedFloat32Array` в `RoadPathData` со сквозным сохранением при `slice_segment`, `clone`, `prune_behind`.
   - Верификация: `test_fork_decision.gd` (212/212 PASS, 0 дефектов), `test_road_graph.gd` (61/61 PASS), `test_road_grammar.gd` (100% PASS), `test_road_contract.gd` (18/18 PASS), `test_diagnostics.gd` (68/68 PASS), `test_sprint_4m_master.gd` (125/125 PASS, 0 утечек).
 
-- **[FEAT-014.4] Горный рельеф, выемки и физические типы поверхностей (Terrain Carving & Surface Physics)**:
-  - Road-Centric Carving: адаптация горного шума под полотно дороги (выемки в скале, полки серпантина, обрывы, насыпи).
-  - Четкое разделение: `Collision Layer` (фильтрация физики Godot) vs `SurfaceType` (свойства материала: rolling resistance, lateral grip, vibration, audio).
-  - Защитные отбойники и предупреждающие вешки на внешних дугах обрывов.
+- **[x] [FEAT-014.4] Горный рельеф, выемки и физические типы поверхностей (Terrain Carving & Surface Physics)**:
+  - Road-Centric Carving: адаптация горного шума под полотно дороги (`TerrainCarver`: 8-вершинный поперечный профиль, 6 квад-полос).
+  - Строгая аналитическая бесшовность $\Delta p \le 0.1$ мм (фактически $0.000000$ м) и C0-непрерывность между чанками.
+  - Альпийские типы рельефа: полка серпантина (`SHELF`), скальная выемка (`CUT`), ущелье/обрыв (`CLIFF`), насыпь (`FILL`), луг (`MEADOW`).
+  - Четкое разделение: `Collision Layer = 4` (слой Grass/Terrain для существующих лучей велосипеда) vs метаданные `surface_type = "mountain_terrain"` без изменения кода `BicycleController`.
+  - Процедурные защитные столбики-делинеаторы `GuardPostMultiMesh` на внешних обрывах ($\Delta h < -2.5$м, `collision_layer = 0`).
+  - Верификация: `test_terrain_carver.gd` (99/99 PASS), `test_diagnostics.gd` (68/68 PASS), `test_sprint_4m_master.gd` (125/125 PASS, 0 утечек памяти).
 
 - **[FEAT-014.5] Стриминг ветвей графа и Greybox-окружение (Branch Streaming & Minimal Dressing)**:
   - Жизненный цикл ветвей: `ACTIVE` $\to$ `PRELOADED` $\to$ `DORMANT` $\to$ `UNLOADED`. Невыбранная ветка переходит в `DORMANT` и выгружается только при окончательном удалении игрока.

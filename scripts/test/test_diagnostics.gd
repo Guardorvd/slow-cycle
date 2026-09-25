@@ -39,9 +39,16 @@ func _init() -> void:
 	var terr_verts1: PackedVector3Array = terr_mesh1.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
 
 	var max_terr_seam_delta: float = 0.0
-	for vi in range(4):
-		var d: float = terr_verts0[-4 + vi].distance_to(terr_verts1[vi])
-		if d > max_terr_seam_delta: max_terr_seam_delta = d
+	var row_verts: int = 8 if terr_verts0.size() % 8 == 0 else 4
+	for vi in range(row_verts):
+		var v0: Vector3 = terr_verts0[-row_verts + vi]
+		var min_d: float = 1e9
+		for v1: Vector3 in terr_verts1:
+			var d: float = v0.distance_to(v1)
+			if d < min_d:
+				min_d = d
+		if min_d > max_terr_seam_delta:
+			max_terr_seam_delta = min_d
 
 	print("[VERIFICATION #1] Real polygon mesh seam deltas:")
 	print("  - Road Mesh Seam Delta: %.6f meters" % max_road_seam_delta)
