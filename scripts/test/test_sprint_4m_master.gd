@@ -4,7 +4,7 @@ extends SceneTree
 ## Slow Cycle — Sprint 4M Master Automated Validation Runner
 ## Orchestrates all test tiers, executes dynamic in-engine physics assertions,
 ## verifies 5-seed procedural determinism, cross-scene memory soak, and reports
-## actual assertion counts dynamically.
+## the expected assertion budget for tiers that exit successfully.
 
 const RoadPathDataClass = preload("res://scripts/world/road_path_data.gd")
 const RoadLogicClass = preload("res://scripts/world/road_logic.gd")
@@ -58,16 +58,16 @@ func _run_master_validation() -> void:
 	print("\n==================================================================")
 	print("                 SPRINT 4M MASTER VERIFICATION SUMMARY             ")
 	print("==================================================================")
-	print("  Tier 1 - Core System Contracts:            %s" % ("PASS (68/68)" if t1_ok else "FAIL"))
-	print("  Tier 2A - 4G Track Verification:           %s" % ("PASS (6/6)" if t2a_ok else "FAIL"))
-	print("  Tier 2B - 4G Dynamic Ride Simulation:      %s" % ("PASS (8/8)" if t2b_ok else "FAIL"))
-	print("  Tier 3 - 4K Technical Lab Contracts:       %s" % ("PASS (15/15)" if t3_ok else "FAIL"))
-	print("  Tier 4 - 4L Gravel Loop Contracts:         %s" % ("PASS (16/16)" if t4_ok else "FAIL"))
+	print("  Tier 1 - Core System Contracts:            %s" % ("PASS (68 expected; exit 0)" if t1_ok else "FAIL"))
+	print("  Tier 2A - 4G Track Verification:           %s" % ("PASS (6 expected; exit 0)" if t2a_ok else "FAIL"))
+	print("  Tier 2B - 4G Dynamic Ride Simulation:      %s" % ("PASS (8 expected; exit 0)" if t2b_ok else "FAIL"))
+	print("  Tier 3 - 4K Technical Lab Contracts:       %s" % ("PASS (15 expected; exit 0)" if t3_ok else "FAIL"))
+	print("  Tier 4 - 4L Gravel Loop Contracts:         %s" % ("PASS (16 expected; exit 0)" if t4_ok else "FAIL"))
 	print("  Tier 5 - 4K T10 Airborne & Landing:        %s" % ("PASS (6 Invariants)" if t5_ok else "FAIL"))
-	print("  Tier 6 - 5-Seed Procedural Determinism:    %s" % ("PASS (5/5 Seeds Exact)" if t6_ok else "FAIL"))
+	print("  Tier 6 - 5-Seed Procedural Determinism:    %s" % ("PASS (5/5 within tolerance)" if t6_ok else "FAIL"))
 	print("  Tier 7 - Multi-Scene Memory Leak Soak:     %s" % ("PASS (0 Leaks)" if t7_ok else "FAIL"))
 	print("------------------------------------------------------------------")
-	print("  TOTAL ASSERTIONS EVALUATED: %d / %d PASSED" % [total_assertions_passed, total_assertions_checked])
+	print("  EXPECTED ASSERTION BUDGET: %d; ATTRIBUTED TO PASSING TIERS: %d" % [total_assertions_checked, total_assertions_passed])
 	print("==================================================================\n")
 
 	var master_success: bool = t1_ok and t2a_ok and t2b_ok and t3_ok and t4_ok and t5_ok and t6_ok and t7_ok and (total_assertions_passed == total_assertions_checked)
@@ -89,7 +89,7 @@ func _run_subprocess_tier(exe_path: String, script_rel_path: String, expected_as
 	var res: int = OS.execute(exe_path, ["--headless", "--script", script_rel_path], output, true)
 	if res == 0:
 		total_assertions_passed += expected_assertions
-		print("  [%s] SUCCESS: Subprocess completed with exit code 0 (%d assertions verified)" % [tier_name, expected_assertions])
+		print("  [%s] SUCCESS: Subprocess completed with exit code 0 (budget: %d expected checks)" % [tier_name, expected_assertions])
 		return true
 	else:
 		printerr("  [%s] FAILURE: Subprocess exited with code %d!" % [tier_name, res])
@@ -232,7 +232,7 @@ func _run_determinism_battery() -> bool:
 		var seed_ok: bool = max_delta_p <= 0.000001 and max_delta_t <= 0.000001 and max_delta_k <= 0.000001
 		if seed_ok:
 			total_assertions_passed += 1
-			print("  - Seed %d: EXACT MATCH over %d samples (max delta_p = %.8f m) [PASS]" % [seed_val, count, max_delta_p])
+			print("  - Seed %d: MATCH within 1e-6 tolerance over %d samples (max delta_p = %.8f m) [PASS]" % [seed_val, count, max_delta_p])
 		else:
 			printerr("  - Seed %d: MISMATCH (max delta_p = %.8f m) [FAIL]" % [seed_val, max_delta_p])
 			battery_ok = false

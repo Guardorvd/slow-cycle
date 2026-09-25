@@ -47,6 +47,7 @@ class RoadForkNode extends RoadNode:
 	var min_curve_radius_m: float = 19.0       ## Tightest downstream radius
 	var preview_distance_m: float = 50.0       ## Distance upstream where fork becomes visible (>= 45m)
 	var decision_zone_length_m: float = 25.0   ## Commit / steering choice zone length
+	var junction_radius_m: float = 3.0         ## Fork is a connected trail area, not a single centerline point
 	var branch_previews: Array[RefCounted] = [] ## Array[BranchPreviewContext]
 
 	func _init(
@@ -122,13 +123,15 @@ class RoadEdge extends RefCounted:
 	var branch_id: int = RoadPathDataClass.UNASSIGNED_BRANCH_ID
 	var length_m: float = 0.0
 	var path_data: RefCounted = null           ## RoadPathData instance or null
+	var branch_index: int = -1                 ## Stable LEFT/RIGHT option at the source fork
 
-	func _init(id: int = -1, src: int = -1, dst: int = -1, path: RefCounted = null, b_id: int = -1) -> void:
+	func _init(id: int = -1, src: int = -1, dst: int = -1, path: RefCounted = null, b_id: int = -1, b_index: int = -1) -> void:
 		edge_id = id
 		source_node_id = src
 		target_node_id = dst
 		path_data = path
 		branch_id = b_id
+		branch_index = b_index
 		if path != null and path.has_method("get_total_distance"):
 			length_m = path.get_total_distance()
 
@@ -165,11 +168,13 @@ func add_fork_node(
 	speed_mps: float = 8.33,
 	slope_deg: float = -6.0,
 	radius_m: float = 19.0,
-	preview_dist_m: float = 50.0
+	preview_dist_m: float = 50.0,
+	junction_radius_m: float = 3.0
 ) -> RoadForkNode:
 	var id: int = _next_node_id
 	_next_node_id += 1
 	var fork := RoadForkNode.new(id, pos, tang, norm, speed_mps, slope_deg, radius_m, preview_dist_m)
+	fork.junction_radius_m = maxf(0.0, junction_radius_m)
 	nodes[id] = fork
 	if root_node_id == -1:
 		root_node_id = id
@@ -180,7 +185,8 @@ func add_edge(
 	src_id: int,
 	dst_id: int,
 	path: RefCounted = null,
-	branch_id: int = RoadPathDataClass.UNASSIGNED_BRANCH_ID
+	branch_id: int = RoadPathDataClass.UNASSIGNED_BRANCH_ID,
+	branch_index: int = -1
 ) -> RoadEdge:
 	if not nodes.has(src_id) or not nodes.has(dst_id):
 		push_error("RoadGraph.add_edge: source %d or target %d node does not exist!" % [src_id, dst_id])
@@ -188,7 +194,7 @@ func add_edge(
 
 	var id: int = _next_edge_id
 	_next_edge_id += 1
-	var edge := RoadEdge.new(id, src_id, dst_id, path, branch_id)
+	var edge := RoadEdge.new(id, src_id, dst_id, path, branch_id, branch_index)
 	edges[id] = edge
 
 	nodes[src_id].outgoing_edge_ids.append(id)
@@ -206,6 +212,12 @@ func get_fork_node(id: int) -> RoadForkNode:
 
 func get_edge(id: int) -> RoadEdge:
 	return edges.get(id, null)
+
+func get_fork_branch_edge(fork_node_id: int, branch_index: int) -> RoadEdge:
+	for edge: RoadEdge in get_outgoing_edges(fork_node_id):
+		if edge.branch_index == branch_index:
+			return edge
+	return null
 
 func get_outgoing_edges(node_id: int) -> Array[RoadEdge]:
 	var result: Array[RoadEdge] = []
@@ -313,9 +325,10 @@ func validate_node_continuity(node_id: int, tol_p: float = 0.001, tol_deg: float
 			var p0: Vector3 = edge.path_data.points[0]
 			var d_pos: float = p0.distance_to(node.position)
 			result["max_pos_error_m"] = maxf(result["max_pos_error_m"], d_pos)
-			if d_pos > tol_p:
+			var start_pos_tol: float = (node as RoadForkNode).junction_radius_m if node is RoadForkNode else tol_p
+			if d_pos > start_pos_tol:
 				result["is_valid"] = false
-				result["errors"].append("Outgoing edge %d point[0] pos delta %.4fm > tol %.4fm" % [e_id, d_pos, tol_p])
+				result["errors"].append("Outgoing edge %d point[0] pos delta %.4fm > tol %.4fm" % [e_id, d_pos, start_pos_tol])
 
 			# For entry tangent at s=0: each branch must be C1 continuous with node tangent
 			var t0: Vector3 = edge.path_data.tangents[0].normalized()

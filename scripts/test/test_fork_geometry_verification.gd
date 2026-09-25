@@ -80,11 +80,14 @@ func test_fork_approach_widening() -> void:
 
 	var end_idx: int = branch.road_path.size() - 1
 	var w_end: float = branch.road_path.road_widths[end_idx]
-	assert_almost_equal(w_end, 6.5, 0.05, "Road width expands to 6.5m at approach chunk end")
+	assert_almost_equal(w_end, 3.6, 0.05, "Road width expands to 3.6m at the fork junction")
+	assert_true(branch.road_path.segment_types[end_idx] == RoadPathDataClass.SegmentType.BRAKING_ZONE, "Fork is preceded by an explicitly generated braking and sightline zone")
+	assert_true(branch.road_path.sight_distances[end_idx] >= 45.0, "Fork approach preserves at least 45m of visibility")
+	assert_true(branch.road_path.slopes[end_idx] >= -5.0 and branch.road_path.slopes[end_idx] <= 2.0, "Fork junction is generated on a mild grade")
 
-	# Check that start of chunk was narrow (~3.2m - 4.0m)
+	# Check that the upstream trail remains narrow singletrack
 	var w_start: float = branch.road_path.road_widths[0]
-	assert_true(w_start <= 4.0, "Road width at approach chunk start is <= 4.0m (measured: %.2f)" % w_start)
+	assert_true(w_start <= 1.81, "Road width at approach chunk start is <= 1.8m (measured: %.2f)" % w_start)
 
 	streamer.queue_free()
 	wm.queue_free()
@@ -118,7 +121,7 @@ func test_divergence_and_wedge_continuity() -> void:
 	var r_end_pt: Vector3 = right_branch.road_path.points[25] # Chunk 0 end sample
 	var sep_dist: float = l_end_pt.distance_to(r_end_pt)
 	print("  [MEASUREMENT] Fork arm separation at 50m: %.2f meters" % sep_dist)
-	assert_true(sep_dist > 18.0, "Fork arms diverge by > 18.0m at 50m distance (measured: %.2f)" % sep_dist)
+	assert_true(sep_dist > 10.0, "Fork arms form two readable lines with > 10m separation at 50m (measured: %.2f)" % sep_dist)
 
 	# Measure inner edge gap at s = 0 (seam)
 	var l_start_pos: Vector3 = left_branch.road_path.points[-26]

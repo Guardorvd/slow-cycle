@@ -50,13 +50,13 @@ static func compute_ortho_normal(tangent: Vector3, bank_deg: float = 0.0) -> Vec
 
 ## Computes continuous road width approaching and through a fork using C1 smoothstep expansion.
 ## s_rel: longitudinal distance relative to fork point (negative approaching, 0 at fork).
-## When s_rel <= -approach_len: returns standard width (4.0m).
-## When s_rel >= 0.0: returns expanded width (10.0m).
+## When s_rel <= -approach_len: returns singletrack width (1.8m).
+## When s_rel >= 0.0: returns the shared junction envelope (3.6m).
 static func compute_fork_width(
 	s_rel: float,
 	approach_len: float = 25.0,
-	w_std: float = 4.0,
-	w_exp: float = 10.0
+	w_std: float = 1.8,
+	w_exp: float = 3.6
 ) -> float:
 	if s_rel <= -approach_len:
 		return w_std
@@ -79,4 +79,3 @@ static func compute_fork_branch_center_offset(
 		return max_offset
 	var t: float = clampf(s_past_fork / maxf(0.0001, div_len), 0.0, 1.0)
 	return max_offset * smoothstep(0.0, 1.0, t)
-

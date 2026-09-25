@@ -61,6 +61,8 @@ var divergence_angle_rad: float = 0.35  ## ~20 degrees default
 var default_branch: int = BranchChoice.LEFT
 var branch_divergence_length: float = 15.0
 var branch_lateral_offset: float = 2.5
+var left_branch_path: RefCounted = null
+var right_branch_path: RefCounted = null
 
 # ==============================================================================
 # STATE VARIABLES
@@ -127,6 +129,11 @@ func setup_from_node(fork_node: RefCounted, def_branch: int = BranchChoice.LEFT)
 			div_deg = absf(bp.divergence_angle_deg)
 	setup(f_id, pos, tang, norm, div_deg, def_branch)
 
+## Uses the exact generated branch centerlines for intent scoring instead of an assumed Y shape.
+func set_branch_paths(left_path: RefCounted, right_path: RefCounted) -> void:
+	left_branch_path = left_path
+	right_branch_path = right_path
+
 # ==============================================================================
 # PER-TICK EVALUATION (O(1) Scalar Arithmetic, Zero Heap Allocations)
 # ==============================================================================
@@ -173,8 +180,14 @@ func update(player_pos: Vector3, player_vel: Vector3, delta: float) -> void:
 
 	# 4. Lateral Distance Bias (S_dist in [-1.0 .. +1.0])
 	# Standard convention: LEFT < 0, RIGHT > 0
-	var d_l: float = absf(x - x_l)
-	var d_r: float = absf(x - x_r)
+	var d_l: float
+	var d_r: float
+	if _has_branch_paths():
+		d_l = _distance_to_path(player_pos, left_branch_path)
+		d_r = _distance_to_path(player_pos, right_branch_path)
+	else:
+		d_l = absf(x - x_l)
+		d_r = absf(x - x_r)
 	var denom_dist: float = maxf(0.5, d_l + d_r)
 	var s_dist: float = (d_l - d_r) / denom_dist
 
@@ -188,9 +201,17 @@ func update(player_pos: Vector3, player_vel: Vector3, delta: float) -> void:
 	if v_planar < 0.1:
 		s_instant = s_dist
 	else:
-		var theta_vel: float = atan2(v_lat, maxf(0.1, v_fwd))
-		var ref_ang: float = maxf(0.01, divergence_angle_rad)
-		s_heading = clampf(theta_vel / ref_ang, -1.0, 1.0)
+		if _has_branch_paths():
+			var vel_dir := Vector3(player_vel.x, 0.0, player_vel.z).normalized()
+			var left_tangent := _tangent_at_nearest_sample(player_pos, left_branch_path)
+			var right_tangent := _tangent_at_nearest_sample(player_pos, right_branch_path)
+			var left_alignment: float = vel_dir.dot(Vector3(left_tangent.x, 0.0, left_tangent.z).normalized())
+			var right_alignment: float = vel_dir.dot(Vector3(right_tangent.x, 0.0, right_tangent.z).normalized())
+			s_heading = clampf((right_alignment - left_alignment) * 0.5, -1.0, 1.0)
+		else:
+			var theta_vel: float = atan2(v_lat, maxf(0.1, v_fwd))
+			var ref_ang: float = maxf(0.01, divergence_angle_rad)
+			s_heading = clampf(theta_vel / ref_ang, -1.0, 1.0)
 		s_instant = clampf(W_DIST * s_dist + W_HEADING * s_heading, -1.0, 1.0)
 
 	# 6. Raw Instantaneous Tendency Output (Deadband Protected)
@@ -246,3 +267,22 @@ func get_instant_tendency() -> int:
 
 func is_locked() -> bool:
 	return current_state == ForkState.BRANCH_LOCKED
+
+func _has_branch_paths() -> bool:
+	return left_branch_path != null and right_branch_path != null and left_branch_path.size() > 1 and right_branch_path.size() > 1
+
+func _nearest_path_index(pos: Vector3, path: RefCounted) -> int:
+	var closest_idx: int = 0
+	var closest_dist_sq: float = INF
+	for idx in range(path.points.size()):
+		var dist_sq: float = pos.distance_squared_to(path.points[idx])
+		if dist_sq < closest_dist_sq:
+			closest_dist_sq = dist_sq
+			closest_idx = idx
+	return closest_idx
+
+func _distance_to_path(pos: Vector3, path: RefCounted) -> float:
+	return pos.distance_to(path.points[_nearest_path_index(pos, path)])
+
+func _tangent_at_nearest_sample(pos: Vector3, path: RefCounted) -> Vector3:
+	return path.tangents[_nearest_path_index(pos, path)]

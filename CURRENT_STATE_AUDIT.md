@@ -2,9 +2,7 @@
 
 > **Дата актуализации**: 23.09.2026  
 > **Инженер-аудитор**: AI Lead Systems Architect & Senior Game Engineer  
-> **Статус проекта**: **Спринты 1, 2, 3 (3A, 3B, 3C), 4 (4A–4H, 4J, 4K, 4L, 4M) Завершены на 100% (124/124 Master PASS, 0 утечек ObjectDB, Human Gate PASS)**.  
-> **Спринт 5 (Фаза 1 — FEAT-014.0)**: **Завершена на 100% (18/18 Contract PASS, эмпирический гейт пройден)**.  
-> **Текущий этап**: **Готовность к старту Спринта 5, Фаза 2 («Road Grammar & MTB Flow Pacing»)**.
+> **Исторический снимок от 23.09.2026**: статусы в этом аудите относятся к состоянию до завершения Sprint 5 и не описывают текущую ревизию. Текущий статус ведётся в `README.md` и `ROADMAP.md`.
 | **Главная сцена** | `res://scenes/main.tscn` |
 | **Тестовый полигон 4G** | `res://scenes/test/riding_feel_test_track.tscn` |
 | **Технический лаб 4K** | `res://scenes/test/riding_lab_track.tscn` |

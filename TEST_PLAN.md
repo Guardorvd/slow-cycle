@@ -62,27 +62,40 @@ Every physics change in 4H–4M must be measured against the 12 KPI baseline:
 ---
 
 ## 5. Automated Verification Suite & Engine Contracts
-Automated CI checks run headlessly using Godot console:
+Automated headless checks run using the Godot console (no CI workflow is configured in the repository):
 
 ```powershell
-# Unified Sprint 4M Master Validation Suite (Runs all 7 Tiers, 124 Assertions, 0 Leaks)
-& "Godot_v4.7.2-stable_mono_win64_console.exe" --headless --script scripts/test/test_sprint_4m_master.gd
+# Unified master validation suite (Godot 4.7+, 7 tiers)
+godot --headless --path . --script scripts/test/test_sprint_4m_master.gd
 ```
 
-- **Master Suite Tiers (124 / 124 Assertions Evaluated)**:
-  - `Tier 1`: 67 deterministic core verifications in `scripts/test/test_diagnostics.gd` (includes late Sprint 4J/4M additions #65–#67).
+- **Most recent run: 25.09.2026, Godot 4.7.2 mono (headless); 125 expected checks across 7 tiers all PASS**:
+  - `Tier 1`: 68 numbered core verifications in `scripts/test/test_diagnostics.gd` (#1–#68).
   - `Tier 2A/2B`: 4G Test Track Baseline (6 geometry verification + 8 live ride simulation assertions).
   - `Tier 3`: 4K Technical Riding Lab (15 geometry & structure contracts).
   - `Tier 4`: 4L Gravel Training Loop (16 rhythm & Zen Flow contracts).
   - `Tier 5`: 4K T10 Ballistic Airborne & Landing Invariant Fixture (6 invariants: detachment, flight duration, ballistic curve, recontact, continuous path, suspension compression).
-  - `Tier 6`: 5-Seed Procedural Determinism Battery (5 seeds bit-exact, $\Delta p \le 10^{-6}$ m).
+  - `Tier 6`: 5-Seed Procedural Determinism Battery (5 seeds match within $\Delta p \le 10^{-6}$ m; tangents and curvature use the same tolerance).
   - `Tier 7`: Multi-Scene Switching Memory Soak (7 transitions, 0 dangling nodes).
-- **Leak Gate**: Strictly 0 ObjectDB leaks on exit across all runners.
+  - The runner attributes a tier's expected count when its subprocess exits with code 0; it does not collect individual assertion events from subprocess output. Treat 125 as an expected assertion budget, not a dynamically measured count.
+- **Leak Gate**: The documented acceptance criterion is 0 ObjectDB leaks on exit across all runners.
 - **Human Perception Gate**: 15 observed gameplay points conducted without F3 HUD, 3x repetition for critical mechanics, and Blind Human Perception Pass. Full report in `docs/sprints/sprint_4m_validation_report.md`.
 
 ---
 
 ## 5.1. Sprint 5 Mountain World & Road Contract Suites
+
+**Latest world-generation run:** `test_fork_decision.gd` 212/212; `test_fork_geometry_verification.gd` 15/15; `test_branch_streaming.gd` 49/49; `test_road_graph.gd` 61/61; `test_road_grammar.gd` passed 5 seeds × 1000 chunks; `test_mountain_validation.gd` 12/12 across 60 traversed forks. RAM delta was +19.7–20.9MB across those 3 seeds (below the 25MB gate). Branch integration additionally verifies edge/centerline mapping, both route transitions and DAG continuity.
+
+### C. Test Directory Map and Determinism Scope
+
+- `test_sprint_4m_master.gd`: aggregate regression entry point; launches the core, 4G, 4K, and 4L suites and runs airborne, determinism, and scene-switch fixtures.
+- `test_diagnostics.gd`: numbered system contracts #1–#68. It is a legacy, broad contract script, not a small unit-test file.
+- `test_track_verification.gd`, `test_track_ride.gd`, `test_riding_lab.gd`, `test_gravel_loop.gd`: geometry and gameplay checks for fixed tracks.
+- `test_road_contract.gd`, `test_road_grammar.gd`, `test_road_graph.gd`, `test_fork_decision.gd`, `test_fork_geometry_verification.gd`, `test_branch_streaming.gd`, `test_terrain_carver.gd`, `test_mountain_validation.gd`: targeted world-generation/branching suites; run individually when changing those systems.
+- `test_airborne_empirical_gate.gd`, `test_airborne_calibration_gate.gd`: empirical physics calibration gates. `test_soak_run.gd` and `test_procedural_run.gd` are longer soak/procedural runs. `capture_*.gd` scripts capture screenshots; `test_*_generator.gd` and the `*_generator.gd` files provide test fixtures/generators.
+
+**Determinism guarantee currently exercised:** in the same Godot runtime and with the same seed and same ordered sequence of chunk-generation calls, two independent `RoadLogic` instances are compared over 15 chunks for equal sample counts and position/tangent/curvature deltas no greater than `1e-6`. This does not establish cross-version bit identity or order-independent generation across branches. Foliage derives its RNG seed from world noise seed and chunk id; fork child seeds derive from parent seed, fork id, and branch index.
 
 ### A. Airborne Empirical Physics Gate (`scripts/test/test_airborne_empirical_gate.gd`)
 Measures existing `BicycleController` dynamics over varied drop geometries without modifying bicycle kinematics:
@@ -92,7 +105,7 @@ Measures existing `BicycleController` dynamics over varied drop geometries witho
 ### B. Road Contract & Validator Suite (`scripts/test/test_road_contract.gd`)
 Runs full geometric validation against `RoadGenerationContract` (v5.1.0) and `RoadAirborneContract`:
 ```powershell
-& "Godot_v4.7.2-stable_mono_win64_console.exe" --headless --script scripts/test/test_road_contract.gd
+godot --headless --path . --script scripts/test/test_road_contract.gd
 ```
 * **Synthetic Battery T01–T16**:
   * T01–T08 (Valid cases): straight, constant downhill $-6^\circ$, switchback $R=19$m, micro-drop, short airborne with landing, full airborne chain, downhill with crest drop, downhill with recovery straight.

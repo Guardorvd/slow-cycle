@@ -20,6 +20,12 @@ enum FlowPhase {
 	RECOVERY_FLAT = 7         ## -1.5°..+1.0°, wide sunny meadow for rollout and rest
 }
 
+enum RouteStyle {
+	BALANCED = 0,
+	FLOW = 1,
+	TECHNICAL = 2
+}
+
 class PhaseSpec extends RefCounted:
 	var phase: int = FlowPhase.RECOVERY_FLAT
 	var min_slope_deg: float = -2.0
@@ -37,6 +43,7 @@ var current_phase: int = FlowPhase.RECOVERY_FLAT
 var phase_queue: Array[int] = []
 var curve_dir: float = 1.0
 var total_chunks_planned: int = 0
+var route_style: int = RouteStyle.BALANCED
 
 func _init(seed_val: int) -> void:
 	rng.seed = seed_val
@@ -69,6 +76,38 @@ func get_current_phase() -> int:
 
 func get_curve_direction() -> float:
 	return curve_dir
+
+## Assigns a deterministic route identity to a branch and gives it a distinct opening rhythm.
+## Both profiles retain the normal weighted grammar after their authored opening sequence.
+func set_route_style(style: int, style_seed: int) -> void:
+	route_style = clampi(style, RouteStyle.BALANCED, RouteStyle.TECHNICAL)
+	rng.seed = style_seed
+	phase_queue.clear()
+	match route_style:
+		RouteStyle.FLOW:
+			phase_queue.assign([
+				FlowPhase.CRUISE_DOWNHILL,
+				FlowPhase.CREST_MICRO_DROP,
+				FlowPhase.CRUISE_DOWNHILL,
+				FlowPhase.RECOVERY_FLAT,
+				FlowPhase.FAST_GRAVITY_DESCENT,
+				FlowPhase.BRAKING_ZONE
+			])
+		RouteStyle.TECHNICAL:
+			phase_queue.assign([
+				FlowPhase.BRAKING_ZONE,
+				FlowPhase.SWITCHBACK,
+				FlowPhase.RECOVERY_FLAT,
+				FlowPhase.AIRBORNE_DROP,
+				FlowPhase.RECOVERY_FLAT,
+				FlowPhase.CRUISE_DOWNHILL
+			])
+		_:
+			_setup_initial_dramatic_sequence()
+
+## Guarantees that the next generated chunk is a clear, low-risk fork approach.
+func queue_fork_approach() -> void:
+	phase_queue.push_front(FlowPhase.BRAKING_ZONE)
 
 ## Advances FSM and returns the next PhaseSpec envelope
 func advance_phase() -> PhaseSpec:

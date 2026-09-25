@@ -41,8 +41,8 @@ const MAX_SEAM_SLOPE_DELTA_DEG: float = 0.1 ## Maximum vertical slope step
 const MAX_SEAM_NORMAL_ANGLE_DEG: float = 0.5 ## Maximum surface normal deviation
 
 # --- 7. CROSS-SECTION & BANKING ---
-const ROAD_STANDARD_WIDTH: float = 4.0 ## Standard packed gravel road width
-const ROAD_FORK_EXPANDED_WIDTH: float = 10.0 ## Maximum expanded width before a fork bifurcation
+const ROAD_STANDARD_WIDTH: float = 1.8 ## Narrow packed singletrack riding surface
+const ROAD_FORK_EXPANDED_WIDTH: float = 3.6 ## Local shared junction envelope before the split
 const MAX_BANKING_ANGLE_DEG: float = 8.0 ## Maximum visual superelevation/banking angle
 
 # --- HELPER / VALIDATION CALCULATION METHODS ---

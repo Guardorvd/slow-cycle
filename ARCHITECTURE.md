@@ -10,7 +10,7 @@ Main Game Scene (res://scenes/main.tscn)
 │    ├── RoadGenerationContract (Mathematical envelopes, derivatives by Δs, seam limits)
 │    ├── RoadAirborneContract (SurfaceContactMode FSM: GROUNDED, MICRO_DROP, AIRBORNE, LANDING)
 │    ├── RoadValidityValidator (Algorithmic C0/C1, curvature, slope & sight distance inspector)
-│    ├── RoadLogic / [Planned Phase 2] RoadGrammar (Deterministic MTB descent pacing & FSM)
+│    ├── RoadLogic / RoadGrammar (implemented deterministic MTB descent pacing & FSM)
 │    ├── ChunkStreamer (Active chunk window [N-1 ... N+5])
 │    └── [Active RoadChunks]
 │          ├── RoadMesh (ArrayMesh: gravel road with micro-texture)
@@ -39,7 +39,12 @@ Main Game Scene (res://scenes/main.tscn)
 
 ---
 
-## 2. Collision Layer Structure
+## 2. Runtime Entry Points and Planned Systems
+
+- `project.godot` starts `res://scenes/mode_select.tscn`; the endless-road gameplay scene is `res://scenes/main.tscn`.
+- `project.godot` currently declares no autoloads. `GameState` and `SettingsManager` shown above are roadmap items, not runtime services.
+
+## 3. Collision Layer Structure
 
 | Layer | Mask Bit | Name | Purpose |
 |---|---|---|---|
@@ -67,3 +72,11 @@ Main Game Scene (res://scenes/main.tscn)
      - `telemetry_updated(speed_kmh: float, cadence_pct: float, is_coasting: bool)`
      - `bell_rung()`
    - UI (`HUD`, `DebugHUD`) and Audio (`BikeAudioManager`) listen to these signals passively without modifying bicycle state.
+
+## 4. Procedural Fork Runtime
+
+- `RoadGraph` owns stable LEFT/RIGHT outgoing edge identity. Each edge stores its branch centerline (`RoadPathData`) and branch id.
+- `ForkDecisionModel` evaluates rider position/course against those centerlines. `ChunkStreamer` resolves the locked choice through the graph edge and activates its branch id.
+- `ChunkStreamer` still owns chunk lifetime, preloading and dormant-branch cleanup; graph-driven materialization is not yet complete.
+- Branch grammars receive deterministic `FLOW` and `TECHNICAL` roles. A braking/sightline chunk is generated before each junction. Main trail width is 1.8m, junction width 3.6m, with technical route samples narrowing to 1.35m.
+- Fork spacing still uses a seeded distance schedule. Macro terrain planning, path merges, route-level quality scoring and manual ride review remain follow-up work.

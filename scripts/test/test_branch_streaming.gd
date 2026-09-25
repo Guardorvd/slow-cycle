@@ -166,6 +166,17 @@ func test_branch_fsm_lifecycle_and_ghost_collision_deactivation() -> void:
 	# Manually spawn a fork to inspect PRELOADED branch
 	streamer._spawn_procedural_fork(trunk)
 	assert_true(trunk.child_branch_ids.size() == 1, "Trunk spawned 1 alternative child branch")
+	var left_edge = streamer.road_graph.get_fork_branch_edge(trunk.graph_fork_node_id, ForkDecisionModelClass.BranchChoice.LEFT)
+	var right_edge = streamer.road_graph.get_fork_branch_edge(trunk.graph_fork_node_id, ForkDecisionModelClass.BranchChoice.RIGHT)
+	assert_true(left_edge != null and right_edge != null, "Runtime road graph owns both stable left/right fork edges")
+	assert_true(left_edge != null and left_edge.branch_id == trunk.branch_id, "Graph LEFT edge points at the generated left centerline")
+	assert_true(right_edge != null and right_edge.branch_id == trunk.child_branch_ids[0], "Graph RIGHT edge points at the generated right centerline")
+	assert_true(trunk.route_style != streamer.branches[trunk.child_branch_ids[0]].route_style, "Fork alternatives have distinct Flow and Technical route styles")
+	assert_true(trunk.decision_model.left_branch_path == left_edge.path_data, "Decision model scores the actual left edge geometry")
+	assert_true(trunk.decision_model.right_branch_path == right_edge.path_data, "Decision model scores the actual right edge geometry")
+	assert_true(streamer.road_graph.is_valid_dag(), "Generated fork topology remains an acyclic graph")
+	var continuity: Dictionary = streamer.road_graph.validate_node_continuity(trunk.graph_fork_node_id)
+	assert_true(continuity.is_valid, "Both generated fork arms meet the junction tangent and shared riding envelope")
 
 	var alt_branch_id: int = trunk.child_branch_ids[0]
 	var alt_branch = streamer.branches.get(alt_branch_id, null)
@@ -177,6 +188,8 @@ func test_branch_fsm_lifecycle_and_ghost_collision_deactivation() -> void:
 	streamer._on_branch_locked(1, ForkDecisionModelClass.BranchChoice.LEFT, trunk.branch_id)
 	assert_true(alt_branch.state == ChunkStreamerClass.BranchState.DORMANT, "Alternative branch transitioned to DORMANT state")
 	assert_true(trunk.state == ChunkStreamerClass.BranchState.ACTIVE, "Primary branch remains in ACTIVE state")
+	assert_true(streamer.active_branch_id == trunk.branch_id, "Graph LEFT choice keeps the left route active")
+	assert_true(trunk.decision_model == null, "Resolved branch decision is released after graph transition")
 
 	# Invariant Check: Solid Presentation Invariant (Alternative branch retains solid collisions while visible)
 	var all_dormant_collisions_solid: bool = true
@@ -197,6 +210,25 @@ func test_branch_fsm_lifecycle_and_ghost_collision_deactivation() -> void:
 	assert_true(not streamer.branches.has(alt_branch_id), "Dormant branch safely removed from streamer after exiting safety envelope (UNLOADED)")
 
 	instance.queue_free()
+	await process_frame
+
+	# Verify the alternative graph edge can also become the real active gameplay route.
+	var right_test_manager := WorldManagerClass.new()
+	right_test_manager.world_seed = 184729
+	right_test_manager._init_shared_resources()
+	var right_test_path := RoadPathDataClass.new()
+	var right_test_logic := RoadLogicClass.new(184729, right_test_path)
+	var right_test_streamer := ChunkStreamerClass.new()
+	root.add_child(right_test_streamer)
+	right_test_streamer.setup(right_test_manager, right_test_path, right_test_logic, right_test_manager.shared_materials, right_test_manager.shared_meshes)
+	var right_test_trunk = right_test_streamer.get_active_branch()
+	right_test_streamer._spawn_procedural_fork(right_test_trunk)
+	var right_test_branch_id: int = right_test_streamer.road_graph.get_fork_branch_edge(right_test_trunk.graph_fork_node_id, ForkDecisionModelClass.BranchChoice.RIGHT).branch_id
+	right_test_streamer._on_branch_locked(1, ForkDecisionModelClass.BranchChoice.RIGHT, right_test_trunk.branch_id)
+	assert_true(right_test_streamer.active_branch_id == right_test_branch_id, "Graph RIGHT choice switches the active riding route to the generated right edge")
+	assert_true(right_test_trunk.state == ChunkStreamerClass.BranchState.DORMANT, "Unselected left continuation becomes dormant after RIGHT choice")
+	right_test_streamer.queue_free()
+	right_test_manager.queue_free()
 	await process_frame
 
 # ==============================================================================

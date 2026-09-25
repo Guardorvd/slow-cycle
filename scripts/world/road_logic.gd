@@ -72,6 +72,12 @@ func get_last_error_count() -> int:
 		return last_validity_report.error_count
 	return 0
 
+func set_route_style(style: int, style_seed: int) -> void:
+	grammar.set_route_style(style, style_seed)
+
+func prepare_fork_approach() -> void:
+	grammar.queue_fork_approach()
+
 ## Plans and appends the next 50m chunk under RoadGrammar FSM control
 func plan_next_chunk() -> void:
 	var start_idx: int = maxi(0, road_path.size() - 1)

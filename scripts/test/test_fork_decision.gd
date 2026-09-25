@@ -68,20 +68,20 @@ func test_road_width_geometry_and_path_data() -> void:
 	print("--- Running Test 1: Road Width Geometry & Path Data ---")
 
 	# 1. C1 Smoothstep Width Profile
-	var w_far: float = RoadMathClass.compute_fork_width(-30.0, 25.0, 4.0, 10.0)
-	assert_almost_equal(w_far, 4.0, 0.001, "Width far upstream is standard 4.0m")
+	var w_far: float = RoadMathClass.compute_fork_width(-30.0, 25.0, 1.8, 3.6)
+	assert_almost_equal(w_far, 1.8, 0.001, "Width far upstream is singletrack 1.8m")
 
-	var w_start: float = RoadMathClass.compute_fork_width(-25.0, 25.0, 4.0, 10.0)
-	assert_almost_equal(w_start, 4.0, 0.001, "Width at start of expansion (-25m) is 4.0m")
+	var w_start: float = RoadMathClass.compute_fork_width(-25.0, 25.0, 1.8, 3.6)
+	assert_almost_equal(w_start, 1.8, 0.001, "Width at start of expansion (-25m) is 1.8m")
 
-	var w_mid: float = RoadMathClass.compute_fork_width(-12.5, 25.0, 4.0, 10.0)
-	assert_almost_equal(w_mid, 7.0, 0.01, "Width halfway through expansion (-12.5m) is 7.0m")
+	var w_mid: float = RoadMathClass.compute_fork_width(-12.5, 25.0, 1.8, 3.6)
+	assert_almost_equal(w_mid, 2.7, 0.01, "Width halfway through expansion (-12.5m) is 2.7m")
 
-	var w_fork: float = RoadMathClass.compute_fork_width(0.0, 25.0, 4.0, 10.0)
-	assert_almost_equal(w_fork, 10.0, 0.001, "Width at fork (0m) is 10.0m")
+	var w_fork: float = RoadMathClass.compute_fork_width(0.0, 25.0, 1.8, 3.6)
+	assert_almost_equal(w_fork, 3.6, 0.001, "Width at fork (0m) is 3.6m")
 
-	var w_past: float = RoadMathClass.compute_fork_width(10.0, 25.0, 4.0, 10.0)
-	assert_almost_equal(w_past, 10.0, 0.001, "Width downstream (> 0m) remains 10.0m")
+	var w_past: float = RoadMathClass.compute_fork_width(10.0, 25.0, 1.8, 3.6)
+	assert_almost_equal(w_past, 3.6, 0.001, "Width downstream (> 0m) remains 3.6m")
 
 	# Numerical derivative check: dW/ds at -25m and 0m must be approx 0 (C1 continuity)
 	var eps: float = 0.001

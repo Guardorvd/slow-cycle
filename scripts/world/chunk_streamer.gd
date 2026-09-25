@@ -11,6 +11,8 @@ const RoadChunkClass = preload("res://scripts/world/road_chunk.gd")
 const RoadPathDataClass = preload("res://scripts/world/road_path_data.gd")
 const RoadLogicClass = preload("res://scripts/world/road_logic.gd")
 const ForkDecisionModelClass = preload("res://scripts/world/fork_decision_model.gd")
+const RoadGraphClass = preload("res://scripts/world/road_graph.gd")
+const RoadGrammarClass = preload("res://scripts/world/road_grammar.gd")
 const RoadMathClass = preload("res://scripts/world/road_math.gd")
 
 # ==============================================================================
@@ -67,6 +69,10 @@ class RoadBranch extends RefCounted:
 	var last_closest_idx: int = 0
 	var child_branch_ids: Array[int] = []
 	var parent_branch_id: int = -1
+	var graph_entry_node_id: int = -1
+	var graph_fork_node_id: int = -1
+	var route_style: int = RoadGrammarClass.RouteStyle.BALANCED
+	var next_fork_distance: float = 0.0
 	var needs_fork_transition: bool = false
 	var transition_branch_index: int = -1
 
@@ -89,6 +95,7 @@ var shared_materials: Dictionary = {}
 var shared_meshes: Dictionary = {}
 
 var branches: Dictionary = {}                   ## branch_id (int) -> RoadBranch
+var road_graph: RefCounted = null                ## Authoritative runtime topology for generated forks
 var active_branch_id: int = 0
 var next_branch_id: int = 1
 var next_chunk_id: int = 0
@@ -134,11 +141,13 @@ func setup(manager: Node3D, path: RefCounted, logic: RefCounted, mats: Dictionar
 	world_manager = manager
 	shared_materials = mats
 	shared_meshes = meshes
+	road_graph = RoadGraphClass.new()
 
 	# Ensure noise exists in shared_materials
 	if not shared_materials.has("noise") or shared_materials["noise"] == null:
 		var noise := FastNoiseLite.new()
-		noise.seed = 184729
+		var manager_seed: Variant = world_manager.get("world_seed") if world_manager else null
+		noise.seed = int(manager_seed) if manager_seed != null else 184729
 		shared_materials["noise"] = noise
 
 	# Create initial trunk branch (Branch 0 = ACTIVE)
@@ -148,6 +157,10 @@ func setup(manager: Node3D, path: RefCounted, logic: RefCounted, mats: Dictionar
 	trunk.state = BranchState.ACTIVE
 	trunk.road_path = path
 	trunk.road_logic = logic
+	trunk.next_fork_distance = _derive_fork_spacing(logic.world_seed, 0, true)
+	if path.size() > 0:
+		var graph_root = road_graph.add_node(path.points[0], path.tangents[0], path.normals[0])
+		trunk.graph_entry_node_id = graph_root.node_id
 	branches[0] = trunk
 	active_branch_id = 0
 
@@ -182,10 +195,10 @@ func update_streaming(player_pos: Vector3, player_vel: Vector3 = Vector3.ZERO, d
 
 	# 3. Stream chunks ahead
 	var spawned_count: int = 0
-	var target_interval: float = first_fork_distance if active_branch.distance_at_last_fork == 0.0 else fork_interval_dist
+	var target_interval: float = active_branch.next_fork_distance
 	var dist_since_fork: float = total_s - active_branch.distance_at_last_fork
 
-	if not active_branch.is_fork_spawned and (dist_since_fork + 50.0) >= target_interval and (total_s - player_s) < AHEAD_DISTANCE:
+	if not active_branch.is_fork_spawned and (dist_since_fork + 50.0) >= target_interval and (total_s - player_s) < AHEAD_DISTANCE and _is_safe_fork_site(active_branch):
 		_spawn_chunk_with_fork_widening(active_branch)
 		_spawn_procedural_fork(active_branch)
 		spawned_count += 1
@@ -223,15 +236,16 @@ func _spawn_chunk_with_fork_widening(branch: RoadBranch) -> void:
 	var r_logic: RefCounted = branch.road_logic
 	var start_idx: int = maxi(0, r_path.size() - 1)
 
+	r_logic.prepare_fork_approach()
 	r_logic.plan_next_chunk()
 	var end_idx: int = r_path.size() - 1
 
-	# Apply C1 smoothstep widening (3.2m -> 6.5m) on the last 25m of this approach chunk
+	# Apply C1 smoothstep widening from singletrack to junction width on the final 25m
 	var end_s: float = r_path.cumulative_distances[end_idx]
 	for idx in range(start_idx, end_idx + 1):
 		var s: float = r_path.cumulative_distances[idx]
 		var s_rel: float = s - end_s # -50.0m to 0.0m
-		var w: float = RoadMathClass.compute_fork_width(s_rel, 25.0, 3.2, 6.5)
+		var w: float = RoadMathClass.compute_fork_width(s_rel, 25.0, 1.8, 3.6)
 		if idx < r_path.road_widths.size():
 			r_path.road_widths[idx] = w
 
@@ -266,12 +280,13 @@ func _generate_fork_arm_samples(
 ) -> Array[Vector3]:
 	var inner_verts: Array[Vector3] = []
 	var r_path: RefCounted = branch.road_path
-	var div_angle_deg: float = 14.0 if branch_idx == 0 else -14.0
-	var w_start: float = 3.25
-	var w_end: float = 1.8 if branch_idx == 0 else 3.2
+	var angle_magnitude: float = 5.0 if branch.route_style == RoadGrammarClass.RouteStyle.FLOW else 10.0
+	var div_angle_deg: float = angle_magnitude if branch_idx == 0 else -angle_magnitude
+	var w_start: float = 1.8
+	var w_end: float = 1.6 if branch.route_style == RoadGrammarClass.RouteStyle.FLOW else 1.35
 	var seg_type: int = RoadPathDataClass.SegmentType.CRUISE_DOWNHILL
 
-	var curr_pos: Vector3 = fork_pos + fork_binorm * (-1.625 if branch_idx == 0 else 1.625)
+	var curr_pos: Vector3 = fork_pos + fork_binorm * (-w_start * 0.5 if branch_idx == 0 else w_start * 0.5)
 	var prev_pos: Vector3 = curr_pos
 	var curr_tang: Vector3 = fork_tang
 	var prev_tang: Vector3 = fork_tang
@@ -357,6 +372,20 @@ func _spawn_procedural_fork(parent_branch: RoadBranch) -> void:
 	parent_branch.branch_index = 0
 	parent_branch.needs_fork_transition = false
 
+	var fork_graph_node = road_graph.add_fork_node(
+		fork_pos,
+		fork_tang,
+		fork_norm,
+		8.33,
+		fork_slope,
+		50.0,
+		50.0,
+		2.5
+	)
+	parent_branch.graph_fork_node_id = fork_graph_node.node_id
+	if parent_branch.graph_entry_node_id >= 0:
+		road_graph.add_edge(parent_branch.graph_entry_node_id, fork_graph_node.node_id, null, parent_branch.branch_id)
+
 	# Setup Decision Model for this fork
 	var model = ForkDecisionModelClass.new()
 	model.setup(fork_id, fork_pos, fork_tang, fork_norm, 20.0, ForkDecisionModelClass.BranchChoice.LEFT)
@@ -368,6 +397,7 @@ func _spawn_procedural_fork(parent_branch: RoadBranch) -> void:
 	alt_branch.branch_index = 1
 	alt_branch.needs_fork_transition = false
 	parent_branch.child_branch_ids = [alt_branch.branch_id]
+	_assign_fork_route_styles(parent_branch, alt_branch, fork_id)
 
 	# 1. Generate diverging fork arm samples for Right branch (alt_branch)
 	var right_inner_verts: Array[Vector3] = _generate_fork_arm_samples(
@@ -382,6 +412,18 @@ func _spawn_procedural_fork(parent_branch: RoadBranch) -> void:
 	# 3. Spawn Chunk 0 for Left arm (parent_branch): builds left road + left outer terrain + Splitter Wedge + Sign
 	var left_start_idx: int = maxi(0, parent_branch.road_path.size() - 26)
 	var left_end_idx: int = parent_branch.road_path.size() - 1
+	var left_graph_path: RefCounted = parent_branch.road_path.slice_segment(left_start_idx, left_end_idx)
+	left_graph_path.branch_id = parent_branch.branch_id
+	left_graph_path.fork_node_id = fork_id
+	var left_graph_end = road_graph.add_node(left_graph_path.points[-1], left_graph_path.tangents[-1], left_graph_path.normals[-1])
+	var left_angle: float = 5.0 if parent_branch.route_style == RoadGrammarClass.RouteStyle.FLOW else 10.0
+	var left_target_speed: float = 8.33 if parent_branch.route_style == RoadGrammarClass.RouteStyle.FLOW else 5.85
+	var left_graph_edge = road_graph.add_edge(fork_graph_node.node_id, left_graph_end.node_id, left_graph_path, parent_branch.branch_id, 0)
+	fork_graph_node.add_branch_preview(RoadGraphClass.BranchPreviewContext.new(
+		left_graph_edge.edge_id, 0, left_angle, left_target_speed, fork_slope, 45.0,
+		{"route_style": _route_style_name(parent_branch.route_style)}
+	))
+	parent_branch.graph_entry_node_id = left_graph_end.node_id
 	var c_id_l: int = next_chunk_id
 	next_chunk_id += 1
 	var token_l := GenerationToken.new(parent_branch.generation_id, parent_branch.branch_id, c_id_l)
@@ -402,6 +444,18 @@ func _spawn_procedural_fork(parent_branch: RoadBranch) -> void:
 	# 4. Spawn Chunk 0 for Right arm (alt_branch): builds right road + right outer terrain
 	var right_start_idx: int = 0
 	var right_end_idx: int = alt_branch.road_path.size() - 1
+	var right_graph_path: RefCounted = alt_branch.road_path.slice_segment(right_start_idx, right_end_idx)
+	right_graph_path.branch_id = alt_branch.branch_id
+	right_graph_path.fork_node_id = fork_id
+	var right_graph_end = road_graph.add_node(right_graph_path.points[-1], right_graph_path.tangents[-1], right_graph_path.normals[-1])
+	var right_angle: float = 5.0 if alt_branch.route_style == RoadGrammarClass.RouteStyle.FLOW else 10.0
+	var right_target_speed: float = 8.33 if alt_branch.route_style == RoadGrammarClass.RouteStyle.FLOW else 5.85
+	var right_graph_edge = road_graph.add_edge(fork_graph_node.node_id, right_graph_end.node_id, right_graph_path, alt_branch.branch_id, 1)
+	fork_graph_node.add_branch_preview(RoadGraphClass.BranchPreviewContext.new(
+		right_graph_edge.edge_id, 1, -right_angle, right_target_speed, fork_slope, 19.0,
+		{"route_style": _route_style_name(alt_branch.route_style)}
+	))
+	alt_branch.graph_entry_node_id = right_graph_end.node_id
 	var c_id_r: int = next_chunk_id
 	next_chunk_id += 1
 	var token_r := GenerationToken.new(alt_branch.generation_id, alt_branch.branch_id, c_id_r)
@@ -417,6 +471,8 @@ func _spawn_procedural_fork(parent_branch: RoadBranch) -> void:
 	chunk_r.commit(prep_r, shared_materials, shared_meshes)
 	alt_branch.active_chunks[c_id_r] = chunk_r
 	alt_branch.chunk_end_distances[c_id_r] = alt_branch.road_path.cumulative_distances[right_end_idx]
+
+	parent_branch.decision_model.set_branch_paths(left_graph_path, right_graph_path)
 
 	# 5. Preload 1 additional chunk for alt_branch (reaches 100m total preloaded)
 	_spawn_chunk_sync(alt_branch)
@@ -460,6 +516,43 @@ func _create_alternative_fork_branch(
 	branches[b_id] = b
 	return b
 
+func _stable_seed(seed_value: int, fork_id: int, branch_index: int = 0) -> int:
+	return int(hash([seed_value, fork_id, branch_index]) & 0x7FFFFFFF)
+
+func _derive_fork_spacing(seed_value: int, branch_id: int, is_initial: bool = false) -> float:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = _stable_seed(seed_value, branch_id, 71)
+	if is_initial:
+		return first_fork_distance * rng.randf_range(0.88, 1.12)
+	return fork_interval_dist * rng.randf_range(0.82, 1.18)
+
+func _assign_fork_route_styles(primary: RoadBranch, alternative: RoadBranch, fork_id: int) -> void:
+	var seed_value: int = primary.road_logic.world_seed
+	var rng := RandomNumberGenerator.new()
+	rng.seed = _stable_seed(seed_value, fork_id, 19)
+	var left_style: int = RoadGrammarClass.RouteStyle.FLOW if rng.randi_range(0, 1) == 0 else RoadGrammarClass.RouteStyle.TECHNICAL
+	var right_style: int = RoadGrammarClass.RouteStyle.TECHNICAL if left_style == RoadGrammarClass.RouteStyle.FLOW else RoadGrammarClass.RouteStyle.FLOW
+	primary.route_style = left_style
+	alternative.route_style = right_style
+	primary.road_logic.set_route_style(left_style, _stable_seed(seed_value, fork_id, 0))
+	alternative.road_logic.set_route_style(right_style, _stable_seed(seed_value, fork_id, 1))
+	primary.next_fork_distance = _derive_fork_spacing(primary.road_logic.world_seed, primary.branch_id)
+	alternative.next_fork_distance = _derive_fork_spacing(alternative.road_logic.world_seed, alternative.branch_id)
+
+func _route_style_name(style: int) -> String:
+	match style:
+		RoadGrammarClass.RouteStyle.FLOW:
+			return "flow"
+		RoadGrammarClass.RouteStyle.TECHNICAL:
+			return "technical"
+		_:
+			return "balanced"
+
+func _is_safe_fork_site(branch: RoadBranch) -> bool:
+	if branch == null or branch.road_path == null or branch.road_path.size() < 2:
+		return false
+	return branch.road_logic.last_chunk_passed
+
 # ==============================================================================
 # FORK DECISION EVALUATION & STATE TRANSITIONS
 # ==============================================================================
@@ -474,33 +567,41 @@ func _update_fork_decisions(player_pos: Vector3, player_vel: Vector3, delta: flo
 
 func _on_branch_locked(fork_id: int, chosen_choice: int, parent_branch_id: int) -> void:
 	var parent: RoadBranch = branches.get(parent_branch_id, null)
-	if parent == null or parent.child_branch_ids.is_empty():
+	if parent == null or parent.graph_fork_node_id < 0:
 		return
+	var chosen_edge = road_graph.get_fork_branch_edge(parent.graph_fork_node_id, chosen_choice)
+	var other_edge = road_graph.get_fork_branch_edge(parent.graph_fork_node_id, 1 - chosen_choice)
+	if chosen_edge == null:
+		return
+	var chosen_branch_id: int = chosen_edge.branch_id
+	var other_branch_id: int = other_edge.branch_id if other_edge != null else -1
+	var selected_branch: RoadBranch = branches.get(chosen_branch_id, null)
+	var unselected_branch: RoadBranch = branches.get(other_branch_id, null)
 
-	var alt_branch_id: int = parent.child_branch_ids[0]
-	var alt_branch: RoadBranch = branches.get(alt_branch_id, null)
+	if selected_branch != null and selected_branch != parent:
+		selected_branch.state = BranchState.ACTIVE
+		selected_branch.distance_at_last_fork = 0.0
+		selected_branch.is_fork_spawned = false
 
-	if chosen_choice == ForkDecisionModelClass.BranchChoice.RIGHT and alt_branch != null:
-		# Player chose Right (the alternative branch)
-		alt_branch.state = BranchState.ACTIVE
-		alt_branch.distance_at_last_fork = 0.0
-		alt_branch.is_fork_spawned = false
-
-		# Parent branch remains solid and visible until distance threshold
 		parent.state = BranchState.DORMANT
 		parent.generation_id += 1
 
-		active_branch_id = alt_branch_id
+		active_branch_id = selected_branch.branch_id
 		if world_manager and "road_path" in world_manager:
-			world_manager.road_path = alt_branch.road_path
+			world_manager.road_path = selected_branch.road_path
 	else:
-		# Player chose Left (continued along primary active branch)
-		if alt_branch != null:
-			alt_branch.state = BranchState.DORMANT
-			alt_branch.generation_id += 1
+		if selected_branch != parent:
+			parent.state = BranchState.DORMANT
+			parent.generation_id += 1
+			active_branch_id = selected_branch.branch_id
+			if world_manager and "road_path" in world_manager:
+				world_manager.road_path = selected_branch.road_path
+		else:
+			parent.is_fork_spawned = false
 
-		# Reset fork spawned flag on active branch so next fork can spawn after interval
-		parent.is_fork_spawned = false
+	if unselected_branch != null:
+		unselected_branch.state = BranchState.DORMANT
+		unselected_branch.generation_id += 1
 
 	if parent.decision_model:
 		parent.decision_model = null

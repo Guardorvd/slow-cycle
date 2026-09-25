@@ -11,7 +11,7 @@ const ChunkFoliageClass = preload("res://scripts/world/chunk_foliage.gd")
 const RoadPathDataClass = preload("res://scripts/world/road_path_data.gd")
 const TerrainCarverClass = preload("res://scripts/world/terrain_carver.gd")
 
-const ROAD_HALF_WIDTH: float = 2.0 ## Standard 4.0m road width baseline
+const ROAD_HALF_WIDTH: float = 0.9 ## Standard 1.8m singletrack width baseline
 const TERRAIN_WIDTH: float = 20.0 ## 20m roadside meadow strip
 
 # ==============================================================================

@@ -121,8 +121,8 @@ func _run_mountain_stress_test(seed_val: int, target_forks: int) -> bool:
 			instance.queue_free()
 			return false
 
-		if target_w < 1.7 or target_w > 6.6:
-			assert_true(false, "Road width out of declared bounds [1.8m, 6.5m]: %.2f" % target_w)
+		if target_w < 1.0 or target_w > 3.6:
+			assert_true(false, "Road width out of declared singletrack/junction bounds [1.0m, 3.6m]: %.2f" % target_w)
 			instance.queue_free()
 			return false
 

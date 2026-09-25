@@ -65,7 +65,7 @@ func append_sample(
 	contact_state: int = 0,
 	banking_deg: float = 0.0,
 	sight_dist: float = 50.0,
-	road_w: float = 4.0
+	road_w: float = 1.8
 ) -> void:
 	var norm_tangent: Vector3 = tang.normalized()
 	var norm_normal: Vector3 = norm.normalized()
@@ -309,7 +309,7 @@ func append_path_data(other: RefCounted, policy: int = AppendPolicy.DROP_DUPLICA
 		start_src = 1 # Skip first sample to prevent duplicate 0-distance vertex
 
 	for i in range(start_src, other.points.size()):
-		var rw: float = other.road_widths[i] if i < other.road_widths.size() else 4.0
+		var rw: float = other.road_widths[i] if i < other.road_widths.size() else 1.8
 		append_sample(
 			other.points[i],
 			other.tangents[i],
@@ -383,4 +383,3 @@ func validate_continuity_with(next_path: RefCounted, tol_p: float = 0.001, tol_d
 		res["error_message"] = "C1 tangent angle deviation: %.2f deg > tolerance %.2f deg" % [t_angle_deg, tol_deg]
 
 	return res
-
