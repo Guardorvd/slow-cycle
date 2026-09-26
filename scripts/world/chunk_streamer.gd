@@ -14,6 +14,7 @@ const ForkDecisionModelClass = preload("res://scripts/world/fork_decision_model.
 const RoadGraphClass = preload("res://scripts/world/road_graph.gd")
 const RoadGrammarClass = preload("res://scripts/world/road_grammar.gd")
 const RoadMathClass = preload("res://scripts/world/road_math.gd")
+const FORK_ARM_CENTER_OFFSET_M: float = 0.9 ## Half the 1.8m nominal width; arms begin at their inner-edge split.
 
 # ==============================================================================
 # ENUMS & CONSTANTS
@@ -403,11 +404,27 @@ func _spawn_procedural_fork(parent_branch: RoadBranch) -> void:
 	var right_inner_verts: Array[Vector3] = _generate_fork_arm_samples(
 		alt_branch, 1, fork_pos, fork_tang, fork_norm, fork_binorm, fork_heading, fork_slope
 	)
+	alt_branch.road_logic.apply_macro_profile_to_range(0, alt_branch.road_path.size() - 1, true)
+	var right_anchor_offset: float = alt_branch.road_path.macro_elevation_offsets[0]
+	for i in range(mini(right_inner_verts.size(), alt_branch.road_path.size())):
+		var inner_point: Vector3 = right_inner_verts[i]
+		inner_point.y += alt_branch.road_path.macro_elevation_offsets[i] - right_anchor_offset
+		right_inner_verts[i] = inner_point
 
 	# 2. Generate diverging fork arm samples for Left branch (parent_branch)
+	var left_arm_start_idx: int = maxi(0, parent_branch.road_path.size() - 1)
 	var left_inner_verts: Array[Vector3] = _generate_fork_arm_samples(
 		parent_branch, 0, fork_pos, fork_tang, fork_norm, fork_binorm, fork_heading, fork_slope
 	)
+	parent_branch.road_logic.apply_macro_profile_to_range(left_arm_start_idx, parent_branch.road_path.size() - 1, true)
+	var left_anchor_offset: float = parent_branch.road_path.macro_elevation_offsets[left_arm_start_idx]
+	for i in range(left_inner_verts.size()):
+		var sample_idx: int = left_arm_start_idx + 1 + i
+		if sample_idx >= parent_branch.road_path.size():
+			break
+		var inner_point: Vector3 = left_inner_verts[i]
+		inner_point.y += parent_branch.road_path.macro_elevation_offsets[sample_idx] - left_anchor_offset
+		left_inner_verts[i] = inner_point
 
 	# 3. Spawn Chunk 0 for Left arm (parent_branch): builds left road + left outer terrain + Splitter Wedge + Sign
 	var left_start_idx: int = maxi(0, parent_branch.road_path.size() - 26)
@@ -503,6 +520,11 @@ func _create_alternative_fork_branch(
 	var parent_seed: int = parent_branch.road_logic.world_seed
 	var b_seed: int = hash([parent_seed, fork_id, branch_idx]) & 0x7FFFFFFF
 	var b_logic = RoadLogicClass.new(b_seed, branch_path)
+	var parent_path: RefCounted = parent_branch.road_path
+	var fork_route_distance: float = parent_branch.road_logic.profile_distance_origin_m + parent_path.cumulative_distances[-1]
+	var branch_route_origin: float = fork_route_distance + FORK_ARM_CENTER_OFFSET_M
+	var inherited_offset: float = parent_path.macro_elevation_offsets[-1] if not parent_path.macro_elevation_offsets.is_empty() else 0.0
+	b_logic.set_mountain_profile(parent_branch.road_logic.mountain_profile, branch_route_origin, inherited_offset)
 
 	b_logic.last_point = parent_branch.fork_node_pos
 	b_logic.last_tangent = parent_branch.fork_node_tang

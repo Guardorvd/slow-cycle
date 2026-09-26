@@ -179,11 +179,13 @@ func compute_cross_section(
 	var pos_r_far: Vector3 = pt + binorm * d_far
 
 	# 2. Detail and macro height sampling
-	var h_far_l: float = get_macro_elevation(pos_l_far.x, pos_l_far.z) + get_detail_elevation(pos_l_far.x, pos_l_far.z)
+	var center_macro: float = get_macro_elevation(pt.x, pt.z)
+	var center_detail: float = get_detail_elevation(pt.x, pt.z)
+	var h_far_l: float = pt.y + get_macro_elevation(pos_l_far.x, pos_l_far.z) - center_macro + get_detail_elevation(pos_l_far.x, pos_l_far.z) - center_detail
 	var h_feat_l: float = dh_left + get_detail_elevation(pos_l_feat.x, pos_l_feat.z) * 0.5
 	var h_sh_l: float = -0.02 # Slight drainage dip
 
-	var h_far_r: float = get_macro_elevation(pos_r_far.x, pos_r_far.z) + get_detail_elevation(pos_r_far.x, pos_r_far.z)
+	var h_far_r: float = pt.y + get_macro_elevation(pos_r_far.x, pos_r_far.z) - center_macro + get_detail_elevation(pos_r_far.x, pos_r_far.z) - center_detail
 	var h_feat_r: float = dh_right + get_detail_elevation(pos_r_feat.x, pos_r_feat.z) * 0.5
 	var h_sh_r: float = -0.02 # Slight drainage dip
 

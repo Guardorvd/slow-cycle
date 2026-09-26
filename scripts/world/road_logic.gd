@@ -15,6 +15,8 @@ const RoadGrammarClass = preload("res://scripts/world/road_grammar.gd")
 const ValidatorClass = preload("res://scripts/world/road_validity_validator.gd")
 const Contract = preload("res://scripts/world/road_generation_contract.gd")
 const Airborne = preload("res://scripts/world/road_airborne_contract.gd")
+const MountainProfileClass = preload("res://scripts/world/mountain_profile.gd")
+const MACRO_PROFILE_BLEND: float = 0.35
 
 const CHUNK_LENGTH: float = 50.0 ## Length in meters per chunk
 const SAMPLES_PER_CHUNK: int = 25 ## 2.0m resolution per sample
@@ -24,6 +26,9 @@ var world_seed: int = 184729
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var road_path: RefCounted
 var grammar: RefCounted
+var mountain_profile: RefCounted
+var profile_distance_origin_m: float = 0.0
+var initial_macro_offset_m: float = 0.0
 
 # Spline continuity state tracking
 var last_point: Vector3 = Vector3.ZERO
@@ -42,6 +47,7 @@ func _init(seed_val: int, path_data: RefCounted) -> void:
 	rng.seed = seed_val
 	road_path = path_data
 	grammar = RoadGrammarClass.new(seed_val)
+	mountain_profile = MountainProfileClass.new(seed_val, "world", 3.5)
 	_initialize_start()
 
 func _initialize_start() -> void:
@@ -100,6 +106,7 @@ func plan_next_chunk() -> void:
 	# Generate geometry for the phase
 	_generate_phase_geometry(spec)
 	var end_idx: int = road_path.size() - 1
+	_apply_macro_profile_to_range(start_idx, end_idx)
 	
 	# Objective Inspection Firewall: validates continuity from start_idx through end_idx
 	last_validity_report = ValidatorClass.validate_segment(road_path, start_idx, end_idx)
@@ -117,12 +124,86 @@ func plan_next_chunk() -> void:
 		# Safe conservative fallback: straight recovery
 		_generate_conservative_safe_chunk()
 		end_idx = road_path.size() - 1
+		_apply_macro_profile_to_range(start_idx, end_idx)
 		last_validity_report = ValidatorClass.validate_segment(road_path, start_idx, end_idx)
 		last_chunk_passed = last_validity_report.is_valid
 	else:
 		last_chunk_passed = true
 
 	chunks_generated += 1
+
+## Shares a world profile across a child branch and anchors its local distance at the fork.
+func set_mountain_profile(profile: RefCounted, distance_origin_m: float, inherited_offset_m: float = 0.0) -> void:
+	mountain_profile = profile
+	profile_distance_origin_m = distance_origin_m
+	initial_macro_offset_m = inherited_offset_m
+
+## Applies only the newly generated range. Existing local geometry remains as a residual
+## around the mean descent; the shared profile adds a bounded macro variation.
+func apply_macro_profile_to_range(start_idx: int, end_idx: int, preserve_first_new_tangent: bool = false) -> void:
+	_apply_macro_profile_to_range(start_idx, end_idx, preserve_first_new_tangent)
+
+func _apply_macro_profile_to_range(start_idx: int, end_idx: int, preserve_first_new_tangent: bool = false) -> void:
+	if mountain_profile == null or road_path == null or road_path.size() < 2:
+		return
+	var first: int = clampi(start_idx, 0, road_path.size() - 1)
+	var last: int = clampi(end_idx, first, road_path.size() - 1)
+	if road_path.macro_elevation_offsets.size() < road_path.size():
+		var old_size: int = road_path.macro_elevation_offsets.size()
+		road_path.macro_elevation_offsets.resize(road_path.size())
+		for i in range(old_size, road_path.size()):
+			road_path.macro_elevation_offsets[i] = 0.0
+	var start_route_s: float = profile_distance_origin_m + road_path.cumulative_distances[first]
+	var inherited_offset: float = road_path.macro_elevation_offsets[first]
+	var is_new_branch_anchor: bool = first == 0 and chunks_generated == 0
+	if is_new_branch_anchor:
+		inherited_offset = initial_macro_offset_m
+		road_path.macro_elevation_offsets[first] = inherited_offset
+	var target_start_offset: float = MACRO_PROFILE_BLEND * mountain_profile.centerline_offset_at(start_route_s) if is_new_branch_anchor else inherited_offset
+	# New points were generated from the already aligned start point, so their inherited
+	# macro component begins at the start offset even before the smooth delta is applied.
+	if is_new_branch_anchor:
+		var start_point: Vector3 = road_path.points[first]
+		start_point.y += target_start_offset - inherited_offset
+		road_path.points[first] = start_point
+		road_path.macro_elevation_offsets[first] = target_start_offset
+		inherited_offset = target_start_offset
+	for i in range(first + 1, last + 1):
+		road_path.macro_elevation_offsets[i] = inherited_offset
+	var base_tangents: Array[Vector3] = []
+	for i in range(first, last + 1):
+		base_tangents.append(road_path.tangents[i])
+	for iteration in range(3):
+		for i in range(first + 1, last + 1):
+			var route_s: float = profile_distance_origin_m + road_path.cumulative_distances[i]
+			var target_offset: float = MACRO_PROFILE_BLEND * mountain_profile.centerline_offset_at(route_s)
+			var point: Vector3 = road_path.points[i]
+			point.y += target_offset - road_path.macro_elevation_offsets[i]
+			road_path.points[i] = point
+			road_path.macro_elevation_offsets[i] = target_offset
+		road_path.recalculate_cumulative_distances(first + 1)
+	for i in range(first + 1, last + 1):
+		if preserve_first_new_tangent and i == first + 1:
+			continue
+		var route_s: float = profile_distance_origin_m + road_path.cumulative_distances[i]
+		var profile_sample: Dictionary = mountain_profile.sample_at(route_s)
+		var tangent: Vector3 = base_tangents[i - first]
+		var horizontal_direction: Vector2 = Vector2(tangent.x, tangent.z).normalized()
+		var baseline_rate: float = MountainProfileClass.get_base_vertical_rate()
+		var corrected_rate: float = sin(deg_to_rad(road_path.slopes[i])) + MACRO_PROFILE_BLEND * (float(profile_sample.vertical_rate) - baseline_rate)
+		var corrected_grade: float = rad_to_deg(asin(clampf(corrected_rate, -0.999, 0.999)))
+		var grade_rad: float = deg_to_rad(corrected_grade)
+		var corrected_tangent := Vector3(horizontal_direction.x * cos(grade_rad), sin(grade_rad), horizontal_direction.y * cos(grade_rad)).normalized()
+		var corrected_normal: Vector3 = RoadMath.compute_ortho_normal(corrected_tangent, road_path.banking_angles[i])
+		road_path.tangents[i] = corrected_tangent
+		road_path.normals[i] = corrected_normal
+		road_path.binormals[i] = corrected_tangent.cross(corrected_normal).normalized()
+		road_path.slopes[i] = corrected_grade
+	if last == road_path.size() - 1:
+		last_point = road_path.points[last]
+		last_tangent = road_path.tangents[last]
+		last_normal = road_path.normals[last]
+		current_slope_deg = road_path.slopes[last]
 
 func _generate_phase_geometry(spec: RefCounted) -> void:
 	match spec.phase:

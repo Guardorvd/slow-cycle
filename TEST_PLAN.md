@@ -1,5 +1,137 @@
 # Slow Cycle — Verification & Testing Protocol
 
+## 0. Route-Level Fork Integration (2026-09-26)
+
+Run from the project root with Godot 4.7.2 mono:
+
+```powershell
+& 'C:\Users\Luisa\Downloads\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe' --headless --path . --script res://scripts/test/test_route_branch_integration.gd
+```
+
+The harness creates a fresh runtime scene for each combination of seeds `184729` and `42` and LEFT/RIGHT. It asks the production `ForkDecisionModel` to choose using the registered runtime `RoadGraph` centerlines, then advances the selected rider position along generated centerline samples through `ChunkStreamer` until that branch materializes its next fork. While advancing, it records distance, elevation change, grade and curvature ranges, contact-state sequence/counts, sample gaps, solid collision coverage, selected branch identity/style, and whether the next fork appeared. The route follower places the rider at actual generated samples; this is not a free-running bicycle-physics playtest.
+
+| Seed | Choice | Branch / style | Length to next fork | Elevation delta | Grade range | Curvature range | Contact states | Max sample gap |
+|---:|---|---|---:|---:|---:|---:|---|---:|
+| 184729 | LEFT | 0 / TECHNICAL | 450.9 m | -28.32 m | -7.67° to -1.46° | 0.0000 to 0.0505 m⁻¹ | GROUNDED (227 samples) | 2.001 m |
+| 184729 | RIGHT | 1 / FLOW | 150.0 m | -10.71 m | -5.35° to -3.32° | 0.0003 to 0.0017 m⁻¹ | GROUNDED (76 samples) | 2.001 m |
+| 42 | LEFT | 0 / TECHNICAL | 451.0 m | -35.75 m | -7.00° to -0.33° | 0.0000 to 0.0493 m⁻¹ | GROUNDED (225), MICRO_DROP (2) | 2.018 m |
+| 42 | RIGHT | 1 / FLOW | 150.0 m | -7.88 m | -3.82° to -1.80° | 0.0001 to 0.0035 m⁻¹ | GROUNDED (76) | 2.000 m |
+
+### P0.1 cadence/style audit correction
+
+The table above records the original P0 run. Its route follower manually called `ChunkStreamer.update_streaming()` while `WorldManager._process` also called it, so the LEFT distance (450.9/451.0 m) depended on duplicate update cadence. Treat those values as historical observations, not a deterministic acceptance metric. The style labels for seed `42` were also read after the following fork mutated runtime `route_style`; the selected edge at the original choice was LEFT=FLOW and RIGHT=TECHNICAL. For seed `184729`, it was LEFT=TECHNICAL and RIGHT=FLOW.
+
+Run the isolated diagnostic with:
+
+```powershell
+& 'C:\Users\Luisa\Downloads\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe' --headless --path . --script res://scripts/test/test_route_style_spacing_audit.gd
+```
+
+The runner disables background `WorldManager` and bicycle updates, then explicitly advances the real streamer. With the same two seeds and choices, it reported LEFT/primary next-fork materialization at 300.9 m and RIGHT/child at 150.0 m, regardless of which style each seed assigned to that side. This points to branch role/lifecycle and update setup in this diagnostic scenario, not style alone. The controlled 100 m interval was applied only after branch choice; for RIGHT, the seeded next fork could already have spawned before the override, so this is not a clean comparison to production-default interval behavior. The measured endpoint is next-fork materialization, not rider arrival at that fork.
+
+Audit result: two consecutive isolated runs reproduced all four traces; `STYLE_SPACING_AUDIT_SUMMARY failures=0 traces=4`. Logged chunks were valid (`last_valid=true`, validator error count 0). Rejected candidate/fallback history is not exposed by runtime and therefore remains unproven. Godot printed existing environment messages for the user log path and Windows root certificate store; no parse or leak warnings were seen. The corrected P0.2 integration results follow.
+
+### P0.2 corrected fork-to-fork integration
+
+The updated route harness disables `WorldManager._process` and bike processing and calls `ChunkStreamer.update_streaming()` at one controlled cadence. It records the selected style from the graph branch at initial choice time, then follows the active generated parent centerline to within 20 m of the next fork and drives along a real outgoing edge until the next production decision locks to that edge. The initial fork is a fixed fixture at 100 m in both modes. In the controlled mode, both outgoing branch targets are set to 100 m before the choice; the report also marks when a fork was already materialized before measuring it. In default mode the following intervals retain production seed scheduling.
+
+Run:
+
+```powershell
+& 'C:\Users\Luisa\Downloads\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe' --headless --path . --script res://scripts/test/test_route_branch_integration.gd
+```
+
+| Interval mode | Seed | Choice / style at choice | Distance fork-to-arrival | Elevation delta | Grade range | Curvature range | Arrival to node | Next choice lock |
+|---|---:|---|---:|---:|---:|---:|---:|---|
+| Controlled 100 m | 184729 | LEFT / TECHNICAL | 300.9 m | -15.63 m | -4.52°…-1.88° | 0…0.0505 m⁻¹ | 16.01 m | branch 2, locked |
+| Controlled 100 m | 184729 | RIGHT / FLOW | 150.0 m | -10.71 m | -5.35°…-3.32° | 0.0003…0.0017 m⁻¹ | 18.01 m | branch 1, locked |
+| Controlled 100 m | 42 | LEFT / FLOW | 300.9 m | -22.30 m | -7.00°…-0.33° | 0…0.0017 m⁻¹ | 16.01 m | branch 2, locked |
+| Controlled 100 m | 42 | RIGHT / TECHNICAL | 150.0 m | -7.88 m | -3.82°…-1.80° | 0.0001…0.0035 m⁻¹ | 18.01 m | branch 1, locked |
+| Seeded default | 184729 | LEFT / TECHNICAL | 851.0 m | -54.35 m | -7.67°…-1.46° | 0…0.0519 m⁻¹ | 18.01 m | branch 2, locked |
+| Seeded default | 184729 | RIGHT / FLOW | 650.1 m | -54.07 m | -7.54°…-0.29° | 0…0.0520 m⁻¹ | 18.01 m | branch 1, locked |
+| Seeded default | 42 | LEFT / FLOW | 651.0 m | -48.67 m | -7.00°…0.35° | 0…0.0493 m⁻¹ | 18.01 m | branch 2, locked |
+| Seeded default | 42 | RIGHT / TECHNICAL | 600.1 m | -43.77 m | -7.52°…-0.77° | 0…0.0486 m⁻¹ | 16.01 m | branch 1, locked |
+
+Both full runs reproduced the same eight route rows; `ROUTE_INTEGRATION_SUMMARY failures=0 routes=8`. Each route passed graph identity, positive length, <=2.5 m sample gap, solid collision coverage and next-edge lock checks. The controlled LEFT/primary fork was already materialized at route start: the parent road had been generated about 301 m beyond the first fork, so its 300.9 m result is not a valid 100 m interval measurement. The RIGHT/child controlled result (150 m) had not been materialized and is a valid illustration of the 100 m target plus preload/chunk effects. Treat controlled mode as a lifecycle stress trace, not a balanced side-by-side interval experiment. In seeded-default mode, all four following forks were unmaterialized at measurement start, and the prior fork origin matched the route origin; those rows are suitable for comparing assigned and observed spacing.
+
+The route follower places the rider at generated centerline samples, so this does not establish a free-running bicycle experience. Seeded-default lengths range from 600.1 to 851.0 m; P0.3 below compares them directly with their assigned intervals. Godot still prints environment messages about log writing and Windows certificates; no parse or leak warnings were emitted.
+
+### P0.3 spacing and route-role interpretation
+
+The runtime currently sets the nominal subsequent fork distance to 700 m, then deterministically varies it by ±18% per seed/branch. Thus the scheduled range is 574–826 m. For the four seeded-default routes, the report captured the assigned target, local origin offset, and observed distance:
+
+| Seed | Choice / style | Assigned target | Route origin offset | Observed to fork | Difference |
+|---:|---|---:|---:|---:|---:|
+| 184729 | LEFT / TECHNICAL | 820.7 m | 0.0 m | 851.0 m | +30.2 m |
+| 184729 | RIGHT / FLOW | 624.6 m | 0.0 m | 650.1 m | +25.5 m |
+| 42 | LEFT / FLOW | 618.1 m | 0.0 m | 651.0 m | +32.9 m |
+| 42 | RIGHT / TECHNICAL | 591.0 m | 0.0 m | 600.1 m | +9.1 m |
+
+The observed distance is only 9–33 m above target, below the 50 m chunk length. This is consistent with the streamer checking distance at chunk boundaries and only spawning when the site is safe and enough generated road lies ahead. The target, origin, and observed distance show no evidence of a default-schedule defect in these four traces.
+
+**Draft pacing proposal, not yet an enforced requirement:** for the first 1–2 km greybox route, aim for fork-to-fork legs around **550–900 m**. This brackets the observed default routes and leaves room for roughly two or three meaningful route segments in the target demonstration length. Keep both styles in a similar length band initially; distinguish FLOW through sweeping turns/rollers and a smoother rhythm, and TECHNICAL through tighter line choices, switchbacks and controlled drops. Existing shared geometry safety limits remain authoritative: grade -14°…+5°, radius >=18 m, curvature <=0.0556 m⁻¹. Current two-seed data does not show reliable numeric grade/curvature separation by style, and the sampled legs had no full AIRBORNE/LANDING sequence, so those experience targets need additional seeds and an actual bike ride before becoming assertions.
+
+Related regressions: fork decision 212/212, fork geometry 15/15, branch streaming 49/49, mountain validation 12/12. Existing tests/assertions were not changed.
+
+## Human Greybox Ride Feedback (2026-09-26)
+
+Initial qualitative report from the player; observations are recorded but have not yet been reproduced across a controlled seed/choice sequence:
+
+- The game appears to start on the same seed each time, and the first fork takes too long to reach.
+- The fork can be seen from far away, but its signs/markers feel cluttered; the space between left and right arms looks empty.
+- The alternatives feel alike, and generation of challenging features is weak beyond gentle slopes and straight sections.
+- Visual artifacts occur; the bike can fall through the surface.
+- One selected route curls beneath a later fork and becomes impassable, possibly because the lines overlap or lack vertical clearance.
+
+These findings make route passage and surface collision the next diagnostic priorities. Do not infer yet that the seed pool is small or that the fork arms need additional geometry; first reproduce the cases and identify their seed, choice sequence and exact location. The route crossing/fall-through reports are potential blockers; signs, empty space, spacing and route-role variety follow once passage is reliable.
+
+### P0.4 diagnostic pass — partial, 2026-09-26
+
+Added `scripts/test/test_route_clearance_audit.gd`. It follows 12 forks on seeds `184729` and `42` with deterministic alternating LEFT/RIGHT choices. Both traversals completed (`failures=0`); the graph scan found zero non-connected centerline pairs within 3 m horizontal / 2 m vertical clearance. This does not rule out the player's under-fork case because their exact branch-choice sequence and location are unknown.
+
+The same run found three centerline samples where a ray on road collision layer 2 missed the road and an all-layer ray hit terrain layer 4: two on seed `184729` (branches 8/10, local route distances 803.00/602.95 m) and one on seed `42` (branch 8, 602.99 m). Each point was nominally covered by an active road chunk. These are collision-coverage candidates, not yet confirmed player fall-through: the audit currently raycasts after streaming update and does not compare before/after or lateral samples. Next, isolate those samples across streaming, verify ray hit heights/shape coverage, and only then scope a production repair.
+
+The scene's `world_seed` is explicitly set to `184729`; `WorldManager` also accepts `--seed=<int>`. The repeated start therefore comes from the configured default, not evidence of a limited seed pool. Source inspection of fork dressing also shows two directional signs and eleven marker posts across the paired fork chunks, a plausible cause of the reported clutter. The wedge is generated in code, but the empty center appearance still needs visual/runtime confirmation.
+
+Godot audit summary: `ROUTE_CLEARANCE_AUDIT_SUMMARY failures=0 candidates=0 seeds=2`. Existing environment messages appeared for log-file writing and Windows root certificates; no script parse errors, engine assertion failures, or leak warnings appeared. `git diff --check` passed.
+
+### P0.4 follow-up — collision-hole isolation, 2026-09-26
+
+Expanded `scripts/test/test_route_clearance_audit.gd` as a diagnostic-only runner. For each seed (`184729`, `42`), it now traverses 12 forks with LEFT-only and RIGHT-only decisions (4 runs, 48 fork choices total). At each sampled centerline point it casts road-layer vertical rays at lateral offsets `-0.5m`, `0m`, `+0.5m`, from `+5m` to `-5m`, both immediately before and after `update_streaming()` plus one physics frame. It records centerline road misses and hit height relative to the centerline point.
+
+| Seed | Choices | Forks | Center misses before / after | Road hits before / after | Hit Y delta to centerline point |
+|---:|---|---:|---:|---:|---:|
+| 184729 | LEFT only | 12 | 0 / 0 | 7413/7413 / 7413/7413 | -0.027…+0.672 m |
+| 184729 | RIGHT only | 12 | 0 / 0 | 6030/6030 / 6030/6030 | -0.060…+1.038 m |
+| 42 | LEFT only | 12 | 0 / 0 | 5688/5688 / 5688/5688 | -0.026…+0.653 m |
+| 42 | RIGHT only | 12 | 0 / 0 | 5694/5694 / 5694/5694 | -0.059…+0.611 m |
+
+All-layer/terrain substitution was therefore not observed in these runs, and the three earlier road-layer misses were not reproduced even with the original ±5m ray height. No close non-connected centerline candidates were found (`candidates=0`); this does not disprove the reported under-fork route because the exact seed/choice sequence is unknown and the scan only tests generated centerline proximity, not full bike clearance or swept collision volume. The Y deltas include the lateral probes and are measured against the centerline sample elevation; they are not a road-height error bound or a mesh-seam measurement. This evidence does not confirm a production collision defect, so no production fix plan is opened yet.
+
+Run summary: `ROUTE_CLEARANCE_AUDIT_SUMMARY failures=0 candidates=0 seeds=2 choice_modes=2`, exit 0. No parse/assertion errors or ObjectDB leak warning in the final run. Godot still emitted environment messages about writing `user://logs/godot.log` and reading the Windows root certificate store. Existing production code and regression suites were untouched; `git diff --check` passed.
+
+### P1.0 — Seeded macro elevation profile, 2026-09-26
+
+Added a standalone mathematical envelope in `scripts/world/mountain_profile.gd` and the separate runner `scripts/test/test_mountain_profile.gd`. It uses stable seed/route-keyed phases for three smooth harmonics; elevation and grade are analytic, query cost is O(1), and no per-distance cache grows with travel. The profile is not yet consumed by runtime road or terrain generation.
+
+The headless battery covered 7 seeds × 3 route identities, repeated creation, reverse-order random-access queries, 40 nominal 300m interval boundaries per seed, grade contract limits, monotonic descent, profile diversity and 12km elevation budget. Result: `MOUNTAIN_PROFILE_SUMMARY checks=39845 failures=0 seeds=7 routes=3`, exit 0. Measured 12km drop was 1070.26–1089.66m; measured grade across the route identity/seed battery was approximately -7.42°…-2.91°. No parse errors or ObjectDB leak warning appeared.
+
+Existing regressions were run without changing assertions: `test_road_contract.gd` 18/18 PASS (5 seeded paths 100% compliant; validator benchmark 5.110ms/100 chunks); `test_mountain_validation.gd` 12/12 PASS across 60 forks, RAM delta +19.7–20.9MB. Godot emitted the known environment messages for writing `user://logs/godot.log` and reading the Windows root certificate store. `git diff --check` passed.
+
+P1.0 established the analytic profile foundation. Runtime integration and its verification are recorded below under P1.1.
+
+### P1.1 — Macro profile road/terrain integration, 2026-09-26
+
+Applied a bounded profile elevation correction to generated road samples before validation and mesh/collision construction. Fork arms share the seeded profile and use a common route-distance origin; child-arm local distance is offset by the half-width needed to preserve the shared fork apex. `RoadPathData` carries macro offsets through range operations, and arc distances plus frame vectors are recalculated after height correction. `TerrainCarver` now anchors its far surface to road centerline elevation while retaining the existing lateral noise.
+
+The new `test_macro_profile_road_integration.gd` passed 968 checks for seeds 184729 and 42, including repeated generation, both fork arms, grade/frame contracts, edge alignment and terrain elevation. Existing suites remained unchanged and passed: `test_road_contract.gd` 18/18; `test_fork_geometry_verification.gd` 15/15; `test_branch_streaming.gd` 49/49; `test_terrain_carver.gd` 99/99; `test_mountain_validation.gd` 12/12. `test_mountain_profile.gd` also passed 39,845 checks. No final-run parse errors or ObjectDB leak warnings. Godot emitted known environment messages for log-file permissions and Windows certificate-store access; process exit codes were 0.
+
+The profile blend remains conservative (0.35). This step does not yet make FLOW and TECHNICAL branches follow distinct macro elevation plans, nor does it close the unconfirmed player-reported under-fork traversal issue. See `ROAD_GENERATION.md` §3.3 and the P1.1 task report in `implementation_plan.md`.
+
+All four runs reached the next fork, selected the expected graph edge/branch ID, and had solid collision chunk coverage across every sampled route point. Each seed's alternatives differed in measured length, elevation profile, and curvature range. Two consecutive complete harness runs reproduced the same metrics. No AIRBORNE or LANDING states occurred in these fork-to-fork segments.
+
+This result exposes a route-composition question for follow-up: the sampled technical alternative is about 451 m while Flow is 150 m, the opposite of the earlier route-intent sketch that described Flow as the longer, sweeping option. The harness confirms route-level difference; it does not establish that the player experiences the intended difficulty or that the current length split is deliberate.
+
 ## 1. The 10-Minute "Ride Test" (Core Milestone Verification)
 The ultimate quality gate for Slow Cycle is the uninterrupted continuous **Ride Test**.
 

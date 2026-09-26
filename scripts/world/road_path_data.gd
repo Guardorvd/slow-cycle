@@ -43,6 +43,7 @@ var surface_contact_states: PackedByteArray = PackedByteArray()
 var banking_angles: PackedFloat32Array = PackedFloat32Array()
 var sight_distances: PackedFloat32Array = PackedFloat32Array()
 var road_widths: PackedFloat32Array = PackedFloat32Array()
+var macro_elevation_offsets: PackedFloat32Array = PackedFloat32Array()
 var branch_id: int = MAIN_BRANCH_ID
 var fork_node_id: int = -1
 var parent_branch_id: int = UNASSIGNED_BRANCH_ID
@@ -88,6 +89,15 @@ func append_sample(
 	banking_angles.append(banking_deg)
 	sight_distances.append(sight_dist)
 	road_widths.append(road_w)
+	macro_elevation_offsets.append(0.0)
+
+## Rebuilds arc distances after macro elevation offsets alter sample positions.
+func recalculate_cumulative_distances(start_idx: int = 1) -> void:
+	if points.size() < 2:
+		return
+	var first: int = clampi(start_idx, 1, points.size() - 1)
+	for i in range(first, points.size()):
+		cumulative_distances[i] = cumulative_distances[i - 1] + points[i - 1].distance_to(points[i])
 
 ## Prunes historical spline samples further than cutoff_distance behind the player.
 ## Returns number of pruned samples so callers can adjust cached indices.
@@ -116,6 +126,7 @@ func prune_behind(cutoff_distance: float) -> int:
 	banking_angles = banking_angles.slice(prune_count)
 	sight_distances = sight_distances.slice(prune_count)
 	road_widths = road_widths.slice(prune_count)
+	macro_elevation_offsets = macro_elevation_offsets.slice(prune_count)
 
 	return prune_count
 
@@ -137,6 +148,7 @@ func truncate_to(new_size: int) -> void:
 	banking_angles = banking_angles.slice(0, new_size)
 	sight_distances = sight_distances.slice(0, new_size)
 	road_widths = road_widths.slice(0, new_size)
+	macro_elevation_offsets = macro_elevation_offsets.slice(0, new_size)
 
 
 ## Finds the closest centerline sample index to a given world position
@@ -269,6 +281,7 @@ func slice_segment(start_idx: int, end_idx: int) -> RefCounted:
 	result.banking_angles = banking_angles.slice(s_min, s_max + 1)
 	result.sight_distances = sight_distances.slice(s_min, s_max + 1)
 	result.road_widths = road_widths.slice(s_min, s_max + 1)
+	result.macro_elevation_offsets = macro_elevation_offsets.slice(s_min, s_max + 1)
 
 	# Local cumulative distances recalculation starting strictly at 0.0
 	result.cumulative_distances.resize(count)
@@ -296,6 +309,7 @@ func append_path_data(other: RefCounted, policy: int = AppendPolicy.DROP_DUPLICA
 		banking_angles = other.banking_angles.duplicate()
 		sight_distances = other.sight_distances.duplicate()
 		road_widths = other.road_widths.duplicate()
+		macro_elevation_offsets = other.macro_elevation_offsets.duplicate()
 		return
 
 	var seam_dist: float = points[-1].distance_to(other.points[0])
@@ -322,8 +336,9 @@ func append_path_data(other: RefCounted, policy: int = AppendPolicy.DROP_DUPLICA
 			other.sight_distances[i],
 			rw
 		)
+		macro_elevation_offsets[-1] = other.macro_elevation_offsets[i] if i < other.macro_elevation_offsets.size() else 0.0
 
-## Complete deep-copy of all 11 PackedArrays and metadata
+	## Complete deep-copy of all sample arrays and metadata
 func clone() -> RefCounted:
 	var c = get_script().new()
 	c.branch_id = branch_id
@@ -341,6 +356,7 @@ func clone() -> RefCounted:
 	c.banking_angles = banking_angles.duplicate()
 	c.sight_distances = sight_distances.duplicate()
 	c.road_widths = road_widths.duplicate()
+	c.macro_elevation_offsets = macro_elevation_offsets.duplicate()
 	return c
 
 ## Validates C0 position and C1 tangent continuity between the end of this path and start of next_path
