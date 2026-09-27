@@ -49,7 +49,8 @@ mode_select.tscn
 | Fork location | Seeded distance threshold, followed by endpoint preflight in P2.1 | Select among terrain/sightline/grade/clearance/composition-qualified candidate corridors |
 | Geometry | `RoadPathData` and existing validator define continuous centerlines and local constraints | Route plan → C1 centerline and event geometry → validated road/terrain fit → chunk rendering/collision |
 | Topology/streaming | `RoadGraph` owns fork choice; `ChunkStreamer` owns branch/chunk lifecycle | Migrate lifecycle incrementally only when graph-backed generation passes route and streaming gates |
-| World dressing | Per-chunk foliage MultiMesh groups and local roadside terrain | Seeded ecology/secondary-trail network with exclusion corridors and measured budgets |
+| Graph history | Chunk/branch unload prunes graph nodes strictly behind the oldest live branch entry/fork reference and disconnects incident adjacency | Keep topology bounded to the live choice/streaming window; preserve every node reachable from pending decisions |
+| World dressing | Per-chunk foliage MultiMesh groups use a positive 63-bit hash of stable route seed and quantized local arc-length bounds | Seeded ecology/secondary-trail network with exclusion corridors and measured budgets |
 
 The target flow is deliberately ordered: a shared macro field gives a candidate route its context; route intent chooses a corridor and ride rhythm; the route graph fixes topology; centerlines and events are fitted and validated; terrain is fitted to those same coordinates; chunks materialize render and collision data; foliage is placed last with road/fork/sightline exclusions. Do not generate terrain and road independently and attempt to reconcile them with wheel raycasts.
 
@@ -65,6 +66,7 @@ The initial gate checks the last 25 m for aligned/finite samples, sample spacing
 - The physical bicycle root stays upright; presentation lean/pitch remains in `VisualsRoot`.
 - Road geometry remains mathematically continuous under `RoadGenerationContract`; raycasts cannot hide geometric tears, normal flips or height steps.
 - Every stochastic-looking world choice must derive from stable seed/key inputs. Candidate evaluation itself is deterministic and consumes no RNG.
+- Foliage keys exclude global allocation IDs and materialization order. Keys are a 63-bit hash, so collisions are theoretically possible; the expanded key space makes accidental collisions negligible for current world windows.
 - Keep one local MultiMesh per chunk/group for culling; never consolidate infinite-world foliage into one global MultiMesh.
 - No gears, stamina, stunt scoring, inventory or unrelated gameplay loop is part of the world-generation scope.
 

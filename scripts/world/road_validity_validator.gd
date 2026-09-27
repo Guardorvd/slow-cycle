@@ -8,6 +8,8 @@ extends RefCounted
 
 const Contract = preload("res://scripts/world/road_generation_contract.gd")
 const Airborne = preload("res://scripts/world/road_airborne_contract.gd")
+const RoadPathDataClass = preload("res://scripts/world/road_path_data.gd")
+const MIN_BRAKING_SIGHT_DISTANCE_M: float = 45.0
 
 enum SegmentStatus {
 	VALID_GROUNDED = 0,         ## Continuously grounded and strictly valid
@@ -46,13 +48,29 @@ class ValidityReport extends RefCounted:
 ## Validates a contiguous sequence of samples in a RoadPathData
 static func validate_segment(path_data: RefCounted, start_idx: int = 0, end_idx: int = -1) -> ValidityReport:
 	var report := ValidityReport.new()
+	var structure_error: String = _path_structure_error(path_data)
+	if not structure_error.is_empty():
+		report.add_violation("ERR_PATH_STRUCTURE", start_idx, 0.0, 0.0, 0.0, structure_error)
+		return report
 	var total_pts: int = path_data.size()
 	if total_pts < 2:
+		report.add_violation("ERR_PATH_TOO_SHORT", start_idx, 0.0, float(total_pts), 2.0,
+			"A road segment needs at least two samples")
 		return report
 
-	var s_idx: int = clampi(start_idx, 0, total_pts - 1)
-	var e_idx: int = total_pts - 1 if end_idx < 0 else clampi(end_idx, s_idx, total_pts - 1)
+	if start_idx < 0 or start_idx >= total_pts:
+		report.add_violation("ERR_SAMPLE_RANGE", start_idx, 0.0, float(start_idx), float(total_pts - 1),
+			"Start sample index is outside the path")
+		return report
+	var s_idx: int = start_idx
+	if end_idx >= total_pts or (end_idx >= 0 and end_idx < s_idx):
+		report.add_violation("ERR_SAMPLE_RANGE", end_idx, 0.0, float(end_idx), float(total_pts - 1),
+			"End sample index is outside the selected path range")
+		return report
+	var e_idx: int = total_pts - 1 if end_idx < 0 else end_idx
 	if e_idx <= s_idx:
+		report.add_violation("ERR_SAMPLE_RANGE", s_idx, path_data.cumulative_distances[s_idx],
+			float(e_idx - s_idx), 1.0, "A segment must include at least one sample interval")
 		return report
 
 	var min_slope: float = 999.0
@@ -186,6 +204,20 @@ static func validate_segment(path_data: RefCounted, start_idx: int = 0, end_idx:
 
 		prev_mode = cur_mode
 
+	# Braking-zone metadata declares a minimum visibility contract. Measure actual
+	# centerline crest obstruction once at the leading sample of each contiguous zone;
+	# sampling every 2m would repeat the same bounded line-of-sight scan needlessly.
+	for i in range(s_idx, e_idx + 1):
+		if path_data.segment_types[i] != RoadPathDataClass.SegmentType.BRAKING_ZONE or i >= total_pts - 1:
+			continue
+		if i > s_idx and path_data.segment_types[i - 1] == RoadPathDataClass.SegmentType.BRAKING_ZONE:
+			continue
+		var actual_sight: float = calculate_sight_distance_at(path_data, i, "turn")
+		if actual_sight + 0.01 < MIN_BRAKING_SIGHT_DISTANCE_M:
+			report.add_violation("ERR_SIGHTLINE", i, path_data.cumulative_distances[i], actual_sight,
+				MIN_BRAKING_SIGHT_DISTANCE_M,
+				"Braking zone clear sight distance %.1fm is below %.1fm" % [actual_sight, MIN_BRAKING_SIGHT_DISTANCE_M])
+
 	# Uncontrolled gap detection: airborne without landing
 	if has_airborne and not has_landing:
 		report.add_violation("ERR_UNCONTROLLED_GAP", e_idx, path_data.cumulative_distances[e_idx], 0.0, 0.0,
@@ -216,6 +248,16 @@ static func validate_segment(path_data: RefCounted, start_idx: int = 0, end_idx:
 ## Validates the geometric seam between two consecutive chunks or branches
 static func validate_seam(path_a: RefCounted, idx_a: int, path_b: RefCounted, idx_b: int) -> ValidityReport:
 	var report := ValidityReport.new()
+	var error_a: String = _path_structure_error(path_a)
+	var error_b: String = _path_structure_error(path_b)
+	if not error_a.is_empty() or not error_b.is_empty():
+		report.add_violation("ERR_PATH_STRUCTURE", idx_a, 0.0, 0.0, 0.0,
+			"Invalid seam path data: A=%s B=%s" % [error_a, error_b])
+		return report
+	if idx_a < 0 or idx_a >= path_a.size() or idx_b < 0 or idx_b >= path_b.size():
+		report.add_violation("ERR_SEAM_INDEX", idx_a, 0.0, float(idx_a), float(path_a.size() - 1),
+			"Seam sample index is outside its path")
+		return report
 
 	var p_a: Vector3 = path_a.points[idx_a]
 	var p_b: Vector3 = path_b.points[idx_b]
@@ -257,6 +299,8 @@ static func validate_seam(path_a: RefCounted, idx_a: int, path_b: RefCounted, id
 
 ## Calculates clear line of sight from sample_idx along the road path
 static func calculate_sight_distance_at(path_data: RefCounted, sample_idx: int, sight_type: String = "turn") -> float:
+	if not _path_structure_error(path_data).is_empty() or sample_idx < 0 or sample_idx >= path_data.size():
+		return 0.0
 	var total_pts: int = path_data.size()
 	if sample_idx >= total_pts - 1:
 		return 100.0
@@ -265,6 +309,7 @@ static func calculate_sight_distance_at(path_data: RefCounted, sample_idx: int, 
 	var start_s: float = path_data.cumulative_distances[sample_idx]
 	var max_range: float = 80.0
 	var clear_dist: float = max_range
+	var max_intermediate_slope: float = -INF
 
 	for i in range(sample_idx + 1, mini(total_pts, sample_idx + 45)):
 		var target_pos: Vector3 = path_data.points[i] + path_data.normals[i] * 0.3 # target 0.3m above ground
@@ -274,18 +319,35 @@ static func calculate_sight_distance_at(path_data: RefCounted, sample_idx: int, 
 		if dist_along_road > max_range:
 			break
 
-		# Check for crest obstruction between eye_pos and target_pos
-		var is_obstructed: bool = false
-		for mid in range(sample_idx + 1, i):
-			var mid_ground: Vector3 = path_data.points[mid]
-			var t_mid: float = float(mid - sample_idx) / float(i - sample_idx)
-			var los_y: float = lerpf(eye_pos.y, target_pos.y, t_mid)
-			if mid_ground.y > (los_y + 0.05):
-				is_obstructed = true
-				break
-
-		if is_obstructed:
+		# For a fixed eye point, an intermediate crest blocks the target exactly
+		# when its normalized rise exceeds the target's. Maintain the steepest
+		# intervening rise to compute the same test in O(n), rather than rescanning
+		# every prior sample for every target.
+		if i > sample_idx + 1:
+			var mid: int = i - 1
+			var mid_rise_per_sample: float = (path_data.points[mid].y - eye_pos.y - 0.05) / float(mid - sample_idx)
+			max_intermediate_slope = maxf(max_intermediate_slope, mid_rise_per_sample)
+		var target_rise_per_sample: float = (target_pos.y - eye_pos.y) / float(i - sample_idx)
+		if max_intermediate_slope > target_rise_per_sample:
 			clear_dist = dist_along_road
 			break
 
 	return clear_dist
+
+static func _path_structure_error(path_data: RefCounted) -> String:
+	if path_data == null:
+		return "Path data is null"
+	if path_data.get_script() != RoadPathDataClass:
+		return "Expected RoadPathData"
+	var point_count: int = path_data.points.size()
+	var array_names: Array[String] = [
+		"tangents", "normals", "binormals", "cumulative_distances", "slopes", "curvatures",
+		"segment_types", "surface_contact_states", "banking_angles", "sight_distances",
+		"road_widths", "macro_elevation_offsets"
+	]
+	if point_count == 0:
+		return "Path has no samples"
+	for array_name: String in array_names:
+		if path_data.get(array_name).size() != point_count:
+			return "Path array '%s' has %d values; expected %d" % [array_name, path_data.get(array_name).size(), point_count]
+	return ""

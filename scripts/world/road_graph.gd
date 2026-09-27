@@ -435,12 +435,29 @@ func prune_nodes_behind(node_id_threshold: int) -> int:
 
 	for id in nodes_to_remove:
 		var node: RoadNode = nodes[id]
-		# Remove associated edges
-		for e_id: int in node.incoming_edge_ids:
-			edges.erase(e_id)
+		# Disconnect each edge from both surviving endpoints before removing it.
+		var incident_ids: Array[int] = node.incoming_edge_ids.duplicate()
 		for e_id: int in node.outgoing_edge_ids:
+			if not incident_ids.has(e_id):
+				incident_ids.append(e_id)
+		for e_id: int in incident_ids:
+			var edge: RoadEdge = edges.get(e_id, null)
+			if edge == null:
+				continue
+			var source: RoadNode = nodes.get(edge.source_node_id, null)
+			var target: RoadNode = nodes.get(edge.target_node_id, null)
+			if source != null:
+				source.outgoing_edge_ids.erase(e_id)
+			if target != null:
+				target.incoming_edge_ids.erase(e_id)
 			edges.erase(e_id)
 		nodes.erase(id)
 		pruned_count += 1
+
+	if root_node_id not in nodes:
+		root_node_id = -1
+		for remaining_id: int in nodes:
+			if root_node_id < 0 or remaining_id < root_node_id:
+				root_node_id = remaining_id
 
 	return pruned_count

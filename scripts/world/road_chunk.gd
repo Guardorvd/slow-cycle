@@ -21,6 +21,7 @@ const TERRAIN_WIDTH: float = 20.0 ## 20m roadside meadow strip
 class PreparedChunkData extends RefCounted:
 	var token: RefCounted = null                ## GenerationToken (for stale-result invalidation)
 	var chunk_id: int = 0
+	var foliage_seed_key: int = -1
 	var start_sample_idx: int = 0
 	var end_sample_idx: int = 0
 	var is_rough: bool = false
@@ -58,12 +59,14 @@ static func prepare_geometry_data(
 	token: RefCounted = null,
 	is_fork_chunk: bool = false,
 	fork_tangent: Vector3 = Vector3.FORWARD,
-	fork_context: Dictionary = {}
+	fork_context: Dictionary = {},
+	foliage_seed_key: int = -1
 ) -> PreparedChunkData:
 	var t0: int = Time.get_ticks_usec()
 	var prep := PreparedChunkData.new()
 	prep.token = token
 	prep.chunk_id = id
+	prep.foliage_seed_key = foliage_seed_key
 	prep.start_sample_idx = s_idx
 	prep.end_sample_idx = e_idx
 
@@ -302,7 +305,7 @@ static func prepare_geometry_data(
 
 	# 4. Foliage & Boulders Transforms (filtered by side_mask to protect road junction and wedge)
 	prep.foliage_transforms = ChunkFoliageClass.compute_foliage_and_decor_transforms(
-		path_data, s_idx, e_idx, id, noise, carver, side_mask
+		path_data, s_idx, e_idx, id, noise, carver, side_mask, foliage_seed_key
 	)
 
 	# 5. Fork Greybox Dressing (Marker Posts & Directional Sign)

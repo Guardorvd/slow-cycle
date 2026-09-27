@@ -16,7 +16,8 @@ static func compute_foliage_and_decor_transforms(
 	chunk_id_val: int,
 	noise: FastNoiseLite = null,
 	carver: RefCounted = null,
-	side_mask: int = 3
+	side_mask: int = 3,
+	stable_seed_key: int = -1
 ) -> Dictionary:
 	var result: Dictionary = {
 		"pine": [] as Array[Transform3D],
@@ -27,7 +28,8 @@ static func compute_foliage_and_decor_transforms(
 
 	var rng := RandomNumberGenerator.new()
 	var seed_offset: int = noise.seed if noise else 184729
-	rng.seed = seed_offset + 98765 + chunk_id_val
+	var logical_key: int = chunk_id_val if stable_seed_key < 0 else stable_seed_key
+	rng.seed = hash([seed_offset, 98765, logical_key]) & 0x7FFFFFFFFFFFFFFF
 
 	var seg_type: int = path_data.segment_types[s_idx] if s_idx < path_data.segment_types.size() else 0
 	var is_open_meadow: bool = (seg_type == 14 or seg_type == 5) # 14 = RECOVERY_FLAT, 5 = MEADOW

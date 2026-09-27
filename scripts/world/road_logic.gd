@@ -370,17 +370,17 @@ func _build_airborne_drop_and_landing(spec: RefCounted) -> void:
 	for i in range(1, SAMPLES_PER_CHUNK + 1):
 		var mode: int = Airborne.SurfaceContactMode.GROUNDED
 		var seg_type: int = RoadPathDataClass.SegmentType.RECOVERY_FLAT
-		var y_offset: float = 0.0
 		
 		if i <= 8:
 			# Approach lip: straight, leveling to 0.5°
 			slope_deg = lerpf(slope_deg, 0.5, 0.15)
 		elif i >= 9 and i <= 11:
-			# Airborne free-flight interval (3 samples = 6m span, h = 0.85m drop)
+			# Three 2m chords form the full 6m contract span. Do not add a second
+			# vertical offset on top of the descending tangent: that would extend
+			# both measured flight distance and drop height beyond the contract.
 			mode = Airborne.SurfaceContactMode.AIRBORNE
 			seg_type = RoadPathDataClass.SegmentType.AIRBORNE_DROP
 			slope_deg = -10.0
-			y_offset = -0.28
 		elif i >= 12 and i <= 19:
 			# VALID_LANDING_SURFACE: dedicated matching landing ramp (8 samples = 16m)
 			mode = Airborne.SurfaceContactMode.LANDING
@@ -402,8 +402,8 @@ func _build_airborne_drop_and_landing(spec: RefCounted) -> void:
 		).normalized()
 		
 		var seg_chord: Vector3 = (cur_t + new_tang).normalized()
-		cur_p += seg_chord * SAMPLE_STEP_LEN
-		cur_p.y += y_offset
+		var step_length: float = SAMPLE_STEP_LEN * 0.98 if mode == Airborne.SurfaceContactMode.AIRBORNE else SAMPLE_STEP_LEN
+		cur_p += seg_chord * step_length
 		
 		var norm: Vector3 = RoadMath.compute_ortho_normal(new_tang, 0.0)
 		road_path.append_sample(

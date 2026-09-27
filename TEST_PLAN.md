@@ -1,5 +1,13 @@
 # Slow Cycle — Verification & Testing Protocol
 
+## REVIEW-FIX-01 — Runtime and generation regressions (2026-09-27)
+
+`test_review_fix.gd`: **25/25 PASS**. It covers graph pruning/adjacency, order-independent foliage seeds derived from route identity and quantized path interval, malformed/empty path rejection and occluded braking visibility, generated AIRBORNE distance/height plus landing acceptance on four seeds, and normalized surface weights after frame hitches.
+
+Regression suites passed: RoadGraph `61/61`; branch streaming `49/49`; road contract `18/18`; RouteIntent `72/72`; mountain validation `12/12` over 60 forks; master runner `125/125` expected budget across all seven tiers. The master runner also passed five-seed determinism and scene-switch cleanup. The streaming soak ran 500 chunks (25 km) each on seeds `184729`, `10101` and `99999`; all completed with 9–10 active chunks, graph history at 2–5 nodes / 0–3 edges and RAM deltas +1.4, +0.9 and +0.8 MB.
+
+Godot 4.7.2 headless processes exited successfully. The environment still reports inability to write `user://logs/godot.log` and read the Windows root certificate store; no parse errors, assertion failures or repeatable ObjectDB leak warning appeared. No manual bike ride was part of this regression task. Foliage uses a positive 63-bit hash key; theoretical hash collisions remain possible, with negligible probability for the exercised chunk set.
+
 ## P2.1a — Fork-site endpoint preflight (2026-09-27)
 
 Command:

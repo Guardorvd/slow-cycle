@@ -240,15 +240,7 @@ func _calculate_ground_and_slope(delta: float) -> void:
 	var target_grass: float = 1.0 if (front_grass and rear_grass) else (0.5 if (front_grass or rear_grass) else 0.0)
 	var target_rough: float = 1.0 if (front_rough and rear_rough) else (0.5 if (front_rough or rear_rough) else 0.0)
 
-	surface_grass_weight = lerpf(surface_grass_weight, target_grass, 10.0 * delta)
-	surface_rough_weight = lerpf(surface_rough_weight, target_rough, 10.0 * delta)
-
-	var total_non_gravel: float = surface_grass_weight + surface_rough_weight
-	if total_non_gravel > 1.0:
-		surface_grass_weight /= total_non_gravel
-		surface_rough_weight /= total_non_gravel
-		total_non_gravel = 1.0
-	surface_gravel_weight = maxf(0.0, 1.0 - total_non_gravel)
+	_blend_surface_weights(target_grass, target_rough, delta)
 
 	is_on_grass = surface_grass_weight > 0.08
 	if surface_grass_weight > 0.5:
@@ -323,6 +315,23 @@ func _calculate_ground_and_slope(delta: float) -> void:
 		suspension_compression = lerpf(suspension_compression, delta_h, 14.0 * delta)
 	else:
 		suspension_compression = move_toward(suspension_compression, 0.0, 4.0 * delta)
+
+func _blend_surface_weights(target_grass: float, target_rough: float, delta: float) -> void:
+	var grass_target: float = clampf(target_grass, 0.0, 1.0)
+	var rough_target: float = clampf(target_rough, 0.0, 1.0)
+	var target_total: float = grass_target + rough_target
+	if target_total > 1.0:
+		grass_target /= target_total
+		rough_target /= target_total
+	var blend_alpha: float = 1.0 - exp(-10.0 * maxf(delta, 0.0))
+	surface_grass_weight = lerpf(clampf(surface_grass_weight, 0.0, 1.0), grass_target, blend_alpha)
+	surface_rough_weight = lerpf(clampf(surface_rough_weight, 0.0, 1.0), rough_target, blend_alpha)
+	var total_non_gravel: float = surface_grass_weight + surface_rough_weight
+	if total_non_gravel > 1.0:
+		surface_grass_weight /= total_non_gravel
+		surface_rough_weight /= total_non_gravel
+		total_non_gravel = 1.0
+	surface_gravel_weight = 1.0 - total_non_gravel
 
 func _calculate_forward_dynamics(delta: float) -> void:
 	# Decay sprint boost over time (move_toward zero)

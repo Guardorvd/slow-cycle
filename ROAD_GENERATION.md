@@ -93,7 +93,7 @@ var branch_id: int = 0                         # Идентификатор ве
 
 Production `RoadLogic` seed-батарея (4 world seed × 2 style seed × 2 стиля, повтор каждого входа) подтвердила signature distinction и детерминизм. Максимальная измеренная кривизна FLOW составила 0.00166m⁻¹, TECHNICAL — 0.05263m⁻¹ при контрактном максимуме 0.05556m⁻¹; максимальный sample gap — 2.022m при лимите 2.5m. Все chunks валидны.
 
-Ограничение: проектированный AIRBORNE_DROP на тестовом начале TECHNICAL не проходит существующую проверку: validator измеряет 6.16–6.19m пролёта при лимите 6m и перепад 1.66–1.77m при лимите 1.2m. `RoadLogic` корректно заменяет такой кандидат recovery fallback, поэтому этот элемент намеренно не заявлен частью P2.0. Отдельно спланировать коррекцию геометрии прыжка/посадки, не ослабляя `RoadAirborneContract` или validator. Следующая маршрутная задача остаётся P2.1: выбирать fork sites по пригодности corridor/visibility/grade и планировать route intent до mesh build.
+Историческое ограничение airborne из первых прогонов устранено в REVIEW-FIX-01: убран лишний вертикальный offset поверх нисходящей касательной, а длина хорды в AIRBORNE удерживается внутри контракта. Валидатор и пределы `RoadAirborneContract` не ослаблялись. Генерируемый AIRBORNE с посадкой прошёл validator по четырём seeds; метрики и harness приведены в `TEST_PLAN.md`.
 
 ## 3.5. Fork-site endpoint preflight (P2.1a)
 
@@ -104,6 +104,14 @@ Production `RoadLogic` seed-батарея (4 world seed × 2 style seed × 2 с
 Результат хранится в `ChunkStreamer.last_fork_site_evaluation`: `eligible`, стабильный список `reason_codes` и измеренные метрики. Это диагностическое состояние, а не постоянный пользовательский лог.
 
 **Граница доказательства:** это фильтр одного уже сгенерированного endpoint, не построитель RoutePlan. Он не preview-ит ещё не созданные downstream arms, не проверяет clearance всей сети и не исправляет геометрию. Полный `RouteIntent/RoutePlan`, парная оценка обоих выходов до mesh и pacing trade-offs остаются P2.1b–d в `DEVELOPMENT_ROADMAP.md`. FEAT-014.4 означает локальную carving/terrain полосу вокруг дороги; макро-ландшафт, открытая гора и horizon остаются будущим этапом C.
+
+## 3.6. REVIEW-FIX-01 generation/runtime corrections
+
+RoadGraph pruning вызывается при выгрузке branch: удаляются только node IDs строго до самой старой ещё используемой `graph_entry_node_id` / `graph_fork_node_id`. Удаление очищает incoming/outgoing adjacency у обоих концов инцидентных edges и продвигает root к старейшему оставшемуся node. На 500 chunks × 3 seeds soak граф держался в наблюдаемом диапазоне 2–5 nodes / 0–3 edges.
+
+Foliage RNG использует положительный 63-bit hash от branch-stable route seed и arc-length границ chunk interval, квантованных до миллиметра. Выделенный global chunk ID и порядок материализации не участвуют. Теоретические hash collisions возможны; расширение с 31 до 63 бит делает их пренебрежимо редкими для текущего размера активного окна.
+
+`RoadValidityValidator` возвращает invalid report для пустых/структурно несогласованных путей и неверных индексов; сегменты с `BRAKING_ZONE` проверяются по реальной crest visibility. AIRBORNE distance/height остаются ограничены прежними 6.0m/1.20m contract значениями. Surface material blend использует bounded exponential interpolation, сохраняя нормализованные веса и исходную скорость сглаживания при малом delta.
 
 ## 4. Контракт Прыжков и Посадок (`RoadAirborneContract`)
 

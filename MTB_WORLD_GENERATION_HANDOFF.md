@@ -119,7 +119,7 @@ FLOW/TECHNICAL authored openings now differ in measured generated geometry on 4 
 
 **Next P2.1:** plan each pair of alternatives from route intent before mesh creation; select fork placement only when approach sightline/grade/width and both exit corridors pass measured thresholds. Keep seed determinism and current fork API; replace distance-only scheduling only after the planner has seed-battery evidence. Then arrange a manual bike ride on at least two seeds and both route choices.
 
-**Separate defect plan needed:** the current `AIRBORNE_DROP` candidate is rejected by its existing validator (6.16–6.19m airborne length, 1.66–1.77m height in this opening) and falls back to recovery. Correct the generated lip/landing geometry while preserving airborne contracts; do not relax validator bounds. The user-reported under-fork traversal remains unreproduced and is a separate diagnostic item.
+**Review-fix status:** REVIEW-FIX-01 corrected the AIRBORNE candidate geometry without changing contract limits, added stable order-independent foliage keys, bounded graph pruning, malformed-path/visibility guards and bounded surface-weight smoothing. The new focused test passed 25/25; 500-chunk × 3-seed soak and the full master runner passed. Exact results are in `TEST_PLAN.md` and `implementation_plan.md`. The user-reported under-fork traversal remains unreproduced and is a separate diagnostic item.
 
 ### P3 — Fit continuous centerlines and local terrain to the plan
 

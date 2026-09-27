@@ -77,6 +77,7 @@ class RoadBranch extends RefCounted:
 	var next_fork_distance: float = 0.0
 	var needs_fork_transition: bool = false
 	var transition_branch_index: int = -1
+	var foliage_route_seed: int = 0
 
 	func get_total_distance() -> float:
 		if road_path and road_path.has_method("get_total_distance"):
@@ -161,6 +162,7 @@ func setup(manager: Node3D, path: RefCounted, logic: RefCounted, mats: Dictionar
 	trunk.state = BranchState.ACTIVE
 	trunk.road_path = path
 	trunk.road_logic = logic
+	trunk.foliage_route_seed = _stable_seed(logic.world_seed, 0, 97)
 	trunk.next_fork_distance = _derive_fork_spacing(logic.world_seed, 0, true)
 	if path.size() > 0:
 		var graph_root = road_graph.add_node(path.points[0], path.tangents[0], path.normals[0])
@@ -258,7 +260,8 @@ func _spawn_chunk_with_fork_widening(branch: RoadBranch) -> void:
 
 	var token := GenerationToken.new(branch.generation_id, branch.branch_id, c_id)
 	var prep = RoadChunkClass.prepare_geometry_data(
-		r_path, start_idx, end_idx, c_id, shared_materials, token, true, r_path.tangents[end_idx]
+		r_path, start_idx, end_idx, c_id, shared_materials, token, true, r_path.tangents[end_idx], {},
+		_foliage_seed_key(branch, start_idx, end_idx)
 	)
 
 	var chunk: Node3D = RoadChunkClass.new()
@@ -453,7 +456,8 @@ func _spawn_procedural_fork(parent_branch: RoadBranch) -> void:
 		"is_fork_arm": true
 	}
 	var prep_l = RoadChunkClass.prepare_geometry_data(
-		parent_branch.road_path, left_start_idx, left_end_idx, c_id_l, shared_materials, token_l, true, fork_tang, fork_ctx_l
+		parent_branch.road_path, left_start_idx, left_end_idx, c_id_l, shared_materials, token_l, true, fork_tang,
+		fork_ctx_l, _foliage_seed_key(parent_branch, left_start_idx, left_end_idx)
 	)
 	var chunk_l: Node3D = RoadChunkClass.new()
 	add_child(chunk_l)
@@ -484,7 +488,8 @@ func _spawn_procedural_fork(parent_branch: RoadBranch) -> void:
 		"is_fork_arm": true
 	}
 	var prep_r = RoadChunkClass.prepare_geometry_data(
-		alt_branch.road_path, right_start_idx, right_end_idx, c_id_r, shared_materials, token_r, true, fork_tang, fork_ctx_r
+		alt_branch.road_path, right_start_idx, right_end_idx, c_id_r, shared_materials, token_r, true, fork_tang,
+		fork_ctx_r, _foliage_seed_key(alt_branch, right_start_idx, right_end_idx)
 	)
 	var chunk_r: Node3D = RoadChunkClass.new()
 	add_child(chunk_r)
@@ -522,6 +527,7 @@ func _create_alternative_fork_branch(
 	# Strictly deterministic child seed derivation
 	var parent_seed: int = parent_branch.road_logic.world_seed
 	var b_seed: int = hash([parent_seed, fork_id, branch_idx]) & 0x7FFFFFFF
+	b.foliage_route_seed = _stable_seed(parent_branch.foliage_route_seed, fork_id, branch_idx)
 	var b_logic = RoadLogicClass.new(b_seed, branch_path)
 	var parent_path: RefCounted = parent_branch.road_path
 	var fork_route_distance: float = parent_branch.road_logic.profile_distance_origin_m + parent_path.cumulative_distances[-1]
@@ -643,6 +649,7 @@ func _on_branch_locked(fork_id: int, chosen_choice: int, parent_branch_id: int) 
 
 	if parent.decision_model:
 		parent.decision_model = null
+	parent.graph_fork_node_id = -1
 
 # ==============================================================================
 # PHYSICAL 3D ROLLBACK SAFETY ENVELOPE (DORMANT -> UNLOADED)
@@ -711,6 +718,29 @@ func _unload_branch(b_id: int) -> void:
 	b.active_chunks.clear()
 	b.chunk_end_distances.clear()
 	branches.erase(b_id)
+	_prune_road_graph_history()
+
+func _foliage_seed_key(branch: RoadBranch, start_idx: int, end_idx: int) -> int:
+	var path: RefCounted = branch.road_path
+	if path == null or start_idx < 0 or end_idx < start_idx or end_idx >= path.size():
+		return hash([branch.foliage_route_seed, start_idx, end_idx]) & 0x7FFFFFFFFFFFFFFF
+	# Quantized route arc-length bounds are stable across chunk allocation and commit order.
+	# Branch identity is folded into foliage_route_seed when the branch is created.
+	var start_mm: int = roundi(path.cumulative_distances[start_idx] * 1000.0)
+	var end_mm: int = roundi(path.cumulative_distances[end_idx] * 1000.0)
+	return hash([branch.foliage_route_seed, start_mm, end_mm]) & 0x7FFFFFFFFFFFFFFF
+
+func _prune_road_graph_history() -> void:
+	if road_graph == null:
+		return
+	var oldest_live_node: int = 2147483647
+	for branch: RoadBranch in branches.values():
+		if branch.graph_entry_node_id >= 0:
+			oldest_live_node = mini(oldest_live_node, branch.graph_entry_node_id)
+		if branch.graph_fork_node_id >= 0:
+			oldest_live_node = mini(oldest_live_node, branch.graph_fork_node_id)
+	if oldest_live_node < 2147483647:
+		road_graph.prune_nodes_behind(oldest_live_node)
 
 # ==============================================================================
 # CHUNK GENERATION & DISPATCH
@@ -730,7 +760,8 @@ func _spawn_chunk_sync(branch: RoadBranch) -> void:
 	var token := GenerationToken.new(branch.generation_id, branch.branch_id, c_id)
 
 	var prep = RoadChunkClass.prepare_geometry_data(
-		r_path, start_idx, end_idx, c_id, shared_materials, token, false, branch.fork_node_tang
+		r_path, start_idx, end_idx, c_id, shared_materials, token, false, branch.fork_node_tang, {},
+		_foliage_seed_key(branch, start_idx, end_idx)
 	)
 
 	var chunk: Node3D = RoadChunkClass.new()

@@ -1,12 +1,12 @@
 extends SceneTree
 
 const TEST_SEEDS: Array[int] = [184729, 10101, 99999]
-const TARGET_CHUNKS: int = 350 # 17.5 km per seed (~25-30 minutes of real riding)
+const TARGET_CHUNKS: int = 500 # 25 km per seed; graph/lifecycle regression soak
 
 func _init() -> void:
 	print("\n========================================================")
-	print("=== STARTING 15-MINUTE CONTINUOUS SOAK STRESS TEST  ===")
-	print("=== TARGET: 17.5 KM (350 CHUNKS) PER SEED           ===")
+	print("=== STARTING CONTINUOUS STREAMING SOAK STRESS TEST ===")
+	print("=== TARGET: 25 KM (500 CHUNKS) PER SEED            ===")
 	print("========================================================\n")
 
 	var all_ok: bool = true
@@ -79,9 +79,11 @@ func _run_seed_soak(seed_val: int) -> bool:
 			if cur_ram_mb > max_ram_mb: max_ram_mb = cur_ram_mb
 			var active_c: int = streamer.get_active_chunk_count()
 			var spline_pts: int = road_path.size()
+			var graph_nodes: int = streamer.road_graph.nodes.size()
+			var graph_edges: int = streamer.road_graph.edges.size()
 
-			print("  [MILESTONE] %4d chunks (%.1f km) | Active Chunks: %d | Spline Pts: %d | RAM: %.1f MB | Pos Y: %.1f" % [
-				current_chunk, current_distance / 1000.0, active_c, spline_pts, cur_ram_mb, bike.global_position.y
+			print("  [MILESTONE] %4d chunks (%.1f km) | Active Chunks: %d | Graph: %d nodes/%d edges | Spline Pts: %d | RAM: %.1f MB | Pos Y: %.1f" % [
+				current_chunk, current_distance / 1000.0, active_c, graph_nodes, graph_edges, spline_pts, cur_ram_mb, bike.global_position.y
 			])
 
 			# Assertions
@@ -92,6 +94,11 @@ func _run_seed_soak(seed_val: int) -> bool:
 
 			if spline_pts > 400:
 				print("    [FAIL] Spline points not pruned properly: %d pts" % spline_pts)
+				instance.queue_free()
+				return false
+
+			if graph_nodes > 48 or graph_edges > 48:
+				print("    [FAIL] Road graph exceeds bounded active window: %d nodes, %d edges" % [graph_nodes, graph_edges])
 				instance.queue_free()
 				return false
 
