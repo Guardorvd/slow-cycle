@@ -118,6 +118,8 @@ func _run_route(seed_value: int, choice: int, mode: String) -> Dictionary:
 	var prior_fork_origin_s: float = active.distance_at_last_fork
 	var route_start_offset_from_origin_m: float = route_start_s - prior_fork_origin_s
 	var next_fork_pre_materialized: bool = active.is_fork_spawned and active.decision_model != null
+	var pacing_trace_start: int = streamer.fork_pacing_trace.size()
+	var next_fork_pacing_record: Dictionary = {}
 	var route_stats: Dictionary = {
 		"last_s": route_start_s - 0.01,
 		"start_s": route_start_s,
@@ -162,6 +164,11 @@ func _run_route(seed_value: int, choice: int, mode: String) -> Dictionary:
 		scene.queue_free()
 		await process_frame
 		return {}
+	for trace_idx in range(streamer.fork_pacing_trace.size() - 1, pacing_trace_start - 1, -1):
+		var trace_record: Dictionary = streamer.fork_pacing_trace[trace_idx]
+		if int(trace_record.get("branch_id", -1)) == active.branch_id and trace_record.get("decision", "") == "accept":
+			next_fork_pacing_record = trace_record.duplicate(true)
+			break
 
 	# Keep moving on the actual parent centerline until the rider is in the
 	# decision region. The decision then consumes samples on one real outgoing
@@ -235,17 +242,26 @@ func _run_route(seed_value: int, choice: int, mode: String) -> Dictionary:
 		"contact_counts": route_stats.contact_counts,
 		"max_sample_gap_m": route_stats.max_gap,
 		"solid_road_chunks": route_stats.solid_chunks,
-		"collision_coverage_ok": route_stats.collision_coverage_ok
+		"collision_coverage_ok": route_stats.collision_coverage_ok,
+		"pacing_trace": next_fork_pacing_record
 	}
 	_check(row.length_m > 0.0, "seed %d choice %s route has positive measured length" % [seed_value, choice_name])
 	_check(row.max_sample_gap_m <= 2.5, "seed %d choice %s centerline sample continuity <= 2.5m (%.3f)" % [seed_value, choice_name, row.max_sample_gap_m])
 	_check(row.solid_road_chunks > 0, "seed %d choice %s has active solid road collision chunks" % [seed_value, choice_name])
 	_check(row.collision_coverage_ok, "seed %d choice %s has solid collision chunk coverage across the measured route" % [seed_value, choice_name])
-	print("ROUTE mode=%s seed=%d choice=%s branch=%d style_at_choice=%s target_interval=%.1f target_applies_to_measured_fork=%s fork_pre_materialized=%s route_origin_s=%.1f previous_fork_origin_s=%.1f origin_offset=%.1f actual_distance=%.1f overshoot=%.1f elevation_delta=%.2f grade=[%.2f,%.2f] curvature=[%.4f,%.4f] contact_sequence=%s contact_counts=%s gap=%.3f solid_chunks=%d collision_coverage=%s arrival_dist=%.2f next_locked=%s next_branch=%d" % [
+	if mode == "SEEDED_DEFAULT" and not next_fork_pre_materialized:
+		_check(not next_fork_pacing_record.is_empty(), "seed %d choice %s default fork has a pacing trace" % [seed_value, choice_name])
+		if not next_fork_pacing_record.is_empty():
+			_check(absf(float(next_fork_pacing_record.candidate_distance_m) - row.length_m) < 0.1,
+				"seed %d choice %s pacing trace matches generated fork distance" % [seed_value, choice_name])
+			_check(next_fork_pacing_record.pacing_band == "within" and not next_fork_pacing_record.pacing_overrun,
+				"seed %d choice %s default leg remains within diagnostic pacing band" % [seed_value, choice_name])
+	print("ROUTE mode=%s seed=%d choice=%s branch=%d style_at_choice=%s target_interval=%.1f target_applies_to_measured_fork=%s fork_pre_materialized=%s route_origin_s=%.1f previous_fork_origin_s=%.1f origin_offset=%.1f actual_distance=%.1f overshoot=%.1f pacing_band=%s pacing_overrun=%s elevation_delta=%.2f grade=[%.2f,%.2f] curvature=[%.4f,%.4f] contact_sequence=%s contact_counts=%s gap=%.3f solid_chunks=%d collision_coverage=%s arrival_dist=%.2f next_locked=%s next_branch=%d" % [
 		mode, seed_value, choice_name, row.branch_id, row.style, row.assigned_interval_m,
 		str(not row.next_fork_pre_materialized), str(row.next_fork_pre_materialized),
 		row.route_start_s, row.prior_fork_origin_s, row.route_start_offset_from_origin_m,
-		row.length_m, row.length_m - row.assigned_interval_m, row.elevation_delta_m,
+		row.length_m, row.length_m - row.assigned_interval_m,
+		str(row.pacing_trace.get("pacing_band", "none")), str(row.pacing_trace.get("pacing_overrun", false)), row.elevation_delta_m,
 		row.min_grade_deg, row.max_grade_deg, row.min_curvature, row.max_curvature,
 		JSON.stringify(row.contact_sequence), JSON.stringify(row.contact_counts), row.max_sample_gap_m,
 		row.solid_road_chunks, str(row.collision_coverage_ok), distance_at_arrival, str(row.next_decision_locked), row.next_branch_id

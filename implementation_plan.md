@@ -1,5 +1,62 @@
 # План: процедурная MTB-сеть и правдоподобные развилки
 
+## P2.1d — Измеримый детерминированный fork pacing
+
+**Статус:** проверка плана выполнена, реализация и документация завершены в рамках разрешения пользователя от 27.09.2026.
+
+### Реализация
+
+- Добавлен чистый `ForkPacingPlanner`: различает ожидание назначенного интервала, безопасный defer, принятие первого подходящего кандидата и pacing overrun. Он измеряет плановую/фактическую дистанцию, номер кандидата, задержку и диагностическую полосу. Первую развилку считает отдельно; для следующих использует предложенный диапазон 550–900 м.
+- `ChunkStreamer` сохраняет только последние 64 candidate records: seed, branch/fork ID, schedule, расстояние до fork, величину генерации впереди игрока, ordinal, отказы site/paired preview и решение. Детерминированный nearest-safe policy остаётся прежним: после интервала берётся ближайший безопасный endpoint; после 4 отказов/200 м пишется overrun, но безопасность не обходится.
+- Seed-derived target distance, стили, выбор LEFT/RIGHT, геометрию, physics и camera не менял.
+
+### Проверка результата
+
+- `test_fork_pacing_planner.gd`: **21/21**; site/preflight и forced normal fallback: **36/36**; paired preview: **15/15**; fork geometry: **15/15**; route integration: **8/8**; branch streaming: **49/49**; road contract: **18/18**; mountain validation: **18 assertions**, **60 выборов** на трёх seed.
+- Четыре seeded-default route traces (seed `184729`, `42`, LEFT/RIGHT) дали target **591.0–820.7 м**, фактическую длину **600.3–851.1 м**, overshoot **9.3–33.3 м**. Во всех четырёх `pacing_band=within`, `pacing_overrun=false`; запись planner совпала с материализованным fork расстоянием. Это малый integration sample, не полная популяционная гарантия.
+- Mountain stress suite намеренно сокращает интервал до 100 м. В нём pipeline не оценивает endpoint, пока сгенерированная дорога не приблизится к 350-метровому ahead window; аудит записал отдельные искусственные overrun **314.6–317.6 м** на ordinal 1. Это ограничение тестовой короткой schedule + streaming horizon, а не замер обычного 550–900 м режима. Стресс всё равно прошёл: active chunks ≤15, branches ≤3, RAM +20.1…+21.4MB.
+- Один batched run route integration однократно вывел `6 ObjectDB instances leaked`; isolated повтор прошёл exit 0 без leak warning, поэтому предупреждение пока не воспроизведено и не объявляется исправленным. Известные Windows сообщения Godot про `user://logs/godot.log` и root certificate остаются.
+- Автоматические follower traces не являются ручным заездом и не подтверждают rider feel. P2.1d измеряет pacing и продолжает ближайший безопасный выбор; он не ранжирует несколько уже просчитанных prospective corridors и не проверяет дальнее пересечение со всей сетью.
+
+### Следующая точка
+
+Foundation P2.1a–d закончена. Stage A остаётся `in progress` по более широким критериям полного route clearance/предварительного выбора сети и ручному ride gate. Дальше по roadmap — Stage B: подтвердить/довести сложные MTB-события production-геометрией, затем Stage C: общий макрорельеф и открытая гора/horizon. Сохранять текущие интервалы до отдельного плана и rider evidence.
+
+## P2.1d — Измеримый детерминированный fork pacing
+
+**Статус:** план сверён с живым code path; реализация разрешена пользователем 27.09.2026.
+
+#### TASK: [P2.1d] Deterministic fork candidate pacing and trace
+
+**Goal**: Сохранить безопасный выбор ближайшего подходящего chunk endpoint после заданного интервала, но сделать поиск кандидатов, допустимое окно ритма и фактические задержки измеримыми и повторяемыми. Так будет видно, даёт ли schedule ожидаемое число метров между решениями или terrain/геометрия слишком часто отодвигают их.
+
+**Do**:
+
+- Добавить pure `ForkPacingPlanner` с явными состояниями ожидания целевого интервала, проверки кандидата, безопасного отказа/продолжения и допуска; результат содержит scheduled distance, observed candidate distance, delay, номер подряд отвергнутого endpoint и pacing band.
+- Взять существующий пользовательский маршрутный диапазон из draft в `TEST_PLAN.md` как диагностический pacing band для следующих legs (550–900 м); первый fork анализировать отдельно по текущему диапазону. Не менять текущий seed-derived scheduler в этом срезе.
+- Интегрировать planner в `ChunkStreamer.update_streaming`: каждый chunk boundary после target — один кандидат; принимать первый site+pair, прошедший P2.1a/c; если reject — normal chunk, стабильный trace, следующий кандидат. Никогда не обходить safety gates ради band.
+- Хранить ограниченный replayable trace: branch/fork identity, seed, scheduled target, candidate distance, site/paired reason codes, задержка, решение; максимум последние 64 записей, без per-frame logs. Один accepted site обязан соответствовать текущему фактическому расстоянию и предсказуемым fork/style IDs.
+- Добавить focused planner tests и deterministic production trace для трёх базовых seed; отразить median/range и любое превышение 900 м в отчёте. Проверить максимальный обычный delay для первых 4 кандидатов (200 м), далее выбирать первый безопасный endpoint с явным `pacing_overrun`, не ломая безопасность и не вводя жёсткий лимит на пригодную дорогу.
+- Переписать только если есть свежее evidence; не выдумывать комфортный ритм из автоматического telemetry proxy.
+
+**Do not**: менять bicycle physics/camera/controls, seed-derived интервалы, fork-choice API, грамматику стилей, geometry/terrain, graph lifecycle и правила безопасности; не создавать небезопасную развилку при исчерпании pacing band; не заявлять rider feel без ручного заезда.
+
+**Acceptance Criteria**: чистый planner детерминирован; каждый endpoint после target учтён ровно один раз; reject никогда не создаёт fork side effects; accept — ближайший допустимый endpoint и его branch/style identity совпадает с production; delay, pacing band и overrun объяснимы; traces повторяются по seed; память trace ограничена; existing regression tests зелёные.
+
+**Tests**: focused pacing state tests (before target, target threshold, repeated rejects, first eligible, 200m band overrun, invalid inputs, stable serialization/ring cap); production seeded-default trace на доступных четырех route integration sequences; controlled multi-seed fork stress для bounded memory/topology, не использовать его 100m fixture как quality spacing result; fork integration, branch streaming, site/previews, graph, road contract, mountain stress; `git diff --check` и headless Godot.
+
+**Files**: новый `scripts/world/fork_pacing_planner.gd`, `scripts/test/test_fork_pacing_planner.gd`; `chunk_streamer.gd` минимально; `implementation_plan.md`, `DEVELOPMENT_ROADMAP.md`, `ARCHITECTURE.md`, `ROAD_GENERATION.md`, `TEST_PLAN.md`, `MTB_WORLD_GENERATION_HANDOFF.md`.
+
+### Проверка плана
+
+- Текущий scheduler уже создаёт fork у первого допустимого 50-метрового chunk boundary после seeded target; интервалы и безопасная normal-chunk fallback остаются неизменными.
+- Живой path не позволяет выбирать задним числом из уже committed endpoints без rollback, запрещённого P2.1a. Поэтому этот ограниченный шаг формализует nearest-safe policy и измеряет кандидатов/delay, но не вводит откат или нелокальный optimization.
+- Текущие schedule legs лежат около draft диапазона; 550–900 м используется как отчётный band, не причина поменять расписание или ослабить contract.
+- Если первые 4 точки (200 м окна pacing) непригодны, попытки продолжаются до первой безопасной; overrun фиксируется, небезопасный forced fork запрещён.
+- Результат продвинет этап A от точечной проверки к измеренному ритму и покажет, готово ли переходить к Stage B/C; он не создаёт макрорельеф. Макрорельеф остаётся следующим большим визуальным направлением после подтверждения rideable geometry.
+
+**Решение проверки:** scope согласован с существующим runtime и пользовательской целью; можно переходить к реализации.
+
 ## P2.1c — Парный предварительный просмотр коридоров развилки
 
 **Статус:** план выполнен в рамках прямого разрешения пользователя от 27.09.2026.
@@ -29,7 +86,7 @@
 
 ### Граница доказательства
 
-Preview подтверждает только два расходящихся fork-arm (~50 м) по структурным/terrain критериям и шву. Он не проверяет будущие грамматические chunks, clearance с далёкими несвязанными дорогами или субъективное ощущение стилей на велосипеде. Эти ограничения зафиксированы, потому что дальнейшие chunks зависят от отдельного продолжающегося состояния RNG. Следующий P2.1d должен выбирать среди кандидатов и учитывать метрики/длину; полный character gate требует поездки игрока.
+Preview подтверждает только два расходящихся fork-arm (~50 м) по структурным/terrain критериям и шву. Он не проверяет будущие грамматические chunks, clearance с далёкими несвязанными дорогами или субъективное ощущение стилей на велосипеде. Эти ограничения зафиксированы, потому что дальнейшие chunks зависят от отдельного продолжающегося состояния RNG. P2.1d добавил pacing trace для ближайшего безопасного endpoint; multi-candidate ranking и full character gate остаются открытыми.
 
 ### Итог P2.1c
 
@@ -37,7 +94,7 @@ Preview подтверждает только два расходящихся fo
 - `ForkCorridorPreviewPlanner` запускается после endpoint preflight и до fork side effects; оценивает обе стороны и сохраняет `last_fork_corridor_preview` для diagnostics. При отказе штатный update добавляет обычный chunk.
 - Focused suite: 15/15. Регрессии: site planner 36/36 (добавлен forced preview reject/fallback), fork geometry 15/15, route integration 8 маршрутов, streaming 49/49, road contract 18/18, mountain validation 12/12 на 60 fork choices. Измерения этого прогона: commit chunk max 0.669ms, среднее 0.471ms; RAM +20.1…+21.4MB на seed (предел старого теста 25MB).
 - Godot сохранил известные ошибки окружения при записи `user://logs/godot.log` и чтении Windows certificates. Повторяемых parse/assertion/leak предупреждений в прогонах не было.
-- P2.1c не доказывает дальний route clearance и rider feel. Далее P2.1d — поиск/оценка кандидатов; затем потребуется ручной заезд и Stage B/C.
+- P2.1c/d не доказывают дальний route clearance и rider feel. Для этого потребуется полная route/network проверка и ручной заезд; Stage B/C остаются впереди.
 
 ## P2.1 — Детерминированный terrain-aware выбор fork site
 
@@ -119,7 +176,7 @@ Preview подтверждает только два расходящихся fo
 - Documentation updated: runtime ownership/data-flow и P2.1a boundary in `ARCHITECTURE.md`; Stage A explicitly split into P2.1a–d and FEAT-014.4/015.x traced in architecture/roadmap; current contracts and measured results in `ROAD_GENERATION.md`, `TEST_PLAN.md`, `MTB_WORLD_GENERATION_HANDOFF.md`.
 - Bike physics, camera, controls, seed policy, grammar styles, interval formulas and existing regression assertions were not changed. Manual bike ride and proof of downstream-arm/network clearance remain open.
 
-**Историческая запись P2.1a:** после него были выполнены P2.1b и P2.1c. Теперь следующий ограниченный шаг — P2.1d candidate search/pacing. Stage A остаётся открытым; дальше — rideable gate B, единый macro landscape/open mountain (Stage C) и финальный путь C–H из `DEVELOPMENT_ROADMAP.md`. Ни P2.1a–c не означает готовность финального build.
+**Историческая запись P2.1a:** после него были выполнены P2.1b–d. Stage A остаётся открытым по full-network clearance и manual ride; дальше — rideable gate B, единый macro landscape/open mountain (Stage C) и финальный путь C–H из `DEVELOPMENT_ROADMAP.md`. Ни P2.1a–d не означает готовность финального build.
 
 ## Следующий шаг — P0: интеграционная проверка обеих ветвей
 

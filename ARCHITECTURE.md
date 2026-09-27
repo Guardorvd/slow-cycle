@@ -65,6 +65,8 @@ P2.1b adds two node-free data contracts. `RouteIntent` describes seed/branch/sty
 
 P2.1c adds a deterministic paired preview before fork creation. `ForkArmGeometry` is the shared pure source for both the 50m fork arms and their production mesh input. `ForkCorridorPreviewPlanner` checks both seeded FLOW/TECHNICAL exits for finite/continuous geometry, legal grade/curvature/sample spacing, approach seam position/tangent, end separation, and terrain danger on both sides. `ChunkStreamer` runs this after site preflight and before graph/branch/mesh side effects; rejection follows the normal chunk path. Preview covers only the fork arms, not subsequent FSM chunks or distant route crossings.
 
+P2.1d adds `ForkPacingPlanner` as a pure label/measurement step after the P2.1a/c safety decisions. The streamer logs each due chunk-end candidate to a bounded 64-entry in-memory trace with seed/branch/fork identity, target and candidate distance, generated-ahead distance, reject reasons and accept/defer result. The runtime retains the existing nearest-safe endpoint and seed-derived schedule. The 200m/four-rejection overrun is diagnostic; it never forces an unsafe fork. The route-wide planner and whole-network clearance gate remain incomplete.
+
 ## 5. Stable contracts and constraints
 
 - `BicycleController` remains a stable API. Other systems may observe its documented properties/signals; world generation does not dictate internal kinematics.

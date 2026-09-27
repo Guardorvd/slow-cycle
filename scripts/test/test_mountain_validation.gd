@@ -177,6 +177,21 @@ func _run_mountain_stress_test(seed_val: int, target_forks: int) -> bool:
 	assert_true(ram_delta_mb < 25.0, "Seed %d RAM delta strictly bounded under 25 MB (measured: +%.1f MB)" % [seed_val, ram_delta_mb])
 	assert_true(streamer.get_active_chunk_count() <= 15, "Seed %d active chunks within sliding window envelope (<= 15)" % seed_val)
 	assert_true(streamer.branches.size() <= 3, "Seed %d branch dictionary strictly pruned (<= 3 concurrent branches)" % seed_val)
+	var accepted_candidate_count: int = 0
+	var max_candidate_delay_m: float = 0.0
+	var max_delay_record: Dictionary = {}
+	var trace_valid: bool = streamer.fork_pacing_trace.size() <= 64
+	for candidate: Dictionary in streamer.fork_pacing_trace:
+		if int(candidate.get("world_seed", -1)) != seed_val or not ["accept", "defer"].has(str(candidate.get("decision", ""))):
+			trace_valid = false
+		if candidate.get("decision", "") == "accept":
+			accepted_candidate_count += 1
+		if float(candidate.get("delay_m", -1.0)) > max_candidate_delay_m:
+			max_candidate_delay_m = float(candidate.get("delay_m", -1.0))
+			max_delay_record = candidate
+	print("  [PACING] Seed %d trace=%d accepted=%d max_delay=%.1fm record=%s" % [seed_val, streamer.fork_pacing_trace.size(), accepted_candidate_count, max_candidate_delay_m, str(max_delay_record)])
+	assert_true(trace_valid, "Seed %d pacing trace has stable decisions and remains capped at 64" % seed_val)
+	assert_true(accepted_candidate_count >= target_forks, "Seed %d pacing trace records each generated fork candidate" % seed_val)
 
 	instance.queue_free()
 	await process_frame

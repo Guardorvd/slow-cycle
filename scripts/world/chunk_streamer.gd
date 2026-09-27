@@ -17,6 +17,7 @@ const RoadMathClass = preload("res://scripts/world/road_math.gd")
 const ForkSitePlannerClass = preload("res://scripts/world/fork_site_planner.gd")
 const ForkCorridorPreviewPlannerClass = preload("res://scripts/world/fork_corridor_preview_planner.gd")
 const ForkArmGeometryClass = preload("res://scripts/world/fork_arm_geometry.gd")
+const ForkPacingPlannerClass = preload("res://scripts/world/fork_pacing_planner.gd")
 const FORK_ARM_CENTER_OFFSET_M: float = 0.9 ## Half the 1.8m nominal width; arms begin at their inner-edge split.
 
 # ==============================================================================
@@ -33,6 +34,7 @@ enum BranchState {
 const AHEAD_DISTANCE: float = 350.0          ## Distance ahead on active branch to keep generated (m)
 const BEHIND_DISTANCE: float = 65.0          ## Distance behind player to retain chunks (m)
 const MAX_CHUNKS_PER_FRAME: int = 1          ## Live streaming rate limit to guarantee 60 FPS
+const FORK_PACING_TRACE_CAPACITY: int = 64
 
 @export var preload_distance: float = 100.0  ## Parametric preload distance for fork branches (m)
 @export var first_fork_distance: float = 450.0 ## Distance to the first fork from start (m)
@@ -80,6 +82,7 @@ class RoadBranch extends RefCounted:
 	var needs_fork_transition: bool = false
 	var transition_branch_index: int = -1
 	var foliage_route_seed: int = 0
+	var fork_candidates_rejected: int = 0
 
 	func get_total_distance() -> float:
 		if road_path and road_path.has_method("get_total_distance"):
@@ -96,6 +99,7 @@ class RoadBranch extends RefCounted:
 # ==============================================================================
 
 var world_manager: Node3D
+var world_seed: int = 184729
 var shared_materials: Dictionary = {}
 var shared_meshes: Dictionary = {}
 
@@ -112,6 +116,8 @@ var last_fork_site_evaluation: Dictionary = {}
 var fork_site_planner: RefCounted = ForkSitePlannerClass.new()
 var fork_corridor_preview_planner: RefCounted = ForkCorridorPreviewPlannerClass.new()
 var last_fork_corridor_preview: Dictionary = {}
+var fork_pacing_planner: RefCounted = ForkPacingPlannerClass.new()
+var fork_pacing_trace: Array[Dictionary] = []
 
 # Backward compatibility properties
 var road_path: RefCounted:
@@ -148,6 +154,7 @@ var chunk_end_distances: Dictionary:
 
 func setup(manager: Node3D, path: RefCounted, logic: RefCounted, mats: Dictionary, meshes: Dictionary) -> void:
 	world_manager = manager
+	world_seed = logic.world_seed if logic != null else 184729
 	shared_materials = mats
 	shared_meshes = meshes
 	road_graph = RoadGraphClass.new()
@@ -208,10 +215,22 @@ func update_streaming(player_pos: Vector3, player_vel: Vector3 = Vector3.ZERO, d
 	var target_interval: float = active_branch.next_fork_distance
 	var dist_since_fork: float = total_s - active_branch.distance_at_last_fork
 
-	if not active_branch.is_fork_spawned and (dist_since_fork + 50.0) >= target_interval and (total_s - player_s) < AHEAD_DISTANCE and _is_safe_fork_site(active_branch):
-		_spawn_chunk_with_fork_widening(active_branch)
-		_spawn_procedural_fork(active_branch)
-		spawned_count += 1
+	var fork_candidate_due: bool = not active_branch.is_fork_spawned and (dist_since_fork + ForkPacingPlannerClass.CHUNK_LENGTH_M) >= target_interval and (total_s - player_s) < AHEAD_DISTANCE
+	if fork_candidate_due:
+		var fork_candidate_eligible: bool = _is_safe_fork_site(active_branch)
+		var is_initial_fork: bool = next_fork_id == 1
+		var pacing_decision: Dictionary = fork_pacing_planner.evaluate_candidate(
+			target_interval, dist_since_fork + ForkPacingPlannerClass.CHUNK_LENGTH_M,
+			active_branch.fork_candidates_rejected, fork_candidate_eligible, is_initial_fork)
+		_record_fork_pacing_candidate(active_branch, pacing_decision)
+		if bool(pacing_decision.get("eligible", false)):
+			_spawn_chunk_with_fork_widening(active_branch)
+			_spawn_procedural_fork(active_branch)
+			spawned_count += 1
+		else:
+			active_branch.fork_candidates_rejected += 1
+			_spawn_chunk_sync(active_branch)
+			spawned_count += 1
 	elif (total_s - player_s) < AHEAD_DISTANCE and spawned_count < MAX_CHUNKS_PER_FRAME:
 		_spawn_chunk_sync(active_branch)
 		spawned_count += 1
@@ -524,12 +543,42 @@ func _assign_fork_route_styles(primary: RoadBranch, alternative: RoadBranch, for
 	alternative.road_logic.set_route_style(right_style, _stable_seed(seed_value, fork_id, 1))
 	primary.next_fork_distance = _derive_fork_spacing(primary.road_logic.world_seed, primary.branch_id)
 	alternative.next_fork_distance = _derive_fork_spacing(alternative.road_logic.world_seed, alternative.branch_id)
+	primary.fork_candidates_rejected = 0
+	alternative.fork_candidates_rejected = 0
 
 func _predict_fork_route_styles(seed_value: int, fork_id: int) -> Array[int]:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = _stable_seed(seed_value, fork_id, 19)
 	var left_style: int = RoadGrammarClass.RouteStyle.FLOW if rng.randi_range(0, 1) == 0 else RoadGrammarClass.RouteStyle.TECHNICAL
 	return [left_style, RoadGrammarClass.RouteStyle.TECHNICAL if left_style == RoadGrammarClass.RouteStyle.FLOW else RoadGrammarClass.RouteStyle.FLOW]
+
+func _record_fork_pacing_candidate(branch: RoadBranch, decision: Dictionary) -> void:
+	var site_reasons: Array = last_fork_site_evaluation.get("reason_codes", []).duplicate()
+	var pair_reasons: Array = last_fork_corridor_preview.get("reason_codes", []).duplicate()
+	var path: RefCounted = branch.road_path
+	var player_s: float = 0.0
+	if path != null and path.size() > 0:
+		player_s = float(path.cumulative_distances[clampi(branch.last_closest_idx, 0, path.size() - 1)])
+	var record: Dictionary = {
+		"world_seed": world_seed,
+		"branch_id": branch.branch_id,
+		"fork_id": next_fork_id,
+		"scheduled_distance_m": decision.metrics.get("scheduled_distance_m", -1.0),
+		"candidate_distance_m": decision.metrics.get("candidate_distance_m", -1.0),
+		"candidate_endpoint_distance_m": path.get_total_distance() - branch.distance_at_last_fork if path != null else -1.0,
+		"generation_ahead_distance_m": path.get_total_distance() - player_s if path != null else -1.0,
+		"candidate_ordinal": decision.metrics.get("candidate_ordinal", -1),
+		"delay_m": decision.metrics.get("delay_m", -1.0),
+		"pacing_band": decision.metrics.get("pacing_band", "invalid"),
+		"pacing_overrun": decision.metrics.get("pacing_overrun", false),
+		"decision": decision.get("decision", "invalid"),
+		"site_reason_codes": site_reasons,
+		"pair_reason_codes": pair_reasons,
+		"preview_signature": last_fork_corridor_preview.get("signature", "")
+	}
+	fork_pacing_trace.append(record)
+	if fork_pacing_trace.size() > FORK_PACING_TRACE_CAPACITY:
+		fork_pacing_trace.pop_front()
 
 func _route_style_name(style: int) -> String:
 	match style:
@@ -594,6 +643,7 @@ func _on_branch_locked(fork_id: int, chosen_choice: int, parent_branch_id: int) 
 	if selected_branch != null and selected_branch != parent:
 		selected_branch.state = BranchState.ACTIVE
 		selected_branch.distance_at_last_fork = 0.0
+		selected_branch.fork_candidates_rejected = 0
 		selected_branch.is_fork_spawned = false
 
 		parent.state = BranchState.DORMANT
@@ -611,6 +661,7 @@ func _on_branch_locked(fork_id: int, chosen_choice: int, parent_branch_id: int) 
 				world_manager.road_path = selected_branch.road_path
 		else:
 			parent.is_fork_spawned = false
+			parent.fork_candidates_rejected = 0
 
 	if unselected_branch != null:
 		unselected_branch.state = BranchState.DORMANT

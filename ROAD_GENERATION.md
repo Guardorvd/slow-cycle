@@ -103,13 +103,19 @@ Production `RoadLogic` seed-батарея (4 world seed × 2 style seed × 2 с
 
 Результат хранится в `ChunkStreamer.last_fork_site_evaluation`: `eligible`, стабильный список `reason_codes` и измеренные метрики. Это диагностическое состояние, а не постоянный пользовательский лог.
 
-**Граница доказательства:** это фильтр одного уже сгенерированного endpoint, не построитель полной сети. P2.1c ниже добавляет preview только двух fork arms; P2.1d и полный route audit ещё потребуются для выбора общего ритма и проверки полной сети. P2.1b предоставляет RouteIntent/RoutePlan как измеримый data contract. FEAT-014.4 означает локальную carving/terrain полосу вокруг дороги; макро-ландшафт, открытая гора и horizon остаются будущим этапом C.
+**Граница доказательства:** это фильтр одного уже сгенерированного endpoint, не построитель полной сети. P2.1c ниже добавляет preview только двух fork arms; P2.1d добавляет измерение pacing, но не ранжирует несколько prospective corridors и не проверяет полную сеть. P2.1b предоставляет RouteIntent/RoutePlan как измеримый data contract. FEAT-014.4 означает локальную carving/terrain полосу вокруг дороги; макро-ландшафт, открытая гора и horizon остаются будущим этапом C.
 
 ## 3.8. Парный fork-arm preview (P2.1c)
 
 Перед созданием graph fork streamer предсказывает обе стороны через production-функцию `ForkArmGeometry.build`. Эта же функция затем добавляет точки в настоящий `RoadPathData`, так что preview не содержит второй приближённой формулы centerline. `ForkCorridorPreviewPlanner` проверяет 26 samples/примерно 50 м на arm, ширину, конечность, шаг, grade/curvature contract, C0/C1 стык в apex, минимальный разнос рукавов и danger flags `TerrainCarver` на обоих боках. FLOW/TECHNICAL назначаются тем же локальным deterministic seed, что и реальный fork.
 
-Если пара отклонена, graph node, child branch и mesh ещё не созданы; streamer продолжает обычную дорогу и повторяет попытку позже. Поля `last_fork_site_evaluation` и `last_fork_corridor_preview` сохраняют диагностику без шумных постоянных логов. Preview не проверяет последующие FSM chunks, соседство с несвязанными далёкими рёбрами или rider feel; такие утверждения требуют P2.1d/full route audit и ручной поездки.
+Если пара отклонена, graph node, child branch и mesh ещё не созданы; streamer продолжает обычную дорогу и повторяет попытку позже. Поля `last_fork_site_evaluation` и `last_fork_corridor_preview` сохраняют диагностику без шумных постоянных логов. Preview не проверяет последующие FSM chunks, соседство с несвязанными далёкими рёбрами или rider feel; эти ограничения остаются для полной route/network проверки и ручной поездки.
+
+## 3.9. Fork pacing и candidate trace (P2.1d)
+
+`ForkPacingPlanner` размечает каждый реальный candidate endpoint после schedule threshold: `wait`, `defer` или `accept`; пишет целевую и измеренную дистанцию, delay, ordinal и band. Первая развилка отделена от следующих; для следующих диагностический band 550–900 м заимствован из draft P0.3, не стал новым gameplay ограничением. При четырёх отказах или delay >200 м ставится `pacing_overrun`, но поиск продолжает требовать site + paired preview safety. `ChunkStreamer.fork_pacing_trace` держит последние 64 записи с seed/branch/fork identity и причиной отказа.
+
+Штатный seed schedule сохранён. В свежих четырёх controlled default traces (2 seed × LEFT/RIGHT) target был 591.0–820.7 м, materialized leg — 600.3–851.1 м, overshoot — 9.3–33.3 м. Это небольшой sample, не rider guarantee. Искусственная 100m stress schedule попала в 314.6–317.6 м delay, потому что проверка endpoint ограничена примерно 350m ahead horizon; это видно в trace и не относится к нормальному default spacing. Никаких изменений интервалов или safety bounds P2.1d не вводит.
 
 ## 3.6. REVIEW-FIX-01 generation/runtime corrections
 

@@ -2,7 +2,7 @@
 
 **Версия плана:** 1.0
 **Состояние проекта на дату документа:** 27.09.2026
-**Текущий implementation stage:** foundation P0/P1/P2.0, P2.1a endpoint preflight, P2.1b RouteIntent/RoutePlan и P2.1c paired fork-arm preview завершены. Следующий ограниченный срез этапа A — P2.1d candidate search/pacing; полный route planner ещё не реализован.
+**Текущий implementation stage:** P2.1a–d foundation завершена; Stage A всё ещё `in progress`, потому что остаются предварительная оценка длинных веток/пересечений полной сети и ручное подтверждение характеров маршрутов. Следующий этап по порядку — Stage B, надёжные rideable MTB-события; затем Stage C, общий макрорельеф и открытая гора/horizon.
 **Статус документа:** стратегический план продукта. Это не разрешение автоматически реализовывать все перечисленные этапы.
 
 ## 1. Для чего нужен этот документ
@@ -142,9 +142,9 @@ Streaming + bicycle observation (без изменения кинематики 
 - **P2.1a — Endpoint eligibility preflight (завершено):** рассмотреть только реально доступный endpoint после минимального seeded интервала; проверить недавний 25m approach и боковой профиль существующего TerrainCarver. При отказе не менять граф/ширину/grammar: создать очередной normal chunk и повторить. Это детерминированная оценка одного кандидата.
 - **P2.1b — RouteIntent/RoutePlan contract (завершено 2026-09-27):** добавить pure data contracts и read-only adapter к существующей грамматике; снять production geometry baseline. Автоматический telemetry proxy записан, но показал нулевой cadence и рассогласование с path-pacing; субъективные trade-offs FLOW/TECHNICAL не утверждать до ручного ride review. Production output не изменён.
 - **P2.1c — Paired fork-arm preview (завершено 2026-09-27):** до fork side effects проверить оба 50-метровых arm тем же общим geometry builder, что использует production. Проверяются профиль дороги, C0/C1 на apex, разнос рукавов и опасные terrain-бока; при отказе обычный chunk продолжает путь. Это ещё не проверка следующих FSM chunks или пересечений с далёкими дорогами.
-- **P2.1d — Candidate search/pacing:** выбирать из ограниченного стабильного списка допустимых sites, учитывать целевой ритм и bounded deferral, затем сравнить с текущим дистанционным расписанием на seed battery.
+- **P2.1d — Nearest-safe pacing trace (завершено 2026-09-27):** сохранить nearest eligible endpoint policy, измерять target/delay/ordinal/reasons и bounded trace, отмечать overrun после 4 отказов/200 м без обхода safety. Seed-derived interval policy не менялся. Четыре controlled default route traces: target 591.0–820.7 м, actual 600.3–851.1 м, overrun 9.3–33.3 м; это ограниченный automated sample, не rider proof.
 
-`P2.1a` сам по себе не закрывает этап A и не доказывает свободный corridor за развилкой. Не помечать A как completed без P2.1b/c и повторной route/streaming проверки.
+`P2.1a–d` закрывают первичный runtime foundation этапа A, но не сам полный этап: arm preview пока только ~50 м; нет clearance scan с несвязанными дальними рёбрами/длинного route candidate optimization, а FLOW/TECHNICAL и удобный ритм не подтверждены ручной поездкой. Не помечать Stage A completed до этих gates.
 
 ### Этап B — Надёжная rideable geometry и особенности MTB-трассы
 
@@ -297,10 +297,10 @@ Steam SDK, магазин, достижения и внешняя публика
 
 ## 9. Текущий backlog и ближайшее движение
 
-1. **Сейчас:** подготовить отдельный implementation plan для P2.1d candidate search/pacing: выбирать среди детерминированных допустимых fork sites с bounded delay и измеримым ритмом. P2.1a–c закрывают предварительную проверку точки/рукавов, но не весь route planner.
+1. **Сейчас:** подготовить отдельный implementation plan для первой задачи Stage B: довести production MTB event geometry под неизменные validator bounds и явно проверять, что запрошенный event не заменён fallback. P2.1a–d дают site/arm/pacing foundation, но не route-wide planner и не manual ride sign-off.
 2. **Завершено в REVIEW-FIX-01:** откалибровать AIRBORNE lip/flight/landing builder по production validator, не меняя пределы контракта; продолжать проверять на будущих seed батареях.
 3. **Не блокировать этим:** детерминированная работа над полноценным macro landscape design может проектироваться, но реализация поля должна опираться на утверждённые требования route planner, чтобы не получить terrain и дорогу с разными coordinate models.
-4. После P2.1d и rideable geometry gate B — Sprint 6: единая macro terrain field и открытая гора/horizon.
+4. После rideable geometry gate B — Sprint 6: единая macro terrain field и открытая гора/horizon.
 5. Потом foliage/secondary trails и world dressing; затем ambience/UI/seed entry; затем полный player review, RC и standalone v1.
 
 Точный under-fork collision report остаётся открытым до появления replay seed/выборов/точки. Первое зафиксированное сообщение игрока о старте на одинаковом seed объяснено явным `184729` в игровой сцене; смена UX seed должна быть включена в этап E, а не теряться в генераторном рефакторинге.
@@ -313,4 +313,4 @@ Steam SDK, магазин, достижения и внешняя публика
 4. Перед road changes читать `ROAD_GENERATION.md`, `ARCHITECTURE.md`; перед тестами — `TEST_PLAN.md` и `.antigravity/rules/test-integrity.md`.
 5. Начать только ближайшую одобренную задачу. Если она меняет файлы/архитектуру, оформить полный task template и дождаться явного approval, если он не дан в текущем контексте.
 
-**Короткий prompt для передачи:** “Прочитай `DEVELOPMENT_ROADMAP.md`, затем `VISION.md`, `AGENTS.md`, `implementation_plan.md`, `MTB_WORLD_GENERATION_HANDOFF.md`, `ROAD_GENERATION.md`, `ARCHITECTURE.md` и `TEST_PLAN.md`. Цель — одна медитативная бесконечная поездка, наполненная качественным горным MTB-миром; P2.1a–c завершены, следующий ограниченный шаг — P2.1d candidate search/pacing. Это ещё не полный route planner. Не принимай исторические тесты за свежие, не меняй велосипед/камеру без отдельного плана и не расширяй approval scope.”
+**Короткий prompt для передачи:** “Прочитай `DEVELOPMENT_ROADMAP.md`, затем `VISION.md`, `AGENTS.md`, `implementation_plan.md`, `MTB_WORLD_GENERATION_HANDOFF.md`, `ROAD_GENERATION.md`, `ARCHITECTURE.md` и `TEST_PLAN.md`. Цель — одна медитативная бесконечная поездка, наполненная качественным горным MTB-миром; P2.1a–d выполнены, Stage A остаётся незавершённым до full-network clearance и rider review; сейчас следующий ограниченный шаг — Stage B rideable MTB event geometry. Затем Stage C: общий макрорельеф/open mountain. Не принимай исторические тесты за свежие, не меняй велосипед/камеру без отдельного плана и не расширяй approval scope.”
