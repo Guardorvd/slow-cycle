@@ -14,7 +14,7 @@
 | **B1 — event-to-surface proof (выполнено)** | Проследить запрошенный production-event от RoadLogic через validator до RoadChunk mesh/collision faces. | REVIEW-FIX-01 и существующие event contracts | Детерминированный тест AIRBORNE→LANDING→RECOVERY на нескольких seed. |
 | **B2 — seed-управляемый ритм (выполнено)** | Управлять не точным процентом случайных препятствий, а читаемым ритмом на 600-метровом окне: гарантировать периодические лёгкие особенности и ограничивать скучивание сложных событий; сохранить разницу FLOW/BALANCED/TECHNICAL. | B1, текущая RoadGrammar FSM | Повторяемые по seed фазовые последовательности; ограниченная дистанция между интересными событиями; стиль-specific потолок major events; на реальных RoadLogic чанках нет fallback/нарушения контракта. |
 | **B3 — геометрический каталог MTB-событий (выполнено)** | B3a измерил production crest/micro-drop, airborne/landing, switchback и recovery; B3b исправил и ограничил реальную высоту micro-drop. | B1, B2; cross-slope terrain contract остаётся в C. | Измеримые event формы проходят контракты и replay; safety envelope проверяется по фактическим точкам. |
-| **B4 — переходы, швы и посадки** | Проверить event-to-event transitions, chunk seams и fork-adjacent границы, возврат к grounded/recovery, соседний terrain и road/collision faces. | B1–B3 | Нет дыр и ступеней на целых цепочках/стыках. |
+| **B4 — переходы, швы и посадки (CPU geometry завершена)** | B4a проверил event chains на shared RoadChunk sample и road/roadside terrain mesh-collision boundary coverage. | B1–B3; существующий branch/fork seam gate. | 36 границ чисты на четырёх seed; runtime collider/bike traversal остаётся в B6. |
 | **B5 — покрытие и clearance маршрута** | Прогнать длинные ветки/сети и event corridors; различать дорожную и terrain collision; исследовать under-fork report с точными replay inputs. | B3–B4; route-planning интерфейсы Stage A | Clearance чист на измеренном диапазоне, подтверждённый defect исправлен, остальное ограничено отчётом. |
 | **B6 — rideability и ручной gate** | Измерить bike contact/flight/landing/recovery, затем вручную проехать игровой маршрут и оценить flow/technical. | B2–B5 и alpha ride из Stage F | Автоматика проходит safe limits, ручной заезд подтверждает читаемость, разнообразие и проходимость; тест не подменяет человеческую оценку. |
 
@@ -57,7 +57,7 @@
 - **Airborne/landing:** три воздушных sample, восемь посадочных, четыре seed прошли validator; высота падения от начала полёта до конца воздушной части **0.793–0.878 м** (контракт допускает до 1.2 м).
 - **Switchback:** фактический поворот **87.43–94.75°**, peak curvature **0.04796–0.05198 м⁻¹**; все четыре кандидата прошли validator.
 - **Recovery:** каждый кандидат дал 25 samples примерно на 50 м и прошёл validator. Это структурная метрика, не доказательство восстановления велосипеда.
-- Замер максимальной разницы между объявленным уклоном sample и уклоном chord между соседними точками показал до 3.39° у crest и до 5.19° у airborne; сохранить как диагностическое evidence для B4 seam/profile audit, без неподтверждённых выводов о rideability.
+- Замер разницы между объявленным уклоном sample и уклоном chord показал до 3.39° у crest и до 5.19° у airborne. Это отдельная метрика продольного профиля: B4 проверил границы чанков и не выявил там разрыва, но не классифицировал эту разницу как дефект. Не делать выводов о rideability по одному этому числу.
 
 **Что это даёт:** теперь известны не только названия событий, но и измеренная форма дороги, которую действительно получит игрок. Мы нашли раннюю локальную поправку до длинных стыковых/физических испытаний. Это готовит сложные участки к проверке, но ещё не создаёт рельефный боковой склон или случайную гору; большая гора и прокладка дороги по ней по-прежнему относятся к Stage C.
 
@@ -105,7 +105,52 @@
 
 **Что это даёт:** маленький гребень теперь действительно соответствует обещанному размеру, вместо более резкого скрытого уступа. Это делает основу технических участков точнее и подготавливает B4 проверять непрерывность стыков на честной форме события. Большая 2D гора и дорога, проложенная по её склонам, всё ещё впереди в Stage C.
 
-**Следующий срез:** B4 — измерить переходы/стыки между такими событиями и соседними terrain/road chunks, включая посадку и возврат к устойчивой поверхности; ручная оценка велосипеда остаётся отдельным B6 gate.
+**Запись на момент окончания B3:** следующим был определён B4 seam audit. Результат B4a ниже; полный route clearance и ручная оценка велосипеда остаются отдельными Stage A/B6 gates.
+
+## B4a — стык RoadChunk на production-геометрии событий
+
+### TASK: [B4a] Проверить непрерывность дороги и roadside terrain на границах mesh/collision чанков
+
+**Goal**: доказать, что соседние production RoadChunk ranges, построенные из одной RoadPathData и перекрытые общей boundary sample, совпадают по road mesh/collision и roadside terrain mesh/collision. Прогон покрывает crest, airborne/landing/recovery, switchback и смешанную event chain.
+
+**Do**:
+
+- Добавить отдельный headless audit через production `RoadLogic.plan_next_chunk()`, `RoadValidityValidator.validate_seam()` и `RoadChunk.prepare_geometry_data()` на фиксированных seed.
+- Использовать streaming policy: соседние диапазоны делят последнюю/первую sample; мерить C0/C1/slope/normal seam report без новых толерансов.
+- Сопоставить road edge boundary rows и проверять, что реальные prepared terrain mesh и collision faces содержат одну и ту же рассчитанную production cross-section на общей точке. Нормали SurfaceTool могут переупорядочить vertex buffer, поэтому поиск вести по позициям в буферах/граничных face blocks, не по предположению о порядке индексов.
+- Проверять число, конечность и невырожденность faces на обеих сторонах стыка; повтором подтверждать подпись.
+
+**Do not**: менять геометрию RoadLogic/TerrainCarver, BicycleController, камеру, управление, fork topology, validator contracts или Stage C macro landscape; не считать prepared CPU faces proof of instantiated collider/bike response.
+
+**Acceptance Criteria**: четыре фиксированных seed × четыре event sequence проходят production validators; seam C0/C1/slope/normal report чист; road/terrain mesh arrays и collision face blocks обеих сторон покрывают одну общую boundary row без расхождения и degenerate triangles; replay signature совпадает.
+
+**Tests**: новый `test_road_event_chunk_seams.gd`; `test_mtb_event_geometry_catalog.gd`; `test_mtb_event_pipeline.gd`; `test_road_contract.gd`; `test_route_branch_integration.gd`; `git diff --check` и headless Godot.
+
+**Files**: новый `scripts/test/test_road_event_chunk_seams.gd`; `implementation_plan.md`, `DEVELOPMENT_ROADMAP.md`, `ARCHITECTURE.md`, `ROAD_GENERATION.md`, `TEST_PLAN.md`, `MTB_WORLD_GENERATION_HANDOFF.md`. Production fix — только при воспроизводимом несовпадении.
+
+### Проверка плана B4a
+
+- Проверены live dispatch ranges в `ChunkStreamer._spawn_chunk_sync()`: новый chunk начинает с `road_path.size() - 1`, затем добавляет новые samples. Поэтому shared boundary задействована реально, а не симулирована отдельными равными путями.
+- `RoadChunk.prepare_geometry_data()` вычисляет road edges и terrain cross-sections из общего boundary sample и постоянного cumulative distance. Terrain `SurfaceTool.generate_normals()` может переупорядочить vertices; тест поэтому находит ожидаемые cross-section positions в actual mesh buffer и first/last collision-face blocks.
+- `validate_seam()` вызывается на двух независимых `RoadPathData.slice_segment()` срезах, по обе стороны одной shared sample; contracts из `RoadGenerationContract` не расширяются.
+- Эти проверки подтверждают CPU geometry/face preparation, не регистрацию PhysicsServer collider, wheel raycast, whole-network clearance или riding feel. Последние остаются Stage A/B5/B6.
+
+**Решение проверки:** scope совпал с live chunk ranges, production terrain mesh/collision builders и seam API; пользователь явно разрешил продолжать. Реализовать тестовый proof; production geometry менять только при реальном divergence.
+
+### Итог B4a
+
+**Завершено 2026-09-27.** Создан `scripts/test/test_road_event_chunk_seams.gd`. Он строит 4 сценария (crest→recovery; airborne/landing→recovery; switchback→recovery; mixed chain из 7 chunks) для seed `184729`, `42`, `7319`, `900001`. Всего проверено **36 shared boundaries / 96 assertions**.
+
+- Все последовательности действительно содержали запрошенные crest, airborne/landing и switchback состояния, прошли RoadLogic validator и seam `C0/C1/slope/normal`; ошибки position/tangent/slope/normal на общей sample равны нулю.
+- Road mesh endpoints и road collision face blocks встретили одинаковые boundary vertices; production roadside terrain cross-section найден в обоих actual prepared mesh buffers и collision face blocks без предположения о vertex ordering.
+- Каждый chunk имел ожидаемое число finite, non-degenerate road/terrain faces; 96/96 assertions прошли, signatures совпали при повторе.
+- Первоначальная попытка сравнить 8 соседних индексов terrain vertex buffer ошибочно предполагала сохранение row ordering после `SurfaceTool.generate_normals()`. Замер переформулирован на поиск boundary vertices в реальных prepared mesh/faces; отличие было в проверочном harness, production mesh/collision данные после корректного анализа совпали. Runtime geometry code не менялся.
+- Регрессии: event geometry **228/228**, event-to-surface **8/8**, road contract **18/18**, route branch integration **8 routes / 0 failures**. `git diff --check` чистый. Из среды Godot сохраняются только сообщения про user log и Windows certificates.
+
+**Что это даёт:** теперь подтверждено, что подготовленные соседние игровые куски дороги и обочины используют одну и ту же граничную линию даже рядом с сложными событиями. Мы проверили место, где отдельные chunks могли бы оставить щель под колесом; на проверенных seed такого разрыва нет. Тест пока не создаёт живые physics colliders и не делает ручную поездку.
+
+**Следующий этап B5:** пройти длинные последовательности маршрутов/веток и проверить clearance/crossings beyond local fork preview. Затем B6 добавит bicycle-level contact/landing measurements и ручной ride; Stage C по-прежнему отвечает за большую seed-generated гору.
+
 
 ### TASK: [B1] Проверка пути MTB-события до дорожного меша и коллизии
 
@@ -138,11 +183,11 @@
 **Завершено 2026-09-27.** Добавлен `scripts/test/test_mtb_event_pipeline.gd`. Для четырёх seed он дважды создаёт одно и то же production AIRBORNE_DROP и recovery-цепочку, проверяет acceptance обоих чанков и передаёт полный путь в `RoadChunk.prepare_geometry_data()`. Во всех случаях получено 3 AIRBORNE, 8 LANDING и 25 GROUNDED RECOVERY samples; road mesh содержит 102 vertex, collision face array — 300 vertex, и все 11 отрезков события покрыты треугольниками.
 
 - Результат: focused B1 runner **8/8 PASS**, exit 0. Параметры и ограничения validator/физики не менялись.
-- Ограничение доказательства: сравниваются подготовленные mesh/collision arrays; физический collider в world не инстанцировался и велосипед не проходил эту поверхность. Это остаётся для B4/B6 и ручного ride gate.
+- Ограничение доказательства: сравниваются подготовленные mesh/collision arrays; физический collider в world не инстанцировался и велосипед не проходил эту поверхность. Это остаётся для B6 и ручного ride gate.
 - Обновлены `DEVELOPMENT_ROADMAP.md`, `ARCHITECTURE.md`, `ROAD_GENERATION.md`, `TEST_PLAN.md` и `MTB_WORLD_GENERATION_HANDOFF.md` с разделением B1–B6 и границей доказанного.
 - На момент отчёта B1 его будущими частями были B2–B5; после этого завершён B2, а B3–B6 остаются открыты: геометрический каталог событий, seam audit, route clearance и rideability/manual ride.
 
-Следующий срез — B3: проверить форму существующих элементов и определить, что нужно для выраженных боковых склонов и перепадов. B4 проверит переходы/стыки, B5 — clearance веток, B6 — игровое ощущение. Полноценная случайная гора, по которой сначала планируется линия дороги, остаётся этапом C: B2 организует ритм дороги и не выдаёт его за terrain-aware route planning.
+Историческая запись на момент B1: следующим тогда был B3. Текущие этапы и открытые gates перечислены в начале этого документа и в `DEVELOPMENT_ROADMAP.md`. Полноценная случайная гора, по которой сначала планируется линия дороги, остаётся этапом C: B2 организует ритм дороги и не выдаёт его за terrain-aware route planning.
 
 ## B2 — seed-управляемый ритм поездки
 

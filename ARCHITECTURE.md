@@ -126,7 +126,7 @@ The initial baseline exposed one actionable documentation/geometry mismatch: the
 marked crest micro-drop samples spanned about 4 m and fell **0.552–0.608 m** across the
 four catalogue seeds, while the builder comment stated `h <= 0.35m`. B3b corrected this
 locally without loosening the validator. The measured tangent vs chord grade difference
-also remains evidence for B4's continuity audit.
+is a separate profile metric. The B4 boundary audit found no chunk-seam mismatch; it neither classifies that sample-to-chord difference as a defect nor certifies the longitudinal profile.
 
 B3b removed the extra per-point vertical offset and reduced only the marked crest
 profile slope from −7° to −4.5°. The measured fall is now **0.181–0.238 m** across
@@ -135,7 +135,20 @@ test enforces `0 < fall <= 0.35 m`; airborne, switchback, and recovery productio
 builders were left unchanged. This is a bounded longitudinal road-profile feature,
 not a cross-slope or an open mountain landform.
 
-## 9. Collision layers
+## 9. Stage B4 road/terrain chunk seam audit
+
+`test_road_event_chunk_seams.gd` builds real `RoadLogic` event sequences, then prepares
+neighboring inclusive `RoadChunk` ranges from the same path and shared endpoint. For
+36 boundaries across four seeds and four event sequences it checks seam C0/C1/slope/normal, road edge vertices,
+the actual roadside terrain boundary cross-section in both prepared mesh buffers and
+collision face blocks, plus face finiteness and non-degeneracy. All 96 assertions passed
+with zero boundary position/frame or mesh/collision row error.
+
+This is CPU geometry preparation evidence. It does not register live PhysicsServer
+colliders, query the bicycle wheels or prove whole-route clearance; those remain B5/B6
+checks. No production geometry changed in B4.
+
+## 10. Collision layers
 
 The bicycle queries the existing road and surface layers through its configured collision mask. Road generation and physics contracts are coupled at the collision interface only; P2.1 does not edit that mask or tune wheel raycasts.
 
@@ -146,7 +159,7 @@ The bicycle queries the existing road and surface layers through its configured 
 | 4 | Player | Bicycle character body |
 | 5 | RoughRoad | Rough road surface |
 
-## 9. Legacy feature traceability
+## 11. Legacy feature traceability
 
 The historic sprint ID alone does not imply that the full product goal is done.
 

@@ -196,12 +196,14 @@ seed each session; `--seed=N` replays exactly, and tooling scenes keep fixed see
 Stage A still has route-network clearance
 and manual route-style gates. B3a/B3b measured four production event types and fixed
 the crest micro-drop height: **228/228**, 12 seeds × four event types, now measure
-0.181–0.238 m vs the 0.35 m cap, preserving its two marked contacts. Regressions:
-event pipeline 8/8, road contract 18/18, grammar and rhythm pass. Next is B4:
-check event/road/terrain seams, landing and recovery continuity. The fix did not add
-a landscape; Stage C remains the future terrain-first 2D mountain and route. Preserve
-bike physics, camera and controls.
+0.181–0.238 m vs the 0.35 m cap, preserving its two marked contacts. B4 seam audit:
+**96/96** across 36 chunk boundaries, four seeds and four event chains; road/terrain
+mesh and collision boundary positions matched exactly. Regressions: event pipeline
+8/8, road contract 18/18, route branch integration 8 routes / 0 failures. These are
+prepared CPU geometry/faces, not live wheel contact or manual riding. Next is B5:
+long-route and branch clearance. Stage C remains the terrain-first 2D mountain and
+terrain-aware routing. Preserve bike physics, camera and controls.
 
 ### Prompt to resume in a new chat
 
-“Read `DEVELOPMENT_ROADMAP.md`, `VISION.md`, `AGENTS.md`, `implementation_plan.md`, `MTB_WORLD_GENERATION_HANDOFF.md`, `ROAD_GENERATION.md`, `ARCHITECTURE.md` and `TEST_PLAN.md`. The goal is one meditative endless ride enriched by a coherent, rideable procedural MTB world. P2.1a–d and Stage B1–B3 are complete; B3b constrained marked crest micro-drop to 0.181–0.238 m on 12 seeds (cap 0.35 m), with 228/228 catalogue checks. Next is B4: audit event/road/terrain seams, landing and recovery continuity. B2 paces features on a seeded road but is not terrain-first 2D mountain routing; Stage C remains the visible macro landscape and terrain-aware route. Stage A still has network clearance/manual review. Treat old results as historical until rerun. Preserve bicycle physics/camera/controls, report known ObjectDB warning in RoutePlan test, and respect the user-approved scope and repository plan gate.”
+“Read `DEVELOPMENT_ROADMAP.md`, `VISION.md`, `AGENTS.md`, `implementation_plan.md`, `MTB_WORLD_GENERATION_HANDOFF.md`, `ROAD_GENERATION.md`, `ARCHITECTURE.md` and `TEST_PLAN.md`. The goal is one meditative endless ride enriched by a coherent, rideable procedural MTB world. P2.1a–d and Stage B1–B4 are complete through the current automated geometry/mesh preparation gates; B3b constrains the crest micro-drop to 0.181–0.238 m on 12 seeds. B4 checked 36 shared boundaries on four seeds, 96/96 assertions, with exact road/terrain prepared mesh and collision boundary rows. Next is B5: long-route and branch clearance; B6 still needs bike-level contact/landing measures and manual review. Stage C remains the visible 2D macro landscape routed across its terrain. Stage A still has network clearance/manual route-style gates. Preserve bicycle physics/camera/controls; distinguish CPU geometry evidence from live physics and rider feel.”

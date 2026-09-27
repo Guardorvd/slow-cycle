@@ -232,10 +232,10 @@ production `RoadLogic` для seed `184729`, `42`, `7319`, `900001`; два од
 | Switchback | поворот 87.43–94.75°; пик кривизны 0.04796–0.05198 м⁻¹ | Все четыре seed приняты. Полную субъективную сложность это не устанавливает. |
 | Recovery | 25 sample / около 50 м | Геометрия проходит validator; велосипедная стабилизация проверяется отдельно в B6. |
 
-Отклонение между записанным уклоном sample и уклоном фактического chord достигло
-3.39° у crest и 5.19° у airborne. Это лишь численный сигнал для B4: B3a не вводит
-допуск и не заявляет дефект continuity без специального adjacent sample audit.
-Runner не меняет production geometry и не симулирует велосипед.
+Разница между уклоном sample и фактическим chord достигла 3.39° у crest и 5.19° у
+airborne. Это отдельная метрика продольного профиля, а не ошибка границы чанка. B4
+подтвердил нулевое расхождение на shared chunk boundary, но не классифицирует и не
+сертифицирует эту метрику. Runner не меняет production geometry и не симулирует велосипед.
 
 ## 10. Stage B3b — предел фактического crest micro-drop
 
@@ -249,3 +249,29 @@ sample и последним из двух помеченных samples. Пер�
 точки `MICRO_DROP` остаются на месте. Новый assertion требует для каждого seed
 положительное значение до 0.35 м включительно; safety limits validator-а не менялись.
 Это доказывает только высоту дорожной геометрии, не ощущение велосипеда.
+
+## 11. Stage B4a — стыки соседних road chunks
+
+`test_road_event_chunk_seams.gd` повторяет production streaming range policy:
+следующий chunk начинается с последней sample пути, затем добавляет свою новую
+геометрию. Поэтому соседние inclusive ranges делят один реальный boundary sample.
+Для четырёх seed строятся crest→recovery, airborne/landing→recovery,
+switchback→recovery и mixed chain из 7 chunks. Итого проверены **36 boundaries,
+96 assertions**.
+
+`RoadValidityValidator.validate_seam()` на двух independent path slices подтвердил
+C0 position, C1 tangent, slope и normal. Prepared road edge mesh vertices совпали;
+boundary road collision faces содержат те же края. Ожидаемые 6 используемых
+cross-section vertices roadside terrain найдены как в actual `SurfaceTool` mesh buffer,
+так и в конце/начале collision-face blocks. Все face counts совпали с количеством
+segment strips; вершины конечны, вырожденных треугольников нет. Измеренные position,
+tangent, slope, normal, road-row и terrain-row boundary errors равны нулю.
+
+Примечание к методу: `SurfaceTool.generate_normals()` может изменить порядок terrain
+vertex buffer. Первое harness сравнение соседних восьми индексов было неверным; test
+теперь проверяет coverage по ожидаемым геометрическим позициям в реальном output.
+Это была ошибка harness, production geometry и collision output на стыке совпали.
+
+**Граница:** это proof подготовки CPU mesh/collision arrays; отдельные Scene/PhysicsServer
+colliders не регистрируются. Это не заезд и не проверка дальних пересечений веток;
+route coverage остаётся B5, bicycle response и ручная оценка — B6.

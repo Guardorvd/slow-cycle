@@ -1,5 +1,28 @@
 # Slow Cycle — Verification & Testing Protocol
 
+## Stage B4a — production event chunk seam audit (2026-09-27)
+
+Command: `godot --headless --path . --script res://scripts/test/test_road_event_chunk_seams.gd`.
+
+Result: **96/96 PASS** across 4 fixed seeds × 4 sequences; 36 shared boundaries
+were audited. Sequences cover crest→recovery, airborne/landing→recovery,
+switchback→recovery and a mixed 7-chunk event chain. Assertions confirm the requested
+event/contact states were actually generated; `RoadLogic` and seam-validator reports
+pass. Road edge rows and the six used roadside terrain cross-section vertices
+were found on both sides in actual prepared mesh and collision outputs. Road/terrain
+face counts match the source intervals; no non-finite or degenerate triangles were
+found. Measured position, tangent, slope, normal and mesh/collision boundary errors:
+**0**. Repeated prepared signatures matched.
+
+This is CPU geometry preparation, not instantiated PhysicsServer collision or a bike
+ride. A first harness comparison incorrectly assumed `SurfaceTool.generate_normals()`
+preserves terrain vertex row order; it was corrected to find expected boundary positions
+in the actual mesh/collision outputs. The 96/96 result is from that corrected audit.
+
+Regressions: B3 event geometry **228/228**; MTB event pipeline **8/8**; road contract
+**18/18**; route branch integration **8 routes / 0 failures**. Godot still prints
+environment errors for `user://logs/godot.log` and Windows certificate-store access.
+
 ## Stage B3b — actual crest micro-drop height bound (2026-09-27)
 
 Command: `godot --headless --path . --script res://scripts/test/test_mtb_event_geometry_catalog.gd`.
@@ -33,7 +56,7 @@ no validator limit was changed. AIRBORNE segment drops measured 0.793–0.878 m,
 3 airborne and 8 landing samples, under the 1.2 m contract. Switchback turn measured
 87.43–94.75°; peak curvature 0.04796–0.05198 m⁻¹. Recovery generated 25 samples / ~50 m.
 Maximum metadata-vs-chord grade differences reached 3.39° (crest) and 5.19° (airborne);
-retain as diagnostic evidence for B4, not as a declared failure or rider assessment.
+retain as an unclassified sample-to-chord profile metric; B4 checks chunk seams, not this longitudinal profile metric.
 
 ## Stage B1 — MTB event to road surface (2026-09-27)
 
