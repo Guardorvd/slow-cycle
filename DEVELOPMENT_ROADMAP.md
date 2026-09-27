@@ -2,7 +2,7 @@
 
 **Версия плана:** 1.0
 **Состояние проекта на дату документа:** 27.09.2026
-**Текущий implementation stage:** foundation P0/P1/P2.0 завершён; идёт P2.1a — проверка пригодности доступной точки fork до её материализации. Полное планирование пары маршрутов остаётся дальше в этапе A.
+**Текущий implementation stage:** foundation P0/P1/P2.0, P2.1a endpoint preflight и P2.1b RouteIntent/RoutePlan contract завершены. Следующий ограниченный срез этапа A — P2.1c paired corridor preview; полный route planner ещё не реализован.
 **Статус документа:** стратегический план продукта. Это не разрешение автоматически реализовывать все перечисленные этапы.
 
 ## 1. Для чего нужен этот документ
@@ -139,8 +139,8 @@ Streaming + bicycle observation (без изменения кинематики 
 
 **Декомпозиция, чтобы не спутать проверку площадки с глобальным planner-ом:**
 
-- **P2.1a — Endpoint eligibility preflight (текущий узкий срез):** рассмотреть только реально доступный endpoint после минимального seeded интервала; проверить недавний 25m approach и боковой профиль существующего TerrainCarver. При отказе не менять граф/ширину/grammar: создать очередной normal chunk и повторить. Это детерминированная оценка одного кандидата.
-- **P2.1b — RouteIntent/RoutePlan contract:** определить измеримые характеристики leg/ритма из ride telemetry и Vision, отдельно задать допустимые trade-offs FLOW/TECHNICAL.
+- **P2.1a — Endpoint eligibility preflight (завершено):** рассмотреть только реально доступный endpoint после минимального seeded интервала; проверить недавний 25m approach и боковой профиль существующего TerrainCarver. При отказе не менять граф/ширину/grammar: создать очередной normal chunk и повторить. Это детерминированная оценка одного кандидата.
+- **P2.1b — RouteIntent/RoutePlan contract (завершено 2026-09-27):** добавить pure data contracts и read-only adapter к существующей грамматике; снять production geometry baseline. Автоматический telemetry proxy записан, но показал нулевой cadence и рассогласование с path-pacing; субъективные trade-offs FLOW/TECHNICAL не утверждать до ручного ride review. Production output не изменён.
 - **P2.1c — Paired corridor preview:** до materialization оценить обе выходящие линии, clearance относительно несвязанных roads, rideable event/recovery цепочки и junction C0/C1. Preview должен использовать те же функции построения, что production, а не дублировать приближённую геометрию.
 - **P2.1d — Candidate search/pacing:** выбирать из ограниченного стабильного списка допустимых sites, учитывать целевой ритм и bounded deferral, затем сравнить с текущим дистанционным расписанием на seed battery.
 
@@ -297,8 +297,8 @@ Steam SDK, магазин, достижения и внешняя публика
 
 ## 9. Текущий backlog и ближайшее движение
 
-1. **Сейчас:** завершить проверку P2.1a endpoint planner, зафиксировать число отложенных кандидатов по seed и regression suite. Следующий отдельный шаг в Stage A — измеримый RouteIntent/RoutePlan и paired corridor preview; не объявлять один preflight полным route planner-ом.
-2. **Отдельно:** сформировать узкий план на починку AIRBORNE lip/flight/landing builder по повторённым validator violations; контракт остаётся неизменным.
+1. **Сейчас:** подготовить отдельный implementation plan для P2.1c paired corridor preview: обе ветки оценивать до mesh на production geometry, сохраняя текущие choice/streaming API. P2.1a/b закрывают только site preflight и data contract, не весь route planner.
+2. **Завершено в REVIEW-FIX-01:** откалибровать AIRBORNE lip/flight/landing builder по production validator, не меняя пределы контракта; продолжать проверять на будущих seed батареях.
 3. **Не блокировать этим:** детерминированная работа над полноценным macro landscape design может проектироваться, но реализация поля должна опираться на утверждённые требования route planner, чтобы не получить terrain и дорогу с разными coordinate models.
 4. После P2.1b/c и rideable geometry gate B — Sprint 6: единая macro terrain field и открытая гора/horizon.
 5. Потом foliage/secondary trails и world dressing; затем ambience/UI/seed entry; затем полный player review, RC и standalone v1.
@@ -313,4 +313,4 @@ Steam SDK, магазин, достижения и внешняя публика
 4. Перед road changes читать `ROAD_GENERATION.md`, `ARCHITECTURE.md`; перед тестами — `TEST_PLAN.md` и `.antigravity/rules/test-integrity.md`.
 5. Начать только ближайшую одобренную задачу. Если она меняет файлы/архитектуру, оформить полный task template и дождаться явного approval, если он не дан в текущем контексте.
 
-**Короткий prompt для передачи:** “Прочитай `DEVELOPMENT_ROADMAP.md`, затем `VISION.md`, `AGENTS.md`, `implementation_plan.md`, `MTB_WORLD_GENERATION_HANDOFF.md`, `ROAD_GENERATION.md`, `ARCHITECTURE.md` и `TEST_PLAN.md`. Цель — одна медитативная бесконечная поездка, наполненная качественным горным MTB-миром; текущий шаг — P2.1a endpoint preflight. Это не полный маршрутный planner. Не принимай исторические тесты за свежие, не меняй велосипед/камеру без отдельного плана и не расширяй approval scope.”
+**Короткий prompt для передачи:** “Прочитай `DEVELOPMENT_ROADMAP.md`, затем `VISION.md`, `AGENTS.md`, `implementation_plan.md`, `MTB_WORLD_GENERATION_HANDOFF.md`, `ROAD_GENERATION.md`, `ARCHITECTURE.md` и `TEST_PLAN.md`. Цель — одна медитативная бесконечная поездка, наполненная качественным горным MTB-миром; P2.1a/b завершены, следующий ограниченный шаг — P2.1c paired corridor preview. Это ещё не полный маршрутный planner. Не принимай исторические тесты за свежие, не меняй велосипед/камеру без отдельного плана и не расширяй approval scope.”

@@ -8,6 +8,7 @@ extends RefCounted
 
 const Airborne = preload("res://scripts/world/road_airborne_contract.gd")
 const Contract = preload("res://scripts/world/road_generation_contract.gd")
+const RouteIntentClass = preload("res://scripts/world/route_intent.gd")
 
 enum FlowPhase {
 	CRUISE_DOWNHILL = 0,     ## -5°..-8°, 25-30 km/h, comfortable coasting with ratchet click
@@ -44,9 +45,11 @@ var phase_queue: Array[int] = []
 var curve_dir: float = 1.0
 var total_chunks_planned: int = 0
 var route_style: int = RouteStyle.BALANCED
+var route_style_seed: int = 0
 var authored_switchbacks_planned: int = 0
 
 func _init(seed_val: int) -> void:
+	route_style_seed = seed_val
 	rng.seed = seed_val
 	_setup_initial_dramatic_sequence()
 
@@ -82,6 +85,7 @@ func get_curve_direction() -> float:
 ## Both profiles retain the normal weighted grammar after their authored opening sequence.
 func set_route_style(style: int, style_seed: int) -> void:
 	route_style = clampi(style, RouteStyle.BALANCED, RouteStyle.TECHNICAL)
+	route_style_seed = style_seed
 	rng.seed = style_seed
 	authored_switchbacks_planned = 0
 	curve_dir = -1.0 if rng.randf() < 0.5 else 1.0
@@ -113,6 +117,35 @@ func set_route_style(style: int, style_seed: int) -> void:
 			])
 		_:
 			_setup_initial_dramatic_sequence()
+
+## Exports the current authored phase queue as a pure route-planning contract.
+## This reads grammar state only; it does not consume RNG or advance the queue.
+func build_route_intent(
+	world_seed: int,
+	route_identity: String,
+	branch_id: int,
+	global_start_distance_m: float
+) -> RefCounted:
+	var intent = RouteIntentClass.new()
+	var planned_phases: Array[int] = phase_queue.duplicate()
+	var envelopes: Array[Dictionary] = []
+	for phase_id: int in planned_phases:
+		var spec: PhaseSpec = get_phase_spec(phase_id)
+		envelopes.append({
+			"phase_id": phase_id,
+			"min_slope_deg": spec.min_slope_deg,
+			"max_slope_deg": spec.max_slope_deg,
+			"target_speed_kmh": spec.target_speed_kmh,
+			"min_length_m": spec.min_length_m,
+			"max_length_m": spec.max_length_m,
+			"min_radius_m": spec.min_radius_m,
+			"sight_distance_m": spec.sight_distance_m,
+			"surface_mode": spec.surface_mode,
+			"banking_angle_deg": spec.banking_angle_deg
+		})
+	intent.configure(world_seed, route_identity, branch_id, route_style, route_style_seed,
+		global_start_distance_m, planned_phases, envelopes)
+	return intent
 
 ## Guarantees that the next generated chunk is a clear, low-risk fork approach.
 func queue_fork_approach() -> void:

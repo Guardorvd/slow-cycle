@@ -32,7 +32,7 @@ mode_select.tscn
 ### Runtime data flow
 
 1. `WorldManager` selects the effective seed, initializes shared resources and creates the trunk `RoadPathData` plus `RoadLogic`.
-2. `RoadLogic` asks seeded `RoadGrammar` for a phase, constructs a candidate centerline, applies the shared `MountainProfile`, and validates it before it is committed to the path. Invalid ordinary chunks use the existing bounded recovery/fallback behavior.
+2. `RoadGrammar` can export its current authored queue as a pure `RouteIntent`; `RoadLogic` still asks the seeded grammar for each phase, constructs a candidate centerline, applies the shared `MountainProfile`, and validates it before it is committed. `RoutePlan` records measured geometry/telemetry as data for planner tests. The streamer does not yet consume RoutePlan when generating production routes.
 3. `ChunkStreamer` checks whether the generated horizon needs another chunk. Fork spacing remains a seeded minimum-distance schedule. Once that minimum is reached, `ForkSitePlanner` evaluates the available endpoint before any fork approach widening, graph mutation or fork mesh commit. Rejected sites take the ordinary chunk path; streaming retries on a later chunk boundary.
 4. For an accepted site, existing `RoadLogic` queues a braking approach; the streamer widens the junction, constructs LEFT/RIGHT paths, registers graph edges, and commits `RoadChunk` meshes and colliders.
 5. `ForkDecisionModel` compares the rider to those actual edge centerlines. `RoadGraph` is authoritative for the chosen edge and branch ID; `ChunkStreamer` still owns chunk lifetime, preloading and dormant branch state.
@@ -46,6 +46,7 @@ mode_select.tscn
 | Determinism | Stable world/profile/grammar/fork sub-seeds and deterministic geometry for the same seed/choice sequence | Keep deterministic independent streams as landscape, ecology and route planning expand |
 | Large terrain shape | 1D `MountainProfile` contributes a bounded elevation overlay; `TerrainCarver` creates local roadside flanks | One shared seeded 2D mountain/valley/ridge field used by distant horizon, rideable terrain and trail planning |
 | Route intent | FLOW and TECHNICAL have distinct authored openings; later grammar remains seeded | Plan leg composition, terrain corridor and both alternatives before committing fork topology/mesh |
+| Planning data | `RouteIntent` exports the current queue and phase envelopes; `RoutePlan` stores measured intervals/profile/telemetry with stable signatures | Use measured intent/plan to preview paired branch corridors before mesh creation |
 | Fork location | Seeded distance threshold, followed by endpoint preflight in P2.1 | Select among terrain/sightline/grade/clearance/composition-qualified candidate corridors |
 | Geometry | `RoadPathData` and existing validator define continuous centerlines and local constraints | Route plan → C1 centerline and event geometry → validated road/terrain fit → chunk rendering/collision |
 | Topology/streaming | `RoadGraph` owns fork choice; `ChunkStreamer` owns branch/chunk lifecycle | Migrate lifecycle incrementally only when graph-backed generation passes route and streaming gates |
@@ -59,6 +60,8 @@ The target flow is deliberately ordered: a shared macro field gives a candidate 
 `ForkSitePlanner` is a pure evaluator, not a full network optimizer. It receives the currently available `RoadPathData`, candidate endpoint, prior-chunk validation result, existing `TerrainCarver`, and the `BRAKING_ZONE` sight distance supplied by `RoadGrammar`. It returns an eligibility flag, stable reason codes and measured metrics. It does not mutate path arrays, RNG state, graph topology, grammar state, meshes or colliders.
 
 The initial gate checks the last 25 m for aligned/finite samples, sample spacing, standard road width, existing grade/curvature bounds and grounded contact. It checks both terrain-carver sides for the existing danger signal and verifies the actual braking phase has at least the contract sight distance. A rejection creates no fork side effects; the current 50 m chunk is generated normally, allowing a later endpoint to be reconsidered. It does not inspect yet-unbuilt downstream arms or promise a globally optimal route. Those remain later roadmap work and need separate evidence/acceptance criteria.
+
+P2.1b adds two node-free data contracts. `RouteIntent` describes seed/branch/style identity, the global leg start, the current phase sequence and each phase's existing geometry envelope. `RoutePlan` stores actual interval bounds, observed geometry/contact/event metrics and explicitly sourced bike telemetry. Its builder rejects malformed paths; validators report stable reason codes for incomplete intent, intervals, metrics or telemetry. These records do not change generation behavior and are not yet a route optimizer.
 
 ## 5. Stable contracts and constraints
 

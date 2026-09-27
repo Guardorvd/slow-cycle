@@ -103,7 +103,7 @@ Production `RoadLogic` seed-батарея (4 world seed × 2 style seed × 2 с
 
 Результат хранится в `ChunkStreamer.last_fork_site_evaluation`: `eligible`, стабильный список `reason_codes` и измеренные метрики. Это диагностическое состояние, а не постоянный пользовательский лог.
 
-**Граница доказательства:** это фильтр одного уже сгенерированного endpoint, не построитель RoutePlan. Он не preview-ит ещё не созданные downstream arms, не проверяет clearance всей сети и не исправляет геометрию. Полный `RouteIntent/RoutePlan`, парная оценка обоих выходов до mesh и pacing trade-offs остаются P2.1b–d в `DEVELOPMENT_ROADMAP.md`. FEAT-014.4 означает локальную carving/terrain полосу вокруг дороги; макро-ландшафт, открытая гора и horizon остаются будущим этапом C.
+**Граница доказательства:** это фильтр одного уже сгенерированного endpoint, не построитель полной сети. Он не preview-ит ещё не созданные downstream arms, не проверяет clearance всей сети и не исправляет геометрию. P2.1b предоставляет RouteIntent/RoutePlan как измеримый data contract; парный preview и pacing trade-offs остаются P2.1c–d в `DEVELOPMENT_ROADMAP.md`. FEAT-014.4 означает локальную carving/terrain полосу вокруг дороги; макро-ландшафт, открытая гора и horizon остаются будущим этапом C.
 
 ## 3.6. REVIEW-FIX-01 generation/runtime corrections
 
@@ -112,6 +112,14 @@ RoadGraph pruning вызывается при выгрузке branch: удал�
 Foliage RNG использует положительный 63-bit hash от branch-stable route seed и arc-length границ chunk interval, квантованных до миллиметра. Выделенный global chunk ID и порядок материализации не участвуют. Теоретические hash collisions возможны; расширение с 31 до 63 бит делает их пренебрежимо редкими для текущего размера активного окна.
 
 `RoadValidityValidator` возвращает invalid report для пустых/структурно несогласованных путей и неверных индексов; сегменты с `BRAKING_ZONE` проверяются по реальной crest visibility. AIRBORNE distance/height остаются ограничены прежними 6.0m/1.20m contract значениями. Surface material blend использует bounded exponential interpolation, сохраняя нормализованные веса и исходную скорость сглаживания при малом delta.
+
+## 3.7. RouteIntent / RoutePlan contract (P2.1b)
+
+`RoadGrammar.build_route_intent()` без изменения очереди или RNG экспортирует `RouteIntent`: world/style seeds, route/branch identity, global start distance, запланированные фазы и действующие для каждой фазы ограничения grade, speed, length, radius, visibility, contact и banking. `RoutePlan.from_road_path()` сохраняет фактические глобальные интервалы, диапазон grade, кривизну, максимальный sample gap, contact counts и segment event counts; для полноты нужны также источник и сводка `telemetry_updated`.
+
+На production opening длиной примерно 450m по 16 профилям (4 world seeds × 2 style salts × FLOW/TECHNICAL) FLOW содержал две crest/micro-drop фазы, без switchback; TECHNICAL — две подготовка→switchback→recovery связки и отдельные recovery. FLOW max curvature измерена 0.00101–0.00166m⁻¹, TECHNICAL — 0.05118–0.05263m⁻¹; sample gap обеих стилей 2.015–2.022m. Диапазоны grade: FLOW −8.24°…+0.98°, TECHNICAL −7.48°…+0.95°. Это starting baseline текущей генерации, а не утверждённые субъективные цели качества.
+
+Автоматический path-follower proxy на одном seed для каждого стиля записал сигналы контроллера, но поддерживал продвижение по линии минимум 7m/s; сигнал велосипеда показал среднюю скорость около 9.5km/h и нулевой cadence. Это не согласованный свободный заезд и не годится для выбора style targets. До оценки trade-offs нужен более достоверный ручной ride/telemetry review. P2.1b ничего не меняет в текущей генерации; `ChunkStreamer` ещё не использует RoutePlan для выбора fork.
 
 ## 4. Контракт Прыжков и Посадок (`RoadAirborneContract`)
 

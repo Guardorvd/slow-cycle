@@ -51,7 +51,7 @@ Primary code: `scripts/world/chunk_streamer.gd`, `fork_site_planner.gd`, `fork_d
 
 `ForkSitePlanner` checks recent width, finite/aligned path samples, sample spacing, grade, curvature, grounded contact, last-chunk validation, both existing TerrainCarver danger flags and the actual planned braking-phase sight distance. Rejection has stable reason codes and falls through to a normal chunk; it does not mutate fork graph or width. The new focused test reports decision repeatability on seeds `184729`, `42`, and `99999`; see the current run in `TEST_PLAN.md` and details in `implementation_plan.md`.
 
-This step closes only the site-filtering foundation. Continue with P2.1b route intent/ride-pacing contract, then P2.1c shared paired-arm preview and clearance, then P2.1d candidate search/pacing. Read `DEVELOPMENT_ROADMAP.md` Stage A before proposing that follow-up. Do not describe P2.1a as a completed whole-route planner.
+This step closes only the site-filtering foundation. P2.1b now adds the node-free `RouteIntent`/`RoutePlan` contract and measured geometry baseline; it does not change streaming or select routes. Next is P2.1c shared paired-arm preview and clearance, followed by P2.1d candidate search/pacing. Read `DEVELOPMENT_ROADMAP.md` Stage A before that follow-up. Neither P2.1a nor P2.1b is a complete whole-route planner.
 
 ### P0 — Route-level acceptance before another generator rewrite — COMPLETED 2026-09-26
 
@@ -117,7 +117,9 @@ Plan alternatives before meshing: `FLOW` should trade length for sweeping turns/
 
 FLOW/TECHNICAL authored openings now differ in measured generated geometry on 4 world seeds and two style seeds per style. FLOW has two micro-drop events and no switchback; TECHNICAL has two opposite-turn switchbacks, recovery after each, and a micro-drop. The production route-intent runner passed 72 checks, with unchanged core suites also green. See `ROAD_GENERATION.md` §3.4 and `TEST_PLAN.md`.
 
-**Next P2.1:** plan each pair of alternatives from route intent before mesh creation; select fork placement only when approach sightline/grade/width and both exit corridors pass measured thresholds. Keep seed determinism and current fork API; replace distance-only scheduling only after the planner has seed-battery evidence. Then arrange a manual bike ride on at least two seeds and both route choices.
+**P2.1b completed:** `RouteIntent` exports seeded style identity, global start, planned phase sequence and existing phase envelopes. `RoutePlan` measures actual phase intervals, grade/curvature/sample/contact/event metrics and sourced bike telemetry; validation rejects malformed/incomplete records with reason codes. Production geometry is unchanged. Sixteen FLOW/TECHNICAL profiles repeated across a reversed seed order; focused suite 166/166. Two automated controller traces showed a path-pacing/telemetry mismatch and zero cadence, so they are explicitly not used as quality targets. See `TEST_PLAN.md`.
+
+**Next P2.1c:** paired corridor preview before mesh creation; evaluate both exits using production geometry functions, clearance, event/recovery chain and C0/C1 seams. Retain stable seed/route identity and current public fork API. A manual bike ride on at least two seeds and both route choices remains required to validate rider experience.
 
 **Review-fix status:** REVIEW-FIX-01 corrected the AIRBORNE candidate geometry without changing contract limits, added stable order-independent foliage keys, bounded graph pruning, malformed-path/visibility guards and bounded surface-weight smoothing. The new focused test passed 25/25; 500-chunk × 3-seed soak and the full master runner passed. Exact results are in `TEST_PLAN.md` and `implementation_plan.md`. The user-reported under-fork traversal remains unreproduced and is a separate diagnostic item.
 

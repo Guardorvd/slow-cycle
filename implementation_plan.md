@@ -80,7 +80,7 @@
 - Documentation updated: runtime ownership/data-flow и P2.1a boundary in `ARCHITECTURE.md`; Stage A explicitly split into P2.1a–d and FEAT-014.4/015.x traced in architecture/roadmap; current contracts and measured results in `ROAD_GENERATION.md`, `TEST_PLAN.md`, `MTB_WORLD_GENERATION_HANDOFF.md`.
 - Bike physics, camera, controls, seed policy, grammar styles, interval formulas and existing regression assertions were not changed. Manual bike ride and proof of downstream-arm/network clearance remain open.
 
-**Следующее направление:** P2.1b — оформить RouteIntent/RoutePlan и целевые метрики маршрута из Vision и ручных ride telemetry; затем P2.1c paired corridor preview на тех же production geometry functions; затем P2.1d стабильный поиск кандидатов и pacing. После route/rideable gates B — полноценное общее 2D macro landscape/open mountain (Stage C). Финальный путь до release — `DEVELOPMENT_ROADMAP.md` stages C–H. Этот P2.1a task не объявляет Stage A/спринт FEAT-014.4 заново завершённым и не означает готовность финального build.
+**Следующее направление на момент P2.1a:** затем был выполнен P2.1b RouteIntent/RoutePlan; следующий ограниченный шаг — P2.1c paired corridor preview на тех же production geometry functions, после него P2.1d candidate search/pacing. Stage A остаётся открытым; дальше — rideable gate B, единый macro landscape/open mountain (Stage C) и финальный путь C–H из `DEVELOPMENT_ROADMAP.md`. Ни P2.1a, ни P2.1b не означает готовность финального build.
 
 ## Следующий шаг — P0: интеграционная проверка обеих ветвей
 
@@ -473,6 +473,39 @@ If a production defect is confirmed, write a separate task using the standard TA
 
 **Проверки:** `test_route_intent.gd`: `checks=72 failures=0`, world seeds 184729/42/7319/900001 × два style seeds × оба стиля, полная геометрическая повторяемость. Все чанки прошли validator. FLOW curvature 0.00101–0.00166m⁻¹, TECHNICAL 0.05118–0.05263m⁻¹; grade -8.24°…+0.98°, sample gap ≤2.022m. Без изменений прошли `test_road_grammar.gd`, `test_road_contract.gd` 18/18, `test_branch_streaming.gd` 49/49, `test_fork_geometry_verification.gd` 15/15, P1 профиль/интеграция 39,845/0 и 968/0, mountain validation 12/12.
 
-**Найденное ограничение:** production `AIRBORNE_DROP` повторяемо отклонён валидатором: 6.16–6.19m длины и 1.66–1.77m перепада превышают существующие границы. В текущем P2.0 он заменён в authored sequence на поддержанный micro-drop; нужно отдельным планом исправить геометрию lip/landing без ослабления контракта.
+**Историческое ограничение (исправлено в REVIEW-FIX-01):** первые P2.0 прогоны production `AIRBORNE_DROP` отклонялись валидатором (6.16–6.19m длины и 1.66–1.77m перепада). Builder теперь проходит неизменённые контрактные limits; отдельный follow-up больше не нужен.
 
 **Следующий этап:** P2.1 — детерминированный выбор мест развилки по sightline, уклону, ширине и валидности двух выходных коридоров, с планированием route intent до генерации mesh. Fork scheduling не менялся в P2.0. После P2.1 нужен ручной заезд на двух seed и обеих ветках. Не воспроизведённый under-fork report остаётся отдельно в диагностике.
+
+### TASK: P2.1b Контракт RouteIntent / RoutePlan
+
+**Статус:** завершено 27.09.2026 после явного одобрения пользователя.
+
+**Goal:** ввести детерминированный контракт, которым следующие подэтапы смогут описывать желаемый ритм leg и фактическое содержимое RoutePlan. Сначала измерить существующие FLOW/TECHNICAL openings и доступную bike telemetry; не зашивать неподтверждённые субъективные численные targets.
+
+**Do:**
+- Зафиксировать production baseline для FLOW/TECHNICAL: последовательность сегментов/событий, длина leg, grade/curvature envelope, braking/recovery, sample spacing и контакты поверхности на seed battery. Сохранить результаты рядом с новым тестом.
+- Измерить доступные `telemetry_updated(speed_kmh, cadence_pct, is_coasting)` на одном детерминированном контролируемом physics-runner для каждого authored opening. Отделить измеренный automated rider trace от субъективной оценки; не выдавать runner за ручной ride.
+- Создать минимальные типы `RouteIntent` и `RoutePlan` с seed/route identity, стилем, origin/global distance, leg/event intent, уже измеренными constraints, фактическими intervals/metrics и stable signature. Они должны валидировать внутреннюю согласованность и сериализоваться/сравниваться без ссылок на Nodes, RNG, mesh или chunk IDs.
+- Добавить чистое отображение текущего FLOW/TECHNICAL intent в новый contract; сохранить существующие authored opening outputs и все runtime generation/fork scheduling behavior без изменений.
+- Добавить новый focused runner для construction, invalid inputs, signature determinism/order stability и production baseline extraction. Существующие assertions не редактировать и не ослаблять.
+- Обновить roadmap, architecture, road-generation, test-plan, handoff и этот план фактическим измеренным baseline, schema и ограничениями.
+
+**Do not:** менять `BicycleController`, камеру, контролы, route FSM/авторскую очередь, `RoadLogic` геометрию, fork scheduler, graph lifecycle, terrain, art/UI или публичные bike signals. Не выбирать численные style thresholds только для удобства теста. Не начинать P2.1c paired corridor preview в этом подэтапе.
+
+**Acceptance Criteria:**
+- Для фиксированных world seed, style seed и route identity contract повторяется с одинаковым stable signature независимо от allocation order; FLOW/TECHNICAL создают разные intent по измеримым baseline данным.
+- RouteIntent/RoutePlan отклоняют пустые/несогласованные интервалы, некорректные event constraints и неполные metrics явными reason codes; валидные планы не содержат Node references.
+- Новая production adapter не меняет существующий opening: `test_route_intent.gd` сохраняет текущие ожидаемые типы, ритм, envelopes и детерминизм.
+- Тестовый отчёт содержит реальные distributions, использованные как starting bounds, и отдельно маркирует automated telemetry как proxy. Численные субъективные trade-off thresholds не фиксируются без manual ride evidence.
+- Existing graph, streaming, geometry, validation и master suites проходят; документы не объявляют P2.1 или этап A завершённым.
+
+**Tests:** новый `scripts/test/test_route_plan_contract.gd`; `test_route_intent.gd`; `test_road_graph.gd`; `test_branch_streaming.gd`; `test_fork_geometry_verification.gd`; `test_road_contract.gd`; `test_sprint_4m_master.gd`; `git diff --check`. Seed battery не менее текущих четырёх world seeds × двух style seeds × двух стилей; повторить входы в переставленном порядке и сравнить signatures. Один physics-runner на каждый стиль с записью speed/cadence/coasting telemetry.
+
+**Files:** создать `scripts/world/route_intent.gd`, `scripts/world/route_plan.gd`, `scripts/test/test_route_plan_contract.gd`; разрешённый адаптер `scripts/world/road_grammar.gd`; документация `DEVELOPMENT_ROADMAP.md`, `ARCHITECTURE.md`, `ROAD_GENERATION.md`, `TEST_PLAN.md`, `MTB_WORLD_GENERATION_HANDOFF.md`, `implementation_plan.md`.
+
+**Самопроверка и риск:** в репозитории есть Vision и event/geometry baseline, но нет сохранённых bike telemetry traces. Поэтому план сначала снимает повторяемый controlled telemetry proxy и строит contract от измеренных route metrics; он не подменяет manual ride review. Если во время реализации окажется, что допустимые FLOW/TECHNICAL trade-offs нельзя определить без rider preferences, остановить фиксацию этих численных порогов, приложить измерения и запросить их до P2.1c. Этот подэтап не должен влиять на текущую генерацию маршрута.
+
+**Результат:** добавлены `RouteIntent` и `RoutePlan`, адаптер `RoadGrammar.build_route_intent()` и focused runner. 16 профилей (4 seeds × 2 style salts × 2 стили) повторили те же signatures в обратном порядке. Текущие openings длиной 449.9–450.4m сохранили различимые event signatures; FLOW max curvature 0.00101–0.00166m⁻¹, TECHNICAL 0.05118–0.05263m⁻¹; максимальный sample gap 2.015–2.022m. Focused suite 166/166. Телеметрия из automated path-following proxy показала около 9.5km/h, 0 cadence и примерно 33% coasting при pace floor 7m/s; из-за этого расхождения прокси не используется для субъективных/стилевых порогов. Нужен ручной ride review до выбора trade-offs. Production route outputs, велосипед и fork scheduling не менялись.
+
+**Регрессии:** RouteIntent 72/72; RoadGraph 61/61; branch streaming 49/49; fork geometry 15/15; road contract 18/18. Ошибок парсинга и repeatable leak warnings не наблюдалось; остаются известные сообщения Godot о user log и Windows certificate store.

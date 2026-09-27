@@ -1,5 +1,15 @@
 # Slow Cycle — Verification & Testing Protocol
 
+## P2.1b — RouteIntent / RoutePlan data contract (2026-09-27)
+
+Command: `godot --headless --path . --script res://scripts/test/test_route_plan_contract.gd` (Godot 4.7.2 mono). Result: `ROUTE_PLAN_CONTRACT_SUMMARY checks=166 failures=0 geometry_profiles=16 physics_traces=2`.
+
+The 16 geometry profiles used 4 world seeds × 2 style salts × FLOW/TECHNICAL. Each route generated nine production chunks (about 450m), then repeated in reverse battery order. Route/style signatures and centerline outputs matched; all measured sample gaps were 2.015–2.022m. FLOW measured grade −8.24°…+0.98° and max curvature 0.00101–0.00166m⁻¹; TECHNICAL measured grade −7.48°…+0.95° and max curvature 0.05118–0.05263m⁻¹. Segment event counts retained the existing two FLOW crests and two opposite TECHNICAL switchbacks/recovery pattern.
+
+The focused runner also checks incomplete/mismatched intent, missing intervals/metrics, malformed path arrays, stable plan serialization, data-only (no Node references), and two controller telemetry traces. Those traces use an automated follower that maintains path progress at a 7m/s minimum; controller signals averaged about 9.5km/h / 0 cadence / 33% coasting for both styles in the final run. This proxy is inconsistent with its imposed path pace and is explicitly **not** a rider-quality target or a manual ride result. No subjective style thresholds were set from it.
+
+Existing suites after adding the read-only grammar adapter passed: RouteIntent `72/72`, RoadGraph `61/61`, branch streaming `49/49`, fork geometry `15/15`, road contract `18/18`. Godot prints the known log-file and Windows certificate-store environment messages. Manual bike review remains open.
+
 ## REVIEW-FIX-01 — Runtime and generation regressions (2026-09-27)
 
 `test_review_fix.gd`: **25/25 PASS**. It covers graph pruning/adjacency, order-independent foliage seeds derived from route identity and quantized path interval, malformed/empty path rejection and occluded braking visibility, generated AIRBORNE distance/height plus landing acceptance on four seeds, and normalized surface weights after frame hitches.
