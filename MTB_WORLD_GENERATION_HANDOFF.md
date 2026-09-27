@@ -1,6 +1,6 @@
 # MTB World Generation — Handoff for the Next Chat
 
-Updated: 2026-09-26. This file is the single starting specification for continuing the procedural MTB world work. Read it together with `AGENTS.md`; the analysis and implementation plan linked below retain supporting detail.
+Updated: 2026-09-27. This file is the single starting specification for continuing the procedural MTB world work. Read it together with `AGENTS.md`; the analysis and implementation plan linked below retain supporting detail.
 
 ## 1. Product goal
 
@@ -92,7 +92,7 @@ See `TEST_PLAN.md` and `implementation_plan.md`. P0.3 compared assigned and obse
 
 ### P1.0 — Seeded macro elevation envelope — COMPLETED 2026-09-26
 
-Added `MountainProfile`, a pure O(1) analytic function of seed, route identity and arc distance. It returns elevation, grade, grade derivative and a macro region label. Seven seeds × three route identities passed 39,845 assertions; 12km descent measured 1070–1090m. It remains a mathematical foundation and is not yet wired into runtime road or terrain generation. Full contract and limits are in `ROAD_GENERATION.md` §3.2 and `TEST_PLAN.md`.
+Added `MountainProfile`, a pure O(1) analytic function of seed, route identity and arc distance. It returns elevation, grade, grade derivative and a macro region label. Seven seeds × three route identities passed 39,845 assertions; 12km descent measured 1070–1090m. P1.1 now wires it into runtime road and terrain generation. Full contract and limits are in `ROAD_GENERATION.md` §3.2–3.3 and `TEST_PLAN.md`.
 
 The collision-hole isolation substep of P0.4 is complete but inconclusive: exact player route is still unknown. Continue capturing/reproducing the reported impassable route when available; do not let that block the broader landscape work or alter production code without a confirmed defect and its own plan.
 
@@ -105,6 +105,14 @@ The integration is a common macro envelope; branches still lack distinct elevati
 ### P2 — Plan route intent and forks on that envelope
 
 Plan alternatives before meshing: `FLOW` should trade length for sweeping turns/rollers and a steady descent; `TECHNICAL` should trade time/line choice for switchbacks, controlled drops and recovery. Place forks only where the planned approach supports sightline, width, grade and both outgoing corridors. Replace distance-only scheduling after these acceptance tests exist.
+
+### P2.0 — Deterministic style opening — COMPLETED 2026-09-27
+
+FLOW/TECHNICAL authored openings now differ in measured generated geometry on 4 world seeds and two style seeds per style. FLOW has two micro-drop events and no switchback; TECHNICAL has two opposite-turn switchbacks, recovery after each, and a micro-drop. The production route-intent runner passed 72 checks, with unchanged core suites also green. See `ROAD_GENERATION.md` §3.4 and `TEST_PLAN.md`.
+
+**Next P2.1:** plan each pair of alternatives from route intent before mesh creation; select fork placement only when approach sightline/grade/width and both exit corridors pass measured thresholds. Keep seed determinism and current fork API; replace distance-only scheduling only after the planner has seed-battery evidence. Then arrange a manual bike ride on at least two seeds and both route choices.
+
+**Separate defect plan needed:** the current `AIRBORNE_DROP` candidate is rejected by its existing validator (6.16–6.19m airborne length, 1.66–1.77m height in this opening) and falls back to recovery. Correct the generated lip/landing geometry while preserving airborne contracts; do not relax validator bounds. The user-reported under-fork traversal remains unreproduced and is a separate diagnostic item.
 
 ### P3 — Fit continuous centerlines and local terrain to the plan
 

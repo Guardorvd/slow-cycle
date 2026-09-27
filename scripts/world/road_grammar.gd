@@ -44,6 +44,7 @@ var phase_queue: Array[int] = []
 var curve_dir: float = 1.0
 var total_chunks_planned: int = 0
 var route_style: int = RouteStyle.BALANCED
+var authored_switchbacks_planned: int = 0
 
 func _init(seed_val: int) -> void:
 	rng.seed = seed_val
@@ -82,6 +83,8 @@ func get_curve_direction() -> float:
 func set_route_style(style: int, style_seed: int) -> void:
 	route_style = clampi(style, RouteStyle.BALANCED, RouteStyle.TECHNICAL)
 	rng.seed = style_seed
+	authored_switchbacks_planned = 0
+	curve_dir = -1.0 if rng.randf() < 0.5 else 1.0
 	phase_queue.clear()
 	match route_style:
 		RouteStyle.FLOW:
@@ -89,16 +92,22 @@ func set_route_style(style: int, style_seed: int) -> void:
 				FlowPhase.CRUISE_DOWNHILL,
 				FlowPhase.CREST_MICRO_DROP,
 				FlowPhase.CRUISE_DOWNHILL,
+				FlowPhase.CREST_MICRO_DROP,
+				FlowPhase.RECOVERY_FLAT,
+				FlowPhase.CRUISE_DOWNHILL,
 				FlowPhase.RECOVERY_FLAT,
 				FlowPhase.FAST_GRAVITY_DESCENT,
-				FlowPhase.BRAKING_ZONE
+				FlowPhase.CRUISE_DOWNHILL
 			])
 		RouteStyle.TECHNICAL:
 			phase_queue.assign([
 				FlowPhase.BRAKING_ZONE,
 				FlowPhase.SWITCHBACK,
 				FlowPhase.RECOVERY_FLAT,
-				FlowPhase.AIRBORNE_DROP,
+				FlowPhase.BRAKING_ZONE,
+				FlowPhase.SWITCHBACK,
+				FlowPhase.RECOVERY_FLAT,
+				FlowPhase.CREST_MICRO_DROP,
 				FlowPhase.RECOVERY_FLAT,
 				FlowPhase.CRUISE_DOWNHILL
 			])
@@ -116,6 +125,10 @@ func advance_phase() -> PhaseSpec:
 
 	current_phase = phase_queue.pop_front()
 	total_chunks_planned += 1
+	if route_style == RouteStyle.TECHNICAL and current_phase == FlowPhase.SWITCHBACK:
+		authored_switchbacks_planned += 1
+		if authored_switchbacks_planned == 2:
+			curve_dir *= -1.0
 	return get_phase_spec(current_phase)
 
 ## Weighted FSM Transition Table with strict hard constraints

@@ -60,8 +60,8 @@ Gate пройден: пользователь одобрил выполнени�
 ### Дальнейшие шаги
 
 1. **P0.1 — Диагностировать длину ветвей — выполнено.** См. результаты и P0.2 ниже.
-2. **P1.0 — Seeded macro elevation envelope.** Завершено: см. задачу и отчёт ниже. P1.1 runtime integration также завершена; следующий архитектурный этап — P2 route intent и размещение развилок с учётом макрорельефа.
-3. **P2 — Планировать fork по доступным коридорам и профилю поездки**, затем строить и валидировать центрлайны до генерации чанков.
+2. **P1.0 — Seeded macro elevation envelope.** Завершено: см. задачу и отчёт ниже. P1.1 runtime integration также завершена; P2.0 задаёт измеримо разные открытия стилей, следующий — P2.1 route planning и размещение развилок с учётом макрорельефа.
+3. **P2.0 — Различимый route intent FLOW/TECHNICAL.** Завершено: девять стартовых чанков проверены на 4 world seed и 2 style seeds; отчёт ниже и в `TEST_PLAN.md`. Следующий — P2.1, route planner и выбор fork site до meshing.
 4. Провести ручной greybox ride на двух seed и обеих ветвях. Нынешний harness следует centerline-точкам телепортацией позиции и не заменяет физический заезд велосипедом; он подтверждает данные/топологию/коллизии, а не ощущение flow.
 
 ## P0.1 — Аудит стиля и задержки следующего fork — выполнено 2026-09-26
@@ -322,3 +322,40 @@ If a production defect is confirmed, write a separate task using the standard TA
 **Проверки:** интеграционный runner — 968 проверок, 2 seed, 0 failures; `test_mountain_profile.gd` — 39,845/0; road contract — 18/18; fork geometry — 15/15; branch streaming — 49/49; terrain carver — 99/99; mountain validation — 12/12. Финальные прогоны завершились с exit 0 без parse/leak warnings. Остались только известные сообщения среды Godot о доступе к user log и Windows certificate store. `git diff --check` выполняется перед коммитом.
 
 **Ограничения и следующий шаг:** профиль общий для альтернатив и пока не планирует отдельные FLOW/TECHNICAL макровысотные бюджеты. Следующий этап — P2: route intent, выбор terrain-aware fork sites и проверка различимости веток. Игровое прохождение остаётся обязательной ручной оценкой; текущие автоматические проверки перемещают велосипед по геометрии/сценариям и её не заменяют. Не воспроизведённый under-fork случай остаётся в диагностическом backlog без подтверждённого дефекта.
+
+### TASK: P2.0 Различимый детерминированный intent FLOW / TECHNICAL
+
+**Статус:** завершено 27.09.2026 после самопроверки плана и выполнения одобренной реализации.
+
+**Goal:** Сделать обещание стилей реальным на начальном отрезке каждой выбранной ветки: FLOW должен стабильно давать читаемый плавный ритм, TECHNICAL — несколько подготовленных техничных элементов с восстановлением. Отличие измерять на сгенерированной дороге, а не по одному enum.
+
+**Do:**
+- В `RoadGrammar` расширить только детерминированную стартовую очередь после `set_route_style`: FLOW получает последовательность плавных фаз и нескольких crest/micro-drop событий без шпилек/прыжковых фаз; TECHNICAL — не менее двух braking→switchback связок, recovery после них и отдельный безопасный micro-drop event.
+- Сохранить переход к текущей seeded weighted grammar после authored opening; не менять общие phase specs, радиусы, скорости, уклоны, RNG-контракт или поведение BALANCED.
+- Создать отдельный тестовый runner, который запускает реальные `RoadLogic` для обоих стилей на фиксированной батарее seed и одинаковом числе chunkов, считает segment/contact event/curvature/grade метрики, проверяет повторяемость, валидность чанков и договорённые event signatures.
+- Записать результаты и ограничения в `ROAD_GENERATION.md`, `TEST_PLAN.md`, handoff и этот план.
+
+**Do not:** Менять `BicycleController`, физику, камеру, управление, fork spacing/placement/choice, terrain, foliage, существующие тесты/их assertions или общие ограничения дорожной геометрии. Не привязывать параметры к одному seed или тестовому примеру. Не заявлять, что автоматическая геометрическая проверка доказывает весёлый ручной заезд.
+
+**Acceptance Criteria:**
+- На первых 9 × 50m authored chunks каждый FLOW имеет минимум 2 `CREST_MICRO_DROP`, ноль `SWITCHBACK` и ноль `AIRBORNE` contact chunks; минимум половина этих chunkов — cruise/crest/recovery, а не fast/braking.
+- На первых 9 authored chunks каждый TECHNICAL имеет минимум 2 `SWITCHBACK`, минимум 1 `MICRO_DROP` contact event и recovery после каждой техничной связки.
+- Критерии выполняются для seeds `184729`, `42`, `7319`, `900001` и двух style seeds на ветку; повтор одинаковых входов даёт те же последовательности/метрики.
+- Все сгенерированные чанки проходят production validator; grade, curvature, sample gap и contact transitions укладываются в существующие contracts.
+- Существующие regression assertions остаются без изменений и проходят.
+
+**Tests:** Новый `scripts/test/test_route_intent.gd` на production `RoadLogic`/`RoadGrammar`; существующие `test_road_grammar.gd`, `test_road_contract.gd`, `test_branch_streaming.gd`, `test_fork_geometry_verification.gd`, `test_mountain_profile.gd`; `git diff --check`.
+
+**Files:** `scripts/world/road_grammar.gd`; создать `scripts/test/test_route_intent.gd`; документы `ROAD_GENERATION.md`, `TEST_PLAN.md`, `MTB_WORLD_GENERATION_HANDOFF.md`, `implementation_plan.md`.
+
+**Самопроверка плана перед реализацией:** область изменений ограничена очередью уже существующей FSM и отдельным эмпирическим runner. Два switchback блока разделяются braking/recovery; тест считает реальные `segment_types` и `contact_modes`, а не только повторяет таблицу фаз. Предварительная seed-проверка выявила, что production AIRBORNE builder отклоняется validator (пролёт 6.16–6.19m при лимите 6m, перепад 1.66–1.77m при лимите 1.2m) и подменяется fallback. Чтобы не расширять текущий scope на геометрию/контактный контракт и не выдавать fallback за route intent, airborne feature исключена из P2.0 и будет отдельной задачей. Критерии проверяемы без изменения публичных API и без конфликта с P1 shared macro envelope.
+
+**Проверенная корректировка scope:** в ходе реализации AIRBORNE отклонение воспроизвелось на всех четырёх world seeds, с обоими style salts; production контракт не менялся. Будет отдельно описан как follow-up defect для узкого плана по геометрии прыжка/посадки.
+
+**Результат P2.0:** расширены FLOW и TECHNICAL authored openings до 9 × 50m chunkов. Технические повороты чередуются по направлению; recovery сохраняется после каждой связки. FLOW получает две micro-drop crest волны без switchback, TECHNICAL — две switchback волны и одну micro-drop. Ветви переходят в общий seeded weighted FSM по завершении очереди.
+
+**Проверки:** `test_route_intent.gd`: `checks=72 failures=0`, world seeds 184729/42/7319/900001 × два style seeds × оба стиля, полная геометрическая повторяемость. Все чанки прошли validator. FLOW curvature 0.00101–0.00166m⁻¹, TECHNICAL 0.05118–0.05263m⁻¹; grade -8.24°…+0.98°, sample gap ≤2.022m. Без изменений прошли `test_road_grammar.gd`, `test_road_contract.gd` 18/18, `test_branch_streaming.gd` 49/49, `test_fork_geometry_verification.gd` 15/15, P1 профиль/интеграция 39,845/0 и 968/0, mountain validation 12/12.
+
+**Найденное ограничение:** production `AIRBORNE_DROP` повторяемо отклонён валидатором: 6.16–6.19m длины и 1.66–1.77m перепада превышают существующие границы. В текущем P2.0 он заменён в authored sequence на поддержанный micro-drop; нужно отдельным планом исправить геометрию lip/landing без ослабления контракта.
+
+**Следующий этап:** P2.1 — детерминированный выбор мест развилки по sightline, уклону, ширине и валидности двух выходных коридоров, с планированием route intent до генерации mesh. Fork scheduling не менялся в P2.0. После P2.1 нужен ручной заезд на двух seed и обеих ветках. Не воспроизведённый under-fork report остаётся отдельно в диагностике.

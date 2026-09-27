@@ -87,6 +87,14 @@ var branch_id: int = 0                         # Идентификатор ве
 
 Предел: blend `0.35` намеренно консервативен, чтобы additive grade не вытолкнул существующие технические фазы за contract envelope. У разных ветвей общая macro-высота; различия локальной геометрии остаются в `RoadGrammar`. Планирование отдельного высотного профиля/бюджета для каждой альтернативы — следующий этап route intent.
 
+## 3.4. Deterministic Branch Route Intent (P2.0)
+
+После выбора ветки `RoadGrammar.set_route_style` теперь задаёт девять authored 50m фаз. FLOW следует последовательности плавных cruise/recovery отрезков с двумя crest/micro-drop событиями и одним fast descent; его первые 450m не содержат switchback или AIRBORNE контактов. TECHNICAL строит две braking→switchback→recovery связки с противоположным направлением поворота, затем micro-drop и recovery. После authored opening обе ветви возвращаются в существующий seeded weighted FSM. BALANCED и общие envelope/validator параметры не менялись.
+
+Production `RoadLogic` seed-батарея (4 world seed × 2 style seed × 2 стиля, повтор каждого входа) подтвердила signature distinction и детерминизм. Максимальная измеренная кривизна FLOW составила 0.00166m⁻¹, TECHNICAL — 0.05263m⁻¹ при контрактном максимуме 0.05556m⁻¹; максимальный sample gap — 2.022m при лимите 2.5m. Все chunks валидны.
+
+Ограничение: проектированный AIRBORNE_DROP на тестовом начале TECHNICAL не проходит существующую проверку: validator измеряет 6.16–6.19m пролёта при лимите 6m и перепад 1.66–1.77m при лимите 1.2m. `RoadLogic` корректно заменяет такой кандидат recovery fallback, поэтому этот элемент намеренно не заявлен частью P2.0. Отдельно спланировать коррекцию геометрии прыжка/посадки, не ослабляя `RoadAirborneContract` или validator. Следующая маршрутная задача остаётся P2.1: выбирать fork sites по пригодности corridor/visibility/grade и планировать route intent до mesh build.
+
 ## 4. Контракт Прыжков и Посадок (`RoadAirborneContract`)
 
 ### 4.1. Режимы контакта (`SurfaceContactMode`)
