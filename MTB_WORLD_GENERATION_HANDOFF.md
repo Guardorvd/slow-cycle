@@ -194,8 +194,11 @@ generate a random landform first or route the trail over a 2D mountain; that lar
 visible terrain-and-route step is Stage C. The normal main ride now selects a fresh
 seed each session; `--seed=N` replays exactly, and tooling scenes keep fixed seeds.
 Stage A still has route-network clearance
-and manual route-style gates. Next is B3; preserve bike physics, camera and controls.
+and manual route-style gates. B3a now has a four-event production geometry catalogue
+(68/68, including grounded recovery after jumps): it found the marked crest/micro-drop falls 0.55–0.61 m vs the builder's
+0.35 m comment. Next is B3b: correct that local profile and lock the measured bound;
+then continue event geometry work before B4. Preserve bike physics, camera and controls.
 
 ### Prompt to resume in a new chat
 
-“Read `DEVELOPMENT_ROADMAP.md`, `VISION.md`, `AGENTS.md`, `implementation_plan.md`, `MTB_WORLD_GENERATION_HANDOFF.md`, `ROAD_GENERATION.md`, `ARCHITECTURE.md` and `TEST_PLAN.md`. The goal is one meditative endless ride enriched by a coherent, rideable procedural MTB world. P2.1a–d and Stage B1/B2 are complete; B2 paces features on a seeded road but is not terrain-first 2D mountain routing. Stage A still has network clearance/manual review, Stage B next is B3 event geometry, and Stage C is the visible macro landscape and terrain-aware route. Treat old results as historical until rerun. Preserve bicycle physics/camera/controls, report known ObjectDB warning in RoutePlan test, and respect the user-approved scope and repository plan gate.”
+“Read `DEVELOPMENT_ROADMAP.md`, `VISION.md`, `AGENTS.md`, `implementation_plan.md`, `MTB_WORLD_GENERATION_HANDOFF.md`, `ROAD_GENERATION.md`, `ARCHITECTURE.md` and `TEST_PLAN.md`. The goal is one meditative endless ride enriched by a coherent, rideable procedural MTB world. P2.1a–d and Stage B1/B2 are complete; B3a measured current events and found crest/micro-drop marked height 0.55–0.61 m vs a stated 0.35 m maximum. Next approved Stage B step is B3b: fix only this profile and assert its measured limit, then continue event geometry work. B2 paces features on a seeded road but is not terrain-first 2D mountain routing; Stage C remains the visible macro landscape and terrain-aware route. Stage A still has network clearance/manual review. Treat old results as historical until rerun. Preserve bicycle physics/camera/controls, report known ObjectDB warning in RoutePlan test, and respect the user-approved scope and repository plan gate.”

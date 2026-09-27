@@ -113,7 +113,22 @@ their configured fixed seed unless they explicitly request session randomization
 The effective value remains visible in the existing F3 DebugHUD. Stage E still
 owns user-facing seed selection and copy/replay controls.
 
-## 8. Collision layers
+## 8. Stage B3a event geometry baseline
+
+`scripts/test/test_mtb_event_geometry_catalog.gd` measures the current production
+builders through `RoadLogic.plan_next_chunk()` for crest/micro-drop, airborne plus
+landing, switchback and recovery. It confirms validator acceptance and deterministic
+replay while reporting actual point-to-point geometry; the airborne case additionally
+requires accepted grounded recovery samples. It does not tune the builder, instantiate
+the bike or establish perceived difficulty.
+
+The baseline exposed one actionable documentation/geometry mismatch: the two marked
+crest micro-drop samples span about 4 m and fall **0.552–0.608 m** across the four
+catalogue seeds, while the builder comment states `h <= 0.35m`. Do not loosen the
+validator to hide this. B3b owns the focused profile correction. The measured tangent
+vs chord grade difference also remains evidence for B4's continuity audit.
+
+## 9. Collision layers
 
 The bicycle queries the existing road and surface layers through its configured collision mask. Road generation and physics contracts are coupled at the collision interface only; P2.1 does not edit that mask or tune wheel raycasts.
 

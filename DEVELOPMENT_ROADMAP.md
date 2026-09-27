@@ -2,7 +2,7 @@
 
 **Версия плана:** 1.0
 **Состояние проекта на дату документа:** 27.09.2026
-**Текущий implementation stage:** P2.1a–d foundation и Stage B1–B2 завершены. Stage A остаётся `in progress` по длинным веткам/clearance всей сети и ручному подтверждению route-style. Следом в Stage B: B3 форма существующих событий, B4 переходы/швы, B5 покрытие длинных маршрутов, B6 rideability/manual ride. Полноценная seed-generated гора и прокладка дороги с учётом реального рельефа — Stage C, крупное видимое изменение после rideable gates.
+**Текущий implementation stage:** P2.1a–d foundation, Stage B1–B2 и B3a замер формы событий завершены. Stage A остаётся `in progress` по длинным веткам/clearance всей сети и ручному подтверждению route-style. Следующий ограниченный шаг — B3b: привести профиль гребня/микросброса к его заявленному пределу высоты; далее B3 проверит форму остальных событий, B4 переходы/швы, B5 покрытие маршрутов, B6 rideability/manual ride. Полноценная seed-generated гора и прокладка дороги с учётом рельефа — Stage C, крупный видимый шаг после rideable gates.
 **Статус документа:** стратегический план продукта. Это не разрешение автоматически реализовывать все перечисленные этапы.
 
 ## 1. Для чего нужен этот документ
@@ -154,7 +154,7 @@ Streaming + bicycle observation (без изменения кинематики 
 
 1. **B1 — Путь события до поверхности (выполнено):** тест запрашивает AIRBORNE_DROP через `RoadLogic`, убеждается в acceptance validator-а, наличии полёта, посадки и последующего восстановления, затем прогоняет полный диапазон через production `RoadChunk.prepare_geometry_data()`. Проверяются road mesh, collision faces и покрытие каждого event-сегмента треугольниками. Это проверка геометрического pipeline, не поездка велосипеда.
 2. **B2 — Seeded ride rhythm (выполнено):** обычный старт получает новый seed, `--seed=N` воспроизводит точный заезд, а weighted FSM задаёт ритм. Окна 600 м ограничивают сложные события по стилю; лёгкая особенность появляется как минимум раз в 8 дорожных шагов. Это разнообразит поездки по seed, но не создаёт terrain-first случайную гору.
-3. **B3 — Каталог и форма MTB-событий:** измерить формы существующих crest/micro-drop, airborne+landing, turn/switchback и recovery. Боковой уклон самой земли требует terrain-aware slice этапа C.
+3. **B3 — Каталог и форма MTB-событий:** B3a измерил production-профили. Нашлось конкретное несоответствие: помеченный crest/micro-drop падает на 0.55–0.61 м при описанном лимите 0.35 м. Следующим отдельным срезом B3b ограничить этот участок без ослабления validator-а, затем промерить оставшиеся формы. Боковой уклон самой земли требует terrain-aware slice этапа C.
 4. **B4 — Переходы и швы:** проверить цепочки событий, границы чанков, посадку, возврат в grounded/recovery и прилегающий terrain; сравнить соседние road/terrain meshes и collision faces.
 5. **B5 — Маршрутное покрытие и clearance:** длинные ветви и fork-adjacent зоны, дыры/пересечения и известный under-fork report; различать hit дороги и terrain.
 6. **B6 — Подтверждение ощущения езды:** автоматические измерения контакта, полёта, посадки и восстановления, затем ручная поездка для оценки flow/technical. Автоматические тесты не заменяют ручной ride.
@@ -163,7 +163,7 @@ Streaming + bicycle observation (без изменения кинематики 
 
 **Готово, когда:** каждое включённое событие проходит validator без скрытого fallback; его визуальная и физическая поверхность непрерывно покрывает проезжаемую линию; длинные route/collision проверки чисты; автоматические физические gates и ручной заезд подтверждают, что сложные участки безопасны и различимы по характеру.
 
-**Проверять по нарастающей:** B1 event-to-surface runner → B2 long-range rhythm battery → B3 event geometry measurements → B4 seam/terrain audit → B5 route clearance → B6 bike measurements и ручная поездка.
+**Проверять по нарастающей:** B1 event-to-surface runner → B2 long-range rhythm battery → B3a–b event geometry measurements/correction → B4 seam/terrain audit → B5 route clearance → B6 bike measurements и ручная поездка.
 
 ### Этап C — Единый макрорельеф, открытая гора и горизонт (Sprint 6 — расширенный scope)
 
@@ -299,7 +299,7 @@ Steam SDK, магазин, достижения и внешняя публика
 
 ## 9. Текущий backlog и ближайшее движение
 
-1. **Сейчас — B3:** составить измеримый каталог формы текущих MTB-событий; выяснить, где существующая форма уже работает, а где нужна новая геометрия. Cross-slope/terrain dips требуют Stage C.
+1. **Сейчас — B3b:** исправить превышение заявленной высоты crest/micro-drop (замер 0.55–0.61 м против 0.35 м), не меняя другие события и safety limits. Затем расширить каталог/критерии для остальных MTB-элементов. Боковые склоны terrain dips требуют Stage C.
 2. **Завершено:** B1 доказал event→RoadLogic validator→RoadChunk mesh/collision preparation. B2 добавил seed-повторяемый ритм: 600-метровый предел major events и максимум 8 feature-free дорожных чанков.
 3. **Далее:** B4 transitions/seams/terrain → B5 route coverage/clearance → B6 automated measurements + ручная поездка.
 4. **Крупный визуальный шаг:** после rideable gates — Sprint 6/Stage C, seed-keyed 2D macro-landscape и планирование дорожного коридора по нему; затем foliage/secondary trails, атмосфера/UI, player review, RC и standalone v1.
@@ -315,4 +315,4 @@ Steam SDK, магазин, достижения и внешняя публика
 4. Перед road changes читать `ROAD_GENERATION.md`, `ARCHITECTURE.md`; перед тестами — `TEST_PLAN.md` и `.antigravity/rules/test-integrity.md`.
 5. Начать только ближайшую одобренную задачу. Если она меняет файлы/архитектуру, оформить полный task template и дождаться явного approval, если он не дан в текущем контексте.
 
-**Короткий prompt для передачи:** “Прочитай `DEVELOPMENT_ROADMAP.md`, затем `VISION.md`, `AGENTS.md`, `implementation_plan.md`, `MTB_WORLD_GENERATION_HANDOFF.md`, `ROAD_GENERATION.md`, `ARCHITECTURE.md` и `TEST_PLAN.md`. Цель — одна медитативная бесконечная поездка, наполненная качественным горным MTB-миром; P2.1a–d и B1/B2 выполнены. B2 управляет seed-keyed ритмом дороги, но не строит дорогу по случайной 2D-местности: это остаётся Stage C. Stage A открыт по network clearance/manual review; следующая задача Stage B — B3 event geometry catalog. Сохраняй велосипед/камеру/управление и соблюдай plan gate.”
+**Короткий prompt для передачи:** “Прочитай `DEVELOPMENT_ROADMAP.md`, затем `VISION.md`, `AGENTS.md`, `implementation_plan.md`, `MTB_WORLD_GENERATION_HANDOFF.md`, `ROAD_GENERATION.md`, `ARCHITECTURE.md` и `TEST_PLAN.md`. Цель — одна медитативная бесконечная поездка, наполненная качественным горным MTB-миром; P2.1a–d и B1/B2 завершены, B3a измерил события. B3b должен локально исправить micro-drop 0.55–0.61 м при заявленном пределе 0.35 м, затем продолжить каталог. B2 управляет seed-keyed ритмом дороги, но не строит дорогу по случайной 2D-местности: это остаётся Stage C. Stage A открыт по network clearance/manual review; сохраняй велосипед/камеру/управление и соблюдай plan gate.”

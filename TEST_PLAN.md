@@ -1,5 +1,24 @@
 # Slow Cycle — Verification & Testing Protocol
 
+## Stage B3a — production MTB event geometry catalogue (2026-09-27)
+
+Command: `godot --headless --path . --script res://scripts/test/test_mtb_event_geometry_catalog.gd`.
+
+Result: **68/68 PASS**, zero failures. Four fixed seeds (`184729`, `42`, `7319`,
+`900001`) × four forced production chunks (crest/micro-drop, airborne/landing,
+switchback, recovery). Every candidate passed `RoadLogic` validation without safe
+fallback; each repeated signature matched, the airborne chain included grounded
+recovery, and every measured geometry value was finite. This measures the current
+road generator, not bicycle response or human feel.
+
+The marked crest/micro-drop samples fall **0.552–0.608 m across 4 m**, exceeding
+the event builder comment's stated `h <= 0.35 m`. This is a B3b correction target;
+no validator limit was changed. AIRBORNE segment drops measured 0.793–0.878 m, with
+3 airborne and 8 landing samples, under the 1.2 m contract. Switchback turn measured
+87.43–94.75°; peak curvature 0.04796–0.05198 m⁻¹. Recovery generated 25 samples / ~50 m.
+Maximum metadata-vs-chord grade differences reached 3.39° (crest) and 5.19° (airborne);
+retain as diagnostic evidence for B4, not as a declared failure or rider assessment.
+
 ## Stage B1 — MTB event to road surface (2026-09-27)
 
 Command: `& 'C:\Users\Luisa\Downloads\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe' --headless --path . --script res://scripts/test/test_mtb_event_pipeline.gd`
