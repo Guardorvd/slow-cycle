@@ -190,7 +190,8 @@ func _apply_macro_profile_to_range(start_idx: int, end_idx: int, preserve_first_
 		var tangent: Vector3 = base_tangents[i - first]
 		var horizontal_direction: Vector2 = Vector2(tangent.x, tangent.z).normalized()
 		var baseline_rate: float = MountainProfileClass.get_base_vertical_rate()
-		var corrected_rate: float = sin(deg_to_rad(road_path.slopes[i])) + MACRO_PROFILE_BLEND * (float(profile_sample.vertical_rate) - baseline_rate)
+		var sample_rate: float = float(profile_sample.get("vertical_rate", baseline_rate))
+		var corrected_rate: float = sin(deg_to_rad(road_path.slopes[i])) + MACRO_PROFILE_BLEND * (sample_rate - baseline_rate)
 		var corrected_grade: float = rad_to_deg(asin(clampf(corrected_rate, -0.999, 0.999)))
 		var grade_rad: float = deg_to_rad(corrected_grade)
 		var corrected_tangent := Vector3(horizontal_direction.x * cos(grade_rad), sin(grade_rad), horizontal_direction.y * cos(grade_rad)).normalized()

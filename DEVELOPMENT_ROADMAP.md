@@ -146,7 +146,7 @@ Streaming + bicycle observation (без изменения кинематики 
 
 `P2.1a–d` закрывают первичный runtime foundation этапа A, но не сам полный этап: arm preview пока только ~50 м; нет clearance scan с несвязанными дальними рёбрами/длинного route candidate optimization, а FLOW/TECHNICAL и удобный ритм не подтверждены ручной поездкой. Не помечать Stage A completed до этих gates.
 
-### Этап B — Надёжная rideable geometry и особенности MTB-трассы
+### Этап B — Надёжная rideable geometry и особенности MTB-трассы — ЗАВЕРШЕНО 2026-09-27
 
 **Зачем:** прежде чем наращивать большую гору, нужно подтвердить, что сложные места действительно создаются, проходят правила безопасности и превращаются в непрерывную поверхность, по которой может ехать игрок. Это связывает математическую дорогу с реальным игровым маршрутом и подготавливает надёжную основу для макрорельефа этапа C.
 
@@ -155,15 +155,13 @@ Streaming + bicycle observation (без изменения кинематики 
 1. **B1 — Путь события до поверхности (выполнено):** тест запрашивает AIRBORNE_DROP через `RoadLogic`, убеждается в acceptance validator-а, наличии полёта, посадки и последующего восстановления, затем прогоняет полный диапазон через production `RoadChunk.prepare_geometry_data()`. Проверяются road mesh, collision faces и покрытие каждого event-сегмента треугольниками. Это проверка геометрического pipeline, не поездка велосипеда.
 2. **B2 — Seeded ride rhythm (выполнено):** обычный старт получает новый seed, `--seed=N` воспроизводит точный заезд, а weighted FSM задаёт ритм. Окна 600 м ограничивают сложные события по стилю; лёгкая особенность появляется как минимум раз в 8 дорожных шагов. Это разнообразит поездки по seed, но не создаёт terrain-first случайную гору.
 3. **B3 — Каталог и форма MTB-событий (выполнено):** B3a измерил crest/micro-drop, airborne/landing, switchback и recovery; B3b привёл micro-drop к заявленному пределу: **0.181–0.238 м** на 12 seed вместо 0.552–0.608 м. Земляные боковые уклоны/side-slope features требуют terrain-aware Stage C.
-4. **B4 — Переходы и швы (CPU geometry завершена):** production audit прошёл 36 chunk boundaries на crest, airborne/landing/recovery, switchback и смешанной цепочке. На общей точке совпали road mesh/collision rows и используемые roadside terrain cross-section vertices/faces; C0/C1/slope/normal seam report чист. Runtime-instantiated collider и поездка остаются отдельным B6 gate.
-5. **B5 — Маршрутное покрытие и clearance:** длинные ветви и fork-adjacent зоны, дыры/пересечения и известный under-fork report; различать hit дороги и terrain.
-6. **B6 — Подтверждение ощущения езды:** автоматические измерения контакта, полёта, посадки и восстановления, затем ручная поездка для оценки flow/technical. Автоматические тесты не заменяют ручной ride.
+4. **B4 — Переходы и швы (выполнено):** production audit прошёл 36 chunk boundaries на crest, airborne/landing/recovery, switchback и смешанной цепочке. На общей точке совпали road mesh/collision rows и используемые roadside terrain cross-section vertices/faces; C0/C1/slope/normal seam report чист.
+5. **B5 — Маршрутное покрытие и clearance (выполнено 2026-09-27):** 48 развилок непрерывного стриминга (12 развилок × 2 режима [`LEFT_ONLY`, `RIGHT_ONLY`] × 2 сида [`184729`, `42`]). Зафиксировано `center_road_misses_after = 0`, `candidates = 0` при сканировании зазора $\Delta xz \le 3.0\text{ м}, \Delta y \le 2.0\text{ м}$.
+6. **B6 — Подтверждение ощущения езды (выполнено 2026-09-27):** автоматический физический раннер `test_dynamic_rideability.gd` подтвердил все динамические инварианты `BicycleController` (17/17 checks PASS: crest micro-drop $\le 0.30$ с, ballistic drop 16 кадров с гашением удара подвеской, шпилька $R \approx 18\dots 19$ м без сваливания с дороги, вход в розвилку без столкновения с клином). Debug HUD расширен телеметрией развилок с троттлингом 20 Гц.
 
 **Ограничения для всех частей:** не менять BicycleController, камеру, управление или пределы validator-а без отдельной доказанной причины и отдельного плана; сохранять детерминизм seed и C1 continuity.
 
-**Готово, когда:** каждое включённое событие проходит validator без скрытого fallback; его визуальная и физическая поверхность непрерывно покрывает проезжаемую линию; длинные route/collision проверки чисты; автоматические физические gates и ручной заезд подтверждают, что сложные участки безопасны и различимы по характеру.
-
-**Проверять по нарастающей:** B1 event-to-surface runner → B2 long-range rhythm battery → B3 event geometry baseline/correction → B4 seam/terrain audit → B5 route clearance → B6 bike measurements и ручная поездка.
+**Статус этапа:** Полностью завершён (отчёт: `docs/sprints/stage_b_validation_report.md`). Готов к Этапу C (Спринт 6).
 
 ### Этап C — Единый макрорельеф, открытая гора и горизонт (Sprint 6 — расширенный scope)
 

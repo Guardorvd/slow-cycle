@@ -19,17 +19,16 @@ static func build(
 	var div_angle_deg: float = angle_magnitude if branch_idx == 0 else -angle_magnitude
 	var w_start: float = 1.8
 	var w_end: float = 1.6 if route_style == 1 else 1.35
+	var fork_norm: Vector3 = fork_binorm.cross(fork_tang).normalized()
 	var curr_pos: Vector3 = fork_pos + fork_binorm * (-w_start * 0.5 if branch_idx == 0 else w_start * 0.5)
 	var prev_pos: Vector3 = curr_pos
 	var prev_tang: Vector3 = fork_tang
 	for i in range(samples_count + 1):
 		var t_norm: float = float(i) / float(samples_count)
 		var curve_factor: float = smoothstep(0.0, 0.70, t_norm)
-		var curr_heading: float = fork_heading + div_angle_deg * curve_factor
+		var curr_angle: float = deg_to_rad(div_angle_deg * curve_factor)
 		var curr_w: float = lerpf(w_start, w_end, smoothstep(0.0, 1.0, t_norm))
-		var h_rad: float = deg_to_rad(curr_heading)
-		var s_rad: float = deg_to_rad(fork_slope)
-		var curr_tang := Vector3(sin(h_rad) * cos(s_rad), sin(s_rad), cos(h_rad) * cos(s_rad)).normalized()
+		var curr_tang: Vector3 = fork_tang.rotated(fork_norm, curr_angle).normalized()
 		var curr_norm: Vector3 = RoadMath.compute_ortho_normal(curr_tang, 0.0)
 		var curr_binorm: Vector3 = curr_tang.cross(curr_norm).normalized()
 		if i > 0:

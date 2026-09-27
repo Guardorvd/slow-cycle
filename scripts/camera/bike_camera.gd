@@ -193,7 +193,7 @@ func _process(delta: float) -> void:
 	var is_working_pedals: bool = is_pedaling or is_sprinting
 	var eff_pedal_power: float = pedal_power if is_pedaling else clampf(sprint_boost_val / 3.0, 0.5, 1.0)
 	if is_working_pedals and current_speed > 0.5:
-		bob_phase += delta * (current_speed * 1.4)
+		bob_phase = fmod(bob_phase + delta * (current_speed * 1.4), TAU)
 		target_bob_y = sin(bob_phase) * vertical_bob_intensity
 		sway_offset_x = sin(crank_rot) * cadence_sway_intensity * eff_pedal_power
 	elif is_coasting or current_speed <= 0.5:
@@ -208,7 +208,7 @@ func _process(delta: float) -> void:
 	# -------------------------------------------------------------
 	# 7. Speed FOV & Speed Breathing (Breathing OFF by default)
 	# -------------------------------------------------------------
-	var speed_ratio: float = clampf(current_speed / fov_speed_range, 0.0, 1.0)
+	var speed_ratio: float = clampf(current_speed / maxf(fov_speed_range, 0.1), 0.0, 1.0)
 	var breathing_deg: float = 0.0
 	if speed_breathing_amplitude > 0.001 and current_speed > 10.0:
 		breathing_deg = sin(travel_distance * 8.0) * speed_breathing_amplitude
@@ -257,8 +257,9 @@ func _process(delta: float) -> void:
 			spring_arm.spring_length = lerpf(spring_arm.spring_length, target_spring, arm_t)
 
 func _apply_camera_mode() -> void:
-	if first_person_cam and third_person_cam:
+	if first_person_cam:
 		first_person_cam.current = is_first_person
+	if third_person_cam:
 		third_person_cam.current = not is_first_person
 
 ## Resets dynamic camera state upon teleportation / recovery to prevent visual spikes

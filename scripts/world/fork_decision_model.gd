@@ -240,7 +240,8 @@ func update(player_pos: Vector3, player_vel: Vector3, delta: float) -> void:
 			if absf(confidence_score) >= FALLBACK_THRESHOLD:
 				_lock_to_branch(BranchChoice.RIGHT if confidence_score > 0.0 else BranchChoice.LEFT)
 			else:
-				_lock_to_branch(default_branch)
+				var fallback: int = default_branch if default_branch in [BranchChoice.LEFT, BranchChoice.RIGHT] else BranchChoice.LEFT
+				_lock_to_branch(fallback)
 
 func _lock_to_branch(choice: int) -> void:
 	var old_state: int = current_state

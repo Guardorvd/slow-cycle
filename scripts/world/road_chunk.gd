@@ -275,28 +275,34 @@ static func prepare_geometry_data(
 			var uv_y1: float = dist_i1 * 0.15
 			var norm_up: Vector3 = Vector3.UP
 
+			var w_base: int = count * 8 + i * 12
+
 			# Triangle 1: (p_l0, p_l1, p_m0)
 			st_terr.set_normal(norm_up); st_terr.set_uv(Vector2(0.3, uv_y0)); st_terr.add_vertex(p_l0)
 			st_terr.set_normal(norm_up); st_terr.set_uv(Vector2(0.3, uv_y1)); st_terr.add_vertex(p_l1)
 			st_terr.set_normal(norm_up); st_terr.set_uv(Vector2(0.5, uv_y0)); st_terr.add_vertex(p_m0)
+			st_terr.add_index(w_base + 0); st_terr.add_index(w_base + 1); st_terr.add_index(w_base + 2)
 			terr_faces.append(p_l0); terr_faces.append(p_l1); terr_faces.append(p_m0)
 
 			# Triangle 2: (p_m0, p_l1, p_m1)
 			st_terr.set_normal(norm_up); st_terr.set_uv(Vector2(0.5, uv_y0)); st_terr.add_vertex(p_m0)
 			st_terr.set_normal(norm_up); st_terr.set_uv(Vector2(0.3, uv_y1)); st_terr.add_vertex(p_l1)
 			st_terr.set_normal(norm_up); st_terr.set_uv(Vector2(0.5, uv_y1)); st_terr.add_vertex(p_m1)
+			st_terr.add_index(w_base + 3); st_terr.add_index(w_base + 4); st_terr.add_index(w_base + 5)
 			terr_faces.append(p_m0); terr_faces.append(p_l1); terr_faces.append(p_m1)
 
 			# Triangle 3: (p_m0, p_m1, p_r0)
 			st_terr.set_normal(norm_up); st_terr.set_uv(Vector2(0.5, uv_y0)); st_terr.add_vertex(p_m0)
 			st_terr.set_normal(norm_up); st_terr.set_uv(Vector2(0.5, uv_y1)); st_terr.add_vertex(p_m1)
 			st_terr.set_normal(norm_up); st_terr.set_uv(Vector2(0.7, uv_y0)); st_terr.add_vertex(p_r0)
+			st_terr.add_index(w_base + 6); st_terr.add_index(w_base + 7); st_terr.add_index(w_base + 8)
 			terr_faces.append(p_m0); terr_faces.append(p_m1); terr_faces.append(p_r0)
 
 			# Triangle 4: (p_r0, p_m1, p_r1)
 			st_terr.set_normal(norm_up); st_terr.set_uv(Vector2(0.7, uv_y0)); st_terr.add_vertex(p_r0)
 			st_terr.set_normal(norm_up); st_terr.set_uv(Vector2(0.5, uv_y1)); st_terr.add_vertex(p_m1)
 			st_terr.set_normal(norm_up); st_terr.set_uv(Vector2(0.7, uv_y1)); st_terr.add_vertex(p_r1)
+			st_terr.add_index(w_base + 9); st_terr.add_index(w_base + 10); st_terr.add_index(w_base + 11)
 			terr_faces.append(p_r0); terr_faces.append(p_m1); terr_faces.append(p_r1)
 
 	st_terr.generate_normals()

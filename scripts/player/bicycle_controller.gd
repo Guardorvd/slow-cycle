@@ -344,9 +344,9 @@ func _calculate_forward_dynamics(delta: float) -> void:
 			brake_strength = 1.0 # Programmatic fallback for headless tests
 		elif brake_strength < 0.05:
 			brake_strength = brake_input
-		brake_input = minf(brake_strength, brake_input + (1.0 / brake_attack_time) * delta)
+		brake_input = minf(brake_strength, brake_input + (1.0 / maxf(brake_attack_time, 0.001)) * delta)
 	else:
-		brake_input = maxf(0.0, brake_input - (1.0 / brake_release_time) * delta)
+		brake_input = maxf(0.0, brake_input - (1.0 / maxf(brake_release_time, 0.001)) * delta)
 
 	# Visual-only nose dive under braking (smoothly tracking brake_input)
 	var target_dive: float = -deg_to_rad(brake_dive_angle_deg) * brake_input
@@ -370,7 +370,7 @@ func _calculate_forward_dynamics(delta: float) -> void:
 		var pedal_strength: float = Input.get_action_strength("pedal")
 		if pedal_strength < 0.05:
 			pedal_strength = 1.0 # Programmatic fallback
-		pedal_power = minf(pedal_strength, pedal_power + (1.0 / pedal_attack_time) * delta)
+		pedal_power = minf(pedal_strength, pedal_power + (1.0 / maxf(pedal_attack_time, 0.001)) * delta)
 
 		# Sustain thrust: baseline force needed to counteract road rolling + air drag at cruising speed
 		var cruise_res: float = active_roll_res + air_drag_coeff * (effective_cruising * effective_cruising)
@@ -492,10 +492,10 @@ func _calculate_steering_and_banking(delta: float) -> void:
 	# 7. Visual steering ergonomics (FEAT-006.11 / Sprint 3C)
 	var dynamic_max_visual: float
 	if current_speed <= cruising_speed:
-		var speed_ratio: float = clampf(current_speed / cruising_speed, 0.0, 1.0)
+		var speed_ratio: float = clampf(current_speed / maxf(cruising_speed, 0.001), 0.0, 1.0)
 		dynamic_max_visual = lerpf(max_visual_steer_low_speed, max_visual_steer_cruising, speed_ratio)
 	else:
-		var high_speed_ratio: float = clampf((current_speed - cruising_speed) / (max_sprint_speed - cruising_speed), 0.0, 1.0)
+		var high_speed_ratio: float = clampf((current_speed - cruising_speed) / maxf(max_sprint_speed - cruising_speed, 0.001), 0.0, 1.0)
 		dynamic_max_visual = lerpf(max_visual_steer_cruising, max_visual_steer_high_speed, high_speed_ratio)
 
 	var target_visual_steer: float = clampf(current_steer * visual_steer_gain, -dynamic_max_visual, dynamic_max_visual)

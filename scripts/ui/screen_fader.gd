@@ -10,6 +10,11 @@ func _ready() -> void:
 		color_rect.color = Color(0, 0, 0, 0)
 		color_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
+func _exit_tree() -> void:
+	is_fading = false
+	if color_rect:
+		color_rect.color.a = 0.0
+
 func fade_reposition(on_midpoint: Callable) -> void:
 	if is_fading:
 		return
@@ -18,15 +23,20 @@ func fade_reposition(on_midpoint: Callable) -> void:
 		color_rect = get_node_or_null("ColorRect")
 
 	if not color_rect:
-		on_midpoint.call()
+		if on_midpoint.is_valid():
+			on_midpoint.call()
 		return
 
 	is_fading = true
 	var tween: Tween = create_tween()
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	# 1. Fade out to black in 0.22s
 	tween.tween_property(color_rect, "color:a", 1.0, 0.22).set_trans(Tween.TRANS_SINE)
-	# 2. Trigger callback at midpoint
-	tween.tween_callback(on_midpoint)
+	# 2. Trigger callback safely at midpoint
+	var safe_midpoint = func():
+		if on_midpoint.is_valid():
+			on_midpoint.call()
+	tween.tween_callback(safe_midpoint)
 	# 3. Small hold
 	tween.tween_interval(0.08)
 	# 4. Fade back in in 0.28s

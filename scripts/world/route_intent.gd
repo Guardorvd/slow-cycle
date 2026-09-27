@@ -57,6 +57,7 @@ func validate() -> Dictionary:
 		reasons.append("ERR_START_DISTANCE")
 	if phase_ids.is_empty() or phase_envelopes.size() != phase_ids.size():
 		reasons.append("ERR_PHASE_COUNT")
+		return {"is_valid": false, "reason_codes": reasons}
 	if not is_finite(planned_length_m) or planned_length_m <= 0.0:
 		reasons.append("ERR_PLANNED_LENGTH")
 	for i in range(phase_envelopes.size()):

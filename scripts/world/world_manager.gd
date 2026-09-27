@@ -68,7 +68,10 @@ func request_bike_recovery(current_pos: Vector3) -> Transform3D:
 	if not active_path or active_path.size() < 2:
 		return Transform3D(Basis(), Vector3(0, 4.0, 0))
 
-	var closest_idx: int = active_path.find_closest_index(current_pos)
+	var hint_idx: int = 0
+	if chunk_streamer and "last_closest_idx" in chunk_streamer:
+		hint_idx = chunk_streamer.last_closest_idx
+	var closest_idx: int = active_path.find_closest_index(current_pos, hint_idx)
 	var current_dist: float = active_path.cumulative_distances[closest_idx]
 	var target_dist: float = maxf(0.0, current_dist - 20.0)
 

@@ -76,24 +76,13 @@ func _ready() -> void:
 			bike_controller.connect("bell_rung", _on_bell_rung)
 
 func _exit_tree() -> void:
-	if bell_player:
-		bell_player.stop()
-		bell_player.stream = null
-	if freewheel_player_a:
-		freewheel_player_a.stop()
-		freewheel_player_a.stream = null
-	if freewheel_player_b:
-		freewheel_player_b.stop()
-		freewheel_player_b.stream = null
-	if wind_player:
-		wind_player.stop()
-		wind_player.stream = null
-	if gravel_player:
-		gravel_player.stop()
-		gravel_player.stream = null
-	if skid_player:
-		skid_player.stop()
-		skid_player.stream = null
+	if bike_controller and bike_controller.is_connected("bell_rung", _on_bell_rung):
+		bike_controller.disconnect("bell_rung", _on_bell_rung)
+	for p: AudioStreamPlayer3D in [bell_player, freewheel_player_a, freewheel_player_b, wind_player, gravel_player, skid_player]:
+		if is_instance_valid(p):
+			p.stop()
+			p.stream = null
+			p.queue_free()
 
 
 ## Resets transient audio state upon recovery to prevent audio spikes
@@ -102,6 +91,10 @@ func reset_audio_dynamics() -> void:
 	freewheel_use_a = true
 	if skid_player:
 		skid_player.volume_db = -80.0
+	if wind_player:
+		wind_player.volume_db = -80.0
+	if gravel_player:
+		gravel_player.volume_db = -80.0
 
 
 func _process(delta: float) -> void:

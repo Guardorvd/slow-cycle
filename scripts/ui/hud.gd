@@ -11,11 +11,19 @@ var bell_timer: float = 0.0
 
 func _ready() -> void:
 	if bike_controller:
-		if bike_controller.has_signal("telemetry_updated"):
+		if bike_controller.has_signal("telemetry_updated") and not bike_controller.is_connected("telemetry_updated", _on_telemetry_updated):
 			bike_controller.connect("telemetry_updated", _on_telemetry_updated)
-		if bike_controller.has_signal("bell_rung"):
+		if bike_controller.has_signal("bell_rung") and not bike_controller.is_connected("bell_rung", _on_bell_rung):
 			bike_controller.connect("bell_rung", _on_bell_rung)
-	bell_notice.modulate.a = 0.0
+	if bell_notice:
+		bell_notice.modulate.a = 0.0
+
+func _exit_tree() -> void:
+	if bike_controller:
+		if bike_controller.has_signal("telemetry_updated") and bike_controller.is_connected("telemetry_updated", _on_telemetry_updated):
+			bike_controller.disconnect("telemetry_updated", _on_telemetry_updated)
+		if bike_controller.has_signal("bell_rung") and bike_controller.is_connected("bell_rung", _on_bell_rung):
+			bike_controller.disconnect("bell_rung", _on_bell_rung)
 
 func _process(delta: float) -> void:
 	# Return to mode select menu on Escape
