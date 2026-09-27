@@ -11,11 +11,12 @@
 
 | Часть | Цель | Зависит от | Результат / выходной gate |
 |---|---|---|---|
-| **B1 — event-to-surface proof (текущая)** | Проследить принудительно запрошенное production-событие от RoadLogic через validator до RoadChunk mesh и collision faces. Провал должен означать отсутствие/замену события, а не просто неудачный визуальный отчёт. | REVIEW-FIX-01 и существующие event contracts | Детерминированный тест AIRBORNE→LANDING→RECOVERY на нескольких seed; событие принято валидатором; подготовленные road mesh и collision faces покрывают весь диапазон; документация описывает, что доказывает тест. |
-| **B2 — геометрический каталог MTB-событий** | Зафиксировать целевые формы, измерения и допустимые диапазоны существующих crest/micro-drop, airborne/landing, berm/turn/switchback и recovery. Исправлять только подтверждённые дефекты конкретного элемента. | B1 | Каждый поддерживаемый event реально создаёт собственную форму, проходит контракт и имеет понятный комфортный/технический смысл. Новые enum без формы не добавлять. |
-| **B3 — переходы, швы и посадки** | Проверить event-to-event transitions, chunk seams и fork-adjacent границы, в особенности посадку и возврат к grounded/recovery; сравнивать соседние mesh/collision поверхности. | B1, B2 | Нет геометрических разрывов/перехлёстов и зон без дорожной коллизии на целых цепочках; повторяемые стресс-сценарии. |
-| **B4 — покрытие и clearance маршрута** | Прогнать длинные ветки/сети, event corridors, terrain danger и известный under-fork диагностический случай. Отличать попадание в дорожную коллизию от terrain collision. | B2, B3; интерфейсы этапа A | Нет найденных столкновений/дыр на проверенной сети; необъяснённые жалобы либо воспроизводятся и получают отдельный минимальный fix, либо остаются ограниченным поиском с отчётом. |
-| **B5 — измеренная rideability и ручной gate** | Снять автоматические измерения контакта, времени/длины полёта, посадки и восстановления без изменения велосипедной физики; затем выполнить ручной игровой заезд и оценить ощущение flow/technical. | B2–B4 и доступный игровой alpha ride этапа F | Автоматические физические показатели проходят безопасные пределы, а ручной заезд подтверждает, что участки читаемы, разнообразны и проходимы. Автоматический тест не объявляется заменой ручного. |
+| **B1 — event-to-surface proof (выполнено)** | Проследить запрошенный production-event от RoadLogic через validator до RoadChunk mesh/collision faces. | REVIEW-FIX-01 и существующие event contracts | Детерминированный тест AIRBORNE→LANDING→RECOVERY на нескольких seed. |
+| **B2 — seed-управляемый ритм (выполнено)** | Управлять не точным процентом случайных препятствий, а читаемым ритмом на 600-метровом окне: гарантировать периодические лёгкие особенности и ограничивать скучивание сложных событий; сохранить разницу FLOW/BALANCED/TECHNICAL. | B1, текущая RoadGrammar FSM | Повторяемые по seed фазовые последовательности; ограниченная дистанция между интересными событиями; стиль-specific потолок major events; на реальных RoadLogic чанках нет fallback/нарушения контракта. |
+| **B3 — геометрический каталог MTB-событий (следующий)** | Измерить формы существующих crest/micro-drop, airborne/landing, switchback и recovery; отдельно выбрать/реализовать боковой уклон и более резкий профиль только после корректного terrain contract. | B1, B2; макросклон terrain contract из C для cross-slope | Каждый тип имеет измеримую форму и понятную роль. Не маркировать случайную прямую как новое событие. |
+| **B4 — переходы, швы и посадки** | Проверить event-to-event transitions, chunk seams и fork-adjacent границы, возврат к grounded/recovery, соседний terrain и road/collision faces. | B1–B3 | Нет дыр и ступеней на целых цепочках/стыках. |
+| **B5 — покрытие и clearance маршрута** | Прогнать длинные ветки/сети и event corridors; различать дорожную и terrain collision; исследовать under-fork report с точными replay inputs. | B3–B4; route-planning интерфейсы Stage A | Clearance чист на измеренном диапазоне, подтверждённый defect исправлен, остальное ограничено отчётом. |
+| **B6 — rideability и ручной gate** | Измерить bike contact/flight/landing/recovery, затем вручную проехать игровой маршрут и оценить flow/technical. | B2–B5 и alpha ride из Stage F | Автоматика проходит safe limits, ручной заезд подтверждает читаемость, разнообразие и проходимость; тест не подменяет человеческую оценку. |
 
 ### TASK: [B1] Проверка пути MTB-события до дорожного меша и коллизии
 
@@ -48,11 +49,61 @@
 **Завершено 2026-09-27.** Добавлен `scripts/test/test_mtb_event_pipeline.gd`. Для четырёх seed он дважды создаёт одно и то же production AIRBORNE_DROP и recovery-цепочку, проверяет acceptance обоих чанков и передаёт полный путь в `RoadChunk.prepare_geometry_data()`. Во всех случаях получено 3 AIRBORNE, 8 LANDING и 25 GROUNDED RECOVERY samples; road mesh содержит 102 vertex, collision face array — 300 vertex, и все 11 отрезков события покрыты треугольниками.
 
 - Результат: focused B1 runner **8/8 PASS**, exit 0. Параметры и ограничения validator/физики не менялись.
-- Ограничение доказательства: сравниваются подготовленные mesh/collision arrays; физический collider в world не инстанцировался и велосипед не проходил эту поверхность. Это остаётся для B3/B5 и ручного ride gate.
-- Обновлены `DEVELOPMENT_ROADMAP.md`, `ARCHITECTURE.md`, `ROAD_GENERATION.md`, `TEST_PLAN.md` и `MTB_WORLD_GENERATION_HANDOFF.md` с разделением B1–B5 и границей доказанного.
-- В реализации планы B2–B5 остаются будущими: геометрический каталог событий, transition/seam audit, route clearance, автоматические измерения rider и ручная поездка.
+- Ограничение доказательства: сравниваются подготовленные mesh/collision arrays; физический collider в world не инстанцировался и велосипед не проходил эту поверхность. Это остаётся для B4/B6 и ручного ride gate.
+- Обновлены `DEVELOPMENT_ROADMAP.md`, `ARCHITECTURE.md`, `ROAD_GENERATION.md`, `TEST_PLAN.md` и `MTB_WORLD_GENERATION_HANDOFF.md` с разделением B1–B6 и границей доказанного.
+- На момент отчёта B1 его будущими частями были B2–B5; после этого завершён B2, а B3–B6 остаются открыты: геометрический каталог событий, seam audit, route clearance и rideability/manual ride.
 
-Следующий рабочий срез — B2: каталог измеримых целей для уже существующих MTB-событий, сверка production-форм с контрактами и исправления только при найденном несоответствии. Он приблизит проект от «событие сгенерировалось» к «понятно, какое ощущение и диапазон оно должно давать». Затем B3 проверит переходы/стыки, B4 всю ветку, B5 игровое ощущение. Большая визуальная перемена — открытая гора и общий макрорельеф — остаётся этапом C после устойчивости rideable geometry.
+Следующий срез — B3: проверить форму существующих элементов и определить, что нужно для выраженных боковых склонов и перепадов. B4 проверит переходы/стыки, B5 — clearance веток, B6 — игровое ощущение. Полноценная случайная гора, по которой сначала планируется линия дороги, остаётся этапом C: B2 организует ритм дороги и не выдаёт его за terrain-aware route planning.
+
+## B2 — seed-управляемый ритм поездки
+
+**Статус:** выполнено 27.09.2026 по разрешению пользователя; фактический отчёт ниже.
+
+### TASK: [B2] Seeded long-range MTB event rhythm
+
+**Goal**: сделать длинный участок похожим на поездку с ритмом: периодически возникает мягкая особенность, после которой есть спокойный разгон/восстановление, а сложные повороты и прыжки не скучиваются. Seed и идентичность стиля воспроизводят ту же последовательность. Это промежуточный этап к пользовательской модели «seed задаёт случайный мир и по нему проектируется маршрут»; поле реальной 2D-местности и прокладка линии по нему — отдельная Stage C архитектура.
+
+**Do**:
+
+- Для обычной сцены поездки выбирать новый world seed на старте; явный `--seed=N` всегда имеет приоритет для точного воспроизведения. В тестовых/инструментальных WorldManager оставить текущее поведение фиксированного seed по умолчанию. Эффективный seed уже показывается в F3 DebugHUD; полноценный UI для выбора/копирования останется Stage E.
+- В `RoadGrammar` добавить bounded sliding history последних 12 phase chunks (около 600 м) и не допускать более style-specific числа major features на этом окне: FLOW — 2, BALANCED — 3, TECHNICAL — 4. Major — `SWITCHBACK` и `AIRBORNE_DROP`; mandatory braking/landing/recovery остаются частью соответствующего элемента, а не считаются отдельно как ещё один прыжок.
+- Не допускать более 8 последовательных chunks без feature sample (`CREST_MICRO_DROP`, `SWITCHBACK` или `AIRBORNE_DROP`): при исчерпании свободных решений очередь получает лёгкий crest. Максимум один обязательный light feature за цикл; все прочие решения остаются seed-random.
+- После начальной авторской последовательности bias-овать weighted FSM по выбранному стилю: FLOW чаще оставляет cruise/crest, TECHNICAL чаще предлагает braking→switchback, BALANCED сохраняет текущие веса. Точные проценты не заявлять как пользовательский tuning до ручной поездки; ограничения — потолок/максимальный интервал, не фиксированный рецепт каждой трассы.
+- Перезапускать историю на `set_route_style`, хранить только последние 12 phase IDs, сохранять все mandatory AIRBORNE→LANDING→RECOVERY и BRAKING-before-major safety transitions.
+- Добавить новый production-driven runner: измерить полные phase sequence по нескольким seed, сравнить replay/hash, окна и интервалы; затем прогнать выбранные sequence через настоящий RoadLogic, проверяя отсутствие fallback и одинаковость event statistics.
+- Отразить философию параметров и честную границу Stage C в roadmap/architecture/road generation/test plan/handoff.
+
+**Do not**: менять велосипеды/камеру/управление, форму/пределы валидатора, `MountainProfile`, terrain/коллизии, семантику forks или начать строить макрорельеф. Не менять fixed-seed test scenes и не обещать заданный процент каждого препятствия или субъективно интересную поездку до ручного alpha ride.
+
+**Acceptance Criteria**: обычная main ride session выбирает fresh seed, а явный `--seed` воспроизводит его и имеет приоритет; test scenes сохраняют fixed seed; максимум 8 feature-free chunks; style-specific major-event cap проверяется на каждом окне из 12 фаз; на одинаковых seed/style фазовая и геометрическая подписи повторяются, другие seed дают другие дороги; FLOW/BALANCED/TECHNICAL различимы, production chunks проходят контракт без fallback, посадка/recovery не теряются.
+
+**Tests**: новый `test_world_session_seed.gd` для fresh/default/explicit override семантики; `test_route_rhythm.gd` — 8 фиксированных seed × FLOW/BALANCED/TECHNICAL × 1200 фаз для replay/spacing/window/style/seed-diversity assertions; 4 seed × 3 стиля × 150 production chunks (с повторами для signatures); `test_road_grammar.gd`, `test_route_intent.gd`, `test_route_plan_contract.gd`, `test_road_contract.gd`, branch integration, REVIEW-FIX-01, B1 pipeline и `git diff --check`.
+
+**Files**: `scripts/world/road_grammar.gd`, `scripts/world/world_manager.gd`, `scenes/main.tscn`, новые `scripts/test/test_route_rhythm.gd` and `scripts/test/test_world_session_seed.gd`, `implementation_plan.md`, `DEVELOPMENT_ROADMAP.md`, `ARCHITECTURE.md`, `ROAD_GENERATION.md`, `TEST_PLAN.md`, `MTB_WORLD_GENERATION_HANDOFF.md`.
+
+### Проверка плана до реализации
+
+- Живой code path подтверждает, что `RoadGrammar` уже выдаёт детерминированные phase queues и обязательные transitions, но после opening queue использует одинаковые weighted transitions для всех стилей и не учитывает недавние фазы. Значит задача закрывает реальный пробел, не повторяет B1.
+- Каждый phase chunk имеет одинаковую длину 50 м, что позволяет использовать distance proxy в chunks. Это не будет переноситься на variable-length events без пересчёта по cumulative distance.
+- Ограничение 12 фаз bounded; event maxima style-specific; минимум feature реализуется только лёгким crest, а не принудительным сложным obstacle. Это соответствует zen-first vision и оставляет seed вариативность.
+- B2 меняет порядок feature-ов, но не генерирует cross-slope terrain и не строит дорогу по 2D полю. В документации Stage C сохраняется как крупный шаг с заметной горой/долиной.
+- Текущая main scene оказалась настроена на literal seed `184729`, тогда как `WorldManager` уже принимает `--seed`. Поэтому обычный-session randomization добавлена в B2, сохраняя флаг повторного запуска; полноценный пользовательский seed chooser/copy controls остаётся в Stage E.
+- Проверка примет production status только если каждый chunk реально прошёл RoadLogic validator; очередь сама по себе недостаточна.
+
+### Отчёт B2
+
+**Завершено 2026-09-27.** До изменения замер показал реальную проблему ритма: на 8 seed, 1200 фаз и стиль major event count был почти одинаковым — FLOW 191–211 и TECHNICAL 193–213. В отдельных окнах было до 3 major features, а интервал без характерного элемента доходил до 12 дорожных chunks (около 600 м).
+
+- В `RoadGrammar` добавлена bounded история последних 12 phase chunks. Лимит major событий за полное 600 м окно: FLOW 2, BALANCED 3, TECHNICAL 4. Восьмой feature-free chunk вызывает мягкий crest, а не прыжок/шпильку. После начального сценария вероятности продолжения различаются по стилю; все решения и геометрия остаются повторяемыми по seed.
+- Проверка игровой стартовой сцены обнаружила literal fixed seed `184729`, поэтому добавлен отдельный session-seed шаг: `main.tscn` просит новый seed при каждом обычном запуске, а `--seed=N` переопределяет его для точного повтора. Tool/test managers остаются фиксированными; эффективный seed виден через существующий F3 HUD, а выбор/копирование seed в UI остаётся Stage E.
+- Результат 8 seed × 1200 фаз: FLOW 112–122 major на 1200 (~9–10%), BALANCED 186–203 (~15–17%), TECHNICAL 233–245 (~19–20%). Самый высокий 12-phase window: FLOW 2, BALANCED 3, TECHNICAL 3 (лимит TECHNICAL = 4); самый длинный feature-free интервал: 6–8 фаз. Конкретные доли — замер этой батареи, не ручная калибровка игрового ощущения и не обещание одинакового процента в каждом участке.
+- Production integration: 4 seed × 3 style × 150 chunks, с двойным запуском signatures. FLOW дал 15–16 major, BALANCED 24–27, TECHNICAL 30–34; все вызовы RoadLogic прошли без fallback, реальные AIRBORNE включали посадку, crest/switchback присутствовали в геометрии, replay centerlines совпали. Отдельно подтверждено, что другой seed порождает другую фазовую последовательность и centerline во всех трёх профилях.
+- `test_route_rhythm.gd`: **105/105 PASS**; `test_world_session_seed.gd`: **7/7 PASS**. Длинная grammar battery: 5 seeds × 1000 chunks, 0 validator/seam/forbidden transition errors. Дополнительно: route intent **72/72**, route plan contract **166/166**, road contract **18/18**, REVIEW-FIX **25/25**, event-to-surface B1 **8/8**, branch integration **8 routes**.
+- В route-plan contract run тест вернул exit 0, но один прогон напечатал `6 ObjectDB instances were leaked`. Этот runner не менялся, а проверяемые им девять authored opening phases остались прежними; warning не считается исправленным/приписанным B2. Оставляю его явной задачей наблюдения, без сокрытия результата.
+- `git diff --check` проходит. Окружение Godot продолжает выдавать сообщения про запись `user://logs/godot.log` и Windows root certificates. Ручной заезд не проводился.
+
+**Что это даёт игроку:** каждый обычный запуск теперь получает новый seed, поэтому генератор начинает с другого повторяемого варианта поездки; при нужде `--seed=N` позволяет запустить именно его снова. На длинном маршруте seed раскладывает особенности по правилам ритма: лёгкий crest не исчезает надолго, сложные события ограничены, а TECHNICAL заметно насыщеннее FLOW. Это пока дорожная композиция, а не дорога, проложенная по заранее сгенерированной случайной горе. Следующая часть B3 измерит форму самих элементов; заметная двумерная гора и путь, выбранный с учётом её склонов, остаются Stage C.
+
 
 ## P2.1d — Измеримый детерминированный fork pacing
 

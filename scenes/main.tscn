@@ -23,6 +23,7 @@ directional_shadow_max_distance = 180.0
 [node name="WorldManager" type="Node3D" parent="." node_paths=PackedStringArray("player")]
 script = ExtResource("2_world")
 world_seed = 184729
+randomize_world_seed_on_start = true
 player = NodePath("../Bicycle")
 
 [node name="Bicycle" parent="." node_paths=PackedStringArray("world_manager", "screen_fader") instance=ExtResource("3_bike")]

@@ -90,9 +90,30 @@ This is stronger than inspecting the grammar queue: it checks committed path dat
 and the mesh/collision preparation pipeline. It does not add runtime instrumentation
 or change generation. It still does not instantiate a physics world, raycast against
 the committed collider, simulate the bicycle, or establish how the feature feels;
-those are later Stage B3/B5 checks. See `TEST_PLAN.md` for the measured seeds.
+those are later Stage B4/B6 checks. See `TEST_PLAN.md` for the measured seeds.
 
-## 7. Collision layers
+## 7. Stage B2 seeded ride rhythm
+
+`RoadGrammar` now retains only the last 12 generated phase IDs (12 × 50 m ≈ 600 m).
+Style profiles cap major events per rolling window: FLOW 2, BALANCED 3, TECHNICAL 4.
+If ordinary choices leave eight feature-free chunks, the grammar schedules a gentle
+crest instead of forcing a high-risk obstacle. After the authored opening, weights
+also differ by route style; the seed still controls the concrete sequence. Recovery,
+landing, and braking-before-major rules remain mandatory. The policy is a bounded
+composition guide, not an exact percentage guarantee or a claim of subjective fun.
+
+B2 changes the order and frequency of road features only. The current generator
+still constructs the road and fits local terrain beside it; it does **not** first
+create a random 2D mountain and then route the road across that landscape. Seeded
+macro landforms and terrain-constrained route planning remain Stage C.
+
+The main ride scene now requests a fresh positive world seed at session start;
+`--seed=N` overrides it for exact replay. Test/tool `WorldManager` instances keep
+their configured fixed seed unless they explicitly request session randomization.
+The effective value remains visible in the existing F3 DebugHUD. Stage E still
+owns user-facing seed selection and copy/replay controls.
+
+## 8. Collision layers
 
 The bicycle queries the existing road and surface layers through its configured collision mask. Road generation and physics contracts are coupled at the collision interface only; P2.1 does not edit that mask or tune wheel raycasts.
 
@@ -103,7 +124,7 @@ The bicycle queries the existing road and surface layers through its configured 
 | 4 | Player | Bicycle character body |
 | 5 | RoughRoad | Rough road surface |
 
-## 8. Legacy feature traceability
+## 9. Legacy feature traceability
 
 The historic sprint ID alone does not imply that the full product goal is done.
 
@@ -118,7 +139,7 @@ The historic sprint ID alone does not imply that the full product goal is done.
 | FEAT-015.3 mountain trails/singletracks | Planned; playable network must connect to route graph or be clearly decorative | Stage D after shared landscape and route corridors |
 | FEAT-015.4 far terrain LOD/streaming | Planned | Stage C performance/completeness gate, then Stage G soak |
 
-## 9. Entry points and references
+## 10. Entry points and references
 
 - `project.godot` starts `res://scenes/mode_select.tscn`; `res://scenes/main.tscn` hosts the ride.
 - Full product stages and intermediate build gates: `DEVELOPMENT_ROADMAP.md`.

@@ -16,6 +16,43 @@ not instantiate the collider in a physics space or ride the bicycle across it.
 Godot exited 0. The environment printed its known `user://logs/godot.log` and
 Windows root certificate messages; there were no parse/runtime/test failures.
 
+## Stage B2 — seeded long-range route rhythm (2026-09-27)
+
+Session-seed command: `& 'C:\Users\Luisa\Downloads\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe' --headless --path . --script res://scripts/test/test_world_session_seed.gd`
+
+Result: **7/7 PASS**. Confirms fixed-seed test/tool default, positive fresh session
+seed, distinct consecutive fresh seeds, explicit `--seed=N` replay, user-argument
+precedence, seed 0 support and that the normal main scene opts into fresh sessions.
+The existing F3 DebugHUD shows the effective seed. Stage E still adds user-facing
+seed choose/copy controls.
+
+Command: `& 'C:\Users\Luisa\Downloads\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe' --headless --path . --script res://scripts/test/test_route_rhythm.gd`
+
+Result: **105/105 PASS**, zero assertion failures. Eight fixed world seeds replayed
+1200 phases per FLOW, BALANCED and TECHNICAL profile twice. Every window obeyed its
+cap (FLOW ≤2, BALANCED ≤3, TECHNICAL ≤4 major events per 12 phases); observed maxima
+were 2, 3 and 3. Longest interval without crest/switchback/jump was 6–8 chunks,
+within the 8-chunk limit. Aggregate major events were FLOW 942/9600, BALANCED
+1564/9600 and TECHNICAL 1924/9600 phases. These are observations from the tested
+seeds, not exact player-percent targets. Across 4 seeds × 3 styles × 150 production
+`RoadLogic` chunks (with replay), all chunks passed validation without fallback,
+same-seed centerlines replayed exactly and different seeds produced different
+centerlines. Major-event counts were FLOW 15–16, BALANCED 24–27, TECHNICAL 30–34.
+
+Before implementation, the same battery measured FLOW 191–211 and TECHNICAL
+193–213 major phases per 1200: long-run style profiles were nearly identical.
+Feature-free gaps reached 9–12 chunks and rolling windows reached 3 major events.
+This baseline motivated style-specific pacing and bounded spacing.
+
+Regression checks after B2: `test_road_grammar.gd` 5 × 1000 chunks without
+validator/seam/transition errors; RouteIntent 72/72; RoutePlan contract 166/166;
+Road contract 18/18; REVIEW-FIX 25/25; B1 event-to-surface 8/8; route integration
+8/8. The RoutePlan contract runner exited 0 but emitted one `6 ObjectDB instances
+were leaked` warning in this run. That test and its authored 9-phase opening are
+unchanged by B2; the warning is recorded and not treated as resolved. Manual ride
+was not part of this task. Godot also prints the known log-file and Windows
+certificate-store messages.
+
 ## P2.1b — RouteIntent / RoutePlan data contract (2026-09-27)
 
 Command: `godot --headless --path . --script res://scripts/test/test_route_plan_contract.gd` (Godot 4.7.2 mono). Result: `ROUTE_PLAN_CONTRACT_SUMMARY checks=166 failures=0 geometry_profiles=16 physics_traces=2`.

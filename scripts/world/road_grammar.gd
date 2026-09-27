@@ -1,7 +1,7 @@
 class_name RoadGrammar
 extends RefCounted
 
-## Slow Cycle — Road Grammar (v5.3)
+## Slow Cycle — Road Grammar (v5.4)
 ## Deterministic rhythm FSM governing the mountain MTB descent drama.
 ## Strictly enforces safety preparation zones, landing surfaces, and recovery flats.
 ## Separation of Concerns: WHAT player experiences and ALLOWED ENVELOPE.
@@ -47,6 +47,10 @@ var total_chunks_planned: int = 0
 var route_style: int = RouteStyle.BALANCED
 var route_style_seed: int = 0
 var authored_switchbacks_planned: int = 0
+const RHYTHM_WINDOW_PHASES: int = 12 ## 12 x 50m phase chunks form an observable 600m window.
+const MAX_PHASES_WITHOUT_FEATURE: int = 8 ## A light crest is queued if choices leave this long a quiet stretch.
+var recent_phase_history: Array[int] = []
+var phases_since_last_feature: int = 0
 
 func _init(seed_val: int) -> void:
 	route_style_seed = seed_val
@@ -88,6 +92,8 @@ func set_route_style(style: int, style_seed: int) -> void:
 	route_style_seed = style_seed
 	rng.seed = style_seed
 	authored_switchbacks_planned = 0
+	recent_phase_history.clear()
+	phases_since_last_feature = 0
 	curve_dir = -1.0 if rng.randf() < 0.5 else 1.0
 	phase_queue.clear()
 	match route_style:
@@ -154,10 +160,16 @@ func queue_fork_approach() -> void:
 ## Advances FSM and returns the next PhaseSpec envelope
 func advance_phase() -> PhaseSpec:
 	if phase_queue.is_empty():
-		_replenish_phase_queue()
+		if phases_since_last_feature >= MAX_PHASES_WITHOUT_FEATURE:
+			# Preserve seeded freedom while avoiding long, unvaried runs: the forced
+			# item is a gentle crest, never a jump or mandatory technical turn.
+			phase_queue.append(FlowPhase.CREST_MICRO_DROP)
+		else:
+			_replenish_phase_queue()
 
 	current_phase = phase_queue.pop_front()
 	total_chunks_planned += 1
+	_record_phase_for_rhythm(current_phase)
 	if route_style == RouteStyle.TECHNICAL and current_phase == FlowPhase.SWITCHBACK:
 		authored_switchbacks_planned += 1
 		if authored_switchbacks_planned == 2:
@@ -167,12 +179,14 @@ func advance_phase() -> PhaseSpec:
 ## Weighted FSM Transition Table with strict hard constraints
 func _replenish_phase_queue() -> void:
 	var roll: float = rng.randf()
+	var profile: Dictionary = _get_rhythm_profile()
+	var major_event_allowed: bool = _recent_major_event_count() < int(profile.major_event_limit)
 
 	match current_phase:
 		FlowPhase.FAST_GRAVITY_DESCENT:
 			# Fast descent MUST NEVER transition directly to switchback or drop!
 			# Always prepare with BRAKING_ZONE or decelerate to CRUISE_DOWNHILL.
-			if roll < 0.65:
+			if roll < float(profile.fast_to_switchback_chance) and major_event_allowed:
 				phase_queue.append(FlowPhase.BRAKING_ZONE)
 				curve_dir = -1.0 if rng.randf() < 0.5 else 1.0
 				phase_queue.append(FlowPhase.SWITCHBACK)
@@ -182,13 +196,17 @@ func _replenish_phase_queue() -> void:
 
 		FlowPhase.BRAKING_ZONE:
 			# Braking zone leads to planned maneuver
-			if roll < 0.70:
+			var switchback_chance: float = float(profile.braking_to_switchback_chance)
+			var airborne_chance: float = float(profile.braking_to_airborne_chance)
+			if major_event_allowed and roll < switchback_chance:
 				curve_dir = -1.0 if rng.randf() < 0.5 else 1.0
 				phase_queue.append(FlowPhase.SWITCHBACK)
 				phase_queue.append(FlowPhase.RECOVERY_FLAT)
-			else:
+			elif major_event_allowed and roll < switchback_chance + airborne_chance:
 				phase_queue.append(FlowPhase.AIRBORNE_DROP)
 				phase_queue.append(FlowPhase.RECOVERY_FLAT)
+			else:
+				phase_queue.append(FlowPhase.CRUISE_DOWNHILL)
 
 		FlowPhase.SWITCHBACK:
 			# After a tight switchback, always provide recovery or cruise
@@ -223,17 +241,69 @@ func _replenish_phase_queue() -> void:
 
 		FlowPhase.CRUISE_DOWNHILL, _:
 			# Normal cruising descent: branch into fast run, braking for turn, micro-drop, or meadow
-			if roll < 0.35:
+			var fast_chance: float = float(profile.cruise_to_fast_chance)
+			var technical_chance: float = float(profile.cruise_to_technical_chance)
+			var crest_chance: float = float(profile.cruise_to_crest_chance)
+			if roll < fast_chance:
 				phase_queue.append(FlowPhase.FAST_GRAVITY_DESCENT)
-			elif roll < 0.65:
+			elif roll < fast_chance + technical_chance and major_event_allowed:
 				phase_queue.append(FlowPhase.BRAKING_ZONE)
 				curve_dir = -1.0 if rng.randf() < 0.5 else 1.0
 				phase_queue.append(FlowPhase.SWITCHBACK)
 				phase_queue.append(FlowPhase.RECOVERY_FLAT)
-			elif roll < 0.82:
+			elif roll < fast_chance + technical_chance + crest_chance:
 				phase_queue.append(FlowPhase.CREST_MICRO_DROP)
 			else:
 				phase_queue.append(FlowPhase.RECOVERY_FLAT)
+
+func _get_rhythm_profile() -> Dictionary:
+	match route_style:
+		RouteStyle.FLOW:
+			return {
+				"major_event_limit": 2,
+				"cruise_to_fast_chance": 0.38,
+				"cruise_to_technical_chance": 0.18,
+				"cruise_to_crest_chance": 0.26,
+				"fast_to_switchback_chance": 0.40,
+				"braking_to_switchback_chance": 0.45,
+				"braking_to_airborne_chance": 0.18
+			}
+		RouteStyle.TECHNICAL:
+			return {
+				"major_event_limit": 4,
+				"cruise_to_fast_chance": 0.20,
+				"cruise_to_technical_chance": 0.55,
+				"cruise_to_crest_chance": 0.15,
+				"fast_to_switchback_chance": 0.75,
+				"braking_to_switchback_chance": 0.82,
+				"braking_to_airborne_chance": 0.12
+			}
+		_:
+			return {
+				"major_event_limit": 3,
+				"cruise_to_fast_chance": 0.35,
+				"cruise_to_technical_chance": 0.30,
+				"cruise_to_crest_chance": 0.17,
+				"fast_to_switchback_chance": 0.65,
+				"braking_to_switchback_chance": 0.70,
+				"braking_to_airborne_chance": 0.30
+			}
+
+func _record_phase_for_rhythm(phase: int) -> void:
+	recent_phase_history.append(phase)
+	if recent_phase_history.size() > RHYTHM_WINDOW_PHASES:
+		recent_phase_history.pop_front()
+	if phase in [FlowPhase.CREST_MICRO_DROP, FlowPhase.SWITCHBACK, FlowPhase.AIRBORNE_DROP]:
+		phases_since_last_feature = 0
+	else:
+		phases_since_last_feature += 1
+
+func _recent_major_event_count() -> int:
+	var count: int = 0
+	for phase: int in recent_phase_history:
+		if phase in [FlowPhase.SWITCHBACK, FlowPhase.AIRBORNE_DROP]:
+			count += 1
+	return count
 
 ## Constructs pre-clamped PhaseSpec with allowed envelope bounds
 func get_phase_spec(phase: int) -> PhaseSpec:

@@ -7,6 +7,7 @@ const ChunkStreamerClass = preload("res://scripts/world/chunk_streamer.gd")
 const TerrainCarverClass = preload("res://scripts/world/terrain_carver.gd")
 
 @export var world_seed: int = 184729
+@export var randomize_world_seed_on_start: bool = false
 @export var player: Node3D
 
 var road_path: RefCounted
@@ -17,16 +18,7 @@ var shared_materials: Dictionary = {}
 var shared_meshes: Dictionary = {}
 
 func _ready() -> void:
-	for arg in OS.get_cmdline_args():
-		if arg.begins_with("--seed="):
-			var val: String = arg.trim_prefix("--seed=")
-			if val.is_valid_int():
-				world_seed = val.to_int()
-	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--seed="):
-			var val: String = arg.trim_prefix("--seed=")
-			if val.is_valid_int():
-				world_seed = val.to_int()
+	_resolve_session_seed(OS.get_cmdline_args(), OS.get_cmdline_user_args())
 
 	_init_shared_resources()
 	
@@ -37,6 +29,29 @@ func _ready() -> void:
 	chunk_streamer = ChunkStreamerClass.new()
 	chunk_streamer.setup(self, road_path, road_logic, shared_materials, shared_meshes)
 	add_child(chunk_streamer)
+
+## Keep the generator deterministic after choosing its session seed. Normal gameplay
+## can request a fresh value, while explicit CLI seeds always win for replay/tests.
+func _resolve_session_seed(command_args: PackedStringArray, user_args: PackedStringArray) -> void:
+	var seed_override: Variant = _find_seed_override(command_args)
+	var user_seed_override: Variant = _find_seed_override(user_args)
+	if user_seed_override != null:
+		seed_override = user_seed_override
+	if seed_override != null:
+		world_seed = int(seed_override)
+		return
+	if randomize_world_seed_on_start:
+		var session_rng := RandomNumberGenerator.new()
+		session_rng.randomize()
+		world_seed = session_rng.randi_range(1, 2147483647)
+
+func _find_seed_override(arguments: PackedStringArray) -> Variant:
+	for arg: String in arguments:
+		if arg.begins_with("--seed="):
+			var value: String = arg.trim_prefix("--seed=")
+			if value.is_valid_int():
+				return value.to_int()
+	return null
 
 func _process(_delta: float) -> void:
 	var player_pos: Vector3 = player.global_position if player else Vector3.ZERO

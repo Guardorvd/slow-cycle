@@ -191,3 +191,28 @@ LANDING и grounded RECOVERY, создаёт road mesh vertices и road collisio
 ещё не runtime physics query по зарегистрированному в сцене collider и не
 устойчивость реального велосипеда при посадке. Эти gates остаются в частях B3 и
 B5 соответственно; ограничения `RoadAirborneContract` не менялись.
+
+## 8. Stage B2 — seed-управляемый ритм
+
+`RoadGrammar` применяет ограниченную историю последних 12 phase chunks (около
+600 м при фиксированных 50 м на chunk). В одном полном скользящем окне допускается
+максимум 2 major event для FLOW, 3 для BALANCED и 4 для TECHNICAL; major — это
+`SWITCHBACK` и `AIRBORNE_DROP`. Если обычный weighted выбор оставляет 8 feature-free
+chunks подряд, добавляется только мягкий `CREST_MICRO_DROP`. Это потолки и
+максимальный интервал, а не фиксированный процент каждого элемента. Конкретное
+размещение остаётся seeded и воспроизводимым.
+
+На батарее 8 seed × 1200 фаз FLOW создал 112–122 major, TECHNICAL — 233–245;
+максимальный интервал без crest/switchback/jump был 6–8 chunks. Самое плотное
+полное 600 м окно содержало 2 major в FLOW и 3 в TECHNICAL. В production батарее
+по 150 настоящих `RoadLogic` chunks на seed/style не было validator fallback, а
+подпись центра дороги совпала при replay. Chunk сейчас фиксирован 50 м; при смене
+длины event budget следует пересчитывать по метрам.
+
+**Граница:** этот слой задаёт ритм вдоль уже построенной дорожной оси. Seed-generated
+рельеф, по которому сначала прокладывается дорога, ещё не реализован; это Stage C
+с непрерывным 2D terrain field и terrain-aware route planning.
+
+Обычная `scenes/main.tscn` теперь запрашивает свежий positive seed на старте;
+`--seed=N` имеет приоритет и точно повторяет маршрут. `WorldManager` по умолчанию
+остаётся fixed-seed для test/tool сцен, чтобы их результаты не плавали.

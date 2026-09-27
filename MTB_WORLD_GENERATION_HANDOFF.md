@@ -123,7 +123,7 @@ FLOW/TECHNICAL authored openings now differ in measured generated geometry on 4 
 
 **P2.1d completed:** nearest-safe endpoint policy now records schedule target, actual fork distance, delay, candidate ordinal, site/paired rejection reasons, branch/fork/seed identity and generation-ahead distance in a 64-entry trace. Diagnostic band 550–900m and 200m/four-rejection overrun; unsafe forks remain forbidden and production interval formulas are unchanged. Four seeded-default integration routes measured 600.3–851.1m against 591.0–820.7m targets (9.3–33.3m overshoot), all in band. A forced 100m stress schedule showed >300m delay because it's below the streamer's ~350m ahead window; don't treat it as production pacing. Focused pacing 21/21; mountain validation 60 choices/3 seeds; route integration 8 routes. See `TEST_PLAN.md` and `implementation_plan.md`.
 
-**Historical next-step note (superseded by Stage B progress below):** P2.1a–d foundation is complete; Stage A remained open for full-network clearance/long corridor preview and human route-style review. Stage B has since started; B1 is complete and the current next slice is B2.
+**Historical next-step note (superseded by Stage B progress below):** P2.1a–d foundation is complete; Stage A remains open for full-network clearance/long corridor preview and human route-style review. Stage B has since started; B1 and B2 are complete, with B3 next.
 
 **Review-fix status:** REVIEW-FIX-01 corrected the AIRBORNE candidate geometry without changing contract limits, added stable order-independent foliage keys, bounded graph pruning, malformed-path/visibility guards and bounded surface-weight smoothing. The new focused test passed 25/25; 500-chunk × 3-seed soak and the full master runner passed. Exact results are in `TEST_PLAN.md` and `implementation_plan.md`. The user-reported under-fork traversal remains unreproduced and is a separate diagnostic item.
 
@@ -182,16 +182,20 @@ Latest completed results: fork decision 212/212; fork geometry 15/15; branch str
 
 ### Stage B progress (2026-09-27)
 
-Stage B is decomposed in `DEVELOPMENT_ROADMAP.md` into B1 event-to-surface proof,
-B2 MTB-event shape/measurement catalog, B3 transitions/seams, B4 route coverage
-and clearance, and B5 measured rideability/manual ride. **B1 is complete**:
-`test_mtb_event_pipeline.gd` passed 8/8 across four deterministic seeds, with
-production RoadLogic acceptance, recovery, mesh/collision face output and coverage
-of every event segment. The test prepares collision geometry but does not simulate
-a bike or query a registered physics collider. Next is B2; preserve bike physics,
-camera and controls. Stage C macro landscape/open mountain remains the first major
-world-scale visual change after rideable event reliability.
+Stage B is decomposed in `DEVELOPMENT_ROADMAP.md` into B1 event-to-surface,
+B2 seed-keyed feature rhythm, B3 event geometry, B4 seams/transitions, B5 route
+clearance and B6 rideability/manual review. **B1 passed 8/8** on four seeds.
+**B2 passed 105/105** on eight seeds × 1200 phases × all three styles, plus production
+generation on four seeds × three styles × 150 chunks: FLOW had 15–16 major events,
+BALANCED 24–27 and TECHNICAL 30–34; all chunks validated, replayed centerlines
+matched and different seeds produced different roads. B2 now bounds long quiet
+spans and high-intensity clusters while preserving seeded choice. It does not yet
+generate a random landform first or route the trail over a 2D mountain; that larger,
+visible terrain-and-route step is Stage C. The normal main ride now selects a fresh
+seed each session; `--seed=N` replays exactly, and tooling scenes keep fixed seeds.
+Stage A still has route-network clearance
+and manual route-style gates. Next is B3; preserve bike physics, camera and controls.
 
 ### Prompt to resume in a new chat
 
-“Read `DEVELOPMENT_ROADMAP.md`, `VISION.md`, `AGENTS.md`, `implementation_plan.md`, `MTB_WORLD_GENERATION_HANDOFF.md`, `ROAD_GENERATION.md`, `ARCHITECTURE.md` and `TEST_PLAN.md`. The goal is one meditative endless ride enriched by a coherent, rideable procedural MTB world. P2.1a–d and B1 are complete; Stage A still has route-network/manual-review gates, Stage B is next at B2, and Stage C is unified macro landscape/open mountain. Treat old results as historical until rerun. Preserve bicycle physics/camera and controls; respect the current user-approved scope and repository plan gate.”
+“Read `DEVELOPMENT_ROADMAP.md`, `VISION.md`, `AGENTS.md`, `implementation_plan.md`, `MTB_WORLD_GENERATION_HANDOFF.md`, `ROAD_GENERATION.md`, `ARCHITECTURE.md` and `TEST_PLAN.md`. The goal is one meditative endless ride enriched by a coherent, rideable procedural MTB world. P2.1a–d and Stage B1/B2 are complete; B2 paces features on a seeded road but is not terrain-first 2D mountain routing. Stage A still has network clearance/manual review, Stage B next is B3 event geometry, and Stage C is the visible macro landscape and terrain-aware route. Treat old results as historical until rerun. Preserve bicycle physics/camera/controls, report known ObjectDB warning in RoutePlan test, and respect the user-approved scope and repository plan gate.”
