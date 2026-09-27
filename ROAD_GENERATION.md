@@ -177,3 +177,17 @@ $$\text{GROUNDED} \longrightarrow \text{AIRBORNE} \longrightarrow \text{LANDING}
 * Метод `calculate_sight_distance_at(path_data, sample_idx, sight_type) -> float`:
   - Трассирует прямую видимость с учетом выпуклых гребней рельефа.
 * **Производительность**: проверка 100 чанков (2500 сэмплов, 5.0 км) занимает $\approx 7.6$ мс (то есть **0.076 мс на чанк** при лимите 1.0 мс).
+
+## 7. Stage B1 — доказательство event-to-surface
+
+`scripts/test/test_mtb_event_pipeline.gd` использует production `RoadLogic` для
+создания запрошенного AIRBORNE_DROP и следующей recovery-фазы, а затем передаёт
+тот же `RoadPathData` в production `RoadChunk.prepare_geometry_data()`. На seed
+`184729`, `42`, `7319`, `900001` event проходит validator, содержит AIRBORNE,
+LANDING и grounded RECOVERY, создаёт road mesh vertices и road collision faces.
+Середина каждого сегмента полёта/посадки лежит на дорожных collision faces.
+
+Это доказывает связность геометрического pipeline до mesh/collision данных, но
+ещё не runtime physics query по зарегистрированному в сцене collider и не
+устойчивость реального велосипеда при посадке. Эти gates остаются в частях B3 и
+B5 соответственно; ограничения `RoadAirborneContract` не менялись.

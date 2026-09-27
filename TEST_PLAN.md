@@ -1,5 +1,21 @@
 # Slow Cycle — Verification & Testing Protocol
 
+## Stage B1 — MTB event to road surface (2026-09-27)
+
+Command: `& 'C:\Users\Luisa\Downloads\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe' --headless --path . --script res://scripts/test/test_mtb_event_pipeline.gd`
+
+Result: **8/8 PASS**, zero failures. Four fixed seeds (`184729`, `42`, `7319`,
+`900001`) were each replayed twice. Every replay generated 3 AIRBORNE, 8 LANDING
+and 25 RECOVERY samples; the road mesh contained 102 vertices and collision data
+contained 300 face vertices. All 11 event centerline segments had midpoint
+coverage by the road collision triangles. Event acceptance, recovery validation,
+non-empty finite surface data and repeated signatures passed.
+
+This exercises production RoadLogic and RoadChunk geometry preparation; it does
+not instantiate the collider in a physics space or ride the bicycle across it.
+Godot exited 0. The environment printed its known `user://logs/godot.log` and
+Windows root certificate messages; there were no parse/runtime/test failures.
+
 ## P2.1b — RouteIntent / RoutePlan data contract (2026-09-27)
 
 Command: `godot --headless --path . --script res://scripts/test/test_route_plan_contract.gd` (Godot 4.7.2 mono). Result: `ROUTE_PLAN_CONTRACT_SUMMARY checks=166 failures=0 geometry_profiles=16 physics_traces=2`.

@@ -77,7 +77,22 @@ P2.1d adds `ForkPacingPlanner` as a pure label/measurement step after the P2.1a/
 - Keep one local MultiMesh per chunk/group for culling; never consolidate infinite-world foliage into one global MultiMesh.
 - No gears, stamina, stunt scoring, inventory or unrelated gameplay loop is part of the world-generation scope.
 
-## 6. Collision layers
+## 6. Stage B event-to-surface boundary
+
+Stage B checks that a generated MTB event survives each production handoff. In B1,
+`RoadLogic.plan_next_chunk()` generates and validates AIRBORNE→LANDING geometry;
+the subsequent queued recovery phase returns to grounded road. The test then feeds
+the same `RoadPathData` to `RoadChunk.prepare_geometry_data()`, which is the
+production source for road mesh arrays and road collision faces. Every airborne
+and landing segment midpoint must be covered by those road triangles.
+
+This is stronger than inspecting the grammar queue: it checks committed path data
+and the mesh/collision preparation pipeline. It does not add runtime instrumentation
+or change generation. It still does not instantiate a physics world, raycast against
+the committed collider, simulate the bicycle, or establish how the feature feels;
+those are later Stage B3/B5 checks. See `TEST_PLAN.md` for the measured seeds.
+
+## 7. Collision layers
 
 The bicycle queries the existing road and surface layers through its configured collision mask. Road generation and physics contracts are coupled at the collision interface only; P2.1 does not edit that mask or tune wheel raycasts.
 
@@ -88,7 +103,7 @@ The bicycle queries the existing road and surface layers through its configured 
 | 4 | Player | Bicycle character body |
 | 5 | RoughRoad | Rough road surface |
 
-## 7. Legacy feature traceability
+## 8. Legacy feature traceability
 
 The historic sprint ID alone does not imply that the full product goal is done.
 
@@ -103,7 +118,7 @@ The historic sprint ID alone does not imply that the full product goal is done.
 | FEAT-015.3 mountain trails/singletracks | Planned; playable network must connect to route graph or be clearly decorative | Stage D after shared landscape and route corridors |
 | FEAT-015.4 far terrain LOD/streaming | Planned | Stage C performance/completeness gate, then Stage G soak |
 
-## 8. Entry points and references
+## 9. Entry points and references
 
 - `project.godot` starts `res://scenes/mode_select.tscn`; `res://scenes/main.tscn` hosts the ride.
 - Full product stages and intermediate build gates: `DEVELOPMENT_ROADMAP.md`.
