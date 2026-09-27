@@ -103,7 +103,13 @@ Production `RoadLogic` seed-батарея (4 world seed × 2 style seed × 2 с
 
 Результат хранится в `ChunkStreamer.last_fork_site_evaluation`: `eligible`, стабильный список `reason_codes` и измеренные метрики. Это диагностическое состояние, а не постоянный пользовательский лог.
 
-**Граница доказательства:** это фильтр одного уже сгенерированного endpoint, не построитель полной сети. Он не preview-ит ещё не созданные downstream arms, не проверяет clearance всей сети и не исправляет геометрию. P2.1b предоставляет RouteIntent/RoutePlan как измеримый data contract; парный preview и pacing trade-offs остаются P2.1c–d в `DEVELOPMENT_ROADMAP.md`. FEAT-014.4 означает локальную carving/terrain полосу вокруг дороги; макро-ландшафт, открытая гора и horizon остаются будущим этапом C.
+**Граница доказательства:** это фильтр одного уже сгенерированного endpoint, не построитель полной сети. P2.1c ниже добавляет preview только двух fork arms; P2.1d и полный route audit ещё потребуются для выбора общего ритма и проверки полной сети. P2.1b предоставляет RouteIntent/RoutePlan как измеримый data contract. FEAT-014.4 означает локальную carving/terrain полосу вокруг дороги; макро-ландшафт, открытая гора и horizon остаются будущим этапом C.
+
+## 3.8. Парный fork-arm preview (P2.1c)
+
+Перед созданием graph fork streamer предсказывает обе стороны через production-функцию `ForkArmGeometry.build`. Эта же функция затем добавляет точки в настоящий `RoadPathData`, так что preview не содержит второй приближённой формулы centerline. `ForkCorridorPreviewPlanner` проверяет 26 samples/примерно 50 м на arm, ширину, конечность, шаг, grade/curvature contract, C0/C1 стык в apex, минимальный разнос рукавов и danger flags `TerrainCarver` на обоих боках. FLOW/TECHNICAL назначаются тем же локальным deterministic seed, что и реальный fork.
+
+Если пара отклонена, graph node, child branch и mesh ещё не созданы; streamer продолжает обычную дорогу и повторяет попытку позже. Поля `last_fork_site_evaluation` и `last_fork_corridor_preview` сохраняют диагностику без шумных постоянных логов. Preview не проверяет последующие FSM chunks, соседство с несвязанными далёкими рёбрами или rider feel; такие утверждения требуют P2.1d/full route audit и ручной поездки.
 
 ## 3.6. REVIEW-FIX-01 generation/runtime corrections
 

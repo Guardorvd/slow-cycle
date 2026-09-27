@@ -307,3 +307,10 @@ Lat Accel: 1.2 m/s² | Scrub: 0.0 m/s² [FLOW]
 Road: CONTINUOUS [OK] | Raycasts: GROUNDED [OK]
 ========================
 ```
+## P2.1c — Парный preview fork arms (2026-09-27)
+
+`test_fork_corridor_preview.gd`: **15/15 PASS**. Проверены обе стороны, 26 production samples на рукав, приблизительно 50 м длины, сохранение стилей, повторяемая подпись, отказ на опасной terrain стороне для каждой ветки, отказ для одинаковой пары стилей и недопустимого grade, отказ при отсутствии terrain evaluator и повторяемость production `TerrainCarver` с seed `184729`.
+
+Неизменённые регрессии после интеграции в `ChunkStreamer`: fork site planner **36/36** (включая forced preview reject/fallback); fork geometry **15/15**; route branch integration **8 маршрутов**; branch streaming **49/49**; road contract **18/18**; mountain validation **12/12** на 60 fork choices по seed `184729`, `42`, `99999`. В stress run peak RAM delta составил +20.1…+21.4 MB, ниже существующего 25 MB gate; streaming suite измерил commit chunk max 0.669ms, mean 0.471ms. `git diff --check` чистый.
+
+Новая проверка меряет только fork-arm (~50 м), а не следующие grammar chunks или дальние crossing roads. Регрессии подтверждают, что настоящие fork meshes, route choices и streaming сохранились на указанной батарее. Godot продолжает выводить средовые ошибки записи `user://logs/godot.log` и чтения Windows certificate store; финальные завершённые runs не показали parser/assertion/leak warning. Реальный заезд на велосипеде автоматикой не заменён.

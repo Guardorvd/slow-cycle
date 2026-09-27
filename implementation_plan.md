@@ -1,5 +1,44 @@
 # План: процедурная MTB-сеть и правдоподобные развилки
 
+## P2.1c — Парный предварительный просмотр коридоров развилки
+
+**Статус:** план выполнен в рамках прямого разрешения пользователя от 27.09.2026.
+
+### Задача
+
+#### TASK: [P2.1c] Deterministic paired fork corridor preview
+
+**Goal**: До фиксации fork-узла проверить обе реальные выходящие ветки вместе с их первыми маршрутными участками. Это снижает шанс предложить игроку развилку, у которой одна сторона сразу узкая, слишком крутая, геометрически неверная или выходит в опасный край terrain.
+
+**Do**:
+
+- Вынести расчёт 50-метрового разветвляющегося arm в общий чистый helper, чтобы preview и production строили один и тот же centerline, а не похожие копии.
+- Добавить `ForkCorridorPreviewPlanner`: до mesh построить оба рукава общей production-функцией; проверить конечность и шаг samples, ширину, уклон/кривизну, совпадение C0/C1 у apex, разнос рукавов, обе terrain стороны и парность FLOW/TECHNICAL.
+- Вычислять парные FLOW/TECHNICAL назначения тем же стабильным seed, что и production. Preview не потребляет RNG/очередь фактической дороги и не создаёт Scene Nodes, chunks или graph edges.
+- Встроить обязательный preview после site preflight и до любого side effect создания развилки. Если пара не проходит, зафиксировать диагностическое решение и продолжить обычную дорогу штатным механизмом.
+- Добавить focused runtime test: реальное принятие валидной пары, отказ обеих проверок/стабильные причины, repeat signature, отсутствие мутации источника и отсутствие fork side effects при отказе.
+- Документировать точную дальность доказательства и ограничения; это первые 100 м ветки, не вся будущая трасса и не ручная оценка ощущений.
+
+**Do not**: менять bicycle physics/camera/controls, правила выбора игроком, интервалы, сами стиль-контракты, mesh/collision production, landscape field, общую грамматику или утверждать пригодность всего маршрута на основании короткого preview.
+
+**Acceptance Criteria**: обе стороны строятся общей production-функцией; одинаковый seed даёт тот же signature без изменения родительского пути/графа/RNG; отрицательная пара не создаёт node/branch/mesh и вызывает normal chunk fallback; валидная пара проходит; причины отказа воспроизводимы.
+
+**Tests**: focused paired-preview suite; production route integration, fork geometry, streaming, fork-site planner, route plan, road contract и mountain validation; детерминированные повторные прогоны на `184729`, `42`, `99999`; `git diff --check`; headless Godot parse/runtime.
+
+**Files**: новый arm geometry helper, planner и focused test; `chunk_streamer.gd` и при необходимости `road_logic.gd`; `implementation_plan.md`, `DEVELOPMENT_ROADMAP.md`, `ARCHITECTURE.md`, `ROAD_GENERATION.md`, `TEST_PLAN.md`, `MTB_WORLD_GENERATION_HANDOFF.md`.
+
+### Граница доказательства
+
+Preview подтверждает только два расходящихся fork-arm (~50 м) по структурным/terrain критериям и шву. Он не проверяет будущие грамматические chunks, clearance с далёкими несвязанными дорогами или субъективное ощущение стилей на велосипеде. Эти ограничения зафиксированы, потому что дальнейшие chunks зависят от отдельного продолжающегося состояния RNG. Следующий P2.1d должен выбирать среди кандидатов и учитывать метрики/длину; полный character gate требует поездки игрока.
+
+### Итог P2.1c
+
+- Общий чистый `ForkArmGeometry` теперь является источником точек и ширины как для реального построения fork mesh, так и для preview.
+- `ForkCorridorPreviewPlanner` запускается после endpoint preflight и до fork side effects; оценивает обе стороны и сохраняет `last_fork_corridor_preview` для diagnostics. При отказе штатный update добавляет обычный chunk.
+- Focused suite: 15/15. Регрессии: site planner 36/36 (добавлен forced preview reject/fallback), fork geometry 15/15, route integration 8 маршрутов, streaming 49/49, road contract 18/18, mountain validation 12/12 на 60 fork choices. Измерения этого прогона: commit chunk max 0.669ms, среднее 0.471ms; RAM +20.1…+21.4MB на seed (предел старого теста 25MB).
+- Godot сохранил известные ошибки окружения при записи `user://logs/godot.log` и чтении Windows certificates. Повторяемых parse/assertion/leak предупреждений в прогонах не было.
+- P2.1c не доказывает дальний route clearance и rider feel. Далее P2.1d — поиск/оценка кандидатов; затем потребуется ручной заезд и Stage B/C.
+
 ## P2.1 — Детерминированный terrain-aware выбор fork site
 
 **Статус:** план проверен; выполнение разрешено пользователем 27.09.2026.
@@ -80,7 +119,7 @@
 - Documentation updated: runtime ownership/data-flow и P2.1a boundary in `ARCHITECTURE.md`; Stage A explicitly split into P2.1a–d and FEAT-014.4/015.x traced in architecture/roadmap; current contracts and measured results in `ROAD_GENERATION.md`, `TEST_PLAN.md`, `MTB_WORLD_GENERATION_HANDOFF.md`.
 - Bike physics, camera, controls, seed policy, grammar styles, interval formulas and existing regression assertions were not changed. Manual bike ride and proof of downstream-arm/network clearance remain open.
 
-**Следующее направление на момент P2.1a:** затем был выполнен P2.1b RouteIntent/RoutePlan; следующий ограниченный шаг — P2.1c paired corridor preview на тех же production geometry functions, после него P2.1d candidate search/pacing. Stage A остаётся открытым; дальше — rideable gate B, единый macro landscape/open mountain (Stage C) и финальный путь C–H из `DEVELOPMENT_ROADMAP.md`. Ни P2.1a, ни P2.1b не означает готовность финального build.
+**Историческая запись P2.1a:** после него были выполнены P2.1b и P2.1c. Теперь следующий ограниченный шаг — P2.1d candidate search/pacing. Stage A остаётся открытым; дальше — rideable gate B, единый macro landscape/open mountain (Stage C) и финальный путь C–H из `DEVELOPMENT_ROADMAP.md`. Ни P2.1a–c не означает готовность финального build.
 
 ## Следующий шаг — P0: интеграционная проверка обеих ветвей
 

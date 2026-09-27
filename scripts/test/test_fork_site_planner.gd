@@ -27,12 +27,17 @@ class RejectPlanner extends RefCounted:
 	func evaluate_site(_path: RefCounted, candidate_idx: int, _last_valid: bool, _terrain: RefCounted, _sight: float) -> Dictionary:
 		return {"eligible": false, "reason_codes": ["forced_test_rejection"], "metrics": {"candidate_idx": candidate_idx}}
 
+class RejectPreviewPlanner extends RefCounted:
+	func evaluate_pair(_pos: Vector3, _tang: Vector3, _binorm: Vector3, _heading: float, _slope: float, _left_style: int, _right_style: int, _terrain: RefCounted) -> Dictionary:
+		return {"eligible": false, "reason_codes": ["forced_preview_rejection"], "arms": [], "signature": "forced"}
+
 var checks: int = 0
 var failures: int = 0
 
 func _initialize() -> void:
 	_check_unit_contract()
 	_check_rejected_site_falls_back_to_normal_chunk()
+	_check_rejected_preview_falls_back_to_normal_chunk()
 	_check_streamed_seed_decisions()
 	print("FORK_SITE_PLANNER_SUMMARY checks=%d failures=%d" % [checks, failures])
 	quit(1 if failures else 0)
@@ -118,6 +123,25 @@ func _check_rejected_site_falls_back_to_normal_chunk() -> void:
 	_assert(not branch.is_fork_spawned and branch.child_branch_ids.is_empty(), "rejected candidate creates no fork or child branch")
 	_assert(before_size - 1 < branch.road_path.road_widths.size() and is_equal_approx(branch.road_path.road_widths[before_size - 1], candidate_width), "rejected candidate does not widen the existing endpoint")
 	_assert(streamer.last_fork_site_evaluation.reason_codes == ["forced_test_rejection"], "rejection reason is retained for diagnostics")
+	streamer.free()
+	manager.free()
+
+func _check_rejected_preview_falls_back_to_normal_chunk() -> void:
+	var manager = WorldManagerClass.new()
+	manager._init_shared_resources()
+	var path = PathClass.new()
+	var logic = LogicClass.new(184729, path)
+	var streamer = StreamerClass.new()
+	streamer.setup(manager, path, logic, manager.shared_materials, manager.shared_meshes)
+	var branch = streamer.get_active_branch()
+	branch.next_fork_distance = 1.0
+	streamer.fork_corridor_preview_planner = RejectPreviewPlanner.new()
+	var before_size: int = branch.road_path.size()
+	_assert(not streamer._is_safe_fork_site(branch), "forced paired preview rejection is respected")
+	_assert(streamer.last_fork_corridor_preview.reason_codes == ["forced_preview_rejection"], "paired preview rejection is diagnosable")
+	streamer.update_streaming(branch.road_path.points[0])
+	_assert(branch.road_path.size() > before_size, "preview rejection continues by generating an ordinary chunk")
+	_assert(not branch.is_fork_spawned and branch.child_branch_ids.is_empty(), "preview rejection creates no fork or child branch")
 	streamer.free()
 	manager.free()
 

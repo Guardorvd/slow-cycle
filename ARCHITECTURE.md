@@ -63,6 +63,8 @@ The initial gate checks the last 25 m for aligned/finite samples, sample spacing
 
 P2.1b adds two node-free data contracts. `RouteIntent` describes seed/branch/style identity, the global leg start, the current phase sequence and each phase's existing geometry envelope. `RoutePlan` stores actual interval bounds, observed geometry/contact/event metrics and explicitly sourced bike telemetry. Its builder rejects malformed paths; validators report stable reason codes for incomplete intent, intervals, metrics or telemetry. These records do not change generation behavior and are not yet a route optimizer.
 
+P2.1c adds a deterministic paired preview before fork creation. `ForkArmGeometry` is the shared pure source for both the 50m fork arms and their production mesh input. `ForkCorridorPreviewPlanner` checks both seeded FLOW/TECHNICAL exits for finite/continuous geometry, legal grade/curvature/sample spacing, approach seam position/tangent, end separation, and terrain danger on both sides. `ChunkStreamer` runs this after site preflight and before graph/branch/mesh side effects; rejection follows the normal chunk path. Preview covers only the fork arms, not subsequent FSM chunks or distant route crossings.
+
 ## 5. Stable contracts and constraints
 
 - `BicycleController` remains a stable API. Other systems may observe its documented properties/signals; world generation does not dictate internal kinematics.

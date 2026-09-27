@@ -15,6 +15,8 @@ const RoadGraphClass = preload("res://scripts/world/road_graph.gd")
 const RoadGrammarClass = preload("res://scripts/world/road_grammar.gd")
 const RoadMathClass = preload("res://scripts/world/road_math.gd")
 const ForkSitePlannerClass = preload("res://scripts/world/fork_site_planner.gd")
+const ForkCorridorPreviewPlannerClass = preload("res://scripts/world/fork_corridor_preview_planner.gd")
+const ForkArmGeometryClass = preload("res://scripts/world/fork_arm_geometry.gd")
 const FORK_ARM_CENTER_OFFSET_M: float = 0.9 ## Half the 1.8m nominal width; arms begin at their inner-edge split.
 
 # ==============================================================================
@@ -108,6 +110,8 @@ var last_chunk_gen_ms: float = 0.0
 var last_chunk_timings: Dictionary = {}
 var last_fork_site_evaluation: Dictionary = {}
 var fork_site_planner: RefCounted = ForkSitePlannerClass.new()
+var fork_corridor_preview_planner: RefCounted = ForkCorridorPreviewPlannerClass.new()
+var last_fork_corridor_preview: Dictionary = {}
 
 # Backward compatibility properties
 var road_path: RefCounted:
@@ -285,75 +289,27 @@ func _generate_fork_arm_samples(
 	samples_count: int = 25,
 	step_len: float = 2.0
 ) -> Array[Vector3]:
-	var inner_verts: Array[Vector3] = []
 	var r_path: RefCounted = branch.road_path
-	var angle_magnitude: float = 5.0 if branch.route_style == RoadGrammarClass.RouteStyle.FLOW else 10.0
-	var div_angle_deg: float = angle_magnitude if branch_idx == 0 else -angle_magnitude
-	var w_start: float = 1.8
-	var w_end: float = 1.6 if branch.route_style == RoadGrammarClass.RouteStyle.FLOW else 1.35
-	var seg_type: int = RoadPathDataClass.SegmentType.CRUISE_DOWNHILL
-
-	var curr_pos: Vector3 = fork_pos + fork_binorm * (-w_start * 0.5 if branch_idx == 0 else w_start * 0.5)
-	var prev_pos: Vector3 = curr_pos
-	var curr_tang: Vector3 = fork_tang
-	var prev_tang: Vector3 = fork_tang
-
-	for i in range(samples_count + 1):
-		var t_norm: float = float(i) / float(samples_count)
-		var curve_factor: float = smoothstep(0.0, 0.70, t_norm)
-		var curr_heading: float = fork_heading + div_angle_deg * curve_factor
-		var curr_w: float = lerpf(w_start, w_end, smoothstep(0.0, 1.0, t_norm))
-
-		var h_rad: float = deg_to_rad(curr_heading)
-		var s_rad: float = deg_to_rad(fork_slope)
-		curr_tang = Vector3(
-			sin(h_rad) * cos(s_rad),
-			sin(s_rad),
-			cos(h_rad) * cos(s_rad)
-		).normalized()
-		var curr_norm: Vector3 = RoadMathClass.compute_ortho_normal(curr_tang, 0.0)
-		var curr_binorm: Vector3 = curr_tang.cross(curr_norm).normalized()
-
-		if i > 0:
-			var seg_chord: Vector3 = (prev_tang + curr_tang).normalized()
-			curr_pos = prev_pos + seg_chord * step_len
-		prev_pos = curr_pos
-		prev_tang = curr_tang
-
-		var curv: float = deg_to_rad(absf(div_angle_deg)) / 50.0
-
-		if i == 0 and r_path.size() > 0 and r_path.points[-1].distance_to(curr_pos) < 0.01:
+	var geometry: Dictionary = ForkArmGeometryClass.build(fork_pos, fork_tang, fork_binorm,
+		fork_heading, fork_slope, branch_idx, branch.route_style, samples_count, step_len)
+	var inner_verts: Array[Vector3] = geometry.inner_edge
+	for i in range(geometry.points.size()):
+		var point: Vector3 = geometry.points[i]
+		var width: float = geometry.widths[i]
+		if i == 0 and r_path.size() > 0 and r_path.points[-1].distance_to(point) < 0.01:
 			if not r_path.road_widths.is_empty():
-				r_path.road_widths[-1] = curr_w
+				r_path.road_widths[-1] = width
 		else:
-			r_path.append_sample(
-				curr_pos,
-				curr_tang,
-				curr_norm,
-				fork_slope,
-				curv,
-				seg_type,
-				0,
-				0.0,
-				50.0,
-				curr_w
-			)
-
-		# Inner edge calculation
-		var p_inner: Vector3
-		if branch_idx == 0:
-			p_inner = curr_pos + curr_binorm * (curr_w * 0.5)
-		else:
-			p_inner = curr_pos - curr_binorm * (curr_w * 0.5)
-
-		inner_verts.append(p_inner)
+			r_path.append_sample(point, geometry.tangents[i], geometry.normals[i], fork_slope,
+				float(geometry.curvature), RoadPathDataClass.SegmentType.CRUISE_DOWNHILL,
+				0, 0.0, 50.0, width)
 
 	if branch.road_logic:
-		branch.road_logic.last_point = curr_pos
+		branch.road_logic.last_point = geometry.points[-1]
 		var last_idx: int = r_path.size() - 1
 		branch.road_logic.last_tangent = r_path.tangents[last_idx]
 		branch.road_logic.last_normal = r_path.normals[last_idx]
-		branch.road_logic.current_heading_deg = fork_heading + div_angle_deg
+		branch.road_logic.current_heading_deg = float(geometry.heading_end)
 		branch.road_logic.current_slope_deg = fork_slope
 
 	return inner_verts
@@ -559,16 +515,21 @@ func _derive_fork_spacing(seed_value: int, branch_id: int, is_initial: bool = fa
 
 func _assign_fork_route_styles(primary: RoadBranch, alternative: RoadBranch, fork_id: int) -> void:
 	var seed_value: int = primary.road_logic.world_seed
-	var rng := RandomNumberGenerator.new()
-	rng.seed = _stable_seed(seed_value, fork_id, 19)
-	var left_style: int = RoadGrammarClass.RouteStyle.FLOW if rng.randi_range(0, 1) == 0 else RoadGrammarClass.RouteStyle.TECHNICAL
-	var right_style: int = RoadGrammarClass.RouteStyle.TECHNICAL if left_style == RoadGrammarClass.RouteStyle.FLOW else RoadGrammarClass.RouteStyle.FLOW
+	var styles: Array[int] = _predict_fork_route_styles(seed_value, fork_id)
+	var left_style: int = styles[0]
+	var right_style: int = styles[1]
 	primary.route_style = left_style
 	alternative.route_style = right_style
 	primary.road_logic.set_route_style(left_style, _stable_seed(seed_value, fork_id, 0))
 	alternative.road_logic.set_route_style(right_style, _stable_seed(seed_value, fork_id, 1))
 	primary.next_fork_distance = _derive_fork_spacing(primary.road_logic.world_seed, primary.branch_id)
 	alternative.next_fork_distance = _derive_fork_spacing(alternative.road_logic.world_seed, alternative.branch_id)
+
+func _predict_fork_route_styles(seed_value: int, fork_id: int) -> Array[int]:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = _stable_seed(seed_value, fork_id, 19)
+	var left_style: int = RoadGrammarClass.RouteStyle.FLOW if rng.randi_range(0, 1) == 0 else RoadGrammarClass.RouteStyle.TECHNICAL
+	return [left_style, RoadGrammarClass.RouteStyle.TECHNICAL if left_style == RoadGrammarClass.RouteStyle.FLOW else RoadGrammarClass.RouteStyle.FLOW]
 
 func _route_style_name(style: int) -> String:
 	match style:
@@ -595,7 +556,15 @@ func _is_safe_fork_site(branch: RoadBranch) -> bool:
 		carver,
 		braking_spec.sight_distance_m if braking_spec != null else 0.0
 	)
-	return bool(last_fork_site_evaluation.get("eligible", false))
+	if not bool(last_fork_site_evaluation.get("eligible", false)):
+		last_fork_corridor_preview = {"eligible": false, "reason_codes": ["fork_site_rejected"], "arms": [], "signature": ""}
+		return false
+	var styles: Array[int] = _predict_fork_route_styles(branch.road_logic.world_seed, next_fork_id)
+	last_fork_corridor_preview = fork_corridor_preview_planner.evaluate_pair(
+		branch.road_path.points[-1], branch.road_path.tangents[-1], branch.road_path.binormals[-1],
+		branch.road_logic.current_heading_deg, branch.road_logic.current_slope_deg,
+		styles[0], styles[1], carver)
+	return bool(last_fork_corridor_preview.get("eligible", false))
 
 # ==============================================================================
 # FORK DECISION EVALUATION & STATE TRANSITIONS
