@@ -1,13 +1,13 @@
 extends SceneTree
 
-## Stage B3a: measure the existing production MTB event envelopes without changing them.
+## Stage B3: measure production event envelopes and enforce the reviewed micro-drop bound.
 
 const RoadPathDataClass = preload("res://scripts/world/road_path_data.gd")
 const RoadLogicClass = preload("res://scripts/world/road_logic.gd")
 const GrammarClass = preload("res://scripts/world/road_grammar.gd")
 const Airborne = preload("res://scripts/world/road_airborne_contract.gd")
 
-const SEEDS: Array[int] = [184729, 42, 7319, 900001]
+const SEEDS: Array[int] = [184729, 42, 7319, 900001, 10101, 20202, 30303, 40404, 50505, 60606, 70707, 80808]
 const EVENTS: Array[Dictionary] = [
 	{"name": "crest_micro_drop", "phase": GrammarClass.FlowPhase.CREST_MICRO_DROP,
 		"segment": RoadPathDataClass.SegmentType.CREST_MICRO_DROP},
@@ -31,6 +31,12 @@ func _init() -> void:
 			_check(int(first.get("event_samples", 0)) > 0, "%s has requested production samples (seed %d)" % [event.name, seed_value])
 			_check(bool(first.get("finite", false)), "%s metrics are finite (seed %d)" % [event.name, seed_value])
 			_check(first.get("signature", "") == replay.get("signature", ""), "%s replay metrics match (seed %d)" % [event.name, seed_value])
+			if event.name == "crest_micro_drop":
+				var measured_drop: float = float(first.get("feature_height_delta_m", 0.0))
+				_check(measured_drop > 0.0 and measured_drop <= 0.35 + 0.001,
+					"crest micro-drop actual height %.3fm is within (0, 0.35m] (seed %d)" % [measured_drop, seed_value])
+				_check(int(first.get("micro_drop_samples", 0)) == 2,
+					"crest retains the two marked MICRO_DROP contacts (seed %d)" % seed_value)
 			if int(event.phase) == GrammarClass.FlowPhase.AIRBORNE_DROP:
 				_check(int(first.get("recovery_samples", 0)) > 0, "airborne event reaches grounded recovery (seed %d)" % seed_value)
 			print("MTB_EVENT_GEOMETRY seed=%d event=%s accepted=%s samples=%d event_samples=%d length_m=%.3f height_delta_m=%.3f feature_drop_m=%.3f grade_deg=%.2f..%.2f max_grade_geometry_error_deg=%.2f peak_curvature=%.5f turn_deg=%.2f airborne=%d landing=%d micro_drop=%d" % [

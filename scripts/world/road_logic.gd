@@ -316,10 +316,11 @@ func _build_crest_micro_drop(spec: RefCounted) -> void:
 			# Approach to crest: gently rise towards 0°
 			slope_deg = lerpf(slope_deg, 1.5, 0.12)
 		elif i == 11 or i == 12:
-			# Micro-drop apex unweighting (span = 4.0m, height step ~0.25m)
+			# Micro-drop apex unweighting (span = 4.0m, actual height drop <= 0.35m).
+			# Keep the profile in the tangent-derived geometry; do not offset positions afterward.
 			mode = Airborne.SurfaceContactMode.MICRO_DROP
 			seg_type = RoadPathDataClass.SegmentType.CREST_MICRO_DROP
-			slope_deg = -7.0
+			slope_deg = -4.5
 		else:
 			# Continuation: recover and blend into downhill
 			slope_deg = lerpf(slope_deg, -6.0, 0.15)
@@ -335,8 +336,6 @@ func _build_crest_micro_drop(spec: RefCounted) -> void:
 		
 		var seg_chord: Vector3 = (cur_t + new_tang).normalized()
 		cur_p += seg_chord * SAMPLE_STEP_LEN
-		if (i == 11 or i == 12):
-			cur_p.y -= 0.12 # Controlled vertical micro-drop
 			
 		var norm: Vector3 = RoadMath.compute_ortho_normal(new_tang, 0.0)
 		road_path.append_sample(

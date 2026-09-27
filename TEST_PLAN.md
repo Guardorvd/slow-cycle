@@ -1,5 +1,21 @@
 # Slow Cycle — Verification & Testing Protocol
 
+## Stage B3b — actual crest micro-drop height bound (2026-09-27)
+
+Command: `godot --headless --path . --script res://scripts/test/test_mtb_event_geometry_catalog.gd`.
+
+The test first reproduced the old defect: **12/12 fixed seeds** produced actual
+micro-drop heights above 0.35 m (0.552–0.608 m). After the production-only fix,
+the expanded catalogue completed **228/228 PASS** across 12 seeds and four event
+types. Every crest measured a positive 0.181–0.238 m drop, under the 0.35 m limit,
+with both `MICRO_DROP` contact samples retained. Repeated geometry signatures matched.
+
+Regressions: MTB event pipeline **8/8**; road contract **18/18**; road grammar battery
+5 × 1000 chunks PASS; route rhythm **105/105**. No new parse or ObjectDB leak warning
+was printed. Godot still reports environment errors opening `user://logs/godot.log`
+and reading the Windows root certificate store. Automated profile checks do not replace
+a manual ride.
+
 ## Stage B3a — production MTB event geometry catalogue (2026-09-27)
 
 Command: `godot --headless --path . --script res://scripts/test/test_mtb_event_geometry_catalog.gd`.

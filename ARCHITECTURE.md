@@ -122,11 +122,18 @@ replay while reporting actual point-to-point geometry; the airborne case additio
 requires accepted grounded recovery samples. It does not tune the builder, instantiate
 the bike or establish perceived difficulty.
 
-The baseline exposed one actionable documentation/geometry mismatch: the two marked
-crest micro-drop samples span about 4 m and fall **0.552–0.608 m** across the four
-catalogue seeds, while the builder comment states `h <= 0.35m`. Do not loosen the
-validator to hide this. B3b owns the focused profile correction. The measured tangent
-vs chord grade difference also remains evidence for B4's continuity audit.
+The initial baseline exposed one actionable documentation/geometry mismatch: the two
+marked crest micro-drop samples spanned about 4 m and fell **0.552–0.608 m** across the
+four catalogue seeds, while the builder comment stated `h <= 0.35m`. B3b corrected this
+locally without loosening the validator. The measured tangent vs chord grade difference
+also remains evidence for B4's continuity audit.
+
+B3b removed the extra per-point vertical offset and reduced only the marked crest
+profile slope from −7° to −4.5°. The measured fall is now **0.181–0.238 m** across
+12 fixed seeds, with the two `MICRO_DROP` samples and contact states preserved. The
+test enforces `0 < fall <= 0.35 m`; airborne, switchback, and recovery production
+builders were left unchanged. This is a bounded longitudinal road-profile feature,
+not a cross-slope or an open mountain landform.
 
 ## 9. Collision layers
 
