@@ -1,5 +1,21 @@
 # Slow Cycle — Verification & Testing Protocol
 
+## P2.1a — Fork-site endpoint preflight (2026-09-27)
+
+Command:
+
+```powershell
+& 'C:\Users\Luisa\Downloads\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe' --headless --path . --script res://scripts/test/test_fork_site_planner.gd
+```
+
+Result: exit code 0, `FORK_SITE_PLANNER_SUMMARY checks=32 failures=0`. The isolated contract cases cover a valid grounded endpoint, no path mutation and deterministic repeated output, invalid prior chunk, short/non-finite planned braking visibility, danger on each terrain side, incomplete terrain result, narrow/steep/over-curved/not-grounded samples, non-finite distance, misaligned sample arrays and invalid candidate index. A forced rejected candidate was also sent through the real streamer update: an ordinary chunk was committed, the endpoint was not widened, and no fork/child branch was created.
+
+The integrated endpoint search on each production road seed accepted the initial 350m endpoint with zero deferrals: seed `184729` ended at 349.9m, seed `42` at 350.0m, and seed `99999` at 349.9m. The two independently generated traces for each seed compared equal. This means the new planner is wired and deterministic; it does **not** demonstrate terrain-driven deferral on these seeds. The negative terrain/safety cases are verified at the evaluator, while runtime retry behavior is verified using a forced rejection seam. Keep this limitation visible when evaluating whether P2.1 is complete.
+
+Godot printed the known environment messages for unavailable `user://logs/godot.log` and the Windows root certificate store. The completed process reported no parse errors, assertion failures or leak warning. This is headless structural validation; it is not a human bike ride and does not inspect the unbuilt future fork arms.
+
+P2.1a regression run (same Godot 4.7.2 mono executable, no test source/assertions changed): route branch integration `failures=0 routes=8`; fork geometry `15/15`; branch streaming `49/49`; route intent `72/72`; terrain carver `99/99`; road contract `18/18`; mountain stress `12/12` across 60 forks and three seeds; route clearance audit `failures=0 candidates=0 seeds=2 choice_modes=2`. Center-road collider misses before/after chunk update: zero for both seeds and both fixed-choice modes. A leak warning appeared once during a parallel mountain run, then did not repeat when mountain stress was rerun alone; see `implementation_plan.md`. Environment log/certificate messages persist.
+
 ## 0. Route-Level Fork Integration (2026-09-26)
 
 Run from the project root with Godot 4.7.2 mono:

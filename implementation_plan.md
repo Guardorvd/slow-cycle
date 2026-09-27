@@ -1,5 +1,87 @@
 # План: процедурная MTB-сеть и правдоподобные развилки
 
+## P2.1 — Детерминированный terrain-aware выбор fork site
+
+**Статус:** план проверен; выполнение разрешено пользователем 27.09.2026.
+
+### Цель
+
+Перейти от чистого расписания расстояний к осознанному выбору безопасной и читаемой точки развилки. После достижения минимального интервала генератор проверяет доступный конец текущей дороги до создания fork-геометрии. Если точка не подходит, генерация продолжается обычными чанками до первого подходящего кандидата. Seed определяет всю дорогу, а решение planner-а остаётся чистой функцией текущих данных и не использует случайность.
+
+Это первая вертикальная часть этапа A в `DEVELOPMENT_ROADMAP.md`, не полный planner всей будущей сети и не реализация открытой 2D-горы.
+
+### План реализации
+
+#### TASK: [P2.1] Deterministic terrain-aware fork-site planner
+
+**Goal**: выбирать первую пригодную точку fork после seeded минимального интервала; исключить fork на невалидном, слишком резком, узком, airborne/landing участке или участке, где боковой terrain carver сообщает опасный обрыв. При отказе продолжать обычную дорогу и повторять оценку на следующем доступном chunk boundary, не делать rollback уже committed mesh.
+
+**Do**:
+
+- Добавить чистый `ForkSitePlanner` с входами `RoadPathData`, индексом candidate endpoint, результатом валидации последнего chunk и существующим `TerrainCarver`. Выход — структурированный результат `eligible`, стабильные `reason_codes` и измеренные величины для диагностики (lookback distance, min width, grade/curvature extrema, contact modes, terrain classes/danger flags, planned approach sight distance).
+- Оценивать последние 25 м доступной дороги: наличие всех необходимых массивов и конечных чисел; ширину не ниже действующего `ROAD_STANDARD_WIDTH`; grade в границах `RoadGenerationContract`; curvature не выше `MAX_CURVATURE`; только `GROUNDED` contact mode в lookback. Использовать `last_chunk_passed` как обязательное условие.
+- Оценить левый и правый бок в candidate endpoint через существующий `TerrainCarver.evaluate_profile`. Отклонить точку, если хотя бы одна сторона имеет `danger_*`; не придумывать второй независимый terrain model.
+- Подтвердить для создаваемого `BRAKING_ZONE` требуемую дальность видимости не ниже `TURN_SIGHT_DISTANCE_40KMH`; planner принимает фактическое значение phase spec, а не дублирует константу в production.
+- Интегрировать оценку в `_is_safe_fork_site`. Отказ не должен вызывать `prepare_fork_approach`, widening, создание graph node, branch или mesh. Текущая ветка продолжает штатный `_spawn_chunk_sync`, поэтому кандидат сдвигается естественно на следующий chunk.
+- Сохранять последнюю оценку в доступном для теста/диагностики поле streamer-а; не добавлять постоянный шумный игровой лог.
+- Добавить отдельный focused test для planner-а и production-path assertions в тесте ветвления/планировщика; старые regressions не менять.
+
+**Do not**:
+
+- Не менять `BicycleController`, физику, suspension/raycast, камеру, управление, материалы/шейдеры, controls и world seed policy.
+- Не менять грамматику FLOW/TECHNICAL, назначение стилей, номинальные интервалы, fork mesh/углы и математические формулы centerline.
+- Не использовать raycast для маскировки геометрических зазоров; не ослаблять или переписывать существующие тесты.
+- Не реализовывать будущую MacroLandscapeField/открытую гору, scoring всей сети, будущие fork-arm preview/rollback, декор или UX seed.
+
+**Acceptance Criteria**:
+
+1. Candidate evaluation не мутирует path, seed, grammar или graph и при одинаковом входе даёт byte-for-byte эквивалентные значимые поля результата.
+2. Валидная ровная/безопасная точка допускается; каждый отдельный критерий отказа проверен отдельным test case и возвращает стабильный reason code.
+3. Не прошедший candidate не создаёт fork node/branch и не меняет ширину существующей дороги; streamer добавляет обычный непрерывный chunk и повторно проверяет более позднюю точку.
+4. Принятый candidate использует существующий `RoadLogic`/`RoadGrammar` braking approach и существующий fork geometry path; существующие branch IDs, выборы и seeded style behavior сохраняются.
+5. На seed `184729`, `42`, `99999` и на двух диагностических последовательностях выбора генератор достигает forks без бесконечного отказа; расстояние до fork объяснено принятой точкой и числом отложенных кандидатов. Повторные прогоны совпадают.
+6. Не меняются bike/camera/control production files; старые regression scripts и assertions не редактируются.
+
+**Tests**:
+
+- Новый `scripts/test/test_fork_site_planner.gd`: валидный кандидат, отсутствующие/несогласованные массивы, слишком узкая дорога, недопустимый grade/curvature, каждый незаземлённый contact state, невалидный chunk, опасная сторона, недостаточная planned sight distance, повторяемость и отсутствие мутаций.
+- Новый либо расширенный узкий runtime harness: seeded запуск настоящего `ChunkStreamer`, сравнение accepted/rejected candidate traces и выбранного graph edge на seed `184729`, `42`, `99999`; два одинаковых прогона.
+- Без изменений прогнать как минимум `test_route_branch_integration.gd`, `test_fork_geometry_verification.gd`, `test_branch_streaming.gd`, `test_route_clearance_audit.gd`, `test_mountain_validation.gd`, `test_road_contract.gd` и свежий focused test.
+- Проверить Godot parse/runtime, exit codes и отсутствие новых leak warnings; `git diff --check`.
+- Автотелепортация/runner доказывает геометрию, выбор и детерминизм, но не заменяет ручной gameplay ride.
+
+**Files**:
+
+- Новый `scripts/world/fork_site_planner.gd`.
+- Изменить `scripts/world/chunk_streamer.gd` минимально: preload planner-а, построение входных ссылок/контрактов, принятие/отклонение кандидата и сохранение последнего решения.
+- Новый `scripts/test/test_fork_site_planner.gd`; при необходимости новый диагностический runtime runner, не переписывая старые regression scripts.
+- Обновить `ARCHITECTURE.md`, `ROAD_GENERATION.md`, `TEST_PLAN.md`, `MTB_WORLD_GENERATION_HANDOFF.md`, `DEVELOPMENT_ROADMAP.md` и этот файл фактической границей P2.1 и результатами.
+
+### Самопроверка плана до исполнения
+
+- **Граница изменений:** только planner, одна точка интеграции в streamer, focused tests и связанные документы; production bike/camera/controls вне списка.
+- **Безопасность жизненного цикла:** оценивать уже доступный chunk endpoint до вызова `prepare_fork_approach`; отказ попадает в существующую normal-chunk ветку update. Это не требует отката path/graph/mesh и сохраняет текущий поток генерации.
+- **Контракты:** пороги ширины/grade/curvature/sight берутся из имеющихся contract/grammar данных; не вводить противоречивые дубликаты. Contact states считаются по `RoadAirborneContract`; неизвестные значения — отказ с кодом.
+- **Риск чрезмерного откладывания:** runtime harness обязан измерить число подряд отклонённых точек и фактическую дистанцию до развилки на нескольких seed. Если установленный terrain danger критерий не позволяет развилке появиться либо существенно ломает заявленный ритм, не обходить его ослаблением теста: пересмотреть критерий/план и документировать результат.
+- **Риск заявить больше доказанного:** P2.1 не планирует многокилометровый маршрут и не доказывает пригодность ещё не построенных downstream arm corridor-ов. Эти обязанности остаются в следующих route-planning/alpha gates; ручной заезд тоже остаётся открытым.
+- **Порядок:** сначала focused test/contract review; затем planner и одна интеграция; tests на отвергнутый и принятый кандидат; seed/runtime matrix; полный набор сохранённых regressions; документация и commit на текущей ветке.
+
+**Решение самопроверки:** scope реализуем по существующим данным. Реализация разрешена пользователем для выполнения после проверки плана. Если фактический API/поведение текущего кода противоречит этому плану или тесты показывают блокирующее ограничение, остановиться на узком плане/отчёте, не менять bike physics и не ослаблять тесты.
+
+### Отчёт P2.1a — выполнено
+
+- Добавлен pure `ForkSitePlanner` и подключён в `_is_safe_fork_site()` до любого fork side effect. При rejection существующий `update_streaming()` вызывает обычную генерацию chunk; уже записанные данные не откатываются и не расширяются.
+- Результат содержит `eligible`, стабильные коды причин и метрики; streamer оставляет последнюю оценку в `last_fork_site_evaluation` для diagnostics. Terrain оценён тем же `TerrainCarver`, а sight distance — реальным `RoadGrammar` `BRAKING_ZONE` spec.
+- Focused runner: 32/32, exit 0. Он проверил положительные/негативные условия (включая non-finite path/sight values и неполный terrain result), отсутствие мутации, повторяемость и реальный forced-rejection update path.
+- Seed traces, два отдельных построения каждого seed дали идентичные решения: `184729` — допустимый endpoint 349.9 м, `42` — 350.0 м, `99999` — 349.9 м. На этих трёх начальных кандидатах отказов/отложенных chunk-ов нет. Это подтверждает интеграцию и seed repeat, но пока не доказывает, что реальные terrain hazards вызывают deferral в runtime.
+- Regressions: route-branch integration — 8 маршрутов PASS; fork geometry — 15/15; branch streaming — 49/49; mountain stress — 60 forks / 12 assertions PASS; road contract — 18/18; route intent — 72/72; terrain carver — 99/99; route clearance audit — `failures=0 candidates=0 seeds=2 choice_modes=2`. Clearance audit повторил 12 forks для каждого seed (`184729`, `42`) и LEFT_ONLY/RIGHT_ONLY, без центра дороги без коллизии до/после обновления чанков.
+- В параллельном прогоне mountain stress один раз напечатал `6 ObjectDB instances were leaked at exit`; тот же suite затем был повторён отдельно: exit 0, 12/12, 60 forks, и leak warning не повторился. Пока это не воспроизводится и не связано с planner allocations; фиксирую как одноразовый шум параллельного запуска, а не объявляю предупреждение исправленным.
+- В Godot остаются известные сообщения среды о невозможности записать `user://logs/godot.log` и прочитать Windows root certificate store. В отдельном mountain rerun, focused, geometry, streaming, route integration и других свежих прогонах нет повторяемого leak warning.
+- Documentation updated: runtime ownership/data-flow и P2.1a boundary in `ARCHITECTURE.md`; Stage A explicitly split into P2.1a–d and FEAT-014.4/015.x traced in architecture/roadmap; current contracts and measured results in `ROAD_GENERATION.md`, `TEST_PLAN.md`, `MTB_WORLD_GENERATION_HANDOFF.md`.
+- Bike physics, camera, controls, seed policy, grammar styles, interval formulas and existing regression assertions were not changed. Manual bike ride and proof of downstream-arm/network clearance remain open.
+
+**Следующее направление:** P2.1b — оформить RouteIntent/RoutePlan и целевые метрики маршрута из Vision и ручных ride telemetry; затем P2.1c paired corridor preview на тех же production geometry functions; затем P2.1d стабильный поиск кандидатов и pacing. После route/rideable gates B — полноценное общее 2D macro landscape/open mountain (Stage C). Финальный путь до release — `DEVELOPMENT_ROADMAP.md` stages C–H. Этот P2.1a task не объявляет Stage A/спринт FEAT-014.4 заново завершённым и не означает готовность финального build.
+
 ## Следующий шаг — P0: интеграционная проверка обеих ветвей
 
 **Статус:** выполнено 26.09.2026 после одобрения пользователя.
@@ -287,7 +369,7 @@ If a production defect is confirmed, write a separate task using the standard TA
 
 **Проверки:** новый `test_mountain_profile.gd`: `checks=39845 failures=0`, 7 seed × 3 route identity. `test_road_contract.gd`: 18/18 PASS, benchmark 5.110ms/100 chunks. `test_mountain_validation.gd`: 12/12 PASS, 60 forks, RAM delta +19.7–20.9MB. `git diff --check` passed. О существующих тестах и assertions изменений не было.
 
-**Scope limit:** модуль пока не подключён к road/terrain runtime; игровая трасса не изменилась. Следующее действие — подготовить отдельный P1.1 план интеграции общего профиля в высоту дорожной оси и terrain carving; сохранять chunk/seam/collision/determinism acceptance gates. После P1.1 перейти к P2 — route intent и выбор мест развилок по рельефу.
+**Исторический scope P1.0:** этот исходный срез добавлял только математическую модель. Интеграция в road/terrain runtime завершена отдельно в P1.1 ниже; различимый opening route intent завершён в P2.0. Актуальный полный путь от текущего состояния к финальному билду — в `DEVELOPMENT_ROADMAP.md`.
 
 ### TASK: P1.1 Интеграция макропрофиля в road centerline и terrain
 
@@ -321,7 +403,7 @@ If a production defect is confirmed, write a separate task using the standard TA
 
 **Проверки:** интеграционный runner — 968 проверок, 2 seed, 0 failures; `test_mountain_profile.gd` — 39,845/0; road contract — 18/18; fork geometry — 15/15; branch streaming — 49/49; terrain carver — 99/99; mountain validation — 12/12. Финальные прогоны завершились с exit 0 без parse/leak warnings. Остались только известные сообщения среды Godot о доступе к user log и Windows certificate store. `git diff --check` выполняется перед коммитом.
 
-**Ограничения и следующий шаг:** профиль общий для альтернатив и пока не планирует отдельные FLOW/TECHNICAL макровысотные бюджеты. Следующий этап — P2: route intent, выбор terrain-aware fork sites и проверка различимости веток. Игровое прохождение остаётся обязательной ручной оценкой; текущие автоматические проверки перемещают велосипед по геометрии/сценариям и её не заменяют. Не воспроизведённый under-fork случай остаётся в диагностическом backlog без подтверждённого дефекта.
+**Ограничения и следующий шаг:** профиль общий для альтернатив и пока не планирует отдельные FLOW/TECHNICAL макровысотные бюджеты. Различимый opening intent закрыт в P2.0; следующий шаг — P2.1 route planner и terrain-aware fork sites. Игровое прохождение остаётся обязательной ручной оценкой; автоматические проверки перемещают велосипед по геометрии/сценариям и её не заменяют. Не воспроизведённый under-fork случай остаётся в диагностическом backlog без подтверждённого дефекта.
 
 ### TASK: P2.0 Различимый детерминированный intent FLOW / TECHNICAL
 

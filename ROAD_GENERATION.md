@@ -95,6 +95,16 @@ Production `RoadLogic` seed-батарея (4 world seed × 2 style seed × 2 с
 
 Ограничение: проектированный AIRBORNE_DROP на тестовом начале TECHNICAL не проходит существующую проверку: validator измеряет 6.16–6.19m пролёта при лимите 6m и перепад 1.66–1.77m при лимите 1.2m. `RoadLogic` корректно заменяет такой кандидат recovery fallback, поэтому этот элемент намеренно не заявлен частью P2.0. Отдельно спланировать коррекцию геометрии прыжка/посадки, не ослабляя `RoadAirborneContract` или validator. Следующая маршрутная задача остаётся P2.1: выбирать fork sites по пригодности corridor/visibility/grade и планировать route intent до mesh build.
 
+## 3.5. Fork-site endpoint preflight (P2.1a)
+
+`ForkSitePlanner` — чистый evaluator уже сгенерированной точки-кандидата, подключённый в `ChunkStreamer._is_safe_fork_site()` до fork approach generation. После seeded минимального расстояния streamer проверяет доступный endpoint; отказ не вызывает `prepare_fork_approach`, widening или graph/branch/mesh mutation. Обычная генерация добавляет очередной chunk, после чего следующий доступный endpoint может быть оценён тем же способом. Planner не потребляет RNG.
+
+В текущем срезе проверяются последние 25 м centerline: согласованность размеров массивов, конечность sample values, sample spacing до `MAX_SAMPLE_SPACING`, ширина не уже `ROAD_STANDARD_WIDTH`, grade и curvature по действующему `RoadGenerationContract`, только `GROUNDED` contact state и валидность предыдущего chunk. Terrain проверяется ровно существующим `TerrainCarver.evaluate_profile()` на обеих сторонах endpoint; `danger_left/right` откладывает площадку. Минимальная видимость берётся из реального `RoadGrammar` braking-phase spec и сравнивается с `TURN_SIGHT_DISTANCE_40KMH`.
+
+Результат хранится в `ChunkStreamer.last_fork_site_evaluation`: `eligible`, стабильный список `reason_codes` и измеренные метрики. Это диагностическое состояние, а не постоянный пользовательский лог.
+
+**Граница доказательства:** это фильтр одного уже сгенерированного endpoint, не построитель RoutePlan. Он не preview-ит ещё не созданные downstream arms, не проверяет clearance всей сети и не исправляет геометрию. Полный `RouteIntent/RoutePlan`, парная оценка обоих выходов до mesh и pacing trade-offs остаются P2.1b–d в `DEVELOPMENT_ROADMAP.md`. FEAT-014.4 означает локальную carving/terrain полосу вокруг дороги; макро-ландшафт, открытая гора и horizon остаются будущим этапом C.
+
 ## 4. Контракт Прыжков и Посадок (`RoadAirborneContract`)
 
 ### 4.1. Режимы контакта (`SurfaceContactMode`)

@@ -4,7 +4,7 @@ Updated: 2026-09-27. This file is the single starting specification for continui
 
 ## 1. Product goal
 
-Build an **arcade mountain-bike riding simulator** with rides that feel like descending a real, rideable singletrack: narrow packed trail, readable flow, turns and switchbacks, rollers, controlled jumps and landings, and forks where each option leads to a distinct ride. The current task is world generation and route design; art, textures and final scenery are explicitly later. Bike physics and camera are stable systems: preserve them unless a measured route defect requires a separately approved change.
+Build a meditative, continuous MTB ride through a coherent natural world. Readable singletracks, FLOW/TECHNICAL forks, turns, switchbacks, rollers and controlled jumps/landings give the quiet ride character; they are not a race or a hardcore punishment loop. The current task is world/route generation; bike physics, camera and controls are stable systems and stay outside scope unless a measured issue has its own approved plan.
 
 ## 2. What the earlier iterations got wrong
 
@@ -31,20 +31,27 @@ The first reviewed vertical slice is implemented:
 - A `BRAKING_ZONE` is queued before each fork, with mild approach grade, >=45m sightline, and smooth width expansion from 1.8m to 3.6m over the final 25m.
 - Runtime singletrack profile is 1.8m nominal; branch lines narrow to 1.6m Flow / 1.35m Technical.
 - RoadGraph continuity allows the two centerlines to begin within the shared junction radius while still enforcing tangent continuity.
-- Fork intervals have seeded variation but are still distance scheduled. Fallback noise now derives its seed from `WorldManager.world_seed`.
+- Fork intervals have seeded variation but still start from a distance schedule. Fallback noise derives its seed from `WorldManager.world_seed`.
+- P2.1a endpoint preflight: `ForkSitePlanner` checks the last 25m at the available endpoint before fork approach/mesh/graph side effects. It uses current path/terrain/grammar contracts and defers rejected candidates through ordinary chunks. This is not a full route planner.
 
-Primary code: `scripts/world/chunk_streamer.gd`, `fork_decision_model.gd`, `road_graph.gd`, `road_logic.gd`, `road_grammar.gd`, `road_generation_contract.gd`, `road_math.gd`, `road_path_data.gd`, `road_chunk.gd`.
+Primary code: `scripts/world/chunk_streamer.gd`, `fork_site_planner.gd`, `fork_decision_model.gd`, `road_graph.gd`, `road_logic.gd`, `road_grammar.gd`, `road_generation_contract.gd`, `road_math.gd`, `road_path_data.gd`, `road_chunk.gd`.
 
 ## 4. Current limits — do not overstate completion
 
-- This is not yet a full procedural mountain route planner. No macro mountain, valley, ridge or drainage/elevation envelope exists.
-- Fork placement is still a seeded distance schedule, not a location selected from terrain, sightline, trail bench and ride composition constraints.
+- `MountainProfile` gives the road a seeded one-dimensional elevation profile, and `TerrainCarver` shapes local roadside strips. Neither provides a shared open 2D mountain/valley/ridge landscape.
+- Fork placement still begins from a seeded distance schedule. P2.1a filters the available endpoint but does not score a full ride, preview downstream arms, or choose among a route-level candidate set.
 - `ChunkStreamer` still owns branch lifecycle/preload dictionaries; graph topology now owns fork choice, but does not yet own complete route materialization.
 - There are no merge nodes or route-level planner/scorer; branches continue as separate generated paths.
 - Automated checks cover both graph choices and centerline traversal to next-fork materialization, but this is not a free-running bike ride or proof of arrival at the next decision node.
 - Initial human greybox ride feedback has now been received, but it has not yet been reproduced systematically across known seeds/choice sequences. Passing geometry tests does not settle those questions.
 
 ## 5. Next work, in order
+
+### P2.1a — Endpoint preflight (implemented in this task)
+
+`ForkSitePlanner` checks recent width, finite/aligned path samples, sample spacing, grade, curvature, grounded contact, last-chunk validation, both existing TerrainCarver danger flags and the actual planned braking-phase sight distance. Rejection has stable reason codes and falls through to a normal chunk; it does not mutate fork graph or width. The new focused test reports decision repeatability on seeds `184729`, `42`, and `99999`; see the current run in `TEST_PLAN.md` and details in `implementation_plan.md`.
+
+This step closes only the site-filtering foundation. Continue with P2.1b route intent/ride-pacing contract, then P2.1c shared paired-arm preview and clearance, then P2.1d candidate search/pacing. Read `DEVELOPMENT_ROADMAP.md` Stage A before proposing that follow-up. Do not describe P2.1a as a completed whole-route planner.
 
 ### P0 — Route-level acceptance before another generator rewrite — COMPLETED 2026-09-26
 
@@ -100,7 +107,7 @@ The collision-hole isolation substep of P0.4 is complete but inconclusive: exact
 
 The profile now contributes a bounded height correction to trunk and fork-arm road samples before chunk validation/build. Fork arms share the seeded profile and global route distance, while the child arm accounts for its local centerline starting at the fork inner edge. Terrain far rows follow road centerline elevation and retain lateral shaping. The new integration runner passed 968 checks on seeds 184729 and 42; the existing road, fork, streaming, terrain, mountain-validation, and profile suites all passed without changing prior regression assertions. See `ROAD_GENERATION.md` §3.3 and `TEST_PLAN.md` for details and known environment messages.
 
-The integration is a common macro envelope; branches still lack distinct elevation/route-intent budgets. Next prepare P2 for deterministic FLOW/TECHNICAL route planning and terrain-aware fork placement, then run an in-game ride review. Keep the unresolved exact under-fork traversal report in the diagnostic backlog; current clearance audits have not reproduced it and do not establish a production defect.
+The integration is a common macro envelope; branches still lack distinct elevation/route-intent budgets. P2.0 now gives branch openings distinct event rhythms. P2.1 route planning/fork-site selection and later full macro landscape are specified in `DEVELOPMENT_ROADMAP.md`. Keep the unresolved exact under-fork traversal report in the diagnostic backlog; current clearance audits have not reproduced it and do not establish a production defect.
 
 ### P2 — Plan route intent and forks on that envelope
 
@@ -159,6 +166,7 @@ Latest completed results: fork decision 212/212; fork geometry 15/15; branch str
 
 ## 9. Helpful project documents
 
+- `DEVELOPMENT_ROADMAP.md` — authoritative full path from current generator to final desktop build.
 - `branch_generation_review.md` — old architecture/root-cause review.
 - `implementation_plan.md` — approved implementation plan and honest execution report/remaining scope.
 - `ROAD_GENERATION.md` — current geometric and runtime fork contract.
@@ -168,4 +176,4 @@ Latest completed results: fork decision 212/212; fork geometry 15/15; branch str
 
 ### Prompt to resume in a new chat
 
-“Read `MTB_WORLD_GENERATION_HANDOFF.md`, `AGENTS.md`, `.antigravity/rules/test-integrity.md`, `implementation_plan.md` and `ROAD_GENERATION.md`. P0–P0.3 are complete. Review proposed P0.4 in `implementation_plan.md`; do not begin it until the user explicitly approves it. Preserve bicycle physics and camera, and follow the plan approval gate for later multi-file work.”
+“Read `DEVELOPMENT_ROADMAP.md`, `VISION.md`, `AGENTS.md`, `implementation_plan.md`, `MTB_WORLD_GENERATION_HANDOFF.md`, `ROAD_GENERATION.md`, `ARCHITECTURE.md` and `TEST_PLAN.md`. The goal is one meditative endless ride enriched by a coherent, rideable procedural MTB world. Foundation P0/P1 and P2.0 are complete; next is P2.1 route planner/fork-site plan. Treat old sprint/test results as historical until rerun. Preserve bicycle physics/camera, and follow the plan approval gate for each implementation stage.”

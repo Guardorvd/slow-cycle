@@ -1,82 +1,104 @@
-# Slow Cycle — System Architecture
+# Slow Cycle — Architecture and Generation Boundaries
 
-## 1. High-Level System Hierarchy
+## 1. Purpose and source of truth
+
+This document describes the current runtime contracts and the intended direction without presenting future systems as implemented. `DEVELOPMENT_ROADMAP.md` owns the full product path; `ROAD_GENERATION.md` owns geometry limits; `implementation_plan.md` owns the active task and its execution report; `TEST_PLAN.md` owns reproducible checks and measured outcomes. `AGENTS.md` and `.antigravity/rules/test-integrity.md` remain mandatory.
+
+The product target is a meditative, continuous ride through a coherent mountain world. A quiet pace is supported by readable singletracks, meaningful FLOW/TECHNICAL choices, rideable MTB features, a convincing landscape, and reliable road/terrain collision. “Meditative” does not mean featureless straight road; route rhythm and mountain scenery are part of the same goal.
+
+## 2. Current runtime ownership
 
 ```text
-Main Game Scene (res://scenes/main.tscn)
-│
-├── WorldManager (Seed, Chunk streaming coordinator)
-│    ├── RoadPathData (Core spline & surface state data contract)
-│    ├── RoadGenerationContract (Mathematical envelopes, derivatives by Δs, seam limits)
-│    ├── RoadAirborneContract (SurfaceContactMode FSM: GROUNDED, MICRO_DROP, AIRBORNE, LANDING)
-│    ├── RoadValidityValidator (Algorithmic C0/C1, curvature, slope & sight distance inspector)
-│    ├── RoadLogic / RoadGrammar (implemented deterministic MTB descent pacing & FSM)
-│    ├── ChunkStreamer (Active chunk window [N-1 ... N+5])
-│    └── [Active RoadChunks]
-│          ├── RoadMesh (ArrayMesh: gravel road with micro-texture)
-│          ├── RoadCollision (Concave CollisionShape3D on Layer 2 "Road" / Layer 5 "RoughRoad")
-│          ├── StripTerrain (Roadside shoulders, verges on Layer 3 "Grass")
-│          └── ChunkFoliage (Local MultiMeshInstance3D for pines, birches, grass)
-│
-├── Bicycle (CharacterBody3D, layer "Player", bit 8; collision mask 7)
-│    ├── 2-Point Raycast Suspension (Pitch calculation, mask 22 = Road | Grass | RoughRoad)
-│    ├── Kinematic Model (Lean-to-Steer, slope gravity, coasting, banking)
-│    ├── VisualsRoot (Decoupled Node3D: visual pitch, banking, dive, suspension compliance)
-│    ├── HandlebarCockpit (Mesh, grips, bell, steering pivot)
-│    ├── CameraRig (Stabilized 1st-person & 3rd-person spring-arm with 35% VOR limit)
-│    └── AudioController (Procedural bell, freewheel ratchet, wind, gravel, skid)
-│
-├── UI Layer (CanvasLayer)
-│    ├── MinimalHUD (Speed km/h, distance traveled)
-│    ├── DebugHUD (F3 toggle: Seed, Chunk ID, FPS, Slope, Curvature, Memory)
-│    ├── ModeSelect (Start screen: Zen Endless Road vs Riding Feel Test Track)
-│    └── [Planned] PauseMenu & MainMenu (Sprint 7: Esc overlay, settings, persistence)
-│
-└── [Planned] Autoloads
-     ├── GameState (Sprint 6: enum RIDING/PAUSED/PHOTO_MODE)
-     └── SettingsManager (Sprint 7: ConfigFile persistence)
+mode_select.tscn
+└── main.tscn
+    ├── WorldManager
+    │   ├── owns world_seed and shared deterministic resources
+    │   ├── MountainProfile (seed + route identity + arc distance)
+    │   └── ChunkStreamer
+    │       ├── branch lifecycle, chunk window and spawn schedule
+    │       ├── ForkSitePlanner: pure preflight at a generated endpoint (P2.1a)
+    │       ├── RoadGraph: fork nodes, LEFT/RIGHT edges and branch identity
+    │       └── RoadChunk instances
+    │           ├── RoadPathData → ArrayMesh and road collision
+    │           ├── TerrainCarver → local roadside cross-section/terrain collision
+    │           └── ChunkFoliage → chunk-local MultiMesh groups
+    ├── Bicycle (stable public API)
+    │   ├── CharacterBody3D movement and road/terrain ray queries
+    │   ├── upright physical root; visual lean/pitch inside VisualsRoot
+    │   └── telemetry_updated / bell_rung signals to observers
+    └── HUD and audio observe player state/signals
 ```
 
----
+### Runtime data flow
 
-## 2. Runtime Entry Points and Planned Systems
+1. `WorldManager` selects the effective seed, initializes shared resources and creates the trunk `RoadPathData` plus `RoadLogic`.
+2. `RoadLogic` asks seeded `RoadGrammar` for a phase, constructs a candidate centerline, applies the shared `MountainProfile`, and validates it before it is committed to the path. Invalid ordinary chunks use the existing bounded recovery/fallback behavior.
+3. `ChunkStreamer` checks whether the generated horizon needs another chunk. Fork spacing remains a seeded minimum-distance schedule. Once that minimum is reached, `ForkSitePlanner` evaluates the available endpoint before any fork approach widening, graph mutation or fork mesh commit. Rejected sites take the ordinary chunk path; streaming retries on a later chunk boundary.
+4. For an accepted site, existing `RoadLogic` queues a braking approach; the streamer widens the junction, constructs LEFT/RIGHT paths, registers graph edges, and commits `RoadChunk` meshes and colliders.
+5. `ForkDecisionModel` compares the rider to those actual edge centerlines. `RoadGraph` is authoritative for the chosen edge and branch ID; `ChunkStreamer` still owns chunk lifetime, preloading and dormant branch state.
+6. `RoadChunk` consumes committed road samples. `TerrainCarver` shapes local roadside strips from the same centerline plus seeded lateral relief. The current terrain is not a shared, open 2D mountain surface.
+7. The bicycle observes world collision and its own telemetry signals. It does not participate in route generation and is not changed by P2.1.
 
-- `project.godot` starts `res://scenes/mode_select.tscn`; the endless-road gameplay scene is `res://scenes/main.tscn`.
-- `project.godot` currently declares no autoloads. `GameState` and `SettingsManager` shown above are roadmap items, not runtime services.
+## 3. Implemented contract versus target architecture
 
-## 3. Collision Layer Structure
+| Concern | Implemented now | Later target |
+|---|---|---|
+| Determinism | Stable world/profile/grammar/fork sub-seeds and deterministic geometry for the same seed/choice sequence | Keep deterministic independent streams as landscape, ecology and route planning expand |
+| Large terrain shape | 1D `MountainProfile` contributes a bounded elevation overlay; `TerrainCarver` creates local roadside flanks | One shared seeded 2D mountain/valley/ridge field used by distant horizon, rideable terrain and trail planning |
+| Route intent | FLOW and TECHNICAL have distinct authored openings; later grammar remains seeded | Plan leg composition, terrain corridor and both alternatives before committing fork topology/mesh |
+| Fork location | Seeded distance threshold, followed by endpoint preflight in P2.1 | Select among terrain/sightline/grade/clearance/composition-qualified candidate corridors |
+| Geometry | `RoadPathData` and existing validator define continuous centerlines and local constraints | Route plan → C1 centerline and event geometry → validated road/terrain fit → chunk rendering/collision |
+| Topology/streaming | `RoadGraph` owns fork choice; `ChunkStreamer` owns branch/chunk lifecycle | Migrate lifecycle incrementally only when graph-backed generation passes route and streaming gates |
+| World dressing | Per-chunk foliage MultiMesh groups and local roadside terrain | Seeded ecology/secondary-trail network with exclusion corridors and measured budgets |
 
-| Layer | Mask Bit | Name | Purpose |
-|---|---|---|---|
-| 1 | 1 | Default | Static environment & default collisions |
-| 2 | 2 | Road | Packed gravel road surface (rolling res: 0.125) |
-| 3 | 4 | Grass | Soft grass verges & off-road runoffs (rolling res: 0.45) |
-| 4 | 8 | Player | Bicycle CharacterBody3D kinematic collider |
-| 5 | 16 | RoughRoad | Stony / washboard rough gravel sections (rolling res: 0.22) |
+The target flow is deliberately ordered: a shared macro field gives a candidate route its context; route intent chooses a corridor and ride rhythm; the route graph fixes topology; centerlines and events are fitted and validated; terrain is fitted to those same coordinates; chunks materialize render and collision data; foliage is placed last with road/fork/sightline exclusions. Do not generate terrain and road independently and attempt to reconcile them with wheel raycasts.
 
----
+## 4. P2.1 planner boundary
 
-## 3. Communication Rules (Zero Spaghetti)
+`ForkSitePlanner` is a pure evaluator, not a full network optimizer. It receives the currently available `RoadPathData`, candidate endpoint, prior-chunk validation result, existing `TerrainCarver`, and the `BRAKING_ZONE` sight distance supplied by `RoadGrammar`. It returns an eligibility flag, stable reason codes and measured metrics. It does not mutate path arrays, RNG state, graph topology, grammar state, meshes or colliders.
 
-1. **WorldManager $\rightarrow$ RoadChunks**:
-   - `WorldManager` owns the `WorldSeed` and computes global road segment data (`RoadSegmentData`).
-   - `RoadChunk` is a dumb renderer: it receives mathematical slice parameters and generates its local `ArrayMesh`, `CollisionShape3D`, roadside strip terrain, and local `MultiMesh` trees. It never invents world data independently.
-2. **Bicycle $\rightarrow$ World**:
-   - The bicycle is completely agnostic to how the road was made.
-   - It queries physics raycasts against Layer 2 (`Road`), Layer 3 (`Grass`), and Layer 5 (`RoughRoad`) with collision mask 22 (`2 | 4 | 16`).
-3. **Bicycle $\rightarrow$ Presentation Decoupling**:
-   - The root `CharacterBody3D` stays strictly upright in world space (`Basis.Y = (0, 1, 0)`), handling only horizontal translation, slope velocity, and yaw rotation.
-   - All visual lean (`current_bank`), terrain slope smoothing (`visual_pitch`), braking dive (`brake_dive_pitch`), and vertical compliance (`suspension_compression`) are isolated inside `VisualsRoot`.
-4. **Bicycle $\rightarrow$ UI & Audio**:
-   - The bicycle emits clean typed signals:
-     - `telemetry_updated(speed_kmh: float, cadence_pct: float, is_coasting: bool)`
-     - `bell_rung()`
-   - UI (`HUD`, `DebugHUD`) and Audio (`BikeAudioManager`) listen to these signals passively without modifying bicycle state.
+The initial gate checks the last 25 m for aligned/finite samples, sample spacing, standard road width, existing grade/curvature bounds and grounded contact. It checks both terrain-carver sides for the existing danger signal and verifies the actual braking phase has at least the contract sight distance. A rejection creates no fork side effects; the current 50 m chunk is generated normally, allowing a later endpoint to be reconsidered. It does not inspect yet-unbuilt downstream arms or promise a globally optimal route. Those remain later roadmap work and need separate evidence/acceptance criteria.
 
-## 4. Procedural Fork Runtime
+## 5. Stable contracts and constraints
 
-- `RoadGraph` owns stable LEFT/RIGHT outgoing edge identity. Each edge stores its branch centerline (`RoadPathData`) and branch id.
-- `ForkDecisionModel` evaluates rider position/course against those centerlines. `ChunkStreamer` resolves the locked choice through the graph edge and activates its branch id.
-- `ChunkStreamer` still owns chunk lifetime, preloading and dormant-branch cleanup; graph-driven materialization is not yet complete.
-- Branch grammars receive deterministic `FLOW` and `TECHNICAL` roles. A braking/sightline chunk is generated before each junction. Main trail width is 1.8m, junction width 3.6m, with technical route samples narrowing to 1.35m.
-- Fork spacing still uses a seeded distance schedule. Macro terrain planning, path merges, route-level quality scoring and manual ride review remain follow-up work.
+- `BicycleController` remains a stable API. Other systems may observe its documented properties/signals; world generation does not dictate internal kinematics.
+- The physical bicycle root stays upright; presentation lean/pitch remains in `VisualsRoot`.
+- Road geometry remains mathematically continuous under `RoadGenerationContract`; raycasts cannot hide geometric tears, normal flips or height steps.
+- Every stochastic-looking world choice must derive from stable seed/key inputs. Candidate evaluation itself is deterministic and consumes no RNG.
+- Keep one local MultiMesh per chunk/group for culling; never consolidate infinite-world foliage into one global MultiMesh.
+- No gears, stamina, stunt scoring, inventory or unrelated gameplay loop is part of the world-generation scope.
+
+## 6. Collision layers
+
+The bicycle queries the existing road and surface layers through its configured collision mask. Road generation and physics contracts are coupled at the collision interface only; P2.1 does not edit that mask or tune wheel raycasts.
+
+| Godot layer | Name | World purpose |
+|---|---|---|
+| 2 | Road | Packed road surface |
+| 3 | Grass / terrain | Local roadside terrain and verge surface |
+| 4 | Player | Bicycle character body |
+| 5 | RoughRoad | Rough road surface |
+
+## 7. Legacy feature traceability
+
+The historic sprint ID alone does not imply that the full product goal is done.
+
+| Backlog item | Status/scope | Roadmap placement |
+|---|---|---|
+| FEAT-014.4 Terrain Carving & Surface Physics | Completed local roadside cross-section, terrain collision metadata/surface integration. It is not open mountain terrain. | Foundation feeding Stage C; broader macro terrain work remains |
+| FEAT-014.5 fork/branch streaming foundation | Completed graph choice and chunk lifecycle foundation; ownership is still split | Stage A/B foundation; lifecycle evolution remains incremental |
+| P0/P1 and P2.0 | Current diagnostic/integration foundation, macro elevation overlay and distinct branch openings | Completed groundwork before Stage A/B |
+| P2.1a | Terrain-aware eligible endpoint selection before fork generation | Stage A, current foundation slice; paired route planner remains open |
+| FEAT-015.1 distant mountain horizon | Planned | Stage C: visual macro landscape |
+| FEAT-015.2 open mountain downhill terrain | Planned | Stage C: continuous near/far mountain field |
+| FEAT-015.3 mountain trails/singletracks | Planned; playable network must connect to route graph or be clearly decorative | Stage D after shared landscape and route corridors |
+| FEAT-015.4 far terrain LOD/streaming | Planned | Stage C performance/completeness gate, then Stage G soak |
+
+## 8. Entry points and references
+
+- `project.godot` starts `res://scenes/mode_select.tscn`; `res://scenes/main.tscn` hosts the ride.
+- Full product stages and intermediate build gates: `DEVELOPMENT_ROADMAP.md`.
+- Geometry/event limits and P0–P2 behavior: `ROAD_GENERATION.md`.
+- Current sprint plan and actual execution log: `implementation_plan.md`.
+- Reproducible test commands, results and limits: `TEST_PLAN.md`.
+- Current handoff summary: `MTB_WORLD_GENERATION_HANDOFF.md`.

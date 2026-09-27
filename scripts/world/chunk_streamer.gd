@@ -14,6 +14,7 @@ const ForkDecisionModelClass = preload("res://scripts/world/fork_decision_model.
 const RoadGraphClass = preload("res://scripts/world/road_graph.gd")
 const RoadGrammarClass = preload("res://scripts/world/road_grammar.gd")
 const RoadMathClass = preload("res://scripts/world/road_math.gd")
+const ForkSitePlannerClass = preload("res://scripts/world/fork_site_planner.gd")
 const FORK_ARM_CENTER_OFFSET_M: float = 0.9 ## Half the 1.8m nominal width; arms begin at their inner-edge split.
 
 # ==============================================================================
@@ -104,6 +105,8 @@ var next_fork_id: int = 1
 
 var last_chunk_gen_ms: float = 0.0
 var last_chunk_timings: Dictionary = {}
+var last_fork_site_evaluation: Dictionary = {}
+var fork_site_planner: RefCounted = ForkSitePlannerClass.new()
 
 # Backward compatibility properties
 var road_path: RefCounted:
@@ -572,8 +575,21 @@ func _route_style_name(style: int) -> String:
 
 func _is_safe_fork_site(branch: RoadBranch) -> bool:
 	if branch == null or branch.road_path == null or branch.road_path.size() < 2:
+		last_fork_site_evaluation = {"eligible": false, "reason_codes": ["path_unavailable"], "metrics": {}}
 		return false
-	return branch.road_logic.last_chunk_passed
+	if branch.road_logic == null or branch.road_logic.grammar == null:
+		last_fork_site_evaluation = {"eligible": false, "reason_codes": ["road_logic_unavailable"], "metrics": {}}
+		return false
+	var braking_spec = branch.road_logic.grammar.get_phase_spec(RoadGrammarClass.FlowPhase.BRAKING_ZONE)
+	var carver: RefCounted = shared_materials.get("terrain_carver")
+	last_fork_site_evaluation = fork_site_planner.evaluate_site(
+		branch.road_path,
+		branch.road_path.size() - 1,
+		branch.road_logic.last_chunk_passed,
+		carver,
+		braking_spec.sight_distance_m if braking_spec != null else 0.0
+	)
+	return bool(last_fork_site_evaluation.get("eligible", false))
 
 # ==============================================================================
 # FORK DECISION EVALUATION & STATE TRANSITIONS
