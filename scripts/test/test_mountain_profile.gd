@@ -15,6 +15,8 @@ func _init() -> void:
 	_test_boundary_continuity()
 	_test_contract_envelope_and_descent()
 	_test_profile_diversity()
+	_test_biome_determinism_and_continuity()
+	_test_biome_zone_alternation_and_diversity()
 	print("MOUNTAIN_PROFILE_SUMMARY checks=%d failures=%d seeds=%d routes=%d" % [checks, failures, SEEDS.size(), ROUTES.size()])
 	quit(1 if failures > 0 else 0)
 
@@ -100,3 +102,86 @@ func _check(condition: bool, label: String) -> void:
 	if not condition:
 		failures += 1
 		push_error("[MOUNTAIN_PROFILE FAIL] %s" % label)
+
+func _test_biome_determinism_and_continuity() -> void:
+	var distances: Array[float] = [0.0, 50.0, 100.0, 200.0, 500.0, 1250.0, 3000.0, 5000.0]
+	for seed_value in SEEDS:
+		for route_id in ROUTES:
+			var profile = Profile.new(seed_value, route_id, 1200.0)
+			_check(profile.get_mountain_weight_at(-10.0) == 0.5, "negative distance weight seed=%d" % seed_value)
+			_check(profile.get_biome_zone_at(-10.0) == Profile.BiomeZone.TRANSITION, "negative distance zone seed=%d" % seed_value)
+
+			var clone = Profile.new(seed_value, route_id, 1200.0)
+			for d in distances:
+				var w1: float = profile.get_mountain_weight_at(d)
+				var w2: float = clone.get_mountain_weight_at(d)
+				var z1: int = profile.get_biome_zone_at(d)
+				var z2: int = clone.get_biome_zone_at(d)
+				_check(is_equal_approx(w1, w2), "deterministic weight seed=%d route=%s s=%.1f" % [seed_value, route_id, d])
+				_check(z1 == z2, "deterministic zone seed=%d route=%s s=%.1f" % [seed_value, route_id, d])
+				_check(w1 >= 0.0 and w1 <= 1.0, "weight bounded [0,1] seed=%d s=%.1f" % [seed_value, d])
+
+		var p = Profile.new(seed_value, "main", 0.0)
+		var prev_w: float = p.get_mountain_weight_at(0.0)
+		for step in range(1, 1001):
+			var s: float = float(step) * 2.0
+			var curr_w: float = p.get_mountain_weight_at(s)
+			_check(absf(curr_w - prev_w) < 0.02, "weight C0 continuous step=%d s=%.1f dw=%.4f" % [step, s, absf(curr_w - prev_w)])
+			prev_w = curr_w
+
+func _test_biome_zone_alternation_and_diversity() -> void:
+	for seed_value in [10101, 20202, 30303, 184729, 42]:
+		var profile = Profile.new(seed_value, "main", 0.0)
+		var m_count: int = 0
+		var f_count: int = 0
+		var t_count: int = 0
+		var switches: int = 0
+		var last_main_zone: int = -1
+		var current_zone: int = -1
+		var zone_start_s: float = 0.0
+		var zone_lengths: Array[Dictionary] = []
+
+		var sample_step_m: float = 10.0
+		var max_distance_m: float = 5000.0
+		var steps: int = int(max_distance_m / sample_step_m)
+
+		for step in range(steps + 1):
+			var s: float = float(step) * sample_step_m
+			var zone: int = profile.get_biome_zone_at(s)
+			match zone:
+				Profile.BiomeZone.MOUNTAIN:
+					m_count += 1
+					if last_main_zone == Profile.BiomeZone.FOREST:
+						switches += 1
+					last_main_zone = Profile.BiomeZone.MOUNTAIN
+				Profile.BiomeZone.FOREST:
+					f_count += 1
+					if last_main_zone == Profile.BiomeZone.MOUNTAIN:
+						switches += 1
+					last_main_zone = Profile.BiomeZone.FOREST
+				Profile.BiomeZone.TRANSITION:
+					t_count += 1
+
+			if current_zone == -1:
+				current_zone = zone
+				zone_start_s = s
+			elif zone != current_zone:
+				zone_lengths.append({"zone": current_zone, "len": s - zone_start_s, "start": zone_start_s, "end": s})
+				current_zone = zone
+				zone_start_s = s
+		zone_lengths.append({"zone": current_zone, "len": max_distance_m - zone_start_s, "start": zone_start_s, "end": max_distance_m})
+
+		_check(switches >= 4, "alternation switches >= 4 (actual=%d) seed=%d" % [switches, seed_value])
+
+		var total_samples: float = float(steps + 1)
+		var m_ratio: float = float(m_count) / total_samples
+		var f_ratio: float = float(f_count) / total_samples
+		var t_ratio: float = float(t_count) / total_samples
+		_check(m_ratio >= 0.30 and m_ratio <= 0.85, "mountain ratio in [0.30, 0.85] (actual=%.2f) seed=%d" % [m_ratio, seed_value])
+		_check(f_ratio >= 0.08 and f_ratio <= 0.60, "forest ratio in [0.08, 0.60] (actual=%.2f) seed=%d" % [f_ratio, seed_value])
+		_check(t_ratio >= 0.05, "transition ratio >= 0.05 (actual=%.2f) seed=%d" % [t_ratio, seed_value])
+
+		for i in range(1, zone_lengths.size() - 1):
+			var seg: Dictionary = zone_lengths[i]
+			if seg.zone != Profile.BiomeZone.TRANSITION:
+				_check(float(seg.len) >= 50.0, "stable non-transition zone length >= 50m (actual=%.1fm) seed=%d start=%.1f" % [seg.len, seed_value, seg.start])

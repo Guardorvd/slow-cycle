@@ -36,7 +36,7 @@ static func compute_foliage_and_decor_transforms(
 	var tree_chance: float = 0.25 if is_open_meadow else 0.75
 
 	# Half-open interval [s_idx, e_idx) prevents duplicate foliage at chunk boundaries
-	var count_pts: int = (e_idx - s_idx) if e_idx < path_data.size() - 1 else (e_idx - s_idx + 1)
+	var count_pts: int = e_idx - s_idx
 	var start_offset: int = (3 - (s_idx % 3)) % 3
 
 	for i in range(start_offset, count_pts, 3):

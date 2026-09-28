@@ -18,7 +18,9 @@ enum FlowPhase {
 	CREST_MICRO_DROP = 4,     ## h <= 0.35m, brief crest unweighting
 	AIRBORNE_DROP = 5,        ## h <= 1.2m, L <= 6m, controlled ballistic lip
 	VALID_LANDING_SURFACE = 6,## R >= 50m, matching downhill trajectory receiving wheels
-	RECOVERY_FLAT = 7         ## -1.5°..+1.0°, wide sunny meadow for rollout and rest
+	RECOVERY_FLAT = 7,        ## -1.5°..+1.0°, wide sunny meadow for rollout and rest
+	WINDING_SINGLETRACK = 8,  ## -5°..-8°, continuous winding mountain singletrack (Phase 6B/6C)
+	FOREST_CRUISE = 9         ## -1°..-4°, gentle forest cruise with smooth sweeping curves (Phase 6B/6C)
 }
 
 enum RouteStyle {
@@ -84,6 +86,16 @@ func get_current_phase() -> int:
 
 func get_curve_direction() -> float:
 	return curve_dir
+
+var _mountain_weight: float = 0.5
+
+## Sets the continuous biome weight in [0.0, 1.0] (1.0 = pure mountain, 0.0 = pure forest).
+## Downstream FSM transitions dynamically interpolate their probabilities based on this weight.
+func set_biome_context(mountain_weight: float) -> void:
+	_mountain_weight = clampf(mountain_weight, 0.0, 1.0)
+
+func get_mountain_weight() -> float:
+	return _mountain_weight
 
 ## Assigns a deterministic route identity to a branch and gives it a distinct opening rhythm.
 ## Both profiles retain the normal weighted grammar after their authored opening sequence.
@@ -176,13 +188,56 @@ func advance_phase() -> PhaseSpec:
 			curve_dir *= -1.0
 	return get_phase_spec(current_phase)
 
-## Weighted FSM Transition Table with strict hard constraints
+## Weighted FSM Transition Table with strict hard constraints and continuous biome adaptation
 func _replenish_phase_queue() -> void:
 	var roll: float = rng.randf()
 	var profile: Dictionary = _get_rhythm_profile()
 	var major_event_allowed: bool = _recent_major_event_count() < int(profile.major_event_limit)
 
 	match current_phase:
+		FlowPhase.WINDING_SINGLETRACK:
+			# Mountain singletrack: stays winding, plunges into switchback, prepares braking, or micro-drop.
+			# In forest conditions, smoothly transitions to FOREST_CRUISE.
+			var p_switchback: float = lerpf(0.05, 0.25, _mountain_weight)
+			var p_winding: float = lerpf(0.05, 0.45, _mountain_weight)
+			var p_braking: float = lerpf(0.10, 0.15, _mountain_weight)
+			var p_crest: float = lerpf(0.15, 0.15, _mountain_weight)
+
+			if major_event_allowed and roll < p_switchback:
+				phase_queue.append(FlowPhase.BRAKING_ZONE)
+				curve_dir = -1.0 if rng.randf() < 0.5 else 1.0
+				phase_queue.append(FlowPhase.SWITCHBACK)
+				phase_queue.append(FlowPhase.RECOVERY_FLAT)
+			elif roll < p_switchback + p_winding:
+				phase_queue.append(FlowPhase.WINDING_SINGLETRACK)
+			elif roll < p_switchback + p_winding + p_braking:
+				phase_queue.append(FlowPhase.BRAKING_ZONE)
+			elif roll < p_switchback + p_winding + p_braking + p_crest:
+				phase_queue.append(FlowPhase.CREST_MICRO_DROP)
+			elif _mountain_weight < 0.40:
+				phase_queue.append(FlowPhase.FOREST_CRUISE)
+			else:
+				phase_queue.append(FlowPhase.CRUISE_DOWNHILL)
+
+		FlowPhase.FOREST_CRUISE:
+			# Forest cruising: long gentle sweepers, transitions back to downhill or meadow.
+			# In mountain conditions, smoothly transitions to WINDING_SINGLETRACK.
+			var p_forest: float = lerpf(0.60, 0.05, _mountain_weight)
+			var p_cruise: float = lerpf(0.20, 0.15, _mountain_weight)
+			var p_crest: float = lerpf(0.12, 0.10, _mountain_weight)
+			var p_flat: float = lerpf(0.05, 0.05, _mountain_weight)
+
+			if roll < p_forest:
+				phase_queue.append(FlowPhase.FOREST_CRUISE)
+			elif roll < p_forest + p_cruise:
+				phase_queue.append(FlowPhase.CRUISE_DOWNHILL)
+			elif roll < p_forest + p_cruise + p_crest:
+				phase_queue.append(FlowPhase.CREST_MICRO_DROP)
+			elif roll < p_forest + p_cruise + p_crest + p_flat:
+				phase_queue.append(FlowPhase.RECOVERY_FLAT)
+			else:
+				phase_queue.append(FlowPhase.WINDING_SINGLETRACK)
+
 		FlowPhase.FAST_GRAVITY_DESCENT:
 			# Fast descent MUST NEVER transition directly to switchback or drop!
 			# Always prepare with BRAKING_ZONE or decelerate to CRUISE_DOWNHILL.
@@ -205,13 +260,17 @@ func _replenish_phase_queue() -> void:
 			elif major_event_allowed and roll < switchback_chance + airborne_chance:
 				phase_queue.append(FlowPhase.AIRBORNE_DROP)
 				phase_queue.append(FlowPhase.RECOVERY_FLAT)
+			elif _mountain_weight >= 0.55:
+				phase_queue.append(FlowPhase.WINDING_SINGLETRACK)
 			else:
 				phase_queue.append(FlowPhase.CRUISE_DOWNHILL)
 
 		FlowPhase.SWITCHBACK:
-			# After a tight switchback, always provide recovery or cruise
-			if roll < 0.70:
+			# After a tight switchback, always provide recovery or cruise / winding
+			if roll < 0.60:
 				phase_queue.append(FlowPhase.RECOVERY_FLAT)
+			elif roll < 0.60 + lerpf(0.05, 0.30, _mountain_weight):
+				phase_queue.append(FlowPhase.WINDING_SINGLETRACK)
 			else:
 				phase_queue.append(FlowPhase.CRUISE_DOWNHILL)
 
@@ -224,43 +283,69 @@ func _replenish_phase_queue() -> void:
 			phase_queue.append(FlowPhase.RECOVERY_FLAT)
 
 		FlowPhase.CREST_MICRO_DROP:
-			# From micro-drop, roll into downhill
-			if roll < 0.60:
-				phase_queue.append(FlowPhase.CRUISE_DOWNHILL)
-			else:
+			# From micro-drop, roll into downhill or winding
+			if roll < 0.50:
+				if _mountain_weight >= 0.55:
+					phase_queue.append(FlowPhase.WINDING_SINGLETRACK)
+				else:
+					phase_queue.append(FlowPhase.CRUISE_DOWNHILL)
+			elif roll < 0.85:
 				phase_queue.append(FlowPhase.FAST_GRAVITY_DESCENT)
+			elif _mountain_weight < 0.40:
+				phase_queue.append(FlowPhase.FOREST_CRUISE)
+			else:
+				phase_queue.append(FlowPhase.WINDING_SINGLETRACK)
 
 		FlowPhase.RECOVERY_FLAT:
-			# From flat meadow, build downhill momentum
-			if roll < 0.55:
+			# From flat meadow, build momentum
+			var p_forest: float = lerpf(0.60, 0.05, _mountain_weight)
+			var p_winding: float = lerpf(0.05, 0.50, _mountain_weight)
+			var p_cruise: float = 0.25
+			var p_fast: float = lerpf(0.05, 0.15, _mountain_weight)
+			if roll < p_forest:
+				phase_queue.append(FlowPhase.FOREST_CRUISE)
+			elif roll < p_forest + p_winding:
+				phase_queue.append(FlowPhase.WINDING_SINGLETRACK)
+			elif roll < p_forest + p_winding + p_cruise:
 				phase_queue.append(FlowPhase.CRUISE_DOWNHILL)
-			elif roll < 0.80:
+			elif roll < p_forest + p_winding + p_cruise + p_fast:
 				phase_queue.append(FlowPhase.FAST_GRAVITY_DESCENT)
 			else:
 				phase_queue.append(FlowPhase.CREST_MICRO_DROP)
 
 		FlowPhase.CRUISE_DOWNHILL, _:
-			# Normal cruising descent: branch into fast run, braking for turn, micro-drop, or meadow
-			var fast_chance: float = float(profile.cruise_to_fast_chance)
-			var technical_chance: float = float(profile.cruise_to_technical_chance)
-			var crest_chance: float = float(profile.cruise_to_crest_chance)
-			if roll < fast_chance:
-				phase_queue.append(FlowPhase.FAST_GRAVITY_DESCENT)
-			elif roll < fast_chance + technical_chance and major_event_allowed:
+			# Normal cruising descent: adapt transition based on mountain weight
+			var p_winding: float = lerpf(0.05, 0.50, _mountain_weight)
+			var p_forest: float = lerpf(0.50, 0.0, _mountain_weight)
+			var p_switchback: float = lerpf(0.08, 0.25, _mountain_weight) * (float(profile.cruise_to_technical_chance) / 0.30)
+			var p_fast: float = lerpf(0.10, 0.15, _mountain_weight) * (float(profile.cruise_to_fast_chance) / 0.35)
+			var p_braking: float = lerpf(0.12, 0.08, _mountain_weight)
+
+			if roll < p_winding:
+				phase_queue.append(FlowPhase.WINDING_SINGLETRACK)
+			elif roll < p_winding + p_forest:
+				phase_queue.append(FlowPhase.FOREST_CRUISE)
+			elif major_event_allowed and roll < p_winding + p_forest + p_switchback:
 				phase_queue.append(FlowPhase.BRAKING_ZONE)
 				curve_dir = -1.0 if rng.randf() < 0.5 else 1.0
 				phase_queue.append(FlowPhase.SWITCHBACK)
 				phase_queue.append(FlowPhase.RECOVERY_FLAT)
-			elif roll < fast_chance + technical_chance + crest_chance:
-				phase_queue.append(FlowPhase.CREST_MICRO_DROP)
+			elif roll < p_winding + p_forest + p_switchback + p_fast:
+				phase_queue.append(FlowPhase.FAST_GRAVITY_DESCENT)
+			elif roll < p_winding + p_forest + p_switchback + p_fast + p_braking:
+				phase_queue.append(FlowPhase.BRAKING_ZONE)
 			else:
-				phase_queue.append(FlowPhase.RECOVERY_FLAT)
+				phase_queue.append(FlowPhase.CREST_MICRO_DROP)
 
 func _get_rhythm_profile() -> Dictionary:
+	var forest_limit: float = 1.0 if route_style != RouteStyle.TECHNICAL else 2.0
+	var mountain_limit: float = 5.0 if route_style != RouteStyle.FLOW else 3.0
+	var effective_limit: int = int(round(lerpf(forest_limit, mountain_limit, _mountain_weight)))
+
 	match route_style:
 		RouteStyle.FLOW:
 			return {
-				"major_event_limit": 2,
+				"major_event_limit": effective_limit,
 				"cruise_to_fast_chance": 0.38,
 				"cruise_to_technical_chance": 0.18,
 				"cruise_to_crest_chance": 0.26,
@@ -270,7 +355,7 @@ func _get_rhythm_profile() -> Dictionary:
 			}
 		RouteStyle.TECHNICAL:
 			return {
-				"major_event_limit": 4,
+				"major_event_limit": effective_limit,
 				"cruise_to_fast_chance": 0.20,
 				"cruise_to_technical_chance": 0.55,
 				"cruise_to_crest_chance": 0.15,
@@ -280,7 +365,7 @@ func _get_rhythm_profile() -> Dictionary:
 			}
 		_:
 			return {
-				"major_event_limit": 3,
+				"major_event_limit": effective_limit,
 				"cruise_to_fast_chance": 0.35,
 				"cruise_to_technical_chance": 0.30,
 				"cruise_to_crest_chance": 0.17,
@@ -374,7 +459,7 @@ func get_phase_spec(phase: int) -> PhaseSpec:
 			spec.surface_mode = Airborne.SurfaceContactMode.LANDING
 			spec.banking_angle_deg = 1.0 # <= 2.0 deg
 
-		FlowPhase.RECOVERY_FLAT, _:
+		FlowPhase.RECOVERY_FLAT:
 			spec.min_slope_deg = -1.5
 			spec.max_slope_deg = 1.0
 			spec.target_speed_kmh = 22.0
@@ -382,6 +467,24 @@ func get_phase_spec(phase: int) -> PhaseSpec:
 			spec.sight_distance_m = 50.0
 			spec.surface_mode = Airborne.SurfaceContactMode.GROUNDED
 			spec.banking_angle_deg = 0.0
+
+		FlowPhase.WINDING_SINGLETRACK:
+			spec.min_slope_deg = -8.0
+			spec.max_slope_deg = -5.0
+			spec.target_speed_kmh = 30.0
+			spec.min_radius_m = 25.0
+			spec.sight_distance_m = 40.0
+			spec.surface_mode = Airborne.SurfaceContactMode.GROUNDED
+			spec.banking_angle_deg = 4.0
+
+		FlowPhase.FOREST_CRUISE, _:
+			spec.min_slope_deg = -4.0
+			spec.max_slope_deg = -1.0
+			spec.target_speed_kmh = 24.0
+			spec.min_radius_m = 65.0
+			spec.sight_distance_m = 55.0
+			spec.surface_mode = Airborne.SurfaceContactMode.GROUNDED
+			spec.banking_angle_deg = 1.0
 
 	# Parameter Clamping against Contract
 	spec.min_slope_deg = clampf(spec.min_slope_deg, Contract.MAX_GRADE_DOWNHILL, Contract.MAX_GRADE_UPHILL)

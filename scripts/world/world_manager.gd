@@ -53,10 +53,16 @@ func _find_seed_override(arguments: PackedStringArray) -> Variant:
 				return value.to_int()
 	return null
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	var player_pos: Vector3 = player.global_position if player else Vector3.ZERO
+	var player_vel: Vector3 = Vector3.ZERO
+	if player:
+		if "velocity" in player:
+			player_vel = player.velocity
+		elif "linear_velocity" in player:
+			player_vel = player.linear_velocity
 	if chunk_streamer:
-		chunk_streamer.update_streaming(player_pos)
+		chunk_streamer.update_streaming(player_pos, player_vel, delta)
 
 func request_bike_recovery(current_pos: Vector3) -> Transform3D:
 	var active_path: RefCounted = road_path

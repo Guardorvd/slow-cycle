@@ -95,6 +95,14 @@ func plan_next_chunk() -> void:
 	var snap_heading: float = current_heading_deg
 	var snap_slope: float = current_slope_deg
 	
+	# Pass current route distance mountain weight to grammar for adaptive FSM transitions
+	if mountain_profile != null:
+		var current_route_s: float = profile_distance_origin_m
+		if road_path != null and road_path.size() > 0 and road_path.cumulative_distances.size() > start_idx:
+			current_route_s += road_path.cumulative_distances[start_idx]
+		var mw: float = mountain_profile.get_mountain_weight_at(current_route_s)
+		grammar.set_biome_context(mw)
+
 	var spec: RefCounted = grammar.advance_phase()
 	
 	# Pre-generation Parameter Clamping against Contract invariants
@@ -220,6 +228,10 @@ func _generate_phase_geometry(spec: RefCounted) -> void:
 			_build_fast_gravity_descent(spec)
 		RoadGrammarClass.FlowPhase.CRUISE_DOWNHILL:
 			_build_cruise_downhill(spec)
+		RoadGrammarClass.FlowPhase.WINDING_SINGLETRACK:
+			_build_winding_singletrack_bridge(spec)
+		RoadGrammarClass.FlowPhase.FOREST_CRUISE:
+			_build_forest_cruise_bridge(spec)
 		RoadGrammarClass.FlowPhase.VALID_LANDING_SURFACE, RoadGrammarClass.FlowPhase.RECOVERY_FLAT, _:
 			_build_recovery_flat(spec)
 
@@ -447,6 +459,18 @@ func _build_recovery_flat(spec: RefCounted) -> void:
 	var target_slope: float = rng.randf_range(-1.0, 0.5)
 	var yaw_wander: float = rng.randf_range(-2.5, 2.5)
 	_build_hermite_chunk(target_slope, yaw_wander, RoadPathDataClass.SegmentType.RECOVERY_FLAT, 50.0, 0.0)
+
+## WINDING_SINGLETRACK: Geometry bridge for Phase 6B (replaced by noise curvature integrator in Phase 6C)
+func _build_winding_singletrack_bridge(spec: RefCounted) -> void:
+	var target_slope: float = rng.randf_range(-7.5, -5.5)
+	var yaw_wander: float = rng.randf_range(-12.0, 12.0)
+	_build_hermite_chunk(target_slope, yaw_wander, RoadPathDataClass.SegmentType.WINDING_SINGLETRACK, 45.0, 3.0)
+
+## FOREST_CRUISE: Geometry bridge for Phase 6B (replaced by gentle noise curvature in Phase 6C)
+func _build_forest_cruise_bridge(spec: RefCounted) -> void:
+	var target_slope: float = rng.randf_range(-3.5, -1.5)
+	var yaw_wander: float = rng.randf_range(-4.0, 4.0)
+	_build_hermite_chunk(target_slope, yaw_wander, RoadPathDataClass.SegmentType.FOREST_CRUISE, 55.0, 1.0)
 
 ## General Hermite spline generator for standard smooth phases
 func _build_hermite_chunk(target_slope: float, yaw_delta: float, seg_type: int, sight_dist: float, max_bank: float) -> void:

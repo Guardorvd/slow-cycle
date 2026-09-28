@@ -64,6 +64,8 @@ func _run() -> void:
 		if route_traces.has(style):
 			await _run_controlled_telemetry(route_traces[style], style)
 	print("ROUTE_PLAN_CONTRACT_SUMMARY checks=%d failures=%d geometry_profiles=%d physics_traces=%d" % [checks, failures, SEEDS.size() * STYLE_SALTS.size() * 2, telemetry_profiles.size()])
+	await process_frame
+	await physics_frame
 	quit(1 if failures > 0 else 0)
 
 func _test_invalid_contract_inputs() -> void:
@@ -234,6 +236,7 @@ func _run_controlled_telemetry(trace: Dictionary, style: int) -> void:
 	])
 	root_node.queue_free()
 	await process_frame
+	await physics_frame
 
 func _on_bike_telemetry(speed_kmh: float, cadence_pct: float, is_coasting: bool) -> void:
 	raw_telemetry_samples.append({"speed_kmh": speed_kmh, "cadence_pct": cadence_pct, "is_coasting": is_coasting})

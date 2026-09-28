@@ -34,7 +34,10 @@ func _change_mode_scene(path: String) -> void:
 	if is_changing_scene:
 		return
 	is_changing_scene = true
-	get_tree().change_scene_to_file(path)
+	var err: Error = get_tree().change_scene_to_file(path)
+	if err != OK:
+		push_error("Failed to load scene %s (error code %d)" % [path, err])
+		is_changing_scene = false
 
 func _on_infinite_selected() -> void:
 	_change_mode_scene("res://scenes/main.tscn")

@@ -148,6 +148,11 @@ var chunk_end_distances: Dictionary:
 		var b = get_active_branch()
 		return b.chunk_end_distances if b else {}
 
+var last_closest_idx: int:
+	get:
+		var b = get_active_branch()
+		return b.last_closest_idx if b else 0
+
 # ==============================================================================
 # INITIALIZATION & SETUP
 # ==============================================================================
@@ -640,7 +645,11 @@ func _on_branch_locked(fork_id: int, chosen_choice: int, parent_branch_id: int) 
 	var selected_branch: RoadBranch = branches.get(chosen_branch_id, null)
 	var unselected_branch: RoadBranch = branches.get(other_branch_id, null)
 
-	if selected_branch != null and selected_branch != parent:
+	if selected_branch == null:
+		push_error("ChunkStreamer: chosen_branch_id %d not found in branches during branch lock!" % chosen_branch_id)
+		return
+
+	if selected_branch != parent:
 		selected_branch.state = BranchState.ACTIVE
 		selected_branch.distance_at_last_fork = 0.0
 		selected_branch.fork_candidates_rejected = 0
@@ -653,15 +662,8 @@ func _on_branch_locked(fork_id: int, chosen_choice: int, parent_branch_id: int) 
 		if world_manager and "road_path" in world_manager:
 			world_manager.road_path = selected_branch.road_path
 	else:
-		if selected_branch != parent:
-			parent.state = BranchState.DORMANT
-			parent.generation_id += 1
-			active_branch_id = selected_branch.branch_id
-			if world_manager and "road_path" in world_manager:
-				world_manager.road_path = selected_branch.road_path
-		else:
-			parent.is_fork_spawned = false
-			parent.fork_candidates_rejected = 0
+		parent.is_fork_spawned = false
+		parent.fork_candidates_rejected = 0
 
 	if unselected_branch != null:
 		unselected_branch.state = BranchState.DORMANT

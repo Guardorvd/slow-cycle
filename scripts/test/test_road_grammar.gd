@@ -44,6 +44,11 @@ func _run_all_tests() -> void:
 	var perf_ok: bool = _test_performance_benchmark()
 	if not perf_ok: all_ok = false
 
+	# Test 4: Biome-Adapted FSM Transitions & Phase Distributions (Sprint 6 Phase 6B)
+	print("\n[TEST 4] Evaluating Biome-Adapted FSM Transitions & Phase Distributions...")
+	var biome_ok: bool = _test_biome_adapted_grammar()
+	if not biome_ok: all_ok = false
+
 	print("\n==================================================================")
 	print("             ROAD GRAMMAR TEST SUITE SUMMARY                      ")
 	print("==================================================================")
@@ -175,3 +180,99 @@ func _test_performance_benchmark() -> bool:
 	var ok: bool = report.is_valid and (avg_val_ms_per_chunk <= 0.08)
 	print("  - Performance Gate:               %s" % ("PASS" if ok else "FAIL"))
 	return ok
+
+func _test_biome_adapted_grammar() -> bool:
+	var passed: bool = true
+
+	# 1. Enum and PhaseSpec validation
+	var spec_w: RefCounted = RoadGrammarClass.new(42).get_phase_spec(RoadGrammarClass.FlowPhase.WINDING_SINGLETRACK)
+	var spec_f: RefCounted = RoadGrammarClass.new(42).get_phase_spec(RoadGrammarClass.FlowPhase.FOREST_CRUISE)
+	if spec_w.phase != RoadGrammarClass.FlowPhase.WINDING_SINGLETRACK or spec_f.phase != RoadGrammarClass.FlowPhase.FOREST_CRUISE:
+		printerr("  [FAIL] PhaseSpec enum mismatch for new phases")
+		return false
+
+	print("  - [PASS] PhaseSpec definitions verified for WINDING_SINGLETRACK and FOREST_CRUISE")
+
+	# 2. Mountain Biome Evaluation (w = 1.0)
+	var mountain_winding_pcts: Array[float] = []
+	for s in TEST_SEEDS:
+		var g := RoadGrammarClass.new(s)
+		g.set_biome_context(1.0)
+		var phase_counts: Dictionary = {}
+		var max_events_in_window: int = 0
+		var window: Array[int] = []
+
+		for c in range(CHUNKS_PER_SEED):
+			var spec: RefCounted = g.advance_phase()
+			var p: int = spec.phase
+			phase_counts[p] = phase_counts.get(p, 0) + 1
+
+			window.append(p)
+			if window.size() > 12:
+				window.pop_front()
+			var events_in_w: int = 0
+			for wp in window:
+				if wp in [RoadGrammarClass.FlowPhase.SWITCHBACK, RoadGrammarClass.FlowPhase.AIRBORNE_DROP]:
+					events_in_w += 1
+			max_events_in_window = maxi(max_events_in_window, events_in_w)
+
+		var winding_pct: float = float(phase_counts.get(RoadGrammarClass.FlowPhase.WINDING_SINGLETRACK, 0)) / float(CHUNKS_PER_SEED) * 100.0
+		mountain_winding_pcts.append(winding_pct)
+		if winding_pct < 25.0:
+			printerr("  [FAIL] Seed %d: Mountain WINDING_SINGLETRACK ratio %.1f%% < 25.0%%" % [s, winding_pct])
+			passed = false
+		if max_events_in_window > 5:
+			printerr("  [FAIL] Seed %d: Mountain major events in window %d > 5" % [s, max_events_in_window])
+			passed = false
+
+	var avg_m_winding: float = 0.0
+	for pct in mountain_winding_pcts: avg_m_winding += pct
+	avg_m_winding /= float(mountain_winding_pcts.size())
+	var min_m_winding: float = mountain_winding_pcts[0]
+	for pct in mountain_winding_pcts: min_m_winding = minf(min_m_winding, pct)
+	print("  - [PASS] Mountain (w=1.0) WINDING_SINGLETRACK avg: %.1f%% (min=%.1f%%, target >= 25%%, max window events <= 5)" % [
+		avg_m_winding, min_m_winding
+	])
+
+	# 3. Forest Biome Evaluation (w = 0.0)
+	var forest_cruise_pcts: Array[float] = []
+	for s in TEST_SEEDS:
+		var g := RoadGrammarClass.new(s)
+		g.set_biome_context(0.0)
+		var phase_counts: Dictionary = {}
+		var max_events_in_window: int = 0
+		var window: Array[int] = []
+
+		for c in range(CHUNKS_PER_SEED):
+			var spec: RefCounted = g.advance_phase()
+			var p: int = spec.phase
+			phase_counts[p] = phase_counts.get(p, 0) + 1
+
+			window.append(p)
+			if window.size() > 12:
+				window.pop_front()
+			var events_in_w: int = 0
+			for wp in window:
+				if wp in [RoadGrammarClass.FlowPhase.SWITCHBACK, RoadGrammarClass.FlowPhase.AIRBORNE_DROP]:
+					events_in_w += 1
+			max_events_in_window = maxi(max_events_in_window, events_in_w)
+
+		var cruise_pct: float = float(phase_counts.get(RoadGrammarClass.FlowPhase.FOREST_CRUISE, 0)) / float(CHUNKS_PER_SEED) * 100.0
+		forest_cruise_pcts.append(cruise_pct)
+		if cruise_pct < 35.0:
+			printerr("  [FAIL] Seed %d: Forest FOREST_CRUISE ratio %.1f%% < 35.0%%" % [s, cruise_pct])
+			passed = false
+		if max_events_in_window > 3:
+			printerr("  [FAIL] Seed %d: Forest major events in window %d > 3" % [s, max_events_in_window])
+			passed = false
+
+	var avg_f_cruise: float = 0.0
+	for pct in forest_cruise_pcts: avg_f_cruise += pct
+	avg_f_cruise /= float(forest_cruise_pcts.size())
+	var min_f_cruise: float = forest_cruise_pcts[0]
+	for pct in forest_cruise_pcts: min_f_cruise = minf(min_f_cruise, pct)
+	print("  - [PASS] Forest (w=0.0) FOREST_CRUISE avg: %.1f%% (min=%.1f%%, target >= 35%%, max window events <= 3)" % [
+		avg_f_cruise, min_f_cruise
+	])
+
+	return passed

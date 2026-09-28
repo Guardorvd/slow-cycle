@@ -454,46 +454,69 @@
 
 ---
 
-## 🏔️ Спринт 6: Открытый Горный Мир и Горизонт (Open Mountain World & Horizon)
+## 🏔️ Спринт 6: Живая Горная Генерация (Living Mountain Generation v3) (`IN PROGRESS [▶]`)
 
-### TASK: [FEAT-015.1] Дальний рельеф гор и силуэты горизонта (Distant Mountain Horizon)
-**Goal**: Создать видимый горный горизонт и дальние хребты, ликвидируя ощущение «подвешенной в пустоте ленты дороги».
-**Do**:
-- Процедурный low-poly меш горных хребтов и вершин, генерируемый вокруг игрока на расстоянии $300\text{–}1500$м.
-- Единый сид с `WorldManager` для детерминированного рельефа горной гряды.
-- Бесшовная интеграция с горизонтом и объемным туманом `forest_env.tres`.
-**Do not**: Не навешивать физические коллизии на дальние горы (`collision_layer = 0`). Не перегружать полигонаж (low-poly силуэты).
-**Acceptance Criteria**:
-- Взгляд в любую сторону открывает панораму горных хребтов и пиков, уходящих к горизонту.
-**Files**: `scripts/world/mountain_horizon.gd` (NEW), `scenes/world/mountain_horizon.tscn` (NEW), `scripts/world/world_manager.gd`.
+### `[x] [FEAT-016.1]` Фаза 6A: Зоны биомов в MountainProfile (Biome Zones & Continuous Weight)
+**Goal**: Определение зон биомов (MOUNTAIN, FOREST, TRANSITION) и расчет непрерывного веса $w \in [0.0, 1.0]$ на основе макро-уклона трассы.
+**Realized**:
+- В `scripts/world/mountain_profile.gd`:
+  - Добавлены `enum BiomeZone { MOUNTAIN = 0, FOREST = 1, TRANSITION = 2 }` и константы порогов `MOUNTAIN_THRESHOLD = -5.2` (уклон круче $\to$ гора), `FOREST_THRESHOLD = -3.5` (уклон положе $\to$ лес), `SMOOTHING_WINDOW = 200.0`.
+  - Реализован непрерывный расчет веса `get_mountain_weight_at(distance_m)` с 5-точечным ядром сглаживания $[-100, -50, 0, +50, +100]$м и защитой от отрицательной дистанции через `maxf(s, 0.0)`.
+  - Дискретный классификатор `get_biome_zone_at(distance_m)` для HUD и телеметрии.
+- В `scripts/test/test_mountain_profile.gd`:
+  - Тесты детерминизма, непрерывности $C^0$ и чередования зон на 7 сидах и 3 маршрутах.
+  - 47,444 проверки пройдены со 100% успехом (0 failures).
+**Files**: `scripts/world/mountain_profile.gd`, `scripts/test/test_mountain_profile.gd`.
 
-### TASK: [FEAT-015.2] Открытый горный склон (Open Mountain Downhill Terrain)
-**Goal**: Отказаться от узкого 20-метрового изолированного коридора в пользу единой открытой поверхности горного склона.
-**Do**:
-- Расширить генерацию террейна от жесткой 20-метровой полосы до открытого рельефа склона горы.
-- Интегрировать непрерывный макро-склон спуска: ощущение реальной огромной горы, по которой проложены маршруты.
-**Do not**: Не ломать физические контракты `collision_layer = 4` и существующие raycast-проверки колес.
-**Acceptance Criteria**:
-- Пространство вокруг дороги больше не обрывается на 20 метрах, создавая ощущение открытого горного спуска.
-**Files**: `scripts/world/terrain_carver.gd`, `scripts/world/road_chunk.gd`.
+### `[x] [FEAT-016.2]` Фаза 6B: Грамматика дороги с учётом биома (Biome-Aware RoadGrammar & FSM)
+**Goal**: Биомо-зависимая модуляция состояний генератора дороги, внедрение фаз извилистых участков и лесного круиза.
+**Realized**:
+- В `scripts/world/road_path_data.gd`:
+  - Добавлены `SegmentType.WINDING_SINGLETRACK = 15` и `SegmentType.FOREST_CRUISE = 16`.
+- В `scripts/world/road_grammar.gd`:
+  - Добавлены `FlowPhase.WINDING_SINGLETRACK = 8` и `FlowPhase.FOREST_CRUISE = 9`.
+  - Добавлены спецификации `PhaseSpec`:
+    - `WINDING_SINGLETRACK`: целевая скорость 30 км/ч, радиус 25м, крен 4°, длина 25–45м.
+    - `FOREST_CRUISE`: целевая скорость 24 км/ч, радиус 65м, крен 1°, длина 50–90м.
+  - Добавлен контекст биома `set_biome_context(mountain_weight)` с плавной линейной интерполяцией вероятностей переходов FSM по весу $w$.
+  - Динамическое масштабирование ритмического окна мажорных событий: $1..2$ в лесу $\to$ $4..5$ в горах.
+- В `scripts/world/road_logic.gd`:
+  - Передача непрерывного веса из `MountainProfile` в `RoadGrammar` на каждом шаге `plan_next_chunk`.
+  - Временные мосты генерации сегментов `_build_winding_singletrack_bridge` и `_build_forest_cruise_bridge`.
+- В `scripts/test/test_road_grammar.gd`:
+  - Добавлен тест 4 с оценкой распределения фаз на 5 сидах по 1000 чанков (250 км).
+  - В горах ($w=1.0$) доля `WINDING_SINGLETRACK` достигает $27.7\%$ (норматив $\ge 25\%$).
+  - В лесу ($w=0.0$) доля `FOREST_CRUISE` достигает $38.8\%$ (норматив $\ge 35\%$).
+  - 0 запрещенных переходов, 0 ошибок валидатора.
+**Files**: `scripts/world/road_grammar.gd`, `scripts/world/road_path_data.gd`, `scripts/world/road_logic.gd`, `scripts/test/test_road_grammar.gd`, `scripts/test/test_route_style_spacing_audit.gd`.
 
-### TASK: [FEAT-015.3] Процедурная сеть тропинок и накатов (Mountain Trail Network & Singletracks)
-**Goal**: Превратить изолированные участки в разветвленную сеть горных накатов и тропинок.
+### `[ ] [FEAT-016.3]` Фаза 6C: Генератор извилистых дорог (Noise-Driven Curvature Integration)
+**Goal**: Генерация органичной плавной кривизны через `FastNoiseLite` с механизмом возврата к среднему (Mean Reversion) $\lambda = 0.06$ м$^{-1}$ для исключения блуждания курса.
 **Do**:
-- Процедурная дифференциация типов путей: широкие гравийные просеки ($3.2$м) и узкие техничные MTB singletracks ($1.8$м).
-- Визуальная читаемость развилок и примыкающих троп на склоне горы.
-**Acceptance Criteria**:
-- С вершины горы или на развилках видны альтернативные накаты и тропы, по которым можно проехать.
-**Files**: `scripts/world/road_logic.gd`, `scripts/world/road_grammar.gd`, `scripts/world/chunk_streamer.gd`.
+- Предсоздать `FastNoiseLite` в `RoadLogic._init()` (`noise_type = TYPE_SIMPLEX_SMOOTH`, `frequency = 0.12`).
+- Реализовать методы `_build_winding_singletrack` и `_build_forest_cruise` с интегрированием кривизны $d\theta/ds = \kappa_{\text{noise}} - \lambda \cdot (\theta - \theta_{\text{macro}})$.
+- Соблюдать строгие ограничения кривизны $\kappa \le 0.0526$ ($R \ge 19.0$м) и центробежного крена.
+**Files**: `scripts/world/road_logic.gd`, `scripts/test/test_road_logic.gd`.
 
-### TASK: [FEAT-015.4] LOD и бесшовный стриминг горного массива (Far Terrain LOD & Horizon Streaming)
-**Goal**: Обеспечить плавную частоту кадров 60+ FPS при отображении дальнего горного массива.
+### `[ ] [FEAT-016.4]` Фаза 6D: Развилки по биомам (Biome-Aware Fork Pacing & Site Planning)
+**Goal**: Адаптация частоты появления развилок в зависимости от зоны биома ($150\text{–}300$м в горах, $400\text{–}700$м в лесу) и смягчение фильтра крутых откосов на горных участках.
 **Do**:
-- Стриминг дальних горных секторов с адаптивным шагом сетки (LOD).
-- Сохранение жесткого бюджета коммита геометрии $\le 1.0$ мс на кадр.
-**Acceptance Criteria**:
-- Перемещение игрока по миру не вызывает статтеров или просадок FPS при подгрузке дальних гор.
-**Files**: `scripts/world/chunk_streamer.gd`, `scripts/world/world_manager.gd`.
+- Передача `mountain_weight` в `ForkPacingPlanner` и `ForkSitePlanner`.
+- Спрямление трассы за 25м до развилки ($\|\kappa\| \le 0.005$) во избежание пересечения рукавов.
+**Files**: `scripts/world/fork_pacing_planner.gd`, `scripts/world/fork_site_planner.gd`, `scripts/world/chunk_streamer.gd`.
+
+### `[ ] [FEAT-016.5]` Фаза 6E: Непрерывная адаптация рельефа по биомам (Continuous Biome Adaptation in TerrainCarver)
+**Goal**: Плавная смена профиля рельефа без дискретных скачков сетки ($\Delta p < 0.05$м на стыках чанков).
+**Do**:
+- Модуляция ширины кюветов, глубины канав и крутизны откосов по `mountain_weight`.
+**Files**: `scripts/world/terrain_carver.gd`, `scripts/test/test_road_contract.gd`.
+
+### `[ ] [FEAT-016.6]` Фаза 6F: Интеграционное тестирование и калибровка Sprint 6
+**Goal**: Комплексная верификация сквозного пайплайна Живой Горной Генерации на протяженных дистанциях.
+**Do**:
+- Создать `scripts/test/test_sprint6_integration.gd` (прогон 5 сидов $\times$ 500 чанков).
+- Проверка радиусов, швов, частоты развилок и баланса зон.
+**Files**: `scripts/test/test_sprint6_integration.gd` (NEW).
 
 ---
 

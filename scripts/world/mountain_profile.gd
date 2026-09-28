@@ -12,10 +12,21 @@ enum MacroRegion {
 	VALLEY = 2
 }
 
+enum BiomeZone {
+	MOUNTAIN = 0,
+	FOREST = 1,
+	TRANSITION = 2
+}
+
 const PROFILE_VERSION: String = "mountain-profile-v1"
 const BASE_VERTICAL_RATE: float = -0.09
 const AMPLITUDES: Array[float] = [0.020, 0.013, 0.007]
 const WAVELENGTHS_M: Array[float] = [1800.0, 600.0, 300.0]
+
+const MOUNTAIN_THRESHOLD: float = -5.2
+const FOREST_THRESHOLD: float = -3.5
+const SMOOTHING_WINDOW: float = 200.0
+const HYSTERESIS_MARGIN: float = 0.0
 
 var world_seed: int
 var route_identity: String
@@ -46,8 +57,10 @@ func sample_at(distance_m: float) -> Dictionary:
 		vertical_rate += amplitude * sin(phase)
 		vertical_rate_derivative += amplitude * angular_frequency * cos(phase)
 		elevation_delta += (amplitude / angular_frequency) * (cos(_phases[i]) - cos(phase))
-	var grade_deg: float = rad_to_deg(asin(clampf(vertical_rate, -0.999, 0.999)))
-	var grade_rate_deg_per_m: float = rad_to_deg(vertical_rate_derivative / sqrt(1.0 - vertical_rate * vertical_rate))
+	var clamped_rate: float = clampf(vertical_rate, -0.999, 0.999)
+	var grade_deg: float = rad_to_deg(asin(clamped_rate))
+	var denom: float = maxf(0.001, sqrt(1.0 - clamped_rate * clamped_rate))
+	var grade_rate_deg_per_m: float = rad_to_deg(vertical_rate_derivative / denom)
 	return {
 		"distance_m": distance_m,
 		"elevation_m": start_elevation_m + elevation_delta,
@@ -64,6 +77,42 @@ func centerline_offset_at(distance_m: float) -> float:
 	if sample.is_empty():
 		return 0.0
 	return float(sample.elevation_m) - (start_elevation_m + BASE_VERTICAL_RATE * distance_m)
+
+## Returns continuous mountain weight in [0.0, 1.0]: 1.0 is pure mountain, 0.0 is pure forest.
+## Uses a 200m smoothing window to filter high-frequency grade fluctuations.
+func get_mountain_weight_at(distance_m: float) -> float:
+	if not is_finite(distance_m) or distance_m < 0.0:
+		return 0.5
+	var avg_grade: float = _smoothed_grade_over_window(distance_m, SMOOTHING_WINDOW)
+	return clampf(
+		(avg_grade - FOREST_THRESHOLD) / (MOUNTAIN_THRESHOLD - FOREST_THRESHOLD),
+		0.0, 1.0
+	)
+
+## Returns discrete BiomeZone enum (MOUNTAIN, FOREST, TRANSITION) for logging and discrete gates.
+func get_biome_zone_at(distance_m: float) -> int:
+	var w: float = get_mountain_weight_at(distance_m)
+	if w > 0.65 + HYSTERESIS_MARGIN:
+		return BiomeZone.MOUNTAIN
+	elif w < 0.35 - HYSTERESIS_MARGIN:
+		return BiomeZone.FOREST
+	else:
+		return BiomeZone.TRANSITION
+
+## Calculates 5-point smoothed grade over a symmetrical window centered at center_m.
+## Clamps negative sample distances to 0.0 to prevent C0 boundary discontinuities.
+func _smoothed_grade_over_window(center_m: float, window_m: float = SMOOTHING_WINDOW) -> float:
+	var total: float = 0.0
+	var count: int = 0
+	var half_w: float = window_m * 0.5
+	var quarter_w: float = half_w * 0.5
+	for offset in [-half_w, -quarter_w, 0.0, quarter_w, half_w]:
+		var s: float = maxf(center_m + offset, 0.0)
+		var sample: Dictionary = sample_at(s)
+		if not sample.is_empty():
+			total += float(sample.get("grade_deg", 0.0))
+			count += 1
+	return total / float(maxf(count, 1))
 
 static func get_base_vertical_rate() -> float:
 	return BASE_VERTICAL_RATE

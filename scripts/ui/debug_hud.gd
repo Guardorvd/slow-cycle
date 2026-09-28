@@ -136,12 +136,12 @@ func _update_telemetry_display(_delta: float, frame_ms: float) -> void:
 					fork_dist_str = "%.0fm" % delta_s
 
 			var fsm_str := "IDLE"
-			var fdm = streamer_node.get("fork_decision_model")
+			var fdm = act_b.get("decision_model") if "decision_model" in act_b else null
 			if fdm:
-				var state_val: int = fdm.get("current_state") if "current_state" in fdm else 0
+				var state_val: int = fdm.get_state() if fdm.has_method("get_state") else (fdm.get("current_state") if "current_state" in fdm else 0)
 				fsm_str = FORK_STATES[state_val] if state_val >= 0 and state_val < FORK_STATES.size() else "?"
 				if state_val == 1 or state_val == 2: # PREVIEW or COMMIT
-					var conf: float = fdm.get("confidence") if "confidence" in fdm else 0.0
+					var conf: float = fdm.get_confidence() if fdm.has_method("get_confidence") else (fdm.get("confidence_score") if "confidence_score" in fdm else 0.0)
 					var side_char := "L" if conf < 0 else "R"
 					fsm_str += " (%s:%.0f%%)" % [side_char, absf(conf) * 100.0]
 
@@ -232,9 +232,9 @@ func _capture_telemetry_snapshot() -> void:
 			if act_b.route_style >= 0 and act_b.route_style < ROUTE_STYLES.size():
 				route_style_str = ROUTE_STYLES[act_b.route_style]
 			dist_to_fork = act_b.next_fork_distance
-			var fdm = streamer.get("fork_decision_model")
+			var fdm = act_b.get("decision_model") if "decision_model" in act_b else null
 			if fdm:
-				var st: int = fdm.get("current_state") if "current_state" in fdm else 0
+				var st: int = fdm.get_state() if fdm.has_method("get_state") else (fdm.get("current_state") if "current_state" in fdm else 0)
 				fork_state_str = FORK_STATES[st] if st >= 0 and st < FORK_STATES.size() else "?"
 
 	var snapshot: Dictionary = {

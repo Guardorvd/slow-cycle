@@ -269,6 +269,8 @@ func _phase_name(phase: int) -> String:
 		RoadGrammarClass.FlowPhase.AIRBORNE_DROP: return "AIRBORNE_DROP"
 		RoadGrammarClass.FlowPhase.VALID_LANDING_SURFACE: return "VALID_LANDING_SURFACE"
 		RoadGrammarClass.FlowPhase.RECOVERY_FLAT: return "RECOVERY_FLAT"
+		RoadGrammarClass.FlowPhase.WINDING_SINGLETRACK: return "WINDING_SINGLETRACK"
+		RoadGrammarClass.FlowPhase.FOREST_CRUISE: return "FOREST_CRUISE"
 		_: return "UNKNOWN_%d" % phase
 
 func _check_role_summary() -> void:

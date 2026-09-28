@@ -12,6 +12,7 @@ func evaluate_pair(
 ) -> Dictionary:
 	var reasons: Array[String] = []
 	var arms: Array[Dictionary] = []
+	var built_arm_points: Array = []
 	var signatures: Array[String] = []
 	if left_style == right_style or not [1, 2].has(left_style) or not [1, 2].has(right_style):
 		reasons.append("route_style_pair_invalid")
@@ -66,10 +67,9 @@ func evaluate_pair(
 			"max_sample_gap_m": max_gap, "reason_codes": arm_reasons,
 			"signature": signatures[-1]
 		})
-	if arms.size() == 2:
-		var left_points: Array[Vector3] = ArmGeometry.build(fork_pos, fork_tang, fork_binorm, fork_heading, fork_slope, 0, left_style).points
-		var right_points: Array[Vector3] = ArmGeometry.build(fork_pos, fork_tang, fork_binorm, fork_heading, fork_slope, 1, right_style).points
-		var end_separation: float = left_points[-1].distance_to(right_points[-1])
+		built_arm_points.append(points)
+	if arms.size() == 2 and not built_arm_points[0].is_empty() and not built_arm_points[1].is_empty():
+		var end_separation: float = built_arm_points[0][-1].distance_to(built_arm_points[1][-1])
 		if end_separation < 8.0:
 			reasons.append("paired_arm_separation_short")
 		arms[0]["paired_end_separation_m"] = end_separation
