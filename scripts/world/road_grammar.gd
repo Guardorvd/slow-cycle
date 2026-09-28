@@ -169,6 +169,17 @@ func build_route_intent(
 func queue_fork_approach() -> void:
 	phase_queue.push_front(FlowPhase.BRAKING_ZONE)
 
+## Returns true if the next queued phase is a fork approach (BRAKING_ZONE).
+func is_fork_approach_queued() -> bool:
+	return not phase_queue.is_empty() and phase_queue[0] == FlowPhase.BRAKING_ZONE
+
+## Peeks at the next upcoming phase in the queue without consuming it.
+## Returns -1 if queue is currently empty.
+func peek_next_phase() -> int:
+	if not phase_queue.is_empty():
+		return phase_queue[0]
+	return -1
+
 ## Advances FSM and returns the next PhaseSpec envelope
 func advance_phase() -> PhaseSpec:
 	if phase_queue.is_empty():
@@ -186,6 +197,14 @@ func advance_phase() -> PhaseSpec:
 		authored_switchbacks_planned += 1
 		if authored_switchbacks_planned == 2:
 			curve_dir *= -1.0
+
+	# Pre-buffer next phase so downstream generators can inspect trail continuity
+	if phase_queue.is_empty():
+		if phases_since_last_feature >= MAX_PHASES_WITHOUT_FEATURE:
+			phase_queue.append(FlowPhase.CREST_MICRO_DROP)
+		else:
+			_replenish_phase_queue()
+
 	return get_phase_spec(current_phase)
 
 ## Weighted FSM Transition Table with strict hard constraints and continuous biome adaptation

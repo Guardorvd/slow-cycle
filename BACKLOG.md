@@ -490,13 +490,22 @@
   - 0 запрещенных переходов, 0 ошибок валидатора.
 **Files**: `scripts/world/road_grammar.gd`, `scripts/world/road_path_data.gd`, `scripts/world/road_logic.gd`, `scripts/test/test_road_grammar.gd`, `scripts/test/test_route_style_spacing_audit.gd`.
 
-### `[ ] [FEAT-016.3]` Фаза 6C: Генератор извилистых дорог (Noise-Driven Curvature Integration)
-**Goal**: Генерация органичной плавной кривизны через `FastNoiseLite` с механизмом возврата к среднему (Mean Reversion) $\lambda = 0.06$ м$^{-1}$ для исключения блуждания курса.
-**Do**:
-- Предсоздать `FastNoiseLite` в `RoadLogic._init()` (`noise_type = TYPE_SIMPLEX_SMOOTH`, `frequency = 0.12`).
-- Реализовать методы `_build_winding_singletrack` и `_build_forest_cruise` с интегрированием кривизны $d\theta/ds = \kappa_{\text{noise}} - \lambda \cdot (\theta - \theta_{\text{macro}})$.
-- Соблюдать строгие ограничения кривизны $\kappa \le 0.0526$ ($R \ge 19.0$м) и центробежного крена.
-**Files**: `scripts/world/road_logic.gd`, `scripts/test/test_road_logic.gd`.
+### `[x] [FEAT-016.3]` Фаза 6C: Генератор извилистых дорог (Noise-Driven Curvature Integration)
+**Goal**: Генерация органичной плавной кривизны через `FastNoiseLite` с механизмом возврата к среднему (Mean Reversion) $\lambda = 0.06$ м$^{-1}$ для исключения блуждания курса, гарантией $R \ge 19.0$м и спрямлением швов.
+**Realized**:
+- В `scripts/world/road_grammar.gd`:
+  - Добавлены методы `is_fork_approach_queued()` и `peek_next_phase()` с пребуферизацией очередей в `advance_phase()` для чтения контекста стыковки.
+- В `scripts/world/road_logic.gd`:
+  - Предсозданы генераторы шума `_curvature_noise` (частота 0.12, сид $+7919$) и `_forest_curvature_noise` (частота 0.04, сид $+7927$) в `_init()` с нулевым GC-давлением.
+  - Реализован метод `_build_winding_singletrack(spec)` с уравнением $d\theta/ds = \kappa_{\text{noise}} - \lambda \cdot (\theta - \theta_{\text{macro}})$, $\lambda = 0.06$, $\theta_{\text{macro}} = 180.0^\circ$ (ось $-Z$).
+  - Реализован метод `_build_forest_cruise(spec)` для мягких лесных связок ($R \approx 83$м, уклон $-3^\circ \dots -1^\circ$, крен $1^\circ$).
+  - Введено физическое ограничение радиуса $R \ge 19.0$м ($|\kappa| \le 1/19 \approx 0.05263\text{ м}^{-1}$) и rate-limiter скорости нарастания кривизны $\Delta \kappa / \Delta s \le 0.0028\text{ м}^{-2}$ (норматив $\le 0.0030$).
+  - Добавлено демпфирование кривизны при выходе из извилистого участка и подходе к развилке ($\kappa \to 0$ на финальных сэмплах).
+  - Отслеживание `last_curvature` на стыках чанков и поддержка в механизме отката (`plan_next_chunk`).
+- В `scripts/test/test_winding_road.gd` (НОВЫЙ):
+  - 8/8 проверок пройдены успешно: детерминизм (1e-6м), валидатор (0 ошибок на 5 сидах × 500 чанков), tortuosity = 1.054 (норматив $\ge 1.03$), отношение кривизны к круизу 24.5× (норматив $\ge 3\times$), отсутствие прямых $> 25$м, боковое ускорение $3.65\text{ м/с}^2 \le 5.2\text{ м/с}^2$ при 30 км/ч, демпфирование на развилке 15/15.
+- Регрессия: `test_road_grammar.gd` (250 км, 5 сидов) — 100% PASS, `test_mountain_profile.gd` (47,444 checks) — PASS, `test_sprint_4m_master.gd` (125 checks) — PASS.
+**Files**: `scripts/world/road_logic.gd`, `scripts/world/road_grammar.gd`, `scripts/test/test_winding_road.gd`.
 
 ### `[ ] [FEAT-016.4]` Фаза 6D: Развилки по биомам (Biome-Aware Fork Pacing & Site Planning)
 **Goal**: Адаптация частоты появления развилок в зависимости от зоны биома ($150\text{–}300$м в горах, $400\text{–}700$м в лесу) и смягчение фильтра крутых откосов на горных участках.

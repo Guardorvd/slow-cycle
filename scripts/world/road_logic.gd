@@ -36,7 +36,13 @@ var last_tangent: Vector3 = Vector3(0, 0, -1)
 var last_normal: Vector3 = Vector3.UP
 var current_heading_deg: float = 180.0 # 180 = -Z
 var current_slope_deg: float = 0.0
+var last_curvature: float = 0.0
 var chunks_generated: int = 0
+
+# Noise-driven curvature integration (pre-allocated once in _init to prevent GC allocations)
+var _curvature_noise: FastNoiseLite
+var _forest_curvature_noise: FastNoiseLite
+var _macro_heading_deg: float = 180.0 # Primary world downhill descent axis (-Z)
 
 # Runtime QA status
 var last_validity_report: RefCounted = null
@@ -48,6 +54,19 @@ func _init(seed_val: int, path_data: RefCounted) -> void:
 	road_path = path_data
 	grammar = RoadGrammarClass.new(seed_val)
 	mountain_profile = MountainProfileClass.new(seed_val, "world", 3.5)
+	
+	_curvature_noise = FastNoiseLite.new()
+	_curvature_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	_curvature_noise.frequency = 0.12
+	_curvature_noise.fractal_octaves = 2
+	_curvature_noise.seed = seed_val + 7919
+	
+	_forest_curvature_noise = FastNoiseLite.new()
+	_forest_curvature_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	_forest_curvature_noise.frequency = 0.04
+	_forest_curvature_noise.fractal_octaves = 2
+	_forest_curvature_noise.seed = seed_val + 7927
+	
 	_initialize_start()
 
 func _initialize_start() -> void:
@@ -56,6 +75,7 @@ func _initialize_start() -> void:
 	last_normal = Vector3.UP
 	current_heading_deg = 180.0
 	current_slope_deg = 0.0
+	last_curvature = 0.0
 	
 	# Add initial baseline sample
 	road_path.append_sample(
@@ -94,6 +114,7 @@ func plan_next_chunk() -> void:
 	var snap_norm: Vector3 = last_normal
 	var snap_heading: float = current_heading_deg
 	var snap_slope: float = current_slope_deg
+	var snap_curvature: float = last_curvature
 	
 	# Pass current route distance mountain weight to grammar for adaptive FSM transitions
 	if mountain_profile != null:
@@ -128,6 +149,7 @@ func plan_next_chunk() -> void:
 		last_normal = snap_norm
 		current_heading_deg = snap_heading
 		current_slope_deg = snap_slope
+		last_curvature = snap_curvature
 		
 		# Safe conservative fallback: straight recovery
 		_generate_conservative_safe_chunk()
@@ -229,9 +251,9 @@ func _generate_phase_geometry(spec: RefCounted) -> void:
 		RoadGrammarClass.FlowPhase.CRUISE_DOWNHILL:
 			_build_cruise_downhill(spec)
 		RoadGrammarClass.FlowPhase.WINDING_SINGLETRACK:
-			_build_winding_singletrack_bridge(spec)
+			_build_winding_singletrack(spec)
 		RoadGrammarClass.FlowPhase.FOREST_CRUISE:
-			_build_forest_cruise_bridge(spec)
+			_build_forest_cruise(spec)
 		RoadGrammarClass.FlowPhase.VALID_LANDING_SURFACE, RoadGrammarClass.FlowPhase.RECOVERY_FLAT, _:
 			_build_recovery_flat(spec)
 
@@ -310,6 +332,7 @@ func _build_switchback(spec: RefCounted) -> void:
 	current_heading_deg = rad_to_deg(heading_rad)
 	current_slope_deg = slope_deg
 	last_normal = RoadMath.compute_ortho_normal(last_tangent, 0.0)
+	last_curvature = 0.0
 
 ## CREST_MICRO_DROP: Gentle rise to crest (0°), brief unweighting step (h <= 0.35m), return to grounded
 func _build_crest_micro_drop(spec: RefCounted) -> void:
@@ -460,17 +483,177 @@ func _build_recovery_flat(spec: RefCounted) -> void:
 	var yaw_wander: float = rng.randf_range(-2.5, 2.5)
 	_build_hermite_chunk(target_slope, yaw_wander, RoadPathDataClass.SegmentType.RECOVERY_FLAT, 50.0, 0.0)
 
-## WINDING_SINGLETRACK: Geometry bridge for Phase 6B (replaced by noise curvature integrator in Phase 6C)
-func _build_winding_singletrack_bridge(spec: RefCounted) -> void:
-	var target_slope: float = rng.randf_range(-7.5, -5.5)
-	var yaw_wander: float = rng.randf_range(-12.0, 12.0)
-	_build_hermite_chunk(target_slope, yaw_wander, RoadPathDataClass.SegmentType.WINDING_SINGLETRACK, 45.0, 3.0)
+## WINDING_SINGLETRACK: Noise-driven curvature integration with Mean Reversion (Phase 6C)
+## Continuous serpentine mountain singletrack guaranteeing R >= 19.0m, seamless C1 seams,
+## and fork approach straightening damping.
+func _build_winding_singletrack(spec: RefCounted) -> void:
+	var max_curvature: float = 0.035
+	var target_slope: float = rng.randf_range(-8.0, -5.0)
+	var max_bank: float = 4.0
+	var MEAN_REVERSION_LAMBDA: float = 0.06
+	var macro_heading_rad: float = deg_to_rad(_macro_heading_deg)
+	
+	var cur_p: Vector3 = last_point
+	var cur_t: Vector3 = last_tangent
+	var heading_rad: float = deg_to_rad(current_heading_deg)
+	var slope_deg: float = current_slope_deg
+	var cur_k: float = last_curvature
+	var is_fork_queued: bool = grammar.is_fork_approach_queued()
+	var next_phase: int = grammar.peek_next_phase()
+	var is_exiting_winding: bool = is_fork_queued or (next_phase != RoadGrammarClass.FlowPhase.WINDING_SINGLETRACK)
+	
+	for i in range(1, SAMPLES_PER_CHUNK + 1):
+		var s: float = float(i) * SAMPLE_STEP_LEN
+		var s_route: float = float(chunks_generated) * CHUNK_LENGTH + s
+		
+		# Fork approach or trail exit straightening damping (Audit #5):
+		var eff_max_curv: float = max_curvature
+		if is_exiting_winding and i >= 17:
+			eff_max_curv = 0.0
+		
+		# Curvature from pre-allocated FastNoiseLite
+		var noise_val: float = _curvature_noise.get_noise_1d(s_route)
+		var k_noise: float = noise_val * eff_max_curv
+		
+		# Mean Reversion: dθ/ds = κ_noise - λ * (θ - θ_macro)
+		var heading_error: float = wrapf(heading_rad - macro_heading_rad, -PI, PI)
+		var k_correction: float = -MEAN_REVERSION_LAMBDA * heading_error
+		var k_target: float = k_noise + k_correction
+		
+		# When transitioning to a non-winding phase or fork, target zero curvature smoothly
+		if is_exiting_winding and i >= 17:
+			k_target = 0.0
+		
+		# Clamp to physical limit: R >= 19.0m (|k| <= 1/19)
+		const MAX_CURVATURE_LIMIT: float = 1.0 / 19.0
+		k_target = clampf(k_target, -MAX_CURVATURE_LIMIT, MAX_CURVATURE_LIMIT)
+		
+		# Curvature slew-rate limiter: |dk/ds| <= Contract.MAX_CURVATURE_CHANGE_PER_METER (0.003)
+		var max_delta_k: float = 0.0028 * SAMPLE_STEP_LEN
+		var delta_k: float = clampf(k_target - cur_k, -max_delta_k, max_delta_k)
+		cur_k += delta_k
+		var k_total: float = cur_k
+		
+		# Heading angle integration
+		heading_rad += k_total * SAMPLE_STEP_LEN
+		
+		# Slope smoothly eases towards target
+		slope_deg = lerpf(slope_deg, target_slope, 0.08)
+		slope_deg = RoadMath.clamp_slope_deg(slope_deg)
+		var slope_rad: float = deg_to_rad(slope_deg)
+		
+		var new_tang: Vector3 = Vector3(
+			sin(heading_rad) * cos(slope_rad),
+			sin(slope_rad),
+			cos(heading_rad) * cos(slope_rad)
+		).normalized()
+		
+		var seg_chord: Vector3 = (cur_t + new_tang).normalized()
+		cur_p += seg_chord * SAMPLE_STEP_LEN
+		
+		var bank: float = max_bank * clampf(k_total / max_curvature, -1.0, 1.0)
+		var norm: Vector3 = RoadMath.compute_ortho_normal(new_tang, bank)
+		
+		road_path.append_sample(
+			cur_p,
+			new_tang,
+			norm,
+			slope_deg,
+			absf(k_total),
+			RoadPathDataClass.SegmentType.WINDING_SINGLETRACK,
+			Airborne.SurfaceContactMode.GROUNDED,
+			bank,
+			35.0
+		)
+		cur_t = new_tang
+		
+	last_point = cur_p
+	last_tangent = cur_t
+	current_heading_deg = rad_to_deg(heading_rad)
+	current_slope_deg = slope_deg
+	last_normal = RoadMath.compute_ortho_normal(last_tangent, 0.0)
+	last_curvature = cur_k
 
-## FOREST_CRUISE: Geometry bridge for Phase 6B (replaced by gentle noise curvature in Phase 6C)
-func _build_forest_cruise_bridge(spec: RefCounted) -> void:
-	var target_slope: float = rng.randf_range(-3.5, -1.5)
-	var yaw_wander: float = rng.randf_range(-4.0, 4.0)
-	_build_hermite_chunk(target_slope, yaw_wander, RoadPathDataClass.SegmentType.FOREST_CRUISE, 55.0, 1.0)
+## FOREST_CRUISE: Gentle noise-driven curvature for flowing woodland descent (Phase 6C)
+func _build_forest_cruise(spec: RefCounted) -> void:
+	var max_curvature: float = 0.012
+	var target_slope: float = rng.randf_range(-3.0, -1.0)
+	var max_bank: float = 1.0
+	var MEAN_REVERSION_LAMBDA: float = 0.06
+	var macro_heading_rad: float = deg_to_rad(_macro_heading_deg)
+	
+	var cur_p: Vector3 = last_point
+	var cur_t: Vector3 = last_tangent
+	var heading_rad: float = deg_to_rad(current_heading_deg)
+	var slope_deg: float = current_slope_deg
+	var cur_k: float = last_curvature
+	var is_fork_queued: bool = grammar.is_fork_approach_queued()
+	var next_phase: int = grammar.peek_next_phase()
+	var is_exiting_forest: bool = is_fork_queued or (next_phase != RoadGrammarClass.FlowPhase.FOREST_CRUISE)
+	
+	for i in range(1, SAMPLES_PER_CHUNK + 1):
+		var s: float = float(i) * SAMPLE_STEP_LEN
+		var s_route: float = float(chunks_generated) * CHUNK_LENGTH + s
+		
+		var eff_max_curv: float = max_curvature
+		if is_exiting_forest and i >= 20:
+			eff_max_curv = 0.0
+			
+		var noise_val: float = _forest_curvature_noise.get_noise_1d(s_route)
+		var k_noise: float = noise_val * eff_max_curv
+		
+		var heading_error: float = wrapf(heading_rad - macro_heading_rad, -PI, PI)
+		var k_correction: float = -MEAN_REVERSION_LAMBDA * heading_error
+		var k_target: float = k_noise + k_correction
+		
+		if is_exiting_forest and i >= 20:
+			k_target = 0.0
+		
+		const MAX_CURVATURE_LIMIT: float = 1.0 / 19.0
+		k_target = clampf(k_target, -MAX_CURVATURE_LIMIT, MAX_CURVATURE_LIMIT)
+		
+		var max_delta_k: float = 0.0028 * SAMPLE_STEP_LEN
+		var delta_k: float = clampf(k_target - cur_k, -max_delta_k, max_delta_k)
+		cur_k += delta_k
+		var k_total: float = cur_k
+		
+		heading_rad += k_total * SAMPLE_STEP_LEN
+		
+		slope_deg = lerpf(slope_deg, target_slope, 0.08)
+		slope_deg = RoadMath.clamp_slope_deg(slope_deg)
+		var slope_rad: float = deg_to_rad(slope_deg)
+		
+		var new_tang: Vector3 = Vector3(
+			sin(heading_rad) * cos(slope_rad),
+			sin(slope_rad),
+			cos(heading_rad) * cos(slope_rad)
+		).normalized()
+		
+		var seg_chord: Vector3 = (cur_t + new_tang).normalized()
+		cur_p += seg_chord * SAMPLE_STEP_LEN
+		
+		var bank: float = max_bank * clampf(k_total / max_curvature, -1.0, 1.0)
+		var norm: Vector3 = RoadMath.compute_ortho_normal(new_tang, bank)
+		
+		road_path.append_sample(
+			cur_p,
+			new_tang,
+			norm,
+			slope_deg,
+			absf(k_total),
+			RoadPathDataClass.SegmentType.FOREST_CRUISE,
+			Airborne.SurfaceContactMode.GROUNDED,
+			bank,
+			50.0
+		)
+		cur_t = new_tang
+		
+	last_point = cur_p
+	last_tangent = cur_t
+	current_heading_deg = rad_to_deg(heading_rad)
+	current_slope_deg = slope_deg
+	last_normal = RoadMath.compute_ortho_normal(last_tangent, 0.0)
+	last_curvature = cur_k
 
 ## General Hermite spline generator for standard smooth phases
 func _build_hermite_chunk(target_slope: float, yaw_delta: float, seg_type: int, sight_dist: float, max_bank: float) -> void:
@@ -531,10 +714,11 @@ func _build_hermite_chunk(target_slope: float, yaw_delta: float, seg_type: int, 
 	last_point = end_point
 	last_tangent = end_tangent
 	last_normal = RoadMath.compute_ortho_normal(last_tangent, 0.0)
+	last_curvature = (road_path.curvatures[-1] if yaw_delta >= 0.0 else -road_path.curvatures[-1]) if road_path.curvatures.size() > 0 else 0.0
 
 ## Conservative safe regeneration fallback in case candidate chunk is rejected
 func _generate_conservative_safe_chunk() -> void:
-	current_slope_deg = lerpf(current_slope_deg, -2.0, 0.5)
+	current_slope_deg = lerpf(current_slope_deg, -2.0, 0.15)
 	current_slope_deg = RoadMath.clamp_slope_deg(current_slope_deg)
 	
 	var heading_rad: float = deg_to_rad(current_heading_deg)
@@ -566,3 +750,4 @@ func _generate_conservative_safe_chunk() -> void:
 	last_point = cur_p
 	last_tangent = tang
 	last_normal = norm
+	last_curvature = 0.0
