@@ -38,6 +38,27 @@ func _run() -> void:
 	_check(Planner.PACING_DEFERRAL_WINDOW_M == 200.0, "pacing review window is 200m")
 	_check(Planner.MIN_LEG_BAND_M == 550.0 and Planner.MAX_LEG_BAND_M == 900.0, "diagnostic leg band matches roadmap proposal")
 	_check(_check_trace_ring(planner), "production diagnostic history is deterministic and capped")
+
+	# Phase 6D: Biome-aware continuous pacing checks
+	var biome_planner = Planner.new()
+	biome_planner.update_pacing_for_biome(1.0)
+	_check(is_equal_approx(biome_planner.min_leg_m, Planner.MOUNTAIN_MIN_LEG_M), "mountain min leg is 200m")
+	_check(is_equal_approx(biome_planner.max_leg_m, Planner.MOUNTAIN_MAX_LEG_M), "mountain max leg is 350m")
+	_check(biome_planner.evaluate_candidate(250.0, 280.0, 0, true).metrics.pacing_band == "within", "mountain candidate in 200-350m is within band")
+	_check(biome_planner.evaluate_candidate(250.0, 180.0, 0, true).metrics.pacing_band == "short", "mountain candidate under 200m is short")
+	_check(biome_planner.evaluate_candidate(250.0, 380.0, 0, true).metrics.pacing_band == "long", "mountain candidate over 350m is long")
+
+	biome_planner.update_pacing_for_biome(0.0)
+	_check(is_equal_approx(biome_planner.min_leg_m, Planner.FOREST_MIN_LEG_M), "forest min leg is 450m")
+	_check(is_equal_approx(biome_planner.max_leg_m, Planner.FOREST_MAX_LEG_M), "forest max leg is 650m")
+	_check(biome_planner.evaluate_candidate(550.0, 550.0, 0, true).metrics.pacing_band == "within", "forest candidate in 450-650m is within band")
+	_check(biome_planner.evaluate_candidate(550.0, 400.0, 0, true).metrics.pacing_band == "short", "forest candidate under 450m is short")
+	_check(biome_planner.evaluate_candidate(550.0, 700.0, 0, true).metrics.pacing_band == "long", "forest candidate over 650m is long")
+
+	biome_planner.update_pacing_for_biome(0.5)
+	_check(is_equal_approx(biome_planner.min_leg_m, 325.0), "transition min leg interpolated to 325m")
+	_check(is_equal_approx(biome_planner.max_leg_m, 500.0), "transition max leg interpolated to 500m")
+
 	print("FORK_PACING_PLANNER_SUMMARY checks=%d failures=%d" % [checks, failures])
 	quit(1 if failures > 0 else 0)
 

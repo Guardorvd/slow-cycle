@@ -5,7 +5,38 @@ extends RefCounted
 
 const Contract = preload("res://scripts/world/road_generation_contract.gd")
 const Airborne = preload("res://scripts/world/road_airborne_contract.gd")
+const MountainProfile = preload("res://scripts/world/mountain_profile.gd")
 const LOOKBACK_METERS: float = 25.0
+
+var mountain_weight: float = 0.0
+var biome_zone: int = MountainProfile.BiomeZone.FOREST
+
+func set_mountain_weight(weight: float) -> void:
+	mountain_weight = clampf(weight, 0.0, 1.0)
+	if mountain_weight > 0.65:
+		biome_zone = MountainProfile.BiomeZone.MOUNTAIN
+	elif mountain_weight < 0.35:
+		biome_zone = MountainProfile.BiomeZone.FOREST
+	else:
+		biome_zone = MountainProfile.BiomeZone.TRANSITION
+
+func set_biome_zone(zone: int) -> void:
+	biome_zone = zone
+	if biome_zone == MountainProfile.BiomeZone.MOUNTAIN:
+		mountain_weight = 1.0
+	elif biome_zone == MountainProfile.BiomeZone.FOREST:
+		mountain_weight = 0.0
+	else:
+		mountain_weight = 0.5
+
+func _is_terrain_safe_for_fork(zone: int, danger_left: bool, danger_right: bool) -> bool:
+	if danger_left and danger_right:
+		return false
+	if not danger_left and not danger_right:
+		return true
+	if zone == MountainProfile.BiomeZone.MOUNTAIN:
+		return true
+	return false
 
 func evaluate_site(
 	path: RefCounted,
@@ -116,10 +147,17 @@ func evaluate_site(
 		metrics.right_profile = int(terrain.get("right_profile", -1))
 		metrics.danger_left = bool(terrain.get("danger_left", false))
 		metrics.danger_right = bool(terrain.get("danger_right", false))
-		if metrics.danger_left:
-			reasons.append("left_fork_corridor_danger")
-		if metrics.danger_right:
-			reasons.append("right_fork_corridor_danger")
+		metrics.mountain_weight = mountain_weight
+		metrics.biome_zone = biome_zone
+		if not _is_terrain_safe_for_fork(biome_zone, metrics.danger_left, metrics.danger_right):
+			if metrics.danger_left and metrics.danger_right:
+				reasons.append("dual_fork_corridor_danger")
+				reasons.append("left_fork_corridor_danger")
+				reasons.append("right_fork_corridor_danger")
+			elif metrics.danger_left:
+				reasons.append("left_fork_corridor_danger")
+			elif metrics.danger_right:
+				reasons.append("right_fork_corridor_danger")
 
 	return _result(reasons.is_empty(), _unique(reasons), metrics)
 

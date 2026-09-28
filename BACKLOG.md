@@ -507,12 +507,31 @@
 - Регрессия: `test_road_grammar.gd` (250 км, 5 сидов) — 100% PASS, `test_mountain_profile.gd` (47,444 checks) — PASS, `test_sprint_4m_master.gd` (125 checks) — PASS.
 **Files**: `scripts/world/road_logic.gd`, `scripts/world/road_grammar.gd`, `scripts/test/test_winding_road.gd`.
 
-### `[ ] [FEAT-016.4]` Фаза 6D: Развилки по биомам (Biome-Aware Fork Pacing & Site Planning)
-**Goal**: Адаптация частоты появления развилок в зависимости от зоны биома ($150\text{–}300$м в горах, $400\text{–}700$м в лесу) и смягчение фильтра крутых откосов на горных участках.
-**Do**:
-- Передача `mountain_weight` в `ForkPacingPlanner` и `ForkSitePlanner`.
-- Спрямление трассы за 25м до развилки ($\|\kappa\| \le 0.005$) во избежание пересечения рукавов.
-**Files**: `scripts/world/fork_pacing_planner.gd`, `scripts/world/fork_site_planner.gd`, `scripts/world/chunk_streamer.gd`.
+### `[x] [FEAT-016.4]` Фаза 6D: Развилки по биомам (Biome-Aware Fork Pacing & Site Planning) (`COMPLETED [x]`)
+**Goal**: Адаптация частоты появления развилок в зависимости от зоны биома ($200\text{–}350$м в горах, $450\text{–}650$м в лесу) и смягчение фильтра крутых откосов на горных участках (разрешение полки с односторонним обрывом).
+**Realized**:
+- В `scripts/world/fork_pacing_planner.gd`:
+  - Введены диапазоны интервалов: `MOUNTAIN_MIN_LEG_M = 200.0`, `MOUNTAIN_MAX_LEG_M = 350.0`, `FOREST_MIN_LEG_M = 450.0`, `FOREST_MAX_LEG_M = 650.0`.
+  - Реализован метод `update_pacing_for_biome(mountain_weight)` с плавной линейной интерполяцией границ.
+  - Реализован метод `derive_fork_spacing(seed_val, branch_id, fork_index, mountain_weight)` для детерминированного выбора интервала следующей развилки.
+  - Добавлен учет расписания и квантования 50м чанков (`PACING_BAND_SLACK_M = 5.0`), динамические границы диапазонов без ложных отсечек "long".
+- В `scripts/world/fork_site_planner.gd`:
+  - Добавлены `mountain_weight`, `biome_zone`, методы `set_mountain_weight()`, `set_biome_zone()`.
+  - Модифицирован `_is_terrain_safe_for_fork()`: на горных участках (`mountain_weight >= 0.5`) разрешен односторонний обрыв (полочный серпантин), при этом двусторонний обрыв (острие хребта) строго запрещен. В лесу (`mountain_weight < 0.5`) по-прежнему запрещен любой обрыв.
+- В `scripts/world/fork_corridor_preview_planner.gd`:
+  - Добавлены `mountain_weight`, `biome_zone`, метод `set_mountain_weight()`.
+  - Согласован `_is_arm_terrain_safe()` с полочным релаксом: для горных участков допускается один крутой склон вдоль превью рукава.
+- В `scripts/world/chunk_streamer.gd`:
+  - Интегрирована передача текущего `mountain_weight` из `MountainProfile` во все три планировщика через безопасные вызовы `has_method()`.
+  - Сохранены стартовые условия первой развилки (450м дефолт / 100м тест), динамический кламп шага применяется ко 2-й и последующим развилкам.
+- В `scripts/world/road_logic.gd`:
+  - Устранена потеря непрерывности кривизны $\Delta \kappa / \Delta s$ на стыках чанков: `_build_crest_micro_drop` и `_build_airborne_drop_and_landing` корректно сбрасывают `last_curvature = 0.0`.
+  - В `_build_winding_singletrack` и `_build_forest_cruise` упреждающее демпфирование кривизны расширено до 11 сэмплов ($i \ge 15$), гарантируя плавный спад до $\kappa \equiv 0.0$ перед развилками и сменой фаз.
+  - `_generate_conservative_safe_chunk` плавно гасит остаточную кривизну со скоростью $\le 0.0028\text{ м}^{-2}$.
+- В `scripts/test/test_fork_biome_pacing.gd` (НОВЫЙ):
+  - 155 проверок пройдены на 100% PASS: 5 сидов $\times$ 1500м (в горах $\ge 4$ развилок, в лесу 2–3 развилки, 0 задержек > 500м, 0 коллизий коридоров, полная изоляция дочерних веток).
+- Регрессия: `test_road_grammar.gd` (250 км, 5 сидов) — 100% PASS (0 ошибок валидатора), `test_mountain_profile.gd` (47,444 checks) — PASS, `test_route_branch_integration.gd` (8/8 routes) — PASS, `test_fork_decision.gd` (212/212) — PASS, `test_sprint_4m_master.gd` (125 checks) — PASS.
+**Files**: `scripts/world/fork_pacing_planner.gd`, `scripts/world/fork_site_planner.gd`, `scripts/world/fork_corridor_preview_planner.gd`, `scripts/world/chunk_streamer.gd`, `scripts/world/road_logic.gd`, `scripts/test/test_fork_biome_pacing.gd`, `scripts/test/test_fork_pacing_planner.gd`, `scripts/test/test_fork_site_planner.gd`.
 
 ### `[ ] [FEAT-016.5]` Фаза 6E: Непрерывная адаптация рельефа по биомам (Continuous Biome Adaptation in TerrainCarver)
 **Goal**: Плавная смена профиля рельефа без дискретных скачков сетки ($\Delta p < 0.05$м на стыках чанков).

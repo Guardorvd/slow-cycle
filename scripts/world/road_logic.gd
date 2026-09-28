@@ -391,6 +391,7 @@ func _build_crest_micro_drop(spec: RefCounted) -> void:
 	last_tangent = cur_t
 	current_slope_deg = slope_deg
 	last_normal = RoadMath.compute_ortho_normal(last_tangent, 0.0)
+	last_curvature = 0.0
 
 ## AIRBORNE_DROP & VALID_LANDING_SURFACE: Ballistic step followed by dedicated landing ramp
 func _build_airborne_drop_and_landing(spec: RefCounted) -> void:
@@ -458,6 +459,7 @@ func _build_airborne_drop_and_landing(spec: RefCounted) -> void:
 	last_tangent = cur_t
 	current_slope_deg = slope_deg
 	last_normal = RoadMath.compute_ortho_normal(last_tangent, 0.0)
+	last_curvature = 0.0
 
 ## BRAKING_ZONE: Straight preparation corridor (-3°..0°) with guaranteed sightline >= 45m
 func _build_braking_zone(spec: RefCounted) -> void:
@@ -508,7 +510,7 @@ func _build_winding_singletrack(spec: RefCounted) -> void:
 		
 		# Fork approach or trail exit straightening damping (Audit #5):
 		var eff_max_curv: float = max_curvature
-		if is_exiting_winding and i >= 17:
+		if is_exiting_winding and i >= 15:
 			eff_max_curv = 0.0
 		
 		# Curvature from pre-allocated FastNoiseLite
@@ -521,7 +523,7 @@ func _build_winding_singletrack(spec: RefCounted) -> void:
 		var k_target: float = k_noise + k_correction
 		
 		# When transitioning to a non-winding phase or fork, target zero curvature smoothly
-		if is_exiting_winding and i >= 17:
+		if is_exiting_winding and i >= 15:
 			k_target = 0.0
 		
 		# Clamp to physical limit: R >= 19.0m (|k| <= 1/19)
@@ -572,6 +574,8 @@ func _build_winding_singletrack(spec: RefCounted) -> void:
 	current_heading_deg = rad_to_deg(heading_rad)
 	current_slope_deg = slope_deg
 	last_normal = RoadMath.compute_ortho_normal(last_tangent, 0.0)
+	if is_exiting_winding:
+		cur_k = 0.0
 	last_curvature = cur_k
 
 ## FOREST_CRUISE: Gentle noise-driven curvature for flowing woodland descent (Phase 6C)
@@ -596,7 +600,7 @@ func _build_forest_cruise(spec: RefCounted) -> void:
 		var s_route: float = float(chunks_generated) * CHUNK_LENGTH + s
 		
 		var eff_max_curv: float = max_curvature
-		if is_exiting_forest and i >= 20:
+		if is_exiting_forest and i >= 15:
 			eff_max_curv = 0.0
 			
 		var noise_val: float = _forest_curvature_noise.get_noise_1d(s_route)
@@ -606,7 +610,7 @@ func _build_forest_cruise(spec: RefCounted) -> void:
 		var k_correction: float = -MEAN_REVERSION_LAMBDA * heading_error
 		var k_target: float = k_noise + k_correction
 		
-		if is_exiting_forest and i >= 20:
+		if is_exiting_forest and i >= 15:
 			k_target = 0.0
 		
 		const MAX_CURVATURE_LIMIT: float = 1.0 / 19.0
@@ -653,6 +657,8 @@ func _build_forest_cruise(spec: RefCounted) -> void:
 	current_heading_deg = rad_to_deg(heading_rad)
 	current_slope_deg = slope_deg
 	last_normal = RoadMath.compute_ortho_normal(last_tangent, 0.0)
+	if is_exiting_forest:
+		cur_k = 0.0
 	last_curvature = cur_k
 
 ## General Hermite spline generator for standard smooth phases
@@ -714,7 +720,8 @@ func _build_hermite_chunk(target_slope: float, yaw_delta: float, seg_type: int, 
 	last_point = end_point
 	last_tangent = end_tangent
 	last_normal = RoadMath.compute_ortho_normal(last_tangent, 0.0)
-	last_curvature = (road_path.curvatures[-1] if yaw_delta >= 0.0 else -road_path.curvatures[-1]) if road_path.curvatures.size() > 0 else 0.0
+	var last_c: float = road_path.curvatures[road_path.size() - 1] if road_path.curvatures.size() > 0 else 0.0
+	last_curvature = last_c if yaw_delta >= 0.0 else -last_c
 
 ## Conservative safe regeneration fallback in case candidate chunk is rejected
 func _generate_conservative_safe_chunk() -> void:
@@ -732,15 +739,18 @@ func _generate_conservative_safe_chunk() -> void:
 	
 	var norm: Vector3 = RoadMath.compute_ortho_normal(tang, 0.0)
 	var cur_p: Vector3 = last_point
+	var cur_k: float = last_curvature
 	
 	for i in range(1, SAMPLES_PER_CHUNK + 1):
 		cur_p += tang * SAMPLE_STEP_LEN
+		var delta_k: float = clampf(0.0 - cur_k, -0.0028 * SAMPLE_STEP_LEN, 0.0028 * SAMPLE_STEP_LEN)
+		cur_k += delta_k
 		road_path.append_sample(
 			cur_p,
 			tang,
 			norm,
 			current_slope_deg,
-			0.0,
+			absf(cur_k),
 			RoadPathDataClass.SegmentType.RECOVERY_FLAT,
 			Airborne.SurfaceContactMode.GROUNDED,
 			0.0,

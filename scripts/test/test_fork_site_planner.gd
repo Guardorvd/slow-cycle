@@ -67,6 +67,31 @@ func _check_unit_contract() -> void:
 	_assert(_has_reason(planner.evaluate_site(path, path.size() - 1, true, terrain, 50.0), "right_fork_corridor_danger"), "right terrain corridor danger is rejected")
 	terrain.danger_right = false
 
+	# Phase 6D: Mountain one-sided cliff tolerance
+	planner.set_mountain_weight(1.0)
+	terrain.danger_left = true
+	terrain.danger_right = false
+	var mtn_left: Dictionary = planner.evaluate_site(path, path.size() - 1, true, terrain, 50.0)
+	_assert(mtn_left.eligible, "mountain accepts one-sided left cliff shelf")
+	_assert(not _has_reason(mtn_left, "left_fork_corridor_danger"), "mountain does not reject on left cliff")
+
+	terrain.danger_left = false
+	terrain.danger_right = true
+	var mtn_right: Dictionary = planner.evaluate_site(path, path.size() - 1, true, terrain, 50.0)
+	_assert(mtn_right.eligible, "mountain accepts one-sided right cliff shelf")
+	_assert(not _has_reason(mtn_right, "right_fork_corridor_danger"), "mountain does not reject on right cliff")
+
+	terrain.danger_left = true
+	terrain.danger_right = true
+	var mtn_dual: Dictionary = planner.evaluate_site(path, path.size() - 1, true, terrain, 50.0)
+	_assert(not mtn_dual.eligible, "mountain strictly rejects dual-sided cliff")
+	_assert(_has_reason(mtn_dual, "dual_fork_corridor_danger"), "mountain reports dual cliff danger")
+
+	# Reset planner back to forest for remaining unit tests
+	planner.set_mountain_weight(0.0)
+	terrain.danger_left = false
+	terrain.danger_right = false
+
 	var narrow := _make_path()
 	narrow.road_widths[-3] = Contract.ROAD_STANDARD_WIDTH - 0.1
 	_assert(_has_reason(planner.evaluate_site(narrow, narrow.size() - 1, true, terrain, 50.0), "road_too_narrow"), "narrow approach sample is rejected")

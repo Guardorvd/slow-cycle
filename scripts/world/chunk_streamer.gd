@@ -179,7 +179,16 @@ func setup(manager: Node3D, path: RefCounted, logic: RefCounted, mats: Dictionar
 	trunk.road_path = path
 	trunk.road_logic = logic
 	trunk.foliage_route_seed = _stable_seed(logic.world_seed, 0, 97)
-	trunk.next_fork_distance = _derive_fork_spacing(logic.world_seed, 0, true)
+	var init_mw: float = 0.5
+	if logic != null and logic.mountain_profile != null:
+		init_mw = logic.mountain_profile.get_mountain_weight_at(0.0)
+	if fork_pacing_planner != null and fork_pacing_planner.has_method("update_pacing_for_biome"):
+		fork_pacing_planner.update_pacing_for_biome(init_mw)
+	if fork_site_planner != null and fork_site_planner.has_method("set_mountain_weight"):
+		fork_site_planner.set_mountain_weight(init_mw)
+	if fork_corridor_preview_planner != null and fork_corridor_preview_planner.has_method("set_mountain_weight"):
+		fork_corridor_preview_planner.set_mountain_weight(init_mw)
+	trunk.next_fork_distance = _derive_fork_spacing(logic.world_seed, 0, true, init_mw)
 	if path.size() > 0:
 		var graph_root = road_graph.add_node(path.points[0], path.tangents[0], path.normals[0])
 		trunk.graph_entry_node_id = graph_root.node_id
@@ -214,6 +223,29 @@ func update_streaming(player_pos: Vector3, player_vel: Vector3 = Vector3.ZERO, d
 	active_branch.last_closest_idx = closest_idx
 	var player_s: float = r_path.cumulative_distances[closest_idx]
 	var total_s: float = active_branch.get_total_distance()
+
+	# 2b. Update biome context across planners for fork candidate evaluation
+	var candidate_route_s: float = total_s
+	if active_branch.road_logic != null:
+		candidate_route_s += active_branch.road_logic.profile_distance_origin_m
+	var mw: float = 0.5
+	if active_branch.road_logic != null and active_branch.road_logic.mountain_profile != null:
+		mw = active_branch.road_logic.mountain_profile.get_mountain_weight_at(candidate_route_s)
+	
+	if fork_pacing_planner != null and fork_pacing_planner.has_method("update_pacing_for_biome"):
+		fork_pacing_planner.update_pacing_for_biome(mw)
+	if fork_site_planner != null and fork_site_planner.has_method("set_mountain_weight"):
+		fork_site_planner.set_mountain_weight(mw)
+	if fork_corridor_preview_planner != null and fork_corridor_preview_planner.has_method("set_mountain_weight"):
+		fork_corridor_preview_planner.set_mountain_weight(mw)
+	if active_branch.road_logic != null and active_branch.road_logic.grammar != null and active_branch.road_logic.grammar.has_method("set_biome_context"):
+		active_branch.road_logic.grammar.set_biome_context(mw)
+
+	# Dynamic pacing adaptation: if we transitioned into a mountain zone where max_leg is shorter,
+	# clamp active_branch.next_fork_distance so the fork appears promptly on the slope.
+	if (active_branch.branch_id > 0 or next_fork_id > 1) and fork_pacing_planner != null and "max_leg_m" in fork_pacing_planner:
+		if is_equal_approx(fork_interval_dist, 700.0) and active_branch.next_fork_distance > fork_pacing_planner.max_leg_m:
+			active_branch.next_fork_distance = fork_pacing_planner.max_leg_m
 
 	# 3. Stream chunks ahead
 	var spawned_count: int = 0
@@ -530,11 +562,18 @@ func _create_alternative_fork_branch(
 func _stable_seed(seed_value: int, fork_id: int, branch_index: int = 0) -> int:
 	return int(hash([seed_value, fork_id, branch_index]) & 0x7FFFFFFF)
 
-func _derive_fork_spacing(seed_value: int, branch_id: int, is_initial: bool = false) -> float:
+func _derive_fork_spacing(seed_value: int, branch_id: int, is_initial: bool = false, mountain_weight: float = -1.0) -> float:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = _stable_seed(seed_value, branch_id, 71)
 	if is_initial:
 		return first_fork_distance * rng.randf_range(0.88, 1.12)
+
+	if not is_equal_approx(fork_interval_dist, 700.0):
+		return fork_interval_dist * rng.randf_range(0.82, 1.18)
+	if mountain_weight >= 0.0:
+		var min_l: float = lerpf(ForkPacingPlannerClass.FOREST_MIN_LEG_M, ForkPacingPlannerClass.MOUNTAIN_MIN_LEG_M, mountain_weight)
+		var max_l: float = lerpf(ForkPacingPlannerClass.FOREST_MAX_LEG_M, ForkPacingPlannerClass.MOUNTAIN_MAX_LEG_M, mountain_weight)
+		return rng.randf_range(min_l, max_l)
 	return fork_interval_dist * rng.randf_range(0.82, 1.18)
 
 func _assign_fork_route_styles(primary: RoadBranch, alternative: RoadBranch, fork_id: int) -> void:
@@ -546,8 +585,19 @@ func _assign_fork_route_styles(primary: RoadBranch, alternative: RoadBranch, for
 	alternative.route_style = right_style
 	primary.road_logic.set_route_style(left_style, _stable_seed(seed_value, fork_id, 0))
 	alternative.road_logic.set_route_style(right_style, _stable_seed(seed_value, fork_id, 1))
-	primary.next_fork_distance = _derive_fork_spacing(primary.road_logic.world_seed, primary.branch_id)
-	alternative.next_fork_distance = _derive_fork_spacing(alternative.road_logic.world_seed, alternative.branch_id)
+
+	var p_logic = primary.road_logic
+	var p_profile = p_logic.mountain_profile if p_logic != null else null
+	var p_dist: float = (p_logic.profile_distance_origin_m + primary.road_path.get_total_distance()) if p_logic != null else 0.0
+	var p_mw: float = p_profile.get_mountain_weight_at(p_dist) if p_profile != null else 0.5
+	
+	var a_logic = alternative.road_logic
+	var a_profile = a_logic.mountain_profile if a_logic != null else null
+	var a_dist: float = (a_logic.profile_distance_origin_m + alternative.road_path.get_total_distance()) if a_logic != null else 0.0
+	var a_mw: float = a_profile.get_mountain_weight_at(a_dist) if a_profile != null else 0.5
+
+	primary.next_fork_distance = _derive_fork_spacing(primary.road_logic.world_seed, primary.branch_id, false, p_mw)
+	alternative.next_fork_distance = _derive_fork_spacing(alternative.road_logic.world_seed, alternative.branch_id, false, a_mw)
 	primary.fork_candidates_rejected = 0
 	alternative.fork_candidates_rejected = 0
 
@@ -601,6 +651,18 @@ func _is_safe_fork_site(branch: RoadBranch) -> bool:
 	if branch.road_logic == null or branch.road_logic.grammar == null:
 		last_fork_site_evaluation = {"eligible": false, "reason_codes": ["road_logic_unavailable"], "metrics": {}}
 		return false
+	var total_s: float = branch.road_path.get_total_distance()
+	var candidate_route_s: float = total_s
+	if branch.road_logic != null:
+		candidate_route_s += branch.road_logic.profile_distance_origin_m
+	var mw: float = 0.5
+	if branch.road_logic != null and branch.road_logic.mountain_profile != null:
+		mw = branch.road_logic.mountain_profile.get_mountain_weight_at(candidate_route_s)
+	if fork_site_planner != null and fork_site_planner.has_method("set_mountain_weight"):
+		fork_site_planner.set_mountain_weight(mw)
+	if fork_corridor_preview_planner != null and fork_corridor_preview_planner.has_method("set_mountain_weight"):
+		fork_corridor_preview_planner.set_mountain_weight(mw)
+
 	var braking_spec = branch.road_logic.grammar.get_phase_spec(RoadGrammarClass.FlowPhase.BRAKING_ZONE)
 	var carver: RefCounted = shared_materials.get("terrain_carver")
 	last_fork_site_evaluation = fork_site_planner.evaluate_site(

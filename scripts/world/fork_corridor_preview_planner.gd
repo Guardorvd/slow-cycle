@@ -4,6 +4,37 @@ extends RefCounted
 ## Deterministic, allocation-only preview of both 50m production fork arms.
 const ArmGeometry = preload("res://scripts/world/fork_arm_geometry.gd")
 const Contract = preload("res://scripts/world/road_generation_contract.gd")
+const MountainProfile = preload("res://scripts/world/mountain_profile.gd")
+
+var mountain_weight: float = 0.0
+var biome_zone: int = MountainProfile.BiomeZone.FOREST
+
+func set_mountain_weight(weight: float) -> void:
+	mountain_weight = clampf(weight, 0.0, 1.0)
+	if mountain_weight > 0.65:
+		biome_zone = MountainProfile.BiomeZone.MOUNTAIN
+	elif mountain_weight < 0.35:
+		biome_zone = MountainProfile.BiomeZone.FOREST
+	else:
+		biome_zone = MountainProfile.BiomeZone.TRANSITION
+
+func set_biome_zone(zone: int) -> void:
+	biome_zone = zone
+	if biome_zone == MountainProfile.BiomeZone.MOUNTAIN:
+		mountain_weight = 1.0
+	elif biome_zone == MountainProfile.BiomeZone.FOREST:
+		mountain_weight = 0.0
+	else:
+		mountain_weight = 0.5
+
+func _is_arm_terrain_safe(danger_left: bool, danger_right: bool) -> bool:
+	if danger_left and danger_right:
+		return false
+	if not danger_left and not danger_right:
+		return true
+	if biome_zone == MountainProfile.BiomeZone.MOUNTAIN:
+		return true
+	return false
 
 func evaluate_pair(
 	fork_pos: Vector3, fork_tang: Vector3, fork_binorm: Vector3,
@@ -51,7 +82,7 @@ func evaluate_pair(
 			if not terrain.has("danger_left") or not terrain.has("danger_right"):
 				arm_reasons.append("terrain_result_invalid")
 				break
-			if bool(terrain.danger_left) or bool(terrain.danger_right):
+			if not _is_arm_terrain_safe(bool(terrain.danger_left), bool(terrain.danger_right)):
 				arm_reasons.append("arm_corridor_terrain_danger")
 		arm_reasons = _unique(arm_reasons)
 		for reason: String in arm_reasons:

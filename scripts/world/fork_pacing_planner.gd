@@ -6,6 +6,26 @@ const CHUNK_LENGTH_M: float = 50.0
 const MIN_LEG_BAND_M: float = 550.0
 const MAX_LEG_BAND_M: float = 900.0
 const PACING_DEFERRAL_WINDOW_M: float = 200.0
+const PACING_BAND_SLACK_M: float = 5.0
+
+const MOUNTAIN_MIN_LEG_M: float = 200.0
+const MOUNTAIN_MAX_LEG_M: float = 350.0
+const FOREST_MIN_LEG_M: float = 450.0
+const FOREST_MAX_LEG_M: float = 650.0
+
+var min_leg_m: float = MIN_LEG_BAND_M
+var max_leg_m: float = MAX_LEG_BAND_M
+var mountain_weight: float = 0.5
+
+func update_pacing_for_biome(p_mountain_weight: float) -> void:
+	mountain_weight = clampf(p_mountain_weight, 0.0, 1.0)
+	min_leg_m = lerpf(FOREST_MIN_LEG_M, MOUNTAIN_MIN_LEG_M, mountain_weight)
+	max_leg_m = lerpf(FOREST_MAX_LEG_M, MOUNTAIN_MAX_LEG_M, mountain_weight)
+
+func derive_fork_spacing(seed_value: int, branch_id: int, _is_initial: bool = false) -> float:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(hash([seed_value, branch_id, 71]) & 0x7FFFFFFF)
+	return rng.randf_range(min_leg_m, max_leg_m)
 
 func evaluate_candidate(
 	scheduled_distance_m: float,
@@ -23,9 +43,11 @@ func evaluate_candidate(
 	var delay_m: float = maxf(0.0, candidate_distance_m - scheduled_distance_m)
 	var band: String = "initial" if is_initial_fork else "within"
 	if not is_initial_fork:
-		if candidate_distance_m < MIN_LEG_BAND_M:
+		var low_bound: float = minf(min_leg_m, scheduled_distance_m * 0.85) - PACING_BAND_SLACK_M
+		var high_bound: float = maxf(max_leg_m, scheduled_distance_m * 1.25) + PACING_BAND_SLACK_M
+		if candidate_distance_m < low_bound:
 			band = "short"
-		elif candidate_distance_m > MAX_LEG_BAND_M:
+		elif candidate_distance_m > high_bound:
 			band = "long"
 	var overrun: bool = rejected_before >= 4 or delay_m > PACING_DEFERRAL_WINDOW_M
 	var reasons: Array[String] = []
@@ -46,7 +68,10 @@ func evaluate_candidate(
 		"candidate_ordinal": rejected_before + 1,
 		"pacing_band": band,
 		"pacing_overrun": overrun,
-		"is_initial_fork": is_initial_fork
+		"is_initial_fork": is_initial_fork,
+		"min_leg_m": min_leg_m,
+		"max_leg_m": max_leg_m,
+		"mountain_weight": mountain_weight
 	})
 
 func _result(decision: String, eligible: bool, reasons: Array[String], metrics: Dictionary) -> Dictionary:
