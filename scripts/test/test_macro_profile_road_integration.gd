@@ -24,6 +24,7 @@ func _init() -> void:
 func _capture_seed(seed_value: int) -> Dictionary:
 	var scene: Node = load("res://scenes/main.tscn").instantiate()
 	var world_manager: Node = scene.get_node("WorldManager")
+	world_manager.randomize_world_seed_on_start = false
 	world_manager.world_seed = seed_value
 	root.add_child(scene)
 	await process_frame
@@ -101,10 +102,10 @@ func _check_terrain_follows_road(world_manager: Node, path: RefCounted, idx: int
 		pt, path.tangents[idx], norm, binorm, half_width, path.curvatures[idx], path.segment_types[idx], path.cumulative_distances[idx]
 	)
 	var vertices: PackedVector3Array = cross_section.vertices
-	var pos_l_far: Vector3 = pt - binorm * (half_width + 0.8 + 4.5 + 20.0)
+	var pos_l_far: Vector3 = pt - binorm * (half_width + CarverClass.W_SHOULDER + CarverClass.W_FEATURE + CarverClass.W_FAR)
 	var center_macro: float = carver.get_macro_elevation(pt.x, pt.z)
 	var center_detail: float = carver.get_detail_elevation(pt.x, pt.z)
-	var far_height: float = pt.y + carver.get_macro_elevation(pos_l_far.x, pos_l_far.z) - center_macro + carver.get_detail_elevation(pos_l_far.x, pos_l_far.z) - center_detail
+	var far_height: float = carver.get_macro_elevation(pos_l_far.x, pos_l_far.z) - center_macro + carver.get_detail_elevation(pos_l_far.x, pos_l_far.z) - center_detail
 	var expected_far: Vector3 = pos_l_far + norm * far_height
 	var far_ok: bool = vertices.size() == 8 and vertices[0].distance_to(expected_far) <= 0.0001
 	var edge_ok: bool = vertices.size() == 8 and vertices[3].distance_to(pt - binorm * half_width) <= 0.0001 and vertices[4].distance_to(pt + binorm * half_width) <= 0.0001

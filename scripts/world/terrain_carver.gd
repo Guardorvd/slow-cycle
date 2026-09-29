@@ -22,7 +22,7 @@ enum ProfileType {
 # Cross-section lateral width dimensions (meters from road edge)
 const W_SHOULDER: float = 0.8   ## Shoulder / drainage swale
 const W_FEATURE: float = 4.5    ## Feature breakline (Cut face or Cliff lip)
-const W_FAR: float = 20.0       ## Outer mountain flank
+const W_FAR: float = 45.0       ## Outer mountain flank (expanded 45m outer skirt)
 
 # Danger threshold for visual guard post placement (meters drop below shoulder)
 const DANGER_DROP_THRESHOLD: float = 2.5
@@ -38,8 +38,12 @@ const DETAIL_NOISE_AMP: float = 1.2
 # ==============================================================================
 
 var world_seed: int = 184729
+var mountain_weight: float = 0.5
 var macro_noise: FastNoiseLite
 var detail_noise: FastNoiseLite
+
+func set_mountain_weight(mw: float) -> void:
+	mountain_weight = clampf(mw, 0.0, 1.0)
 
 # ==============================================================================
 # INITIALIZATION & SETUP
@@ -85,7 +89,8 @@ func get_detail_elevation(wx: float, wz: float) -> float:
 
 ## Evaluates geological profile scores and classification for Left and Right sides.
 ## Returns a Dictionary with profile enums, target feature heights, and danger flags.
-func evaluate_profile(pos: Vector3, binorm: Vector3, curv: float) -> Dictionary:
+func evaluate_profile(pos: Vector3, binorm: Vector3, curv: float, p_mountain_weight: float = -1.0) -> Dictionary:
+	var mw: float = p_mountain_weight if p_mountain_weight >= 0.0 else mountain_weight
 	# 1. Macro slope gradient across the road corridor (+b points strictly RIGHT)
 	var p_l: Vector3 = pos - binorm * 15.0
 	var p_r: Vector3 = pos + binorm * 15.0
@@ -103,9 +108,16 @@ func evaluate_profile(pos: Vector3, binorm: Vector3, curv: float) -> Dictionary:
 	var score_r: float = 0.50 * g_lat - 0.35 * kappa_eff + 0.15 * b_seed
 	var score_l: float = -0.50 * g_lat + 0.35 * kappa_eff + 0.15 * b_seed
 
+	# In mountain zones (mountain_weight > 0.5), amplify relief so cuts/shelves appear even on straights
+	if mw > 0.50:
+		var mw_boost: float = (mw - 0.50) / 0.50 # 0.0 to 1.0
+		var relief_bias: float = (1.0 if b_seed >= 0.0 else -1.0) * 0.28 * mw_boost
+		score_r += relief_bias
+		score_l -= relief_bias
+
 	# 5. Classify profiles and determine feature heights
-	var class_l: Dictionary = _classify_side_score(score_l)
-	var class_r: Dictionary = _classify_side_score(score_r)
+	var class_l: Dictionary = _classify_side_score(score_l, mw)
+	var class_r: Dictionary = _classify_side_score(score_r, mw)
 
 	var danger_l: bool = class_l.delta_h < -DANGER_DROP_THRESHOLD
 	var danger_r: bool = class_r.delta_h < -DANGER_DROP_THRESHOLD
@@ -121,23 +133,29 @@ func evaluate_profile(pos: Vector3, binorm: Vector3, curv: float) -> Dictionary:
 		"danger_right": danger_r
 	}
 
-func _classify_side_score(score: float) -> Dictionary:
+func _classify_side_score(score: float, mw: float = 0.5) -> Dictionary:
+	var mw_amp: float = 1.0 + maxf(0.0, mw - 0.5) * 0.4
 	if score > 0.25:
 		# Uphill rock cut
-		var dh: float = 2.5 + (score - 0.25) * 6.5
-		return { "profile": ProfileType.CUT, "delta_h": clampf(dh, 2.5, 6.5) }
+		var dh: float = (2.5 + (score - 0.25) * 6.5) * mw_amp
+		return { "profile": ProfileType.CUT, "delta_h": clampf(dh, 2.5, 7.5) }
 	elif score < -0.25:
 		# Sheer cliff precipice
-		var dh: float = -4.0 + (score + 0.25) * 12.0
-		return { "profile": ProfileType.CLIFF, "delta_h": clampf(dh, -16.0, -4.0) }
+		var dh: float = (-4.0 + (score + 0.25) * 12.0) * mw_amp
+		return { "profile": ProfileType.CLIFF, "delta_h": clampf(dh, -18.0, -4.0) }
 	elif score < -0.08:
 		# Embankment fill slope
 		var dh: float = -1.5 + (score + 0.08) * 8.0
-		return { "profile": ProfileType.FILL, "delta_h": clampf(dh, -3.0, -1.0) }
+		if mw > 0.5:
+			dh -= (mw - 0.5) * 1.5
+		return { "profile": ProfileType.FILL, "delta_h": clampf(dh, -4.0, -1.0) }
 	else:
 		# Gentle rolling meadow
 		var dh: float = score * 3.0
-		return { "profile": ProfileType.MEADOW, "delta_h": clampf(dh, -1.2, 1.2) }
+		if mw > 0.65:
+			var sign_dh: float = 1.0 if score >= 0.0 else -1.0
+			dh = sign_dh * maxf(absf(dh), 1.5 * (mw - 0.65) / 0.35)
+		return { "profile": ProfileType.MEADOW, "delta_h": clampf(dh, -1.8, 1.8) }
 
 # ==============================================================================
 # CROSS-SECTION GEOMETRY GENERATION
@@ -154,9 +172,11 @@ func compute_cross_section(
 	half_w: float,
 	curv: float,
 	_seg_type: int,
-	dist: float
+	dist: float,
+	p_mountain_weight: float = -1.0
 ) -> Dictionary:
-	var eval: Dictionary = evaluate_profile(pt, binorm, curv)
+	var mw: float = p_mountain_weight if p_mountain_weight >= 0.0 else mountain_weight
+	var eval: Dictionary = evaluate_profile(pt, binorm, curv, mw)
 
 	var dh_left: float = eval.left_delta_h
 	var dh_right: float = eval.right_delta_h

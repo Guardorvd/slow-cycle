@@ -188,6 +188,9 @@ func setup(manager: Node3D, path: RefCounted, logic: RefCounted, mats: Dictionar
 		fork_site_planner.set_mountain_weight(init_mw)
 	if fork_corridor_preview_planner != null and fork_corridor_preview_planner.has_method("set_mountain_weight"):
 		fork_corridor_preview_planner.set_mountain_weight(init_mw)
+	var carver: RefCounted = shared_materials.get("terrain_carver")
+	if carver != null and carver.has_method("set_mountain_weight"):
+		carver.set_mountain_weight(init_mw)
 	trunk.next_fork_distance = _derive_fork_spacing(logic.world_seed, 0, true, init_mw)
 	if path.size() > 0:
 		var graph_root = road_graph.add_node(path.points[0], path.tangents[0], path.normals[0])
@@ -240,6 +243,9 @@ func update_streaming(player_pos: Vector3, player_vel: Vector3 = Vector3.ZERO, d
 		fork_corridor_preview_planner.set_mountain_weight(mw)
 	if active_branch.road_logic != null and active_branch.road_logic.grammar != null and active_branch.road_logic.grammar.has_method("set_biome_context"):
 		active_branch.road_logic.grammar.set_biome_context(mw)
+	var carver: RefCounted = shared_materials.get("terrain_carver")
+	if carver != null and carver.has_method("set_mountain_weight"):
+		carver.set_mountain_weight(mw)
 
 	# Dynamic pacing adaptation: if we transitioned into a mountain zone where max_leg is shorter,
 	# clamp active_branch.next_fork_distance so the fork appears promptly on the slope.
@@ -566,6 +572,9 @@ func _derive_fork_spacing(seed_value: int, branch_id: int, is_initial: bool = fa
 	var rng := RandomNumberGenerator.new()
 	rng.seed = _stable_seed(seed_value, branch_id, 71)
 	if is_initial:
+		if is_equal_approx(first_fork_distance, 450.0) and mountain_weight > 0.50:
+			var base_initial: float = lerpf(first_fork_distance, 220.0, clampf((mountain_weight - 0.50) / 0.50, 0.0, 1.0))
+			return base_initial * rng.randf_range(0.90, 1.10)
 		return first_fork_distance * rng.randf_range(0.88, 1.12)
 
 	if not is_equal_approx(fork_interval_dist, 700.0):

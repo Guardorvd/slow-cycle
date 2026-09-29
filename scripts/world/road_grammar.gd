@@ -9,6 +9,7 @@ extends RefCounted
 const Airborne = preload("res://scripts/world/road_airborne_contract.gd")
 const Contract = preload("res://scripts/world/road_generation_contract.gd")
 const RouteIntentClass = preload("res://scripts/world/route_intent.gd")
+const SlowCycleLogger = preload("res://scripts/core/slow_cycle_logger.gd")
 
 enum FlowPhase {
 	CRUISE_DOWNHILL = 0,     ## -5°..-8°, 25-30 km/h, comfortable coasting with ratchet click
@@ -57,29 +58,15 @@ var phases_since_last_feature: int = 0
 func _init(seed_val: int) -> void:
 	route_style_seed = seed_val
 	rng.seed = seed_val
+	curve_dir = -1.0 if rng.randf() < 0.5 else 1.0
 	_setup_initial_dramatic_sequence()
 
-## Seeds the immediate opening mountain descent sequence so the player experiences
-## genuine MTB mountain topography immediately upon selecting "1. Бесконечная дорога".
+## Free Launch opening: 15m horizontal launchpad + 25m acceleration chute in Chunk 0,
+## then immediately procedural FSM takes over.
 func _setup_initial_dramatic_sequence() -> void:
 	phase_queue.clear()
-	# Opening Mountain Sequence:
-	# 1. Flat Launch & Rollout (RECOVERY_FLAT)
+	# Opening Chunk: RECOVERY_FLAT serves as launchpad & acceleration chute
 	phase_queue.append(FlowPhase.RECOVERY_FLAT)
-	# 2. Gentle Natural Descent (CRUISE_DOWNHILL, -6°)
-	phase_queue.append(FlowPhase.CRUISE_DOWNHILL)
-	# 3. High-Speed Gravity Descent (FAST_GRAVITY_DESCENT, -10°, 38-42 km/h)
-	phase_queue.append(FlowPhase.FAST_GRAVITY_DESCENT)
-	# 4. Mandatory Braking Zone (-2°, clear sightline >= 45m)
-	phase_queue.append(FlowPhase.BRAKING_ZONE)
-	# 5. Mountain Switchback Hairpin (R = 19m, banking 6°)
-	phase_queue.append(FlowPhase.SWITCHBACK)
-	# 6. Wide Recovery Meadow (RECOVERY_FLAT)
-	phase_queue.append(FlowPhase.RECOVERY_FLAT)
-	# 7. Crest Micro-Drop unweighting
-	phase_queue.append(FlowPhase.CREST_MICRO_DROP)
-	# 8. Cruise continuation
-	phase_queue.append(FlowPhase.CRUISE_DOWNHILL)
 
 func get_current_phase() -> int:
 	return current_phase
@@ -97,8 +84,8 @@ func set_biome_context(mountain_weight: float) -> void:
 func get_mountain_weight() -> float:
 	return _mountain_weight
 
-## Assigns a deterministic route identity to a branch and gives it a distinct opening rhythm.
-## Both profiles retain the normal weighted grammar after their authored opening sequence.
+## Assigns a deterministic route identity to a branch and gives it a distinct procedural opening.
+## Eliminates fixed 450m queues, populating a procedural sequence seeded from style_seed.
 func set_route_style(style: int, style_seed: int) -> void:
 	route_style = clampi(style, RouteStyle.BALANCED, RouteStyle.TECHNICAL)
 	route_style_seed = style_seed
@@ -107,45 +94,36 @@ func set_route_style(style: int, style_seed: int) -> void:
 	recent_phase_history.clear()
 	phases_since_last_feature = 0
 	curve_dir = -1.0 if rng.randf() < 0.5 else 1.0
-	phase_queue.clear()
-	match route_style:
-		RouteStyle.FLOW:
-			phase_queue.assign([
-				FlowPhase.CRUISE_DOWNHILL,
-				FlowPhase.CREST_MICRO_DROP,
-				FlowPhase.CRUISE_DOWNHILL,
-				FlowPhase.CREST_MICRO_DROP,
-				FlowPhase.RECOVERY_FLAT,
-				FlowPhase.CRUISE_DOWNHILL,
-				FlowPhase.RECOVERY_FLAT,
-				FlowPhase.FAST_GRAVITY_DESCENT,
-				FlowPhase.CRUISE_DOWNHILL
-			])
-		RouteStyle.TECHNICAL:
-			phase_queue.assign([
-				FlowPhase.BRAKING_ZONE,
-				FlowPhase.SWITCHBACK,
-				FlowPhase.RECOVERY_FLAT,
-				FlowPhase.BRAKING_ZONE,
-				FlowPhase.SWITCHBACK,
-				FlowPhase.RECOVERY_FLAT,
-				FlowPhase.CREST_MICRO_DROP,
-				FlowPhase.RECOVERY_FLAT,
-				FlowPhase.CRUISE_DOWNHILL
-			])
-		_:
-			_setup_initial_dramatic_sequence()
+	plan_procedural_opening(9)
+	SlowCycleLogger.log_grammar("Set route style: %s (seed=%d, curve_dir=%.1f, queue=%s)" % [
+		"FLOW" if route_style == RouteStyle.FLOW else ("TECHNICAL" if route_style == RouteStyle.TECHNICAL else "BALANCED"),
+		style_seed, curve_dir, str(phase_queue)
+	])
 
-## Exports the current authored phase queue as a pure route-planning contract.
-## This reads grammar state only; it does not consume RNG or advance the queue.
+## Pre-plans a procedural sequence of chunks according to route_style weights.
+func plan_procedural_opening(horizon: int = 9) -> void:
+	phase_queue.clear()
+	var temp_phase: int = FlowPhase.RECOVERY_FLAT
+	while phase_queue.size() < horizon:
+		current_phase = temp_phase
+		_replenish_phase_queue()
+		if not phase_queue.is_empty():
+			temp_phase = phase_queue[-1]
+	current_phase = FlowPhase.RECOVERY_FLAT
+
+## Exports the upcoming planned phase queue as a pure route-planning contract.
+## Pre-plans up to horizon_chunks procedurally if the queue is currently shorter.
 func build_route_intent(
 	world_seed: int,
 	route_identity: String,
 	branch_id: int,
-	global_start_distance_m: float
+	global_start_distance_m: float,
+	horizon_chunks: int = 9
 ) -> RefCounted:
+	if phase_queue.size() < horizon_chunks:
+		plan_procedural_opening(horizon_chunks)
 	var intent = RouteIntentClass.new()
-	var planned_phases: Array[int] = phase_queue.duplicate()
+	var planned_phases: Array[int] = phase_queue.slice(0, horizon_chunks)
 	var envelopes: Array[Dictionary] = []
 	for phase_id: int in planned_phases:
 		var spec: PhaseSpec = get_phase_spec(phase_id)
@@ -182,21 +160,18 @@ func peek_next_phase() -> int:
 
 ## Advances FSM and returns the next PhaseSpec envelope
 func advance_phase() -> PhaseSpec:
-	if phase_queue.is_empty():
-		if phases_since_last_feature >= MAX_PHASES_WITHOUT_FEATURE:
-			# Preserve seeded freedom while avoiding long, unvaried runs: the forced
-			# item is a gentle crest, never a jump or mandatory technical turn.
-			phase_queue.append(FlowPhase.CREST_MICRO_DROP)
-		else:
-			_replenish_phase_queue()
+	if phases_since_last_feature >= MAX_PHASES_WITHOUT_FEATURE:
+		phase_queue.clear()
+		phase_queue.append(FlowPhase.CREST_MICRO_DROP)
+	elif phase_queue.is_empty():
+		_replenish_phase_queue()
 
 	current_phase = phase_queue.pop_front()
 	total_chunks_planned += 1
 	_record_phase_for_rhythm(current_phase)
-	if route_style == RouteStyle.TECHNICAL and current_phase == FlowPhase.SWITCHBACK:
+	if current_phase == FlowPhase.SWITCHBACK:
 		authored_switchbacks_planned += 1
-		if authored_switchbacks_planned == 2:
-			curve_dir *= -1.0
+		curve_dir *= -1.0
 
 	# Pre-buffer next phase so downstream generators can inspect trail continuity
 	if phase_queue.is_empty():
@@ -217,14 +192,14 @@ func _replenish_phase_queue() -> void:
 		FlowPhase.WINDING_SINGLETRACK:
 			# Mountain singletrack: stays winding, plunges into switchback, prepares braking, or micro-drop.
 			# In forest conditions, smoothly transitions to FOREST_CRUISE.
-			var p_switchback: float = lerpf(0.05, 0.25, _mountain_weight)
+			var p_switchback: float = lerpf(0.05, 0.25, _mountain_weight) * (float(profile.cruise_to_technical_chance) / 0.30)
 			var p_winding: float = lerpf(0.05, 0.45, _mountain_weight)
 			var p_braking: float = lerpf(0.10, 0.15, _mountain_weight)
 			var p_crest: float = lerpf(0.15, 0.15, _mountain_weight)
 
 			if major_event_allowed and roll < p_switchback:
 				phase_queue.append(FlowPhase.BRAKING_ZONE)
-				curve_dir = -1.0 if rng.randf() < 0.5 else 1.0
+				curve_dir *= -1.0
 				phase_queue.append(FlowPhase.SWITCHBACK)
 				phase_queue.append(FlowPhase.RECOVERY_FLAT)
 			elif roll < p_switchback + p_winding:
@@ -262,7 +237,7 @@ func _replenish_phase_queue() -> void:
 			# Always prepare with BRAKING_ZONE or decelerate to CRUISE_DOWNHILL.
 			if roll < float(profile.fast_to_switchback_chance) and major_event_allowed:
 				phase_queue.append(FlowPhase.BRAKING_ZONE)
-				curve_dir = -1.0 if rng.randf() < 0.5 else 1.0
+				curve_dir *= -1.0
 				phase_queue.append(FlowPhase.SWITCHBACK)
 				phase_queue.append(FlowPhase.RECOVERY_FLAT)
 			else:
@@ -273,7 +248,7 @@ func _replenish_phase_queue() -> void:
 			var switchback_chance: float = float(profile.braking_to_switchback_chance)
 			var airborne_chance: float = float(profile.braking_to_airborne_chance)
 			if major_event_allowed and roll < switchback_chance:
-				curve_dir = -1.0 if rng.randf() < 0.5 else 1.0
+				curve_dir *= -1.0
 				phase_queue.append(FlowPhase.SWITCHBACK)
 				phase_queue.append(FlowPhase.RECOVERY_FLAT)
 			elif major_event_allowed and roll < switchback_chance + airborne_chance:
@@ -317,20 +292,45 @@ func _replenish_phase_queue() -> void:
 
 		FlowPhase.RECOVERY_FLAT:
 			# From flat meadow, build momentum
-			var p_forest: float = lerpf(0.60, 0.05, _mountain_weight)
-			var p_winding: float = lerpf(0.05, 0.50, _mountain_weight)
-			var p_cruise: float = 0.25
-			var p_fast: float = lerpf(0.05, 0.15, _mountain_weight)
-			if roll < p_forest:
-				phase_queue.append(FlowPhase.FOREST_CRUISE)
-			elif roll < p_forest + p_winding:
-				phase_queue.append(FlowPhase.WINDING_SINGLETRACK)
-			elif roll < p_forest + p_winding + p_cruise:
-				phase_queue.append(FlowPhase.CRUISE_DOWNHILL)
-			elif roll < p_forest + p_winding + p_cruise + p_fast:
-				phase_queue.append(FlowPhase.FAST_GRAVITY_DESCENT)
+			if route_style == RouteStyle.TECHNICAL:
+				var p_switchback: float = 0.40
+				var p_winding: float = 0.40
+				if major_event_allowed and roll < p_switchback:
+					phase_queue.append(FlowPhase.BRAKING_ZONE)
+					curve_dir *= -1.0
+					phase_queue.append(FlowPhase.SWITCHBACK)
+					phase_queue.append(FlowPhase.RECOVERY_FLAT)
+				elif roll < p_switchback + p_winding:
+					phase_queue.append(FlowPhase.WINDING_SINGLETRACK)
+				else:
+					phase_queue.append(FlowPhase.CREST_MICRO_DROP)
+			elif route_style == RouteStyle.FLOW:
+				var p_fast: float = 0.40
+				var p_cruise: float = 0.35
+				var p_forest: float = 0.15
+				if roll < p_fast:
+					phase_queue.append(FlowPhase.FAST_GRAVITY_DESCENT)
+				elif roll < p_fast + p_cruise:
+					phase_queue.append(FlowPhase.CRUISE_DOWNHILL)
+				elif roll < p_fast + p_cruise + p_forest:
+					phase_queue.append(FlowPhase.FOREST_CRUISE)
+				else:
+					phase_queue.append(FlowPhase.CREST_MICRO_DROP)
 			else:
-				phase_queue.append(FlowPhase.CREST_MICRO_DROP)
+				var p_forest: float = lerpf(0.60, 0.05, _mountain_weight)
+				var p_winding: float = lerpf(0.05, 0.50, _mountain_weight)
+				var p_cruise: float = 0.25
+				var p_fast: float = lerpf(0.05, 0.15, _mountain_weight)
+				if roll < p_forest:
+					phase_queue.append(FlowPhase.FOREST_CRUISE)
+				elif roll < p_forest + p_winding:
+					phase_queue.append(FlowPhase.WINDING_SINGLETRACK)
+				elif roll < p_forest + p_winding + p_cruise:
+					phase_queue.append(FlowPhase.CRUISE_DOWNHILL)
+				elif roll < p_forest + p_winding + p_cruise + p_fast:
+					phase_queue.append(FlowPhase.FAST_GRAVITY_DESCENT)
+				else:
+					phase_queue.append(FlowPhase.CREST_MICRO_DROP)
 
 		FlowPhase.CRUISE_DOWNHILL, _:
 			# Normal cruising descent: adapt transition based on mountain weight
@@ -346,7 +346,7 @@ func _replenish_phase_queue() -> void:
 				phase_queue.append(FlowPhase.FOREST_CRUISE)
 			elif major_event_allowed and roll < p_winding + p_forest + p_switchback:
 				phase_queue.append(FlowPhase.BRAKING_ZONE)
-				curve_dir = -1.0 if rng.randf() < 0.5 else 1.0
+				curve_dir *= -1.0
 				phase_queue.append(FlowPhase.SWITCHBACK)
 				phase_queue.append(FlowPhase.RECOVERY_FLAT)
 			elif roll < p_winding + p_forest + p_switchback + p_fast:
@@ -358,29 +358,29 @@ func _replenish_phase_queue() -> void:
 
 func _get_rhythm_profile() -> Dictionary:
 	var forest_limit: float = 1.0 if route_style != RouteStyle.TECHNICAL else 2.0
-	var mountain_limit: float = 5.0 if route_style != RouteStyle.FLOW else 3.0
+	var mountain_limit: float = 5.0 if route_style != RouteStyle.FLOW else 0.0
 	var effective_limit: int = int(round(lerpf(forest_limit, mountain_limit, _mountain_weight)))
 
 	match route_style:
 		RouteStyle.FLOW:
 			return {
-				"major_event_limit": effective_limit,
-				"cruise_to_fast_chance": 0.38,
-				"cruise_to_technical_chance": 0.18,
-				"cruise_to_crest_chance": 0.26,
-				"fast_to_switchback_chance": 0.40,
-				"braking_to_switchback_chance": 0.45,
-				"braking_to_airborne_chance": 0.18
+				"major_event_limit": 0,
+				"cruise_to_fast_chance": 0.45,
+				"cruise_to_technical_chance": 0.0,
+				"cruise_to_crest_chance": 0.35,
+				"fast_to_switchback_chance": 0.0,
+				"braking_to_switchback_chance": 0.0,
+				"braking_to_airborne_chance": 0.0
 			}
 		RouteStyle.TECHNICAL:
 			return {
-				"major_event_limit": effective_limit,
-				"cruise_to_fast_chance": 0.20,
-				"cruise_to_technical_chance": 0.55,
+				"major_event_limit": maxi(3, effective_limit),
+				"cruise_to_fast_chance": 0.15,
+				"cruise_to_technical_chance": 0.70,
 				"cruise_to_crest_chance": 0.15,
-				"fast_to_switchback_chance": 0.75,
-				"braking_to_switchback_chance": 0.82,
-				"braking_to_airborne_chance": 0.12
+				"fast_to_switchback_chance": 0.85,
+				"braking_to_switchback_chance": 0.90,
+				"braking_to_airborne_chance": 0.10
 			}
 		_:
 			return {

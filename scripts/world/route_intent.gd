@@ -14,7 +14,7 @@ var planned_length_m: float = 0.0
 var phase_ids: Array[int] = []
 var phase_envelopes: Array[Dictionary] = []
 
-const PHASE_COUNT: int = 8
+const PHASE_COUNT: int = 10
 const SURFACE_MODE_COUNT: int = 4
 
 func configure(

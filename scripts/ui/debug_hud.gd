@@ -21,6 +21,11 @@ var session_elapsed_sec: float = 0.0
 # Route style & Fork state semantic labels
 const ROUTE_STYLES: Array[String] = ["BALANCED", "FLOW", "TECHNICAL"]
 const FORK_STATES: Array[String] = ["APPROACH", "PREVIEW", "COMMIT", "LOCKED"]
+const FLOW_PHASE_NAMES: Array[String] = [
+	"CRUISE_DOWNHILL", "FAST_GRAVITY", "BRAKING_ZONE", "SWITCHBACK",
+	"CREST_DROP", "AIRBORNE_DROP", "LANDING", "RECOVERY_FLAT",
+	"WINDING_TRACK", "FOREST_CRUISE"
+]
 
 func _ready() -> void:
 	visible = show_on_start
@@ -148,6 +153,23 @@ func _update_telemetry_display(_delta: float, frame_ms: float) -> void:
 			text += "Route: Branch #%d [%s] | Next Fork: %s\n" % [act_b.branch_id, style_str, fork_dist_str]
 			text += "Fork State: [%s]\n" % fsm_str
 
+	# Biome & Generation Context (Sprint 6 v4 Observability)
+	var road_logic = world_manager.get("road_logic") if world_manager else null
+	var biome_str := "N/A"
+	var macro_heading_str := "180.0°"
+	var fsm_phase_str := "N/A"
+	if road_logic:
+		if "mountain_profile" in road_logic and road_logic.mountain_profile:
+			var m_wt: float = road_logic.mountain_profile.get_mountain_weight_at(dist_km * 1000.0)
+			var b_name: String = "MOUNTAIN" if m_wt > 0.65 else ("FOREST" if m_wt < 0.35 else "TRANS")
+			biome_str = "%s (wt: %.2f)" % [b_name, m_wt]
+		if "_macro_heading_deg" in road_logic:
+			macro_heading_str = "%.1f°" % road_logic._macro_heading_deg
+		if "grammar" in road_logic and road_logic.grammar:
+			var ph: int = road_logic.grammar.current_phase
+			fsm_phase_str = FLOW_PHASE_NAMES[ph] if ph >= 0 and ph < FLOW_PHASE_NAMES.size() else "PHASE_%d" % ph
+	text += "Biome: %s | FSM: [%s] | Macro: %s\n" % [biome_str, fsm_phase_str, macro_heading_str]
+
 	# Track Section Label
 	if world_manager and world_manager.has_method("get_section_at_distance"):
 		var sec_info: Dictionary = world_manager.get_section_at_distance(dist_km * 1000.0)
@@ -186,7 +208,9 @@ func _update_telemetry_display(_delta: float, frame_ms: float) -> void:
 		var cam_mode: String = "FP" if (cam_rig.get("is_first_person") if "is_first_person" in cam_rig else true) else "TP"
 		var fp_cam = cam_rig.get("first_person_cam") if "first_person_cam" in cam_rig else null
 		var cur_fov: float = fp_cam.fov if fp_cam else 78.0
-		text += "Camera: %s | FOV: %.1f°\n" % [cam_mode, cur_fov]
+		var c_roll: float = rad_to_deg(cam_rig.current_roll if "current_roll" in cam_rig else 0.0)
+		var c_pitch: float = rad_to_deg(cam_rig.current_dive_pitch if "current_dive_pitch" in cam_rig else 0.0)
+		text += "Camera: %s | FOV: %.1f° | Roll: %.1f° | Dive: %.1f°\n" % [cam_mode, cur_fov, c_roll, c_pitch]
 
 	text += "================================="
 	telemetry_label.text = text

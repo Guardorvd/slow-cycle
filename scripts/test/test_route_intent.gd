@@ -104,7 +104,14 @@ func _generate_opening(seed_value: int, style: int, style_seed: int) -> Dictiona
 			micro_drop_chunks += 1
 		if absf(chunk_turn_sum) > 0.001:
 			switchback_turn_signs.append(1 if chunk_turn_sum > 0.0 else -1)
-		if dominant_type in [RoadPathDataClass.SegmentType.CRUISE_DOWNHILL, RoadPathDataClass.SegmentType.CREST_MICRO_DROP, RoadPathDataClass.SegmentType.RECOVERY_FLAT]:
+		if dominant_type in [
+			RoadPathDataClass.SegmentType.CRUISE_DOWNHILL,
+			RoadPathDataClass.SegmentType.FAST_GRAVITY_DESCENT,
+			RoadPathDataClass.SegmentType.CREST_MICRO_DROP,
+			RoadPathDataClass.SegmentType.RECOVERY_FLAT,
+			RoadPathDataClass.SegmentType.FOREST_CRUISE,
+			RoadPathDataClass.SegmentType.WINDING_SINGLETRACK
+		]:
 			cruise_recovery_chunks += 1
 	if path.size() > 1:
 		var path_values := PackedStringArray()
@@ -113,9 +120,15 @@ func _generate_opening(seed_value: int, style: int, style_seed: int) -> Dictiona
 		signature.append_array(path_values)
 	var events_valid: bool = false
 	if style == Grammar.RouteStyle.FLOW:
-		events_valid = micro_drop_chunks >= 2 and switchback_count == 0 and airborne_samples == 0 and cruise_recovery_chunks >= 5
+		events_valid = switchback_count == 0 and airborne_samples == 0 and cruise_recovery_chunks >= 6 and max_curvature < 0.038
 	else:
-		events_valid = switchback_count >= 2 and switchback_turn_signs.size() >= 2 and switchback_turn_signs[0] != switchback_turn_signs[1] and micro_drop_chunks >= 1 and airborne_samples == 0 and chunk_types[2] == RoadPathDataClass.SegmentType.RECOVERY_FLAT and chunk_types[5] == RoadPathDataClass.SegmentType.RECOVERY_FLAT and chunk_types[7] == RoadPathDataClass.SegmentType.RECOVERY_FLAT
+		var switchback_recovery_ok: bool = true
+		for idx in range(chunk_types.size() - 1):
+			if chunk_types[idx] == RoadPathDataClass.SegmentType.SWITCHBACK:
+				if chunk_types[idx + 1] != RoadPathDataClass.SegmentType.RECOVERY_FLAT:
+					switchback_recovery_ok = false
+		var turn_alternation_ok: bool = switchback_turn_signs.size() < 2 or (switchback_turn_signs[0] != switchback_turn_signs[1])
+		events_valid = switchback_count >= 1 and turn_alternation_ok and switchback_recovery_ok and airborne_samples == 0 and max_curvature >= 0.040
 	return {
 		"valid": valid,
 		"events_valid": events_valid,

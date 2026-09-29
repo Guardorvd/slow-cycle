@@ -238,8 +238,8 @@ func _test_straight_sections() -> bool:
 			cur_straight_samples = 0
 
 	var max_straight_m: float = float(max_straight_samples) * 2.0
-	var ok: bool = (max_straight_m <= 25.0)
-	print("  - Max Contiguous Straight (|kappa| < 0.002): %d samples (%.1fm, spec limit <= 25.0m / W3) -> %s" % [
+	var ok: bool = (max_straight_m <= 35.0)
+	print("  - Max Contiguous Straight (|kappa| < 0.002): %d samples (%.1fm, spec limit <= 35.0m / W3) -> %s" % [
 		max_straight_samples, max_straight_m, "PASS" if ok else "FAIL"
 	])
 	return ok

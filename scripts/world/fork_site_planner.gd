@@ -114,7 +114,7 @@ func evaluate_site(
 		metrics.min_slope_deg = minf(metrics.min_slope_deg, slope)
 		metrics.max_slope_deg = maxf(metrics.max_slope_deg, slope)
 		metrics.max_abs_curvature = maxf(metrics.max_abs_curvature, absf(curvature))
-		if width < Contract.ROAD_STANDARD_WIDTH - 0.01:
+		if width < Contract.ROAD_MIN_SINGLETRACK_WIDTH - 0.01:
 			reasons.append("road_too_narrow")
 		if not Contract.is_slope_within_bounds(slope):
 			reasons.append("grade_out_of_bounds")

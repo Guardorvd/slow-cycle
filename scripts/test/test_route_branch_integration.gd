@@ -37,7 +37,9 @@ func _run_route(seed_value: int, choice: int, mode: String) -> Dictionary:
 	var choice_name: String = "LEFT" if choice == ForkDecisionModelClass.BranchChoice.LEFT else "RIGHT"
 	var scene: Node = load("res://scenes/main.tscn").instantiate()
 	var world_manager: Node = scene.get_node("WorldManager")
+	world_manager.randomize_world_seed_on_start = false
 	world_manager.world_seed = seed_value
+	world_manager.set_process(false)
 	root.add_child(scene)
 	await process_frame
 	await physics_frame

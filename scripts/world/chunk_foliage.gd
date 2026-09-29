@@ -33,7 +33,9 @@ static func compute_foliage_and_decor_transforms(
 
 	var seg_type: int = path_data.segment_types[s_idx] if s_idx < path_data.segment_types.size() else 0
 	var is_open_meadow: bool = (seg_type == 14 or seg_type == 5) # 14 = RECOVERY_FLAT, 5 = MEADOW
-	var tree_chance: float = 0.25 if is_open_meadow else 0.75
+	var mw: float = carver.mountain_weight if (carver != null and "mountain_weight" in carver) else 0.5
+	var tree_chance: float = lerpf(0.80, 0.40, mw) if not is_open_meadow else lerpf(0.30, 0.15, mw)
+	var boulder_chance: float = lerpf(0.40, 0.75, mw)
 
 	# Half-open interval [s_idx, e_idx) prevents duplicate foliage at chunk boundaries
 	var count_pts: int = e_idx - s_idx
@@ -52,18 +54,18 @@ static func compute_foliage_and_decor_transforms(
 		if not path_data.road_widths.is_empty() and idx < path_data.road_widths.size():
 			half_w = path_data.road_widths[idx] * 0.5
 
-		# 1. Plants along left and right roadside (filtered by side_mask)
+		# 1. Plants along left and right roadside (filtered by side_mask, strictly >= 2.5m clearance)
 		if (side_mask & 1) != 0:
-			_try_spawn_plant(pt, -binorm, norm, rng, tree_chance, result["pine"], result["birch"], result["grass"], noise)
+			_try_spawn_plant(pt, -binorm, norm, rng, tree_chance, result["pine"], result["birch"], result["grass"], noise, mw)
 		if (side_mask & 2) != 0:
-			_try_spawn_plant(pt, binorm, norm, rng, tree_chance, result["pine"], result["birch"], result["grass"], noise)
+			_try_spawn_plant(pt, binorm, norm, rng, tree_chance, result["pine"], result["birch"], result["grass"], noise, mw)
 
 		# 2. Low-poly boulders along CUT base (rock wall shoulder foot, filtered by side_mask)
 		if carver != null:
-			var cs: Dictionary = carver.compute_cross_section(pt, tang, norm, binorm, half_w, curv, s_type, dist)
+			var cs: Dictionary = carver.compute_cross_section(pt, tang, norm, binorm, half_w, curv, s_type, dist, mw)
 			var eval: Dictionary = cs.get("eval", {})
 			# ProfileType: 0=MEADOW, 1=CUT, 2=SHELF, 3=CLIFF, 4=FILL
-			if (side_mask & 1) != 0 and eval.get("left_profile", -1) == 1 and rng.randf() < 0.60:
+			if (side_mask & 1) != 0 and eval.get("left_profile", -1) == 1 and rng.randf() < boulder_chance:
 				var b_dist_l: float = rng.randf_range(half_w + 1.0, half_w + 3.2)
 				var b_pos_l: Vector3 = pt - binorm * b_dist_l
 				b_pos_l.y = cs.shoulder_left_pos.y + 0.10
@@ -72,7 +74,7 @@ static func compute_foliage_and_decor_transforms(
 				var b_basis_l := Basis(Vector3.UP, b_rot_l).scaled(Vector3.ONE * b_scale_l)
 				result["boulder"].append(Transform3D(b_basis_l, b_pos_l))
 
-			if (side_mask & 2) != 0 and eval.get("right_profile", -1) == 1 and rng.randf() < 0.60:
+			if (side_mask & 2) != 0 and eval.get("right_profile", -1) == 1 and rng.randf() < boulder_chance:
 				var b_dist_r: float = rng.randf_range(half_w + 1.0, half_w + 3.2)
 				var b_pos_r: Vector3 = pt + binorm * b_dist_r
 				b_pos_r.y = cs.shoulder_right_pos.y + 0.10
@@ -141,7 +143,8 @@ static func _try_spawn_plant(
 	pines: Array[Transform3D],
 	birches: Array[Transform3D],
 	grasses: Array[Transform3D],
-	noise: FastNoiseLite = null
+	noise: FastNoiseLite = null,
+	mw: float = 0.5
 ) -> void:
 	if rng.randf() < 0.8:
 		var grass_dist: float = rng.randf_range(2.6, 5.2)
@@ -164,7 +167,8 @@ static func _try_spawn_plant(
 		var basis := Basis(Vector3.UP, rot_y).scaled(Vector3.ONE * scale_val)
 		var t_trans := Transform3D(basis, tree_pos)
 
-		if rng.randf() < 0.65:
+		var pine_chance: float = lerpf(0.50, 0.90, mw)
+		if rng.randf() < pine_chance:
 			pines.append(t_trans)
 		else:
 			birches.append(t_trans)

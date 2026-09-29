@@ -1110,21 +1110,21 @@ func _init() -> void:
 	var dive_pitch_ok: bool = dive_pitch_deg >= -1.6 and dive_pitch_deg <= -1.0
 	var dive_y_ok: bool = dive_y >= -0.030 and dive_y <= -0.015
 
-	# Part B: Horizon stabilization invariant (tilt <= 35% of bike bank)
+	# Part B: Horizon stabilization invariant (Sprint 6 calibrated 65% coupling)
 	bike_47.brake_input = 0.0
 	bike_47.current_bank = deg_to_rad(20.0)
 	for _f in range(60):
 		cam_rig_47._process(1.0 / 60.0)
 	var cam_roll_deg: float = rad_to_deg(cam_rig_47.current_roll)
-	var max_allowed_roll_deg: float = 20.0 * 0.35 + 0.1
-	var horizon_invariant_ok: bool = absf(cam_roll_deg) <= max_allowed_roll_deg and cam_roll_deg > 6.0
+	var max_allowed_roll_deg: float = 20.0 * 0.65 + 0.1
+	var horizon_invariant_ok: bool = absf(cam_roll_deg) <= max_allowed_roll_deg and cam_roll_deg > 12.0
 
 	print("[VERIFICATION #47] Braking Dive & Horizon Stabilization Invariant Contract:")
 	print("  - Braking Dive Pitch: %.2f° (Expected: -1.6° to -1.0°)" % dive_pitch_deg)
 	print("  - Braking Eye Drop Y: %.3fm (Expected: -0.030m to -0.015m)" % dive_y)
-	print("  - Camera Roll at 20° Bank: %.2f° (Invariant: <= %.2f° / 35%%)" % [cam_roll_deg, max_allowed_roll_deg])
+	print("  - Camera Roll at 20° Bank: %.2f° (Invariant: <= %.2f° / 65%%)" % [cam_roll_deg, max_allowed_roll_deg])
 	if dive_pitch_ok and dive_y_ok and horizon_invariant_ok:
-		print("  [PASS] Braking dive pitch and 35%% horizon stabilization invariant confirmed!")
+		print("  [PASS] Braking dive pitch and 65%% horizon stabilization invariant confirmed!")
 	else:
 		print("  [FAIL] Dive or horizon contract violated: dive_pitch=%s, dive_y=%s, horizon=%s" % [dive_pitch_ok, dive_y_ok, horizon_invariant_ok])
 		all_ok = false

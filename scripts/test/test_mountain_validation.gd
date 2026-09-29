@@ -65,6 +65,7 @@ func _run_mountain_stress_test(seed_val: int, target_forks: int) -> bool:
 	var main_scene: PackedScene = load("res://scenes/main.tscn")
 	var instance: Node = main_scene.instantiate()
 	var world_mgr: Node = instance.get_node("WorldManager")
+	world_mgr.randomize_world_seed_on_start = false
 	world_mgr.world_seed = seed_val
 
 	root.add_child(instance)

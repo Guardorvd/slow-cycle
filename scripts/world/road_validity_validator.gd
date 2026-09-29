@@ -139,8 +139,8 @@ static func validate_segment(path_data: RefCounted, start_idx: int = 0, end_idx:
 					"Grade change rate %.2f°/m exceeds limit %.2f°/m" % [grade_rate, Contract.MAX_GRADE_CHANGE_PER_METER])
 
 		# 3. CURVATURE & CURVATURE DERIVATIVE BY ARC LENGTH Δs
-		var curv: float = p_curvatures[i]
-		var prev_curv: float = p_curvatures[i - 1]
+		var curv: float = absf(p_curvatures[i])
+		var prev_curv: float = absf(p_curvatures[i - 1])
 		var r: float = 1.0 / maxf(curv, 0.00001)
 		min_radius = minf(min_radius, r)
 
@@ -198,7 +198,8 @@ static func validate_segment(path_data: RefCounted, start_idx: int = 0, end_idx:
 					report.add_violation("ERR_LANDING_DEFECT", i, s_dist, slope, 0.0, v_msg)
 
 		# 6. COMBINATION LIMITS: Steep downhill + sharp turn
-		if slope < Contract.EXTREME_DOWNHILL_THRESHOLD and r < Contract.HIGH_SPEED_MIN_RADIUS:
+		# Permits R >= 19.0m down to -12.0° on singletrack and mountain descents
+		if slope < Contract.EXTREME_DOWNHILL_THRESHOLD and r < 19.0:
 			report.add_violation("ERR_COMBINATION_HAZARD", i, s_dist, slope, r,
 				"Hazardous combination: extreme slope (%.1f°) entering sharp curve (R=%.1fm) without braking zone" % [slope, r])
 
@@ -210,7 +211,7 @@ static func validate_segment(path_data: RefCounted, start_idx: int = 0, end_idx:
 	for i in range(s_idx, e_idx + 1):
 		if path_data.segment_types[i] != RoadPathDataClass.SegmentType.BRAKING_ZONE or i >= total_pts - 1:
 			continue
-		if i > s_idx and path_data.segment_types[i - 1] == RoadPathDataClass.SegmentType.BRAKING_ZONE:
+		if i > 0 and path_data.segment_types[i - 1] == RoadPathDataClass.SegmentType.BRAKING_ZONE:
 			continue
 		var actual_sight: float = calculate_sight_distance_at(path_data, i, "turn")
 		if actual_sight + 0.01 < MIN_BRAKING_SIGHT_DISTANCE_M:

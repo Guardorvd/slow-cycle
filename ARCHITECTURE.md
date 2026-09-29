@@ -174,7 +174,99 @@ The historic sprint ID alone does not imply that the full product goal is done.
 | FEAT-015.3 mountain trails/singletracks | Planned; playable network must connect to route graph or be clearly decorative | Stage D after shared landscape and route corridors |
 | FEAT-015.4 far terrain LOD/streaming | Planned | Stage C performance/completeness gate, then Stage G soak |
 
-## 10. Entry points and references
+## 12. Biome Data Flow & Cross-System Coupling (Sprint 6 v4)
+
+To prevent visual and physical isolation between road geometry, roadside carving, and vegetation, Sprint 6 v4 formalizes the unified continuous biome pipeline:
+
+```text
+MountainProfile (get_mountain_weight_at(s) ∈ [0.0, 1.0])
+       │
+       ▼
+   RoadLogic (speed envelopes, curvature limits, clothoid transitions)
+       │
+       ▼
+  ChunkStreamer (fork interval pacing: 200–350m mountain vs 450–650m forest)
+       │
+       ├──► TerrainCarver (mountain_weight drives CUT/SHELF/CLIFF, |dh| ≥ 1.5–3.5m,
+       │                   plus 45m outer terrain skirt descending toward horizon)
+       │
+       └──► ChunkFoliage (mountain_weight selects alpine bonsai/scree vs dense forest,
+                          strictly enforcing ≥ 2.5m clearance corridor from road centerline)
+```
+
+- **Data Flow Contract**: `MountainProfile` is the single source of biome weight. `mountain_weight` is computed from the 200m rolling grade window and passed downstream to all chunk generation passes.
+- **Terrain Carver Coupling**: In mountain zones (`mountain_weight > 0.65`), even straight sections generate rock cuts and dramatic shelves. In forest zones (`mountain_weight < 0.35`), gentle ditches and rolling meadows prevail.
+- **Foliage Density & Safety Zone**: Trees, shrubs, and boulders are placed via chunk-local `MultiMeshInstance3D` nodes. All trunks and solid obstacles are strictly banned within $2.5$m of the road centerline.
+
+---
+
+## 13. Curvature Synthesis, Adaptive Macro-Heading & Soft-Repair Architecture
+
+Sprint 6 v4 removes historical straightfall traps (the 400m opening curtain and 450m post-fork queues) and adopts perceptual curvature dynamics:
+
+1. **Perceptual Curvature Noise**:
+   - `FastNoiseLite` frequency is tuned to $f \in [0.020, 0.024]$ (nominal $0.022$).
+   - Semi-wavelength is $\sim 25$m, yielding lateral S-sweeps of $12\text{–}18$m (instead of imperceptible $1.5$m oscillations of high-frequency $0.12$ noise).
+   - Target radius cascade: speed sweepers $R \in [45, 70]$m, medium carvers $R \in [25, 35]$m, tight switchbacks $R \in [19, 22]$m. Minimum design radius is strictly $R \ge 19.0$m.
+
+2. **Adaptive Macro-Heading $\theta_{\text{macro}}$**:
+   - Replaces the legacy rigid south constant ($180.0^\circ$).
+   - Dynamic course tracking:
+     $$\theta_{\text{macro}}(s) = \text{lerp\_angle}(\theta_{\text{macro}}, \theta_{\text{actual}}, 0.015 \cdot ds)$$
+   - Allows the road to contour naturally around mountain massifs without artificial spring-back straightening.
+
+3. **Soft-Repair Geometry Validator**:
+   - **Ban on Silent Fallback**: The destructive `_generate_conservative_safe_chunk()` (silent replacement with a straight line) is prohibited.
+   - **In-Place Clothoid Clamping**: If a candidate turn exceeds physical curvature or lateral jerk bounds, it is smoothly clamped to $R = 19.0$m while preserving the turn direction and continuity.
+   - **Fatal Fallback Scope**: Straight fallback is restricted exclusively to seam tears ($\Delta p > 1$mm) or floating-point non-finiteness (NaN/Inf), and must trigger an explicit alert in `[GEOM]`.
+
+4. **Free Launch & FSM Pacing**:
+   - The opening uses a 15m horizontal launchpad (for wheel physics stabilization) followed by a 25m acceleration chute (grade $-4^\circ \dots -6^\circ$).
+   - Beyond 40m, the procedural FSM takes over immediately. Initial curve direction is seeded 50/50: `rng.randf() < 0.5 ? 1.0 : -1.0`.
+   - Post-fork routes never populate static chunk queues; `set_route_style()` modifies FSM transition weights (`FLOW` vs `TECHNICAL`), keeping generation 100% procedural.
+
+---
+
+## 14. Perception Calibration — Camera Ride Feel & Kinematic Steer Limits
+
+Visual perception and physics are calibrated to reflect mountain steepness and cornering dynamics:
+
+1. **Camera Horizon Tilt (65% Coupling)**:
+   - Third-person and cockpit camera horizon stabilization is adjusted from $0.35$ to $0.65$. At a $24^\circ$ bicycle lean, the camera tilts $15.6^\circ$, conveying high-speed cornering energy without motion sickness.
+   - Asymmetric critical damping eliminates jitter and nauseating roll whip.
+
+2. **Visual Pitch Transmission**:
+   - The camera X-rotation now couples directly with `visual_pitch` (ground-plane pitch). Steep downhill sections ($-10^\circ \dots -14^\circ$) are visibly perceived as steep descents with the valley floor opening below.
+
+3. **Field of View (FOV)**:
+   - Base cockpit FOV is calibrated to $70^\circ$ (dynamic range $70^\circ \dots 75^\circ$ on speed), eliminating perspective compression and restoring depth to mountain slopes.
+
+4. **Kinematic Steer Limit Expansion**:
+   - In `BicycleController`, `high_speed_steer_limit` at $35$ km/h is expanded from $0.045$ rad to $0.062$ rad ($3.55^\circ$).
+   - This physically allows the bicycle to follow curves down to $R = 19.0$m on speed without understeering into roadside terrain.
+
+---
+
+## 15. Observability, Diagnostics & Structured Telemetry
+
+To guarantee full transparency across all procedural subsystems, Sprint 6 v4 introduces the Observability Suite:
+
+1. **Diagnostic Singleton `SlowCycleLogger` (`scripts/core/slow_cycle_logger.gd`)**:
+   - Thread-safe 5000-line circular in-memory buffer with periodic flush to `user://slow_cycle_diagnostics.log`.
+   - Tagged diagnostic channels:
+     - `[WORLD]`: World seed, session lifecycle, active chunk window, memory budget.
+     - `[GRAMMAR]`: FSM phase changes, route style transitions, candidate queue states.
+     - `[GEOM]`: Centerline evaluation, curvature $R$, Soft-Repair events, seam deltas.
+     - `[FORK]`: Fork preflight, preview corridor, decision intent, branch states.
+     - `[TERRAIN]`: Carver cross-section selection, rock cut/shelf offsets, skirt generation.
+     - `[BIKE]`: Speed, cadence, lateral acceleration $a_{\text{lat}}$, frame roll, camera pitch.
+
+2. **F3 Debug HUD (`scripts/ui/debug_hud.gd`)**:
+   - Live runtime overlay showing: Seed, active biome & `mountain_weight`, instantaneous curve radius $R$, adaptive $\theta_{\text{macro}}$, slope grade, lateral $a_{\text{lat}}$, bicycle banking $\phi_{\text{bike}}$, and camera roll/pitch.
+
+---
+
+## 16. Entry points and references
 
 - `project.godot` starts `res://scenes/mode_select.tscn`; `res://scenes/main.tscn` hosts the ride.
 - Full product stages and intermediate build gates: `DEVELOPMENT_ROADMAP.md`.
@@ -182,3 +274,4 @@ The historic sprint ID alone does not imply that the full product goal is done.
 - Current sprint plan and actual execution log: `implementation_plan.md`.
 - Reproducible test commands, results and limits: `TEST_PLAN.md`.
 - Current handoff summary: `MTB_WORLD_GENERATION_HANDOFF.md`.
+

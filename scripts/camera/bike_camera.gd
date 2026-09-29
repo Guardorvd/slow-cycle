@@ -8,7 +8,7 @@ extends Node3D
 @export var is_first_person: bool = true
 
 @export_group("Stabilization & Motion")
-@export var horizon_stabilization: float = 0.35 ## 0 = perfectly level horizon, 1 = locked to bike roll (Invariant: <= 35%)
+@export var horizon_stabilization: float = 0.65 ## 0 = perfectly level horizon, 1 = locked to bike roll (0.65 for mountain immersion)
 @export var roll_damping: float = 8.0
 @export var vertical_bob_intensity: float = 0.015 ## Subtle breathing/pedal bob
 
@@ -117,6 +117,7 @@ func _process(delta: float) -> void:
 	var terrain_rough: float = ctrl.terrain_roughness if ctrl else (bike.get("terrain_roughness") if "terrain_roughness" in bike else 0.16)
 	var is_on_grass: bool = ctrl.is_on_grass if ctrl else (bike.get("is_on_grass") if "is_on_grass" in bike else false)
 	var current_surf: int = ctrl.current_surface if ctrl else (bike.get("current_surface") if "current_surface" in bike else 0)
+	var vis_pitch: float = ctrl.visual_pitch if ctrl else (bike.get("visual_pitch") if "visual_pitch" in bike else 0.0)
 
 	# -------------------------------------------------------------
 	# 1. CORE PRIORITY 1: Horizon Roll Stabilization (VOR Invariant <= 35%)
@@ -232,8 +233,8 @@ func _process(delta: float) -> void:
 		first_person_cam.position.y = base_fp_pos.y + current_bob_y + current_dive_y + current_shake_y
 		first_person_cam.position.z = base_fp_pos.z + current_surge_z + dive_forward_shift
 
-		# Rotation: base_pitch + dive_pitch, look_yaw, current_roll + shake_rot
-		first_person_cam.rotation.x = base_fp_rot.x + current_dive_pitch
+		# Rotation: base_pitch + vis_pitch + dive_pitch, look_yaw, current_roll + shake_rot
+		first_person_cam.rotation.x = base_fp_rot.x + vis_pitch + current_dive_pitch
 		first_person_cam.rotation.y = base_fp_rot.y + current_look_yaw
 		first_person_cam.rotation.z = current_roll + current_shake_rot
 
@@ -243,7 +244,7 @@ func _process(delta: float) -> void:
 	if third_person_cam:
 		# Third person maintains calm perspective: zero angular road noise, zero apex yaw
 		third_person_cam.rotation.z = current_roll * 0.5
-		third_person_cam.rotation.x = 0.0
+		third_person_cam.rotation.x = vis_pitch * 0.85
 		third_person_cam.rotation.y = 0.0
 
 		# Linear noise heavily attenuated to 20%

@@ -434,3 +434,51 @@ Fresh integration results: `test_fork_site_planner.gd` **36/36** including paire
 Four seeded-default pacing records from integration (seeds `184729`, `42`, both branch choices) matched the generated fork distance. Targets were 591.0–820.7m, generated distances 600.3–851.1m and overshoot 9.3–33.3m; all fell in the diagnostic 550–900m band without overrun. This is four controlled route traces only. The mountain stress runner deliberately sets 100m intervals; its 314.6–317.6m first-candidate overrun reflects the 350m generation-ahead window under that artificial schedule, not normal production spacing. Safety behavior was preserved.
 
 One batched route-integration execution printed `6 ObjectDB instances leaked`; isolated repeat exited 0 without reproducing it. It remains an unreproduced warning. Godot also continues to report the environment's log-file and Windows root-certificate errors. Do not describe either as fixed. The path follower does not establish human ride quality.
+
+---
+
+## 7. Трёхуровневая пирамида тестирования и автономный сторожевой комплекс (Sprint 6 v4)
+
+В соответствии с парадигмой **Observability & TDD First** (Спринт 6 v4), проект защищён трёхуровневой системой верификации, исключающей иллюзию «зелёных тестов при прямой дороге»:
+
+```text
+       ▲
+      / \     Уровень 3: Perception & GPU Vulkan Harness (capture_visual_audit.gd)
+     /   \    - 1280x720 рендеринг: Кокпит руля, 3-е лицо, Аэрофото дрона
+    /     \   - Верификация перспективы гор, силуэтов леса и отсутствия дыр террейна
+   /───────\
+  /         \   Уровень 2: Quality Watchdogs & Physical Rider
+ /           \  - test_seed_diversity_matrix.gd (Разброс сидов Δx ≥ 30.0м на 200м)
+/             \ - test_monotony_profiler.gd (Запрет прямых >100м без перепадов |dh| < 0.2м)
+/               \- test_virtual_rider_bot.gd (1500м на честной физике BicycleController)
+/─────────────────\
+/                   \  Уровень 1: Unit & Contract Tests
+/                     \ - Математические инварианты C1, швы Δp < 1мм, DAG графа
+/───────────────────────\ - test_road_contract.gd, test_road_grammar.gd, test_sprint_4m_master.gd
+```
+
+### 7.1. Регламент автономных сторожевых инструментов
+
+1. **Сторож разнообразия сидов (`scripts/test/test_seed_diversity_matrix.gd`)**:
+   - **Команда**: `godot --headless --path . --script res://scripts/test/test_seed_diversity_matrix.gd`
+   - **Методология**: Генерирует 10 детерминированных сидов на дистанцию 500м. Измеряет координаты траекторий на отметках 50м, 100м, 200м, 300м, 400м.
+   - **Критерий PASS**: Разброс боковых координат $\Delta x_{\text{max}} - x_{\text{min}} \ge 30.0$м на отметке 200м. Вывод наглядной ASCII-миникарты разлёта трасс в консоль.
+   - **Критерий FAIL**: Разброс $< 30.0$м (дорога прямая или сид заблокирован).
+
+2. **Сторож монотонности полотна и рельефа (`scripts/test/test_monotony_profiler.gd`)**:
+   - **Команда**: `godot --headless --path . --script res://scripts/test/test_monotony_profiler.gd`
+   - **Методология**: Анализирует сгенерированное полотно скользящим окном 50м. Замеряет кривизну $|\kappa|$, продольный уклон, перепад высот обочины $|dh|$ и наличие объектов окружения.
+   - **Критерий PASS**: Отсутствие мертвых коридоров $>100$м, где одновременно $|\kappa| < 0.005$ и $|dh| < 0.2$м. На горных участках (`mountain_weight > 0.65`) на отрезке 40м перепад высот рельефа обязан составлять $|dh| \ge 1.0$м.
+   - **Критерий FAIL**: Наличие мертвого монотонного участка $>100$м или плоский рельеф на горном участке.
+
+3. **Виртуальный физический райдер (`scripts/test/test_virtual_rider_bot.gd`)**:
+   - **Команда**: `godot --headless --path . --script res://scripts/test/test_virtual_rider_bot.gd`
+   - **Методология**: Инстанциирует честный `BicycleController` в физическом мире Godot без координатной телепортации. Бот удерживает скорость 30–35 км/ч, отрабатывает руление по курсу дороги и проходит 1500м.
+   - **Критерий PASS**: Успешное преодоление 1500м без единого схода с полотна; зафиксировано не менее 4 активных входов в крен ($|\phi_{\text{bike}}| \ge 3.0^\circ$) на 1 км трассы.
+   - **Критерий FAIL**: Сход с полотна, застревание, падение скорости или отсутствие динамических наклонов рамы.
+
+4. **Автоматический фотоаудит (`scripts/test/capture_visual_audit.gd`)**:
+   - **Команда**: `godot --rendering-driver vulkan --path . --script res://scripts/test/capture_visual_audit.gd`
+   - **Методология**: Захватывает реальные GPU Vulkan кадры в разрешении $1280 \times 720$ на 3 сидах (`184729`, `42`, `77777`) с трех ракурсов: вид из кокпита руля, кинематографическая камера 3-го лица и высотный дрон.
+   - **Критерий PASS**: Подтверждение видимости горного рельефа, перепадов высот, скальных полок и отсутствия дыр террейна в радиусе 45м.
+

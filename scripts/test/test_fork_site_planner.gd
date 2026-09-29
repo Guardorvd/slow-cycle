@@ -27,6 +27,10 @@ class RejectPlanner extends RefCounted:
 	func evaluate_site(_path: RefCounted, candidate_idx: int, _last_valid: bool, _terrain: RefCounted, _sight: float) -> Dictionary:
 		return {"eligible": false, "reason_codes": ["forced_test_rejection"], "metrics": {"candidate_idx": candidate_idx}}
 
+class AcceptPlanner extends RefCounted:
+	func evaluate_site(_path: RefCounted, candidate_idx: int, _last_valid: bool, _terrain: RefCounted, _sight: float) -> Dictionary:
+		return {"eligible": true, "reason_codes": [], "metrics": {"candidate_idx": candidate_idx}}
+
 class RejectPreviewPlanner extends RefCounted:
 	func evaluate_pair(_pos: Vector3, _tang: Vector3, _binorm: Vector3, _heading: float, _slope: float, _left_style: int, _right_style: int, _terrain: RefCounted) -> Dictionary:
 		return {"eligible": false, "reason_codes": ["forced_preview_rejection"], "arms": [], "signature": "forced"}
@@ -93,7 +97,7 @@ func _check_unit_contract() -> void:
 	terrain.danger_right = false
 
 	var narrow := _make_path()
-	narrow.road_widths[-3] = Contract.ROAD_STANDARD_WIDTH - 0.1
+	narrow.road_widths[-3] = Contract.ROAD_MIN_SINGLETRACK_WIDTH - 0.1
 	_assert(_has_reason(planner.evaluate_site(narrow, narrow.size() - 1, true, terrain, 50.0), "road_too_narrow"), "narrow approach sample is rejected")
 	var steep := _make_path()
 	steep.slopes[-3] = Contract.MAX_GRADE_DOWNHILL - 1.0
@@ -160,6 +164,7 @@ func _check_rejected_preview_falls_back_to_normal_chunk() -> void:
 	streamer.setup(manager, path, logic, manager.shared_materials, manager.shared_meshes)
 	var branch = streamer.get_active_branch()
 	branch.next_fork_distance = 1.0
+	streamer.fork_site_planner = AcceptPlanner.new()
 	streamer.fork_corridor_preview_planner = RejectPreviewPlanner.new()
 	var before_size: int = branch.road_path.size()
 	_assert(not streamer._is_safe_fork_site(branch), "forced paired preview rejection is respected")
