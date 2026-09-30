@@ -77,29 +77,19 @@ func test_greybox_meshes_and_shared_resources() -> void:
 	wm.world_seed = 424242
 	wm._init_shared_resources()
 
-	# 1. Check mesh registration
+	# 1. Check mesh registration (Zero-Post Mandate: only natural dressing remains)
 	assert_true(wm.shared_meshes.has("boulder"), "shared_meshes contains 'boulder'")
-	assert_true(wm.shared_meshes.has("marker_post"), "shared_meshes contains 'marker_post'")
-	assert_true(wm.shared_meshes.has("directional_sign"), "shared_meshes contains 'directional_sign'")
+	assert_true(not wm.shared_meshes.has("marker_post"), "Zero-Post Mandate: 'marker_post' is eliminated from shared_meshes")
+	assert_true(not wm.shared_meshes.has("directional_sign"), "Zero-Post Mandate: 'directional_sign' is eliminated from shared_meshes")
+	assert_true(not wm.shared_meshes.has("guard_post"), "Zero-Post Mandate: 'guard_post' is eliminated from shared_meshes")
 
 	var boulder_mesh: Mesh = wm.shared_meshes.get("boulder", null)
-	var marker_mesh: Mesh = wm.shared_meshes.get("marker_post", null)
-	var sign_mesh: Mesh = wm.shared_meshes.get("directional_sign", null)
-
 	assert_true(boulder_mesh != null and boulder_mesh.get_surface_count() > 0, "Boulder mesh is valid ArrayMesh with surfaces")
-	assert_true(marker_mesh != null and marker_mesh.get_surface_count() > 0, "Marker post mesh is valid ArrayMesh with surfaces")
-	assert_true(sign_mesh != null and sign_mesh.get_surface_count() > 0, "Directional sign mesh is valid ArrayMesh with surfaces")
 
 	# 2. Check mesh bounds are compact (greybox dimensions)
 	var b_aabb: AABB = boulder_mesh.get_aabb()
 	assert_true(b_aabb.size.x > 0.5 and b_aabb.size.x < 3.0, "Boulder width is within [0.5m, 3.0m] (measured: %.2f)" % b_aabb.size.x)
 	assert_true(b_aabb.size.y > 0.5 and b_aabb.size.y < 3.0, "Boulder height is within [0.5m, 3.0m] (measured: %.2f)" % b_aabb.size.y)
-
-	var m_aabb: AABB = marker_mesh.get_aabb()
-	assert_true(m_aabb.size.y > 0.6 and m_aabb.size.y < 1.6, "Marker post height is within [0.6m, 1.6m] (measured: %.2f)" % m_aabb.size.y)
-
-	var s_aabb: AABB = sign_mesh.get_aabb()
-	assert_true(s_aabb.size.y > 1.2 and s_aabb.size.y < 2.5, "Directional sign height is within [1.2m, 2.5m] (measured: %.2f)" % s_aabb.size.y)
 
 	wm.queue_free()
 
@@ -257,16 +247,12 @@ func test_greybox_dressing_placement_and_physics_layers() -> void:
 	var chunk := RoadChunkClass.new()
 	var _timings = chunk.commit(prep, wm.shared_materials, wm.shared_meshes)
 
-	# 1. Verify greybox elements exist on chunk
+	# 1. Verify Zero-Post Invariant on chunk (no posts, no barricades)
 	var post_mm: MultiMeshInstance3D = chunk.get_node_or_null("MarkerPostMultiMesh")
 	var sign_inst: MeshInstance3D = chunk.get_node_or_null("DirectionalSignInstance")
 
-	assert_true(post_mm != null, "Chunk instantiated MarkerPostMultiMesh")
-	assert_true(sign_inst != null, "Chunk instantiated DirectionalSignInstance on fork chunk (is_fork_decor = true)")
-
-	# 2. Verify MultiMesh custom_aabb for frustum culling
-	if post_mm and post_mm.multimesh and post_mm.multimesh.instance_count > 0:
-		assert_true(post_mm.custom_aabb.size.length() > 0.1, "MarkerPostMultiMesh has custom_aabb configured for frustum culling")
+	assert_true(post_mm == null, "Zero-Post Mandate: Chunk has NO MarkerPostMultiMesh")
+	assert_true(sign_inst == null, "Zero-Post Mandate: Chunk has NO DirectionalSignInstance (clear corridor)")
 
 	# 3. Verify Boulder MultiMesh instancing via ChunkFoliage helper
 	var test_parent := Node3D.new()

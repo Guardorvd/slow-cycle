@@ -187,37 +187,36 @@ func compute_cross_section(
 	var dh_left: float = eval.left_delta_h
 	var dh_right: float = eval.right_delta_h
 
-	# 1. Base lateral displacements along binormal with Smooth Adaptive Curvature Clamping
-	# Continuously scale the inner skirt as curvature increases to prevent evolute crossing and tears
-	var abs_k: float = absf(curv)
-	var r_local: float = (1.0 / abs_k) if abs_k > 0.0001 else 9999.0
-	var d_inner_target: float = minf(W_FAR, maxf(8.0, r_local * 0.70))
+	# 1. Base lateral displacements along binormal with Continuous C1 Lateral Envelope
+	# Avoid evolute crossing on turns while strictly preserving C1 continuity (|dW/ds| <= 0.10 m/m)
+	# curv is signed: > 0 means turning right (+b inner), < 0 means turning left (-b inner)
+	var k_turn: float = clampf(curv, -0.06, 0.06)
+	var abs_k: float = absf(k_turn)
 
-	# Smooth blending factor into turn (0.0 on straights, 1.0 when R <= 45m)
-	var turn_blend: float = clampf((abs_k - 0.002) / (0.022 - 0.002), 0.0, 1.0)
-	var d_clamped_inner: float = lerpf(W_FAR, d_inner_target, turn_blend)
+	# Clamping threshold: curves with R < 65m (abs_k > 0.015) smoothly contract the inner flank.
+	# At abs_k <= 0.015, inner width equals W_FAR (no clamping, zero discontinuity when passing curv=0).
+	var w_far_l: float = W_FAR
+	var w_far_r: float = W_FAR
 
-	# Inner skirt clamping: when turning right (curv > 0), clamp right. When turning left (curv < 0), clamp left.
-	var w_far_l: float = d_clamped_inner if curv < 0.0 else W_FAR
-	var w_far_r: float = d_clamped_inner if curv > 0.0 else W_FAR
+	if abs_k > 0.0001:
+		var r_local: float = 1.0 / abs_k
+		# Inner flank must strictly satisfy total span <= R * 0.70 to eliminate evolute crossings
+		var max_inner_w: float = maxf(8.0, r_local * 0.70 - half_w)
+		var d_clamped: float = minf(W_FAR, max_inner_w)
+
+		if k_turn > 0.0:
+			w_far_r = d_clamped
+		else:
+			w_far_l = d_clamped
 
 	# Strictly enforce monotonic ordering of offsets: half_w < d_sh < d_feat < d_far
-	var total_w_l: float = half_w + W_SHOULDER + W_FEATURE + w_far_l
-	var total_w_r: float = half_w + W_SHOULDER + W_FEATURE + w_far_r
+	var d_sh_l: float = half_w + W_SHOULDER
+	var d_feat_l: float = d_sh_l + W_FEATURE
+	var d_far_l: float = maxf(d_feat_l + 1.5, half_w + w_far_l)
 
-	# Cap inner lateral span strictly under R_local * 0.80
-	if curv > 0.001 and r_local < 900.0:
-		total_w_r = minf(total_w_r, maxf(half_w + 3.5, r_local * 0.75))
-	elif curv < -0.001 and r_local < 900.0:
-		total_w_l = minf(total_w_l, maxf(half_w + 3.5, r_local * 0.75))
-
-	var d_sh_l: float = half_w + minf(W_SHOULDER, (total_w_l - half_w) * 0.15)
-	var d_feat_l: float = d_sh_l + minf(W_FEATURE, (total_w_l - d_sh_l) * 0.35)
-	var d_far_l: float = total_w_l
-
-	var d_sh_r: float = half_w + minf(W_SHOULDER, (total_w_r - half_w) * 0.15)
-	var d_feat_r: float = d_sh_r + minf(W_FEATURE, (total_w_r - d_sh_r) * 0.35)
-	var d_far_r: float = total_w_r
+	var d_sh_r: float = half_w + W_SHOULDER
+	var d_feat_r: float = d_sh_r + W_FEATURE
+	var d_far_r: float = maxf(d_feat_r + 1.5, half_w + w_far_r)
 
 	# Left side positions (-b)
 	var pos_l_road: Vector3 = pt - binorm * half_w

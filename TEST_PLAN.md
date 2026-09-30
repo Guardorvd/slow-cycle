@@ -2,26 +2,37 @@
 
 ## Sprint 7 — Living Mountain Reality Check & Verification Results (2026-09-30)
 
-### Sprint 7 Final Reality Check Status: 100% PASS
+### Sprint 7 Final Reality Check Status: 100% PASS (Math & Physics) / REOPENED for Visual Stabilization
 - **Stress Distance**: 75.0 km continuous generation (3 seeds `[184729, 10101, 99999]` × 25 km / 500 chunks = 1500 chunks streamed).
 - **RAM Stability**: Memory plateau at 51.8–52.3 MB (delta +1.5 MB, strictly <= 75.0 MB budget limit). Zero leaks, zero crashes, zero NaN/Inf.
 - **Master Regression**: `test_sprint_4m_master.gd` — **125/125 PASS** (Tiers 1–7 satisfied, exit code 0).
 - **Core Diagnostics**: `test_diagnostics.gd` — **68/68 PASS** (100% OK).
 - **Layer 0 Massif Field**: `test_mountain_massif_field.gd` — **100% PASS** (Determinism, Seed Diversity, Orthogonality, Gradient Consistency).
 
-### Sprint 7 Automated Watchdogs Results
+### Sprint 7 Automated Watchdogs Results & Upgrades
 1. **`test_road_clearance_watchdog.gd`**:
    - **Result**: **100% PASS** (1124 props audited across 5 seeds).
-   - Zero trees, rocks, signs, or marker posts encroaching on the road envelope ($w(s)/2 + 0.80$m). Dynamic road width and normal-aligned basis verified.
+   - Zero trees and rocks encroaching on the road envelope ($w(s)/2 + 0.80$m). Zero-Post Mandate enforced: 0 marker posts and guard posts generated.
 2. **`test_terrain_topology_watchdog.gd`**:
-   - **Result**: **100% PASS** (22,500 triangles audited across 5 demanding seeds).
-   - Inverted faces: **0** (was 22,298 baseline). Degenerate slivers: **0**. Skirt evolute crossings: **0** (was 170 baseline). Smooth adaptive curvature clamping ($d_{\text{inner}} \le \min(W_{\text{FAR}}, R \cdot 0.70)$) verified.
+   - **Result**: **100% PASS** on core cross-section terrain arrays.
+   - *Upgrade*: Тест расширен для проверки 100% треугольников визуального массива `terrain_arrays[Mesh.ARRAY_INDEX]`, а не только упрощенного массива физики `terrain_faces`.
 3. **`test_foliage_contact_watchdog.gd`**:
    - **Result**: **100% PASS** (350 props audited across 3 seeds).
-   - Floating props: **0** (was 166 baseline). Buried props: **0** (was 89 baseline). Precision surface anchoring with 10 cm root embedment verified via `TerrainCarverClass.get_surface_point_from_cross_section`.
+   - Floating props: **0**. Buried props: **0**. Precision surface anchoring with 10 cm root embedment verified.
 4. **`test_road_verge_seam_watchdog.gd`**:
    - **Result**: **100% PASS** (1500 seam samples audited across 3 seeds).
-   - Coplanar seams ($dh < 0.015$m): **0** (was 1500 baseline / 100% failure). Inverted steps: **0**. Beveled verge step $h_{\text{step}} = 0.035$m cleanly eliminates GPU Z-fighting.
+   - Coplanar seams: **0**. Beveled verge step $h_{\text{step}} = 0.035$m cleanly eliminates GPU Z-fighting.
+
+### Sprint 7 Reboot: Visual Audit & Post-Mortem (2026-09-30)
+- **Инструмент аудита**: `scripts/test/capture_seed_audit.gd` (Vulkan Forward+, 9 кадров: сиды 184729, 42, 77777 на отметках 0м, 100м и первой развилке).
+- **Выявленные дефекты**:
+  1. *«Стрелы в небе / Веера текстур»*: Экструзия внешних юбок до 180м вдоль бинормали полотна на серпантинах ($R=19..30$м) пересекает эволюту поворота. Ошибка знака `curv < -0.001` приводила к отсутствию зажима на левых виражах.
+  2. *«Пустоты в текстурах / Серые бездны»*: Несоответствие между шириной смоделированного коридора (45м) и порогом начала тумана (160м) в `forest_env.tres`.
+- **Статус выполнения**:
+  - `[x]` Демонтаж столбиков и вешек (Zero-Post Mandate).
+  - `[x]` Органическая 3-кластерная крона березы.
+  - `[x]` Развилочный клин (Fork Splitter Wedge) и непрерывная индексация.
+  - `[ ]` Демонтаж 180м юбок и герметизация горизонта туманом (38м..95м) — вынесено в следующую сессию.
 
 ---
 

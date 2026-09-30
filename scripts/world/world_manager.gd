@@ -109,10 +109,7 @@ func _init_shared_resources() -> void:
 	shared_meshes["pine"] = _build_pine_mesh()
 	shared_meshes["birch"] = _build_birch_mesh()
 	shared_meshes["grass"] = _build_grass_mesh()
-	shared_meshes["guard_post"] = _build_guard_post_mesh()
 	shared_meshes["boulder"] = _build_boulder_mesh()
-	shared_meshes["marker_post"] = _build_marker_post_mesh()
-	shared_meshes["directional_sign"] = _build_directional_sign_mesh()
 
 func _build_pine_mesh() -> ArrayMesh:
 	var st := SurfaceTool.new()
@@ -166,37 +163,73 @@ func _build_birch_mesh() -> ArrayMesh:
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	
 	var leaf_mat := StandardMaterial3D.new()
-	leaf_mat.albedo_color = Color(0.38, 0.54, 0.22)
-	leaf_mat.roughness = 0.8
+	leaf_mat.albedo_color = Color(0.40, 0.58, 0.24) # Fresh vibrant mountain birch
+	leaf_mat.roughness = 0.82
 	st.set_material(leaf_mat)
 
-	# 1. Trunk (y=0 to y=2.5)
-	var segs: int = 7
-	var trunk_r: float = 0.14
+	# 1. Trunk (y=0 to y=2.8)
+	var segs: int = 6
+	var trunk_r: float = 0.12
 	for i in range(segs):
 		var a0: float = (float(i) / float(segs)) * TAU
 		var a1: float = (float(i + 1) / float(segs)) * TAU
 		var p0 := Vector3(cos(a0) * trunk_r, 0.0, sin(a0) * trunk_r)
 		var p1 := Vector3(cos(a1) * trunk_r, 0.0, sin(a1) * trunk_r)
-		var p2 := Vector3(cos(a0) * trunk_r * 0.8, 2.5, sin(a0) * trunk_r * 0.8)
-		var p3 := Vector3(cos(a1) * trunk_r * 0.8, 2.5, sin(a1) * trunk_r * 0.8)
+		var p2 := Vector3(cos(a0) * trunk_r * 0.75, 2.8, sin(a0) * trunk_r * 0.75)
+		var p3 := Vector3(cos(a1) * trunk_r * 0.75, 2.8, sin(a1) * trunk_r * 0.75)
 
 		st.add_vertex(p0); st.add_vertex(p2); st.add_vertex(p1)
 		st.add_vertex(p1); st.add_vertex(p2); st.add_vertex(p3)
 
-	# 2. Canopy
-	var r: float = 1.35
-	var y_center: float = 3.0
-	for i in range(segs):
-		var a0: float = (float(i) / float(segs)) * TAU
-		var a1: float = (float(i + 1) / float(segs)) * TAU
-		var p0 := Vector3(cos(a0) * r, y_center, sin(a0) * r)
-		var p1 := Vector3(cos(a1) * r, y_center, sin(a1) * r)
-		var p_top := Vector3(0, y_center + r * 1.0, 0)
-		var p_bot := Vector3(0, y_center - r * 0.7, 0)
+	# 2. Natural 3-Cluster Low-Poly Organic Canopy
+	var clusters := [
+		{"center": Vector3(0.0, 3.2, 0.0), "r": 1.15, "segs": 7},
+		{"center": Vector3(0.30, 4.0, -0.20), "r": 0.85, "segs": 6},
+		{"center": Vector3(-0.25, 2.8, 0.25), "r": 0.80, "segs": 6}
+	]
 
-		st.add_vertex(p0); st.add_vertex(p_top); st.add_vertex(p1)
-		st.add_vertex(p1); st.add_vertex(p_bot); st.add_vertex(p0)
+	for cl in clusters:
+		var c_pos: Vector3 = cl["center"]
+		var cr: float = cl["r"]
+		var c_segs: int = cl["segs"]
+
+		var pole_top := c_pos + Vector3(0.0, cr * 1.05, 0.0)
+		var pole_bot := c_pos + Vector3(0.0, -cr * 0.95, 0.0)
+
+		var r_mid: float = cr
+		var r_top: float = cr * 0.72
+		var r_bot: float = cr * 0.68
+
+		var y_top: float = c_pos.y + cr * 0.50
+		var y_mid: float = c_pos.y
+		var y_bot: float = c_pos.y - cr * 0.45
+
+		var ring_top: Array[Vector3] = []
+		var ring_mid: Array[Vector3] = []
+		var ring_bot: Array[Vector3] = []
+
+		for i in range(c_segs):
+			var a: float = (float(i) / float(c_segs)) * TAU
+			ring_top.append(Vector3(c_pos.x + cos(a) * r_top, y_top, c_pos.z + sin(a) * r_top))
+			ring_mid.append(Vector3(c_pos.x + cos(a + 0.2) * r_mid, y_mid, c_pos.z + sin(a + 0.2) * r_mid))
+			ring_bot.append(Vector3(c_pos.x + cos(a) * r_bot, y_bot, c_pos.z + sin(a) * r_bot))
+
+		for i in range(c_segs):
+			var i_next: int = (i + 1) % c_segs
+
+			# Top cone
+			st.add_vertex(ring_top[i]); st.add_vertex(pole_top); st.add_vertex(ring_top[i_next])
+
+			# Upper band
+			st.add_vertex(ring_mid[i]); st.add_vertex(ring_top[i]); st.add_vertex(ring_mid[i_next])
+			st.add_vertex(ring_mid[i_next]); st.add_vertex(ring_top[i]); st.add_vertex(ring_top[i_next])
+
+			# Lower band
+			st.add_vertex(ring_bot[i]); st.add_vertex(ring_mid[i]); st.add_vertex(ring_bot[i_next])
+			st.add_vertex(ring_bot[i_next]); st.add_vertex(ring_mid[i]); st.add_vertex(ring_mid[i_next])
+
+			# Bottom cone
+			st.add_vertex(ring_bot[i_next]); st.add_vertex(pole_bot); st.add_vertex(ring_bot[i])
 
 	st.generate_normals()
 	return st.commit()
@@ -214,37 +247,6 @@ func _build_grass_mesh() -> ArrayMesh:
 	var w: float = 0.35
 	st.add_vertex(Vector3(-w, 0, 0)); st.add_vertex(Vector3(0, h, 0)); st.add_vertex(Vector3(w, 0, 0))
 	st.add_vertex(Vector3(0, 0, -w)); st.add_vertex(Vector3(0, h, 0)); st.add_vertex(Vector3(0, 0, w))
-
-	st.generate_normals()
-	return st.commit()
-
-func _build_guard_post_mesh() -> ArrayMesh:
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var post_mat := StandardMaterial3D.new()
-	post_mat.albedo_color = Color(0.48, 0.38, 0.28) # Weathered mountain wood
-	post_mat.roughness = 0.92
-	st.set_material(post_mat)
-
-	var segs: int = 6
-	var r: float = 0.08
-	var h: float = 0.85
-
-	for i in range(segs):
-		var a0: float = (float(i) / float(segs)) * TAU
-		var a1: float = (float(i + 1) / float(segs)) * TAU
-		var p0 := Vector3(cos(a0) * r, 0.0, sin(a0) * r)
-		var p1 := Vector3(cos(a1) * r, 0.0, sin(a1) * r)
-		var p2 := Vector3(cos(a0) * r, h, sin(a0) * r)
-		var p3 := Vector3(cos(a1) * r, h, sin(a1) * r)
-
-		# Side quad
-		st.add_vertex(p0); st.add_vertex(p2); st.add_vertex(p1)
-		st.add_vertex(p1); st.add_vertex(p2); st.add_vertex(p3)
-
-		# Top cap
-		var top_center := Vector3(0.0, h, 0.0)
-		st.add_vertex(top_center); st.add_vertex(p2); st.add_vertex(p3)
 
 	st.generate_normals()
 	return st.commit()
@@ -293,107 +295,4 @@ func _build_boulder_mesh() -> ArrayMesh:
 	st.generate_normals()
 	return st.commit()
 
-func _build_marker_post_mesh() -> ArrayMesh:
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var post_mat := StandardMaterial3D.new()
-	post_mat.albedo_color = Color(0.52, 0.42, 0.30) # Light mountain stake
-	post_mat.roughness = 0.90
-	st.set_material(post_mat)
-
-	var segs: int = 5
-	var r: float = 0.05
-	var h: float = 1.10
-	var tip_h: float = 1.18
-
-	for i in range(segs):
-		var a0: float = (float(i) / float(segs)) * TAU
-		var a1: float = (float(i + 1) / float(segs)) * TAU
-		var p0 := Vector3(cos(a0) * r, 0.0, sin(a0) * r)
-		var p1 := Vector3(cos(a1) * r, 0.0, sin(a1) * r)
-		var p2 := Vector3(cos(a0) * r, h, sin(a0) * r)
-		var p3 := Vector3(cos(a1) * r, h, sin(a1) * r)
-
-		# Side quad
-		st.add_vertex(p0); st.add_vertex(p2); st.add_vertex(p1)
-		st.add_vertex(p1); st.add_vertex(p2); st.add_vertex(p3)
-
-		# Tapered pointed tip
-		var tip := Vector3(0.0, tip_h, 0.0)
-		st.add_vertex(p2); st.add_vertex(tip); st.add_vertex(p3)
-
-	st.generate_normals()
-	return st.commit()
-
-func _build_directional_sign_mesh() -> ArrayMesh:
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var wood_mat := StandardMaterial3D.new()
-	wood_mat.albedo_color = Color(0.44, 0.34, 0.24) # Weathered cedar
-	wood_mat.roughness = 0.88
-	st.set_material(wood_mat)
-
-	# 1. Main vertical post
-	var post_r: float = 0.06
-	var post_h: float = 1.65
-	var segs: int = 6
-	for i in range(segs):
-		var a0: float = (float(i) / float(segs)) * TAU
-		var a1: float = (float(i + 1) / float(segs)) * TAU
-		var p0 := Vector3(cos(a0) * post_r, 0.0, sin(a0) * post_r)
-		var p1 := Vector3(cos(a1) * post_r, 0.0, sin(a1) * post_r)
-		var p2 := Vector3(cos(a0) * post_r, post_h, sin(a0) * post_r)
-		var p3 := Vector3(cos(a1) * post_r, post_h, sin(a1) * post_r)
-
-		st.add_vertex(p0); st.add_vertex(p2); st.add_vertex(p1)
-		st.add_vertex(p1); st.add_vertex(p2); st.add_vertex(p3)
-
-	# Helper to build a directional arrow board pointing along an angle
-	var make_arrow_board = func(y_center: float, angle_rad: float, length_val: float):
-		var b_w: float = length_val
-		var b_h: float = 0.16
-		var b_t: float = 0.035
-		var rot := Transform3D(Basis(Vector3.UP, angle_rad), Vector3(0, y_center, 0))
-
-		var p_root_bot := rot * Vector3(0.0, -b_h * 0.5, -b_t * 0.5)
-		var p_root_top := rot * Vector3(0.0, b_h * 0.5, -b_t * 0.5)
-		var p_shaft_bot := rot * Vector3(b_w * 0.75, -b_h * 0.5, -b_t * 0.5)
-		var p_shaft_top := rot * Vector3(b_w * 0.75, b_h * 0.5, -b_t * 0.5)
-		var p_tip := rot * Vector3(b_w, 0.0, -b_t * 0.5)
-
-		# Front face
-		st.add_vertex(p_root_bot); st.add_vertex(p_root_top); st.add_vertex(p_shaft_bot)
-		st.add_vertex(p_shaft_bot); st.add_vertex(p_root_top); st.add_vertex(p_shaft_top)
-		st.add_vertex(p_shaft_bot); st.add_vertex(p_shaft_top); st.add_vertex(p_tip)
-
-		# Back face
-		var f_offset := rot.basis * Vector3(0, 0, b_t)
-		var b_root_bot: Vector3 = p_root_bot + f_offset
-		var b_root_top: Vector3 = p_root_top + f_offset
-		var b_shaft_bot: Vector3 = p_shaft_bot + f_offset
-		var b_shaft_top: Vector3 = p_shaft_top + f_offset
-		var b_tip: Vector3 = p_tip + f_offset
-
-		st.add_vertex(b_root_bot); st.add_vertex(b_shaft_bot); st.add_vertex(b_root_top)
-		st.add_vertex(b_shaft_bot); st.add_vertex(b_shaft_top); st.add_vertex(b_root_top)
-		st.add_vertex(b_shaft_bot); st.add_vertex(b_tip); st.add_vertex(b_shaft_top)
-
-		# Edge quads
-		st.add_vertex(p_root_top); st.add_vertex(b_root_top); st.add_vertex(p_shaft_top)
-		st.add_vertex(p_shaft_top); st.add_vertex(b_root_top); st.add_vertex(b_shaft_top)
-		st.add_vertex(p_shaft_top); st.add_vertex(b_shaft_top); st.add_vertex(p_tip)
-		st.add_vertex(p_tip); st.add_vertex(b_shaft_top); st.add_vertex(b_tip)
-
-		st.add_vertex(p_shaft_bot); st.add_vertex(p_tip); st.add_vertex(b_shaft_bot)
-		st.add_vertex(b_shaft_bot); st.add_vertex(p_tip); st.add_vertex(b_tip)
-		st.add_vertex(p_root_bot); st.add_vertex(p_shaft_bot); st.add_vertex(b_root_bot)
-		st.add_vertex(b_root_bot); st.add_vertex(p_shaft_bot); st.add_vertex(b_shaft_bot)
-
-	# Left board pointing Left (-X, angle ~ PI - 0.25)
-	make_arrow_board.call(1.35, PI - 0.25, 0.65)
-	# Right board pointing Right (+X, angle ~ 0.25)
-	make_arrow_board.call(1.10, 0.25, 0.65)
-
-	st.generate_normals()
-	return st.commit()
 

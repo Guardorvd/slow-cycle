@@ -53,12 +53,14 @@ static func compute_foliage_and_decor_transforms(
 		var curv: float = path_data.curvatures[idx] if idx < path_data.curvatures.size() else 0.0
 		var s_type: int = path_data.segment_types[idx] if idx < path_data.segment_types.size() else 0
 
-		# Compute signed lateral curvature (+b = turning right, -b = turning left)
+		# Compute smooth signed lateral curvature (+b = turning right, -b = turning left)
 		var next_idx: int = mini(idx + 1, path_data.size() - 1)
 		var prev_idx: int = maxi(0, idx - 1)
 		var dt: Vector3 = path_data.tangents[next_idx] - path_data.tangents[prev_idx]
+		var ds_span: float = maxf(0.001, path_data.cumulative_distances[next_idx] - path_data.cumulative_distances[prev_idx])
 		var turn_proj: float = dt.dot(binorm)
-		var signed_curv: float = curv if turn_proj >= 0.0 else -curv
+		var k_lat: float = turn_proj / ds_span
+		var signed_curv: float = clampf(k_lat, -curv, curv) if curv > 0.0 else 0.0
 
 		var half_w: float = 2.0
 		if not path_data.road_widths.is_empty() and idx < path_data.road_widths.size():
@@ -177,7 +179,14 @@ static func _try_spawn_plant(
 		grasses.append(t_trans)
 
 	if rng.randf() < tree_chance:
-		var tree_dist: float = rng.randf_range(5.5, 17.5)
+		var max_tree_dist: float = 17.5
+		if not cs.is_empty():
+			var offsets: PackedFloat32Array = cs.get("offsets", PackedFloat32Array())
+			if offsets.size() >= 8:
+				var flank_w: float = absf(offsets[0]) if side_sign < 0.0 else absf(offsets[7])
+				max_tree_dist = clampf(flank_w - 1.5, 5.2, 17.5)
+
+		var tree_dist: float = rng.randf_range(5.0, max_tree_dist)
 		var tree_base: Vector3 = center_pt + lateral_dir * tree_dist
 		var t_factor: float = clampf((tree_dist - 2.0) / 20.0, 0.0, 1.0)
 		var h_tree: float = (noise.get_noise_2d(tree_base.x, tree_base.z) * 1.8) if noise else 0.0

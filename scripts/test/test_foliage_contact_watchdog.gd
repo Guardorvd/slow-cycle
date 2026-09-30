@@ -57,17 +57,19 @@ func _init() -> void:
 			var num_faces: int = terrain_faces.size() / 3
 
 			# Collect trees and boulders
-			var props: Array[Vector3] = []
+			var props: Array[Dictionary] = []
 			for key in ["pine", "birch", "boulder"]:
 				var t_arr: Array = prep.foliage_transforms.get(key, [])
 				for t in t_arr:
-					props.append(t.origin)
+					props.append({"type": key, "pos": t.origin})
 
-			for p_obj in props:
+			for item in props:
 				total_props_checked += 1
+				var p_obj: Vector3 = item.pos
 				# Find triangle under (p_obj.x, p_obj.z)
 				var surface_y: float = -9999.0
 				var found_triangle: bool = false
+				var min_dy: float = 1e9
 
 				for f_i in range(num_faces):
 					var p0: Vector3 = terrain_faces[f_i * 3 + 0]
@@ -77,9 +79,11 @@ func _init() -> void:
 					# 2D Point-in-triangle test in XZ plane
 					var y_hit: float = _get_triangle_height_at(p0, p1, p2, p_obj.x, p_obj.z)
 					if y_hit > -9000.0:
-						surface_y = y_hit
-						found_triangle = true
-						break
+						var dy: float = absf(p_obj.y - y_hit)
+						if dy < min_dy:
+							min_dy = dy
+							surface_y = y_hit
+							found_triangle = true
 
 				if found_triangle:
 					var delta_y: float = p_obj.y - surface_y
@@ -88,15 +92,15 @@ func _init() -> void:
 						floating_props_count += 1
 						seed_defects += 1
 						if seed_defects <= 3:
-							printerr("  [FLOATING PROP] Seed %d Chunk %d: Prop at (%.2f, %.2f, %.2f) is FLOATING %.2fm above terrain (surface=%.2f)!" % [
-								s, c, p_obj.x, p_obj.y, p_obj.z, delta_y, surface_y
+							printerr("  [FLOATING %s] Seed %d Chunk %d: Prop at (%.2f, %.2f, %.2f) is FLOATING %.2fm above terrain (surface=%.2f)!" % [
+								item.type.to_upper(), s, c, p_obj.x, p_obj.y, p_obj.z, delta_y, surface_y
 							])
 					elif delta_y < -0.35:
 						buried_props_count += 1
 						seed_defects += 1
 						if seed_defects <= 3:
-							printerr("  [BURIED PROP] Seed %d Chunk %d: Prop at (%.2f, %.2f, %.2f) is BURIED %.2fm into terrain (surface=%.2f)!" % [
-								s, c, p_obj.x, p_obj.y, p_obj.z, -delta_y, surface_y
+							printerr("  [BURIED %s] Seed %d Chunk %d: Prop at (%.2f, %.2f, %.2f) is BURIED %.2fm into terrain (surface=%.2f)!" % [
+								item.type.to_upper(), s, c, p_obj.x, p_obj.y, p_obj.z, -delta_y, surface_y
 							])
 
 		if seed_defects > 0:

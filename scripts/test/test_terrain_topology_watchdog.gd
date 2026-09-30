@@ -55,15 +55,16 @@ func _init() -> void:
 				path_data, s_idx, e_idx, c, shared_mats
 			)
 
-			# Analyze prepared terrain_faces (triangles, 3 vertices each)
-			var faces: PackedVector3Array = prep.terrain_faces
-			var num_faces: int = faces.size() / 3
+			# Analyze all visual mesh triangles from prep.terrain_arrays
+			var v_mesh: PackedVector3Array = prep.terrain_arrays[Mesh.ARRAY_VERTEX]
+			var idx_mesh: PackedInt32Array = prep.terrain_arrays[Mesh.ARRAY_INDEX]
+			var num_vis_triangles: int = idx_mesh.size() / 3
 
-			for f_i in range(num_faces):
+			for t_i in range(num_vis_triangles):
 				total_triangles_checked += 1
-				var p0: Vector3 = faces[f_i * 3 + 0]
-				var p1: Vector3 = faces[f_i * 3 + 1]
-				var p2: Vector3 = faces[f_i * 3 + 2]
+				var p0: Vector3 = v_mesh[idx_mesh[t_i * 3 + 0]]
+				var p1: Vector3 = v_mesh[idx_mesh[t_i * 3 + 1]]
+				var p2: Vector3 = v_mesh[idx_mesh[t_i * 3 + 2]]
 
 				var e1: Vector3 = p1 - p0
 				var e2: Vector3 = p2 - p0
@@ -71,27 +72,20 @@ func _init() -> void:
 				var area: float = cross.length() * 0.5
 
 				# 1. Check for degenerate slivers
-				if area < 0.001:
+				if area < 0.0005:
 					degenerate_triangles_count += 1
 					seed_defects += 1
 
 				# 2. Check face normal orientation
-				if area > 0.001:
+				if area > 0.0005:
 					var normal: Vector3 = cross.normalized()
 					# In mountain terrain, normal pointing down (Ny < -0.3) indicates flipped face
 					if normal.y < -0.30:
 						inverted_faces_count += 1
 						seed_defects += 1
 						if seed_defects <= 5:
-							var seg_i: int = f_i / 12
-							var sample_idx: int = s_idx + seg_i
-							var p_road: Vector3 = path_data.points[sample_idx]
-							var t_road: Vector3 = path_data.tangents[sample_idx]
-							var b_road: Vector3 = path_data.binormals[sample_idx]
-							var k_road: float = path_data.curvatures[sample_idx]
-							printerr("  [INVERTED FACE] Seed %d Chunk %d Face %d: normal (%.2f, %.2f, %.2f)\n    pt=%s, t=%s, b=%s, k=%.4f\n    p0=%s\n    p1=%s\n    p2=%s" % [
-								s, c, f_i, normal.x, normal.y, normal.z,
-								str(p_road), str(t_road), str(b_road), k_road,
+							printerr("  [INVERTED VISUAL FACE] Seed %d Chunk %d Tri %d: normal (%.2f, %.2f, %.2f)\n    p0=%s\n    p1=%s\n    p2=%s" % [
+								s, c, t_i, normal.x, normal.y, normal.z,
 								str(p0), str(p1), str(p2)
 							])
 

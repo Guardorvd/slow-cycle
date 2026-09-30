@@ -69,16 +69,8 @@ func _init() -> void:
 				path_data, s_idx, e_idx, c, shared_mats, null, is_fork
 			)
 
-			# Collect all prop positions
+			# Collect all prop positions (boulders and trees only; posts are completely eliminated)
 			var props_to_check: Array[Dictionary] = [] # { type: String, pos: Vector3 }
-
-			for t in prep.guard_post_transforms:
-				props_to_check.append({"type": "guard_post", "pos": t.origin})
-			for t in prep.marker_post_transforms:
-				props_to_check.append({"type": "marker_post", "pos": t.origin})
-			if prep.has_directional_sign:
-				props_to_check.append({"type": "directional_sign", "pos": prep.directional_sign_transform.origin})
-
 			for key in ["pine", "birch", "boulder"]:
 				var t_arr: Array = prep.foliage_transforms.get(key, [])
 				for t in t_arr:
