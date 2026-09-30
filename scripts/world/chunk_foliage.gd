@@ -1,6 +1,8 @@
 class_name ChunkFoliage
 extends RefCounted
 
+const TerrainCarverClass = preload("res://scripts/world/terrain_carver.gd")
+
 ## Slow Cycle — Chunk Foliage & Minimal Greybox Dressing (FEAT-014.5)
 ## Manages chunk-local MultiMesh instancing using shared geometry and materials.
 ## Decouples pure mathematical transform computation (worker/off-physics safe) from
@@ -50,25 +52,37 @@ static func compute_foliage_and_decor_transforms(
 		var dist: float = path_data.cumulative_distances[idx]
 		var curv: float = path_data.curvatures[idx] if idx < path_data.curvatures.size() else 0.0
 		var s_type: int = path_data.segment_types[idx] if idx < path_data.segment_types.size() else 0
+
+		# Compute signed lateral curvature (+b = turning right, -b = turning left)
+		var next_idx: int = mini(idx + 1, path_data.size() - 1)
+		var prev_idx: int = maxi(0, idx - 1)
+		var dt: Vector3 = path_data.tangents[next_idx] - path_data.tangents[prev_idx]
+		var turn_proj: float = dt.dot(binorm)
+		var signed_curv: float = curv if turn_proj >= 0.0 else -curv
+
 		var half_w: float = 2.0
 		if not path_data.road_widths.is_empty() and idx < path_data.road_widths.size():
 			half_w = path_data.road_widths[idx] * 0.5
 
-		# 1. Plants along left and right roadside (filtered by side_mask, strictly >= 2.5m clearance)
-		if (side_mask & 1) != 0:
-			_try_spawn_plant(pt, -binorm, norm, rng, tree_chance, result["pine"], result["birch"], result["grass"], noise, mw)
-		if (side_mask & 2) != 0:
-			_try_spawn_plant(pt, binorm, norm, rng, tree_chance, result["pine"], result["birch"], result["grass"], noise, mw)
-
-		# 2. Low-poly boulders along CUT base (rock wall shoulder foot, filtered by side_mask)
+		# 1. Compute cross-section if carver is present
+		var cs: Dictionary = {}
 		if carver != null:
-			var cs: Dictionary = carver.compute_cross_section(pt, tang, norm, binorm, half_w, curv, s_type, dist, mw)
+			cs = carver.compute_cross_section(pt, tang, norm, binorm, half_w, signed_curv, s_type, dist, mw)
+
+		# 2. Plants along left and right roadside (filtered by side_mask, strictly >= 2.5m clearance)
+		if (side_mask & 1) != 0:
+			_try_spawn_plant(pt, -binorm, norm, rng, tree_chance, result["pine"], result["birch"], result["grass"], cs, -1.0, noise)
+		if (side_mask & 2) != 0:
+			_try_spawn_plant(pt, binorm, norm, rng, tree_chance, result["pine"], result["birch"], result["grass"], cs, 1.0, noise)
+
+		# 3. Low-poly boulders along CUT base (rock wall shoulder foot, filtered by side_mask)
+		if not cs.is_empty():
 			var eval: Dictionary = cs.get("eval", {})
 			# ProfileType: 0=MEADOW, 1=CUT, 2=SHELF, 3=CLIFF, 4=FILL
 			if (side_mask & 1) != 0 and eval.get("left_profile", -1) == 1 and rng.randf() < boulder_chance:
 				var b_dist_l: float = rng.randf_range(half_w + 1.0, half_w + 3.2)
-				var b_pos_l: Vector3 = pt - binorm * b_dist_l
-				b_pos_l.y = cs.shoulder_left_pos.y + 0.10
+				var b_pos_l: Vector3 = TerrainCarverClass.get_surface_point_from_cross_section(cs, -b_dist_l)
+				b_pos_l.y -= 0.08 # Anchored into slope
 				var b_scale_l: float = rng.randf_range(0.70, 1.35)
 				var b_rot_l: float = rng.randf_range(0.0, TAU)
 				var b_basis_l := Basis(Vector3.UP, b_rot_l).scaled(Vector3.ONE * b_scale_l)
@@ -76,8 +90,8 @@ static func compute_foliage_and_decor_transforms(
 
 			if (side_mask & 2) != 0 and eval.get("right_profile", -1) == 1 and rng.randf() < boulder_chance:
 				var b_dist_r: float = rng.randf_range(half_w + 1.0, half_w + 3.2)
-				var b_pos_r: Vector3 = pt + binorm * b_dist_r
-				b_pos_r.y = cs.shoulder_right_pos.y + 0.10
+				var b_pos_r: Vector3 = TerrainCarverClass.get_surface_point_from_cross_section(cs, b_dist_r)
+				b_pos_r.y -= 0.08 # Anchored into slope
 				var b_scale_r: float = rng.randf_range(0.70, 1.35)
 				var b_rot_r: float = rng.randf_range(0.0, TAU)
 				var b_basis_r := Basis(Vector3.UP, b_rot_r).scaled(Vector3.ONE * b_scale_r)
@@ -143,16 +157,22 @@ static func _try_spawn_plant(
 	pines: Array[Transform3D],
 	birches: Array[Transform3D],
 	grasses: Array[Transform3D],
-	noise: FastNoiseLite = null,
-	mw: float = 0.5
+	cs: Dictionary = {},
+	side_sign: float = 1.0,
+	noise: FastNoiseLite = null
 ) -> void:
 	if rng.randf() < 0.8:
 		var grass_dist: float = rng.randf_range(2.6, 5.2)
 		var grass_base: Vector3 = center_pt + lateral_dir * grass_dist
 		var t_factor: float = clampf((grass_dist - 2.0) / 20.0, 0.0, 1.0)
 		var h_grass: float = (noise.get_noise_2d(grass_base.x, grass_base.z) * 1.8) if noise else 0.0
-		var grass_pos: Vector3 = grass_base + norm * (h_grass * t_factor)
-		grass_pos.y -= 0.02 # Slight embed so blades sit cleanly in ground
+		var grass_pos: Vector3
+		if not cs.is_empty():
+			grass_pos = TerrainCarverClass.get_surface_point_from_cross_section(cs, side_sign * grass_dist)
+			grass_pos.y -= 0.02
+		else:
+			grass_pos = grass_base + norm * (h_grass * t_factor)
+			grass_pos.y -= 0.02
 		var t_trans := Transform3D(Basis().scaled(Vector3.ONE * rng.randf_range(0.8, 1.3)), grass_pos)
 		grasses.append(t_trans)
 
@@ -161,13 +181,23 @@ static func _try_spawn_plant(
 		var tree_base: Vector3 = center_pt + lateral_dir * tree_dist
 		var t_factor: float = clampf((tree_dist - 2.0) / 20.0, 0.0, 1.0)
 		var h_tree: float = (noise.get_noise_2d(tree_base.x, tree_base.z) * 1.8) if noise else 0.0
-		var tree_pos: Vector3 = tree_base + norm * (h_tree * t_factor)
+		var tree_pos: Vector3
+		if not cs.is_empty():
+			tree_pos = TerrainCarverClass.get_surface_point_from_cross_section(cs, side_sign * tree_dist)
+			# Precision Rooting: embed trunk base by 10cm into mountain soil
+			tree_pos.y -= 0.10
+		else:
+			tree_pos = tree_base + norm * (h_tree * t_factor)
+			tree_pos.y -= 0.10
 		var scale_val: float = rng.randf_range(0.85, 1.4)
 		var rot_y: float = rng.randf_range(0.0, TAU)
 		var basis := Basis(Vector3.UP, rot_y).scaled(Vector3.ONE * scale_val)
 		var t_trans := Transform3D(basis, tree_pos)
 
-		var pine_chance: float = lerpf(0.50, 0.90, mw)
+		var pine_chance: float = 0.70
+		if not cs.is_empty():
+			var mw: float = float(cs.get("eval", {}).get("mountain_weight", 0.5))
+			pine_chance = lerpf(0.50, 0.90, mw)
 		if rng.randf() < pine_chance:
 			pines.append(t_trans)
 		else:

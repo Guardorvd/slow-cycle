@@ -36,8 +36,43 @@ mode_select.tscn
 3. `ChunkStreamer` checks whether the generated horizon needs another chunk. Fork spacing remains a seeded minimum-distance schedule. Once that minimum is reached, `ForkSitePlanner` evaluates the available endpoint before any fork approach widening, graph mutation or fork mesh commit. Rejected sites take the ordinary chunk path; streaming retries on a later chunk boundary.
 4. For an accepted site, existing `RoadLogic` queues a braking approach; the streamer widens the junction, constructs LEFT/RIGHT paths, registers graph edges, and commits `RoadChunk` meshes and colliders.
 5. `ForkDecisionModel` compares the rider to those actual edge centerlines. `RoadGraph` is authoritative for the chosen edge and branch ID; `ChunkStreamer` still owns chunk lifetime, preloading and dormant branch state.
-6. `RoadChunk` consumes committed road samples. `TerrainCarver` shapes local roadside strips from the same centerline plus seeded lateral relief. The current terrain is not a shared, open 2D mountain surface.
-7. The bicycle observes world collision and its own telemetry signals. It does not participate in route generation and is not changed by P2.1.
+6. `RoadChunk` consumes committed road samples. `TerrainCarver` shapes local roadside strips from the same centerline plus seeded lateral relief. The current terrain is migrating to a shared 2D mountain massif field (`MountainMassifField`).
+7. The bicycle observes world collision and its own telemetry signals. It does not participate in route generation and is not changed by world generation refactoring.
+
+### 2.1. 5 изолированных слоев мира (Sprint 7 Unidirectional Architecture)
+
+Для исключения регрессий и защиты физики велосипеда в кодовой базе утверждается **5-слойный конвейер однонаправленного потока данных (Unidirectional Data Flow)**:
+
+```mermaid
+flowchart TD
+    L0["Слой 0: Геологическое тело горы (Macro Mountain Field)"] -->|2D поле высот H(x,z), уклоны, биом| L1["Слой 1: Кинематический путь и ритмика (Route & Grammar)"]
+    L1 -->|Траектория P(s), радиусы, ширина полотна| L2["Слой 2: Инженерная врезка полотна (Roadbed Carver)"]
+    L0 -->|Высота рельефа на флангах| L2
+    L2 -->|Геометрия полотна и скальных откосов| L3["Слой 3: Окружение и декорации (Environment & Props)"]
+    L2 -->|Физические слои Collision Layer 2 и Layer 4| L4["Слой 4: Физика и игрок (BicycleController)"]
+```
+
+#### Контракты изоляции слоев:
+1. **Слой 0 (Macro Mountain Field):** Чистая математика $H(x, z)$ и градиент $\nabla H(x, z)$ по сиду. Не имеет зависимостей ни от нод сцены, ни от полотна дороги, ни от физики.
+2. **Слой 1 (Route & Grammar):** Генерирует $C^1$-непрерывную осевую линию дороги $P(s)$, ширину $w(s)$, крен полотна и развилки. Опрашивает Слой 0 для выбора естественного спуска по полкам долины, сохраняя автономность математики сплайна.
+3. **Слой 2 (Roadbed Carver):** Принимает геометрию пути $P(s)$ и тело горы Слой 0. Выполняет инженерную выемку (Cut) и насыпь (Fill), строит меш дороги и скальных откосов с разнесением высот (Beveled Verge, ступенька 3–4 см).
+4. **Слой 3 (Environment & Props):** Расставляет деревья, валуны, маркерные вешки. Высота посадки берется строго из полигональной поверхности Слоя 2. Расстановка жестко заблокирована в коридоре безопасности $w(s)/2 + 1.2$м.
+5. **Слой 4 (BicycleController):** Чистый потребитель коллизий. Взаимодействует с миром строго через лучи колес (`Collision Layer 2` — полотно, `Collision Layer 4` — земля). Никакой код террейна не проникает внутрь контроллера.
+
+#### Ключевые инженерные решения Спринта 7:
+- **Ликвидация «стрел в небе» (Adaptive Curvature Clamping):** Внутренняя кромка юбки адаптивно сжимается на виражах:
+  $$d_{\text{inner}}(s) = \min\left(W_{\text{FAR}}, \max\left(8.0, R(s) \cdot 0.70\right)\right)$$
+  Для $R = 19$м внутренняя юбка ужимается до $13.3$м, исключая схлопывание треугольников через эволюту.
+- **Инженерная фаска обочины (Beveled Verge):** Профиль дороги приподнимается над основанием обочины на микро-ступеньку (фаску) высотой 3–4 см:
+  - Вершина кромки полотна: $P_{\text{road}} = P_{\text{center}} \pm \mathbf{b} \cdot \frac{w}{2}$
+  - Дно водоотводной канавки обочины: $P_{\text{ditch}} = P_{\text{center}} \pm \mathbf{b} \cdot \left(\frac{w}{2} + 0.35\right) - \mathbf{n} \cdot 0.04$
+  - Откос скалы/насыпи стартует от $P_{\text{ditch}}$. Полная ликвидация Z-fighting и заступа полигонов травы на дорогу.
+- **Разделение бюджетов Near vs Far:**
+  - Ближняя зона ($\le 12$м от оси): визуальный меш + коллизия (`ConcavePolygonShape3D` Layer 4).
+  - Дальняя зона ($12\dots 60$м): только визуальный меш (`collision_layer = 0`). Снижение нагрузки на PhysicsServer на 65%.
+- **Прецизионная посадка объектов (Props Alignment):**
+  - Вешки ориентируются по нормали грунта $\mathbf{n}_{\text{ground}}$ и выносятся по динамической ширине: $X_{\text{post}} = \pm \mathbf{b} \cdot (w(s)/2 + 0.70\text{м})$.
+  - Стволы деревьев утапливаются на 10 см по реальному сечению $Y_{\text{terrain}}(s, d_{\text{lat}})$.
 
 ## 3. Implemented contract versus target architecture
 

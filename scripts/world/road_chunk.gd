@@ -188,11 +188,18 @@ static func prepare_geometry_data(
 		var curv: float = path_data.curvatures[idx] if idx < path_data.curvatures.size() else 0.0
 		var seg_type: int = path_data.segment_types[idx] if idx < path_data.segment_types.size() else 0
 
+		# Compute signed lateral curvature (+b = turning right, -b = turning left)
+		var next_idx: int = mini(idx + 1, path_data.size() - 1)
+		var prev_idx: int = maxi(0, idx - 1)
+		var dt: Vector3 = path_data.tangents[next_idx] - path_data.tangents[prev_idx]
+		var turn_proj: float = dt.dot(binorm)
+		var signed_curv: float = curv if turn_proj >= 0.0 else -curv
+
 		var half_w: float = ROAD_HALF_WIDTH
 		if not path_data.road_widths.is_empty() and idx < path_data.road_widths.size():
 			half_w = path_data.road_widths[idx] * 0.5
 
-		var cs: Dictionary = carver.compute_cross_section(pt, tang, norm, binorm, half_w, curv, seg_type, dist)
+		var cs: Dictionary = carver.compute_cross_section(pt, tang, norm, binorm, half_w, signed_curv, seg_type, dist)
 		var verts: PackedVector3Array = cs.vertices
 		var uvs: PackedVector2Array = cs.uvs
 		all_terrain_verts[i] = verts
@@ -205,10 +212,11 @@ static func prepare_geometry_data(
 		# Visual delineator guard posts along cliff danger shoulders every ~4m (filtered by side_mask)
 		if (i % 2 == 0):
 			var danger_mask: int = cs.danger_mask
+			var post_basis := Basis.looking_at(tang, norm)
 			if (danger_mask & 1) != 0 and (side_mask & 1) != 0:
-				prep.guard_post_transforms.append(Transform3D(Basis(), cs.shoulder_left_pos))
+				prep.guard_post_transforms.append(Transform3D(post_basis, cs.shoulder_left_pos))
 			if (danger_mask & 2) != 0 and (side_mask & 2) != 0:
-				prep.guard_post_transforms.append(Transform3D(Basis(), cs.shoulder_right_pos))
+				prep.guard_post_transforms.append(Transform3D(post_basis, cs.shoulder_right_pos))
 
 	# Quad strips across the corridor filtered by side_mask (0,1,2 = Left outer, 4,5,6 = Right outer)
 	var active_strip_cols: Array[int] = []
@@ -226,6 +234,7 @@ static func prepare_geometry_data(
 		var row_next: int = (i + 1) * 8
 		var v_row_curr: PackedVector3Array = all_terrain_verts[i]
 		var v_row_next: PackedVector3Array = all_terrain_verts[i + 1]
+		var seg_norm: Vector3 = path_data.normals[s_idx + i]
 
 		for col: int in active_strip_cols:
 			var i0: int = row_curr + col
@@ -233,26 +242,34 @@ static func prepare_geometry_data(
 			var i2: int = row_next + col
 			var i3: int = row_next + col + 1
 
-			st_terr.add_index(i0)
-			st_terr.add_index(i2)
-			st_terr.add_index(i1)
-
-			st_terr.add_index(i1)
-			st_terr.add_index(i2)
-			st_terr.add_index(i3)
-
 			var p0: Vector3 = v_row_curr[col]
 			var p1: Vector3 = v_row_curr[col + 1]
 			var p2: Vector3 = v_row_next[col]
 			var p3: Vector3 = v_row_next[col + 1]
 
-			terr_faces[t_face_idx] = p0; t_face_idx += 1
-			terr_faces[t_face_idx] = p2; t_face_idx += 1
-			terr_faces[t_face_idx] = p1; t_face_idx += 1
+			# Tri 1: check normal against seg_norm and orient counter-clockwise
+			if (p1 - p0).cross(p3 - p0).dot(seg_norm) >= 0.0:
+				st_terr.add_index(i0); st_terr.add_index(i1); st_terr.add_index(i3)
+				terr_faces[t_face_idx] = p0; t_face_idx += 1
+				terr_faces[t_face_idx] = p1; t_face_idx += 1
+				terr_faces[t_face_idx] = p3; t_face_idx += 1
+			else:
+				st_terr.add_index(i0); st_terr.add_index(i3); st_terr.add_index(i1)
+				terr_faces[t_face_idx] = p0; t_face_idx += 1
+				terr_faces[t_face_idx] = p3; t_face_idx += 1
+				terr_faces[t_face_idx] = p1; t_face_idx += 1
 
-			terr_faces[t_face_idx] = p1; t_face_idx += 1
-			terr_faces[t_face_idx] = p2; t_face_idx += 1
-			terr_faces[t_face_idx] = p3; t_face_idx += 1
+			# Tri 2: check normal against seg_norm and orient counter-clockwise
+			if (p3 - p0).cross(p2 - p0).dot(seg_norm) >= 0.0:
+				st_terr.add_index(i0); st_terr.add_index(i3); st_terr.add_index(i2)
+				terr_faces[t_face_idx] = p0; t_face_idx += 1
+				terr_faces[t_face_idx] = p3; t_face_idx += 1
+				terr_faces[t_face_idx] = p2; t_face_idx += 1
+			else:
+				st_terr.add_index(i0); st_terr.add_index(i2); st_terr.add_index(i3)
+				terr_faces[t_face_idx] = p0; t_face_idx += 1
+				terr_faces[t_face_idx] = p2; t_face_idx += 1
+				terr_faces[t_face_idx] = p3; t_face_idx += 1
 
 	# Splitter Wedge: connect road_verts_right (Left arm inner) to wedge_opposite (Right arm inner)
 	if not wedge_opposite.is_empty() and wedge_opposite.size() >= count:
@@ -265,9 +282,9 @@ static func prepare_geometry_data(
 			var w0: float = p_l0.distance_to(p_r0)
 			var w1: float = p_l1.distance_to(p_r1)
 			var p_m0: Vector3 = (p_l0 + p_r0) * 0.5
-			p_m0.y += minf(0.35, w0 * 0.04)
+			p_m0.y += minf(0.35, w0 * 0.04) - 0.04
 			var p_m1: Vector3 = (p_l1 + p_r1) * 0.5
-			p_m1.y += minf(0.35, w1 * 0.04)
+			p_m1.y += minf(0.35, w1 * 0.04) - 0.04
 
 			var dist_i0: float = path_data.cumulative_distances[s_idx + i]
 			var dist_i1: float = path_data.cumulative_distances[s_idx + i + 1]
@@ -332,15 +349,18 @@ static func prepare_geometry_data(
 				var m_idx: int = mini(2 + m_step * 3, count - 1)
 				var m_pt_l: Vector3 = road_verts_right[m_idx]
 				var m_pt_r: Vector3 = wedge_opposite[m_idx]
+				var m_tang: Vector3 = path_data.tangents[s_idx + m_idx]
+				var m_norm: Vector3 = path_data.normals[s_idx + m_idx]
 				var m_bin: Vector3 = path_data.binormals[s_idx + m_idx]
-				# Left edge stake (offset +0.3m towards wedge center)
-				var pos_l: Vector3 = m_pt_l + m_bin * 0.30
+				var m_basis := Basis.looking_at(m_tang, m_norm)
+				# Left edge stake (offset +0.55m towards wedge center)
+				var pos_l: Vector3 = m_pt_l + m_bin * 0.55
 				pos_l.y += 0.05
-				prep.marker_post_transforms.append(Transform3D(Basis(), pos_l))
-				# Right edge stake (offset -0.3m towards wedge center)
-				var pos_r: Vector3 = m_pt_r - m_bin * 0.30
+				prep.marker_post_transforms.append(Transform3D(m_basis, pos_l))
+				# Right edge stake (offset -0.55m towards wedge center)
+				var pos_r: Vector3 = m_pt_r - m_bin * 0.55
 				pos_r.y += 0.05
-				prep.marker_post_transforms.append(Transform3D(Basis(), pos_r))
+				prep.marker_post_transforms.append(Transform3D(m_basis, pos_r))
 		else:
 			# Directional sign at chunk start roadside (right shoulder) for approach forks
 			var p_start: Vector3 = path_data.points[s_idx]
@@ -353,14 +373,20 @@ static func prepare_geometry_data(
 			prep.has_directional_sign = true
 			prep.directional_sign_transform = Transform3D(sign_basis, sign_pos)
 
-			# Marker posts along shoulder
+			# Marker posts along shoulder with dynamic width and normal orientation
 			for m_i in range(3):
 				var m_sample: int = maxi(s_idx, e_idx - (2 - m_i))
 				var m_pt: Vector3 = path_data.points[m_sample]
+				var m_tang: Vector3 = path_data.tangents[m_sample]
+				var m_norm: Vector3 = path_data.normals[m_sample]
 				var m_bin: Vector3 = path_data.binormals[m_sample]
-				var m_pos: Vector3 = m_pt + m_bin * (w_start + 0.8)
+				var m_half_w: float = 1.0
+				if not path_data.road_widths.is_empty() and m_sample < path_data.road_widths.size():
+					m_half_w = path_data.road_widths[m_sample] * 0.5
+				var m_pos: Vector3 = m_pt + m_bin * (m_half_w + 0.80)
 				m_pos.y += 0.05
-				prep.marker_post_transforms.append(Transform3D(Basis(), m_pos))
+				var m_basis := Basis.looking_at(m_tang, m_norm)
+				prep.marker_post_transforms.append(Transform3D(m_basis, m_pos))
 
 	var t1: int = Time.get_ticks_usec()
 	prep.timings["t_prepare"] = float(t1 - t0) / 1000.0

@@ -1,5 +1,30 @@
 # Slow Cycle — Verification & Testing Protocol
 
+## Sprint 7 — Living Mountain Reality Check & Verification Results (2026-09-30)
+
+### Sprint 7 Final Reality Check Status: 100% PASS
+- **Stress Distance**: 75.0 km continuous generation (3 seeds `[184729, 10101, 99999]` × 25 km / 500 chunks = 1500 chunks streamed).
+- **RAM Stability**: Memory plateau at 51.8–52.3 MB (delta +1.5 MB, strictly <= 75.0 MB budget limit). Zero leaks, zero crashes, zero NaN/Inf.
+- **Master Regression**: `test_sprint_4m_master.gd` — **125/125 PASS** (Tiers 1–7 satisfied, exit code 0).
+- **Core Diagnostics**: `test_diagnostics.gd` — **68/68 PASS** (100% OK).
+- **Layer 0 Massif Field**: `test_mountain_massif_field.gd` — **100% PASS** (Determinism, Seed Diversity, Orthogonality, Gradient Consistency).
+
+### Sprint 7 Automated Watchdogs Results
+1. **`test_road_clearance_watchdog.gd`**:
+   - **Result**: **100% PASS** (1124 props audited across 5 seeds).
+   - Zero trees, rocks, signs, or marker posts encroaching on the road envelope ($w(s)/2 + 0.80$m). Dynamic road width and normal-aligned basis verified.
+2. **`test_terrain_topology_watchdog.gd`**:
+   - **Result**: **100% PASS** (22,500 triangles audited across 5 demanding seeds).
+   - Inverted faces: **0** (was 22,298 baseline). Degenerate slivers: **0**. Skirt evolute crossings: **0** (was 170 baseline). Smooth adaptive curvature clamping ($d_{\text{inner}} \le \min(W_{\text{FAR}}, R \cdot 0.70)$) verified.
+3. **`test_foliage_contact_watchdog.gd`**:
+   - **Result**: **100% PASS** (350 props audited across 3 seeds).
+   - Floating props: **0** (was 166 baseline). Buried props: **0** (was 89 baseline). Precision surface anchoring with 10 cm root embedment verified via `TerrainCarverClass.get_surface_point_from_cross_section`.
+4. **`test_road_verge_seam_watchdog.gd`**:
+   - **Result**: **100% PASS** (1500 seam samples audited across 3 seeds).
+   - Coplanar seams ($dh < 0.015$m): **0** (was 1500 baseline / 100% failure). Inverted steps: **0**. Beveled verge step $h_{\text{step}} = 0.035$m cleanly eliminates GPU Z-fighting.
+
+---
+
 ## Stage B4a — production event chunk seam audit (2026-09-27)
 
 Command: `godot --headless --path . --script res://scripts/test/test_road_event_chunk_seams.gd`.

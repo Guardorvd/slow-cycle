@@ -37,10 +37,13 @@ const DETAIL_NOISE_AMP: float = 1.2
 # STATE & NOISE GENERATORS
 # ==============================================================================
 
+const MountainMassifFieldClass = preload("res://scripts/world/mountain_massif_field.gd")
+
 var world_seed: int = 184729
 var mountain_weight: float = 0.5
 var macro_noise: FastNoiseLite
 var detail_noise: FastNoiseLite
+var massif_field: RefCounted = null
 
 func set_mountain_weight(mw: float) -> void:
 	mountain_weight = clampf(mw, 0.0, 1.0)
@@ -54,6 +57,7 @@ func _init(p_seed: int = 184729) -> void:
 
 func setup(p_seed: int) -> void:
 	world_seed = p_seed
+	massif_field = MountainMassifFieldClass.new(world_seed)
 
 	macro_noise = FastNoiseLite.new()
 	macro_noise.seed = world_seed
@@ -78,6 +82,8 @@ func setup(p_seed: int) -> void:
 # ==============================================================================
 
 func get_macro_elevation(wx: float, wz: float) -> float:
+	if massif_field != null:
+		return massif_field.get_elevation(wx, wz)
 	return macro_noise.get_noise_2d(wx, wz) * MACRO_NOISE_AMP
 
 func get_detail_elevation(wx: float, wz: float) -> float:
@@ -98,15 +104,15 @@ func evaluate_profile(pos: Vector3, binorm: Vector3, curv: float, p_mountain_wei
 	var h_macro_r: float = get_macro_elevation(p_r.x, p_r.z)
 	var g_lat: float = clampf((h_macro_r - h_macro_l) / 30.0, -1.0, 1.0)
 
-	# 2. Road curvature factor (kappa > 0 = turning left, inner curve is Left)
+	# 2. Road curvature factor: curv > 0 = turning right (+b), inner curve is Right
 	var kappa_eff: float = clampf(curv * 20.0, -1.0, 1.0)
 
 	# 3. Seeded variation bias from world coordinates
 	var b_seed: float = detail_noise.get_noise_2d(pos.x * 0.05, pos.z * 0.05)
 
-	# 4. Multi-factor weighted scores
-	var score_r: float = 0.50 * g_lat - 0.35 * kappa_eff + 0.15 * b_seed
-	var score_l: float = -0.50 * g_lat + 0.35 * kappa_eff + 0.15 * b_seed
+	# 4. Multi-factor weighted scores (+kappa_eff creates inner rock cut on right)
+	var score_r: float = 0.50 * g_lat + 0.35 * kappa_eff + 0.15 * b_seed
+	var score_l: float = -0.50 * g_lat - 0.35 * kappa_eff + 0.15 * b_seed
 
 	# In mountain zones (mountain_weight > 0.5), amplify relief so cuts/shelves appear even on straights
 	if mw > 0.50:
@@ -181,22 +187,49 @@ func compute_cross_section(
 	var dh_left: float = eval.left_delta_h
 	var dh_right: float = eval.right_delta_h
 
-	# 1. Base lateral displacements along binormal
-	var d_sh: float = half_w + W_SHOULDER
-	var d_feat: float = d_sh + W_FEATURE
-	var d_far: float = d_feat + W_FAR
+	# 1. Base lateral displacements along binormal with Smooth Adaptive Curvature Clamping
+	# Continuously scale the inner skirt as curvature increases to prevent evolute crossing and tears
+	var abs_k: float = absf(curv)
+	var r_local: float = (1.0 / abs_k) if abs_k > 0.0001 else 9999.0
+	var d_inner_target: float = minf(W_FAR, maxf(8.0, r_local * 0.70))
+
+	# Smooth blending factor into turn (0.0 on straights, 1.0 when R <= 45m)
+	var turn_blend: float = clampf((abs_k - 0.002) / (0.022 - 0.002), 0.0, 1.0)
+	var d_clamped_inner: float = lerpf(W_FAR, d_inner_target, turn_blend)
+
+	# Inner skirt clamping: when turning right (curv > 0), clamp right. When turning left (curv < 0), clamp left.
+	var w_far_l: float = d_clamped_inner if curv < 0.0 else W_FAR
+	var w_far_r: float = d_clamped_inner if curv > 0.0 else W_FAR
+
+	# Strictly enforce monotonic ordering of offsets: half_w < d_sh < d_feat < d_far
+	var total_w_l: float = half_w + W_SHOULDER + W_FEATURE + w_far_l
+	var total_w_r: float = half_w + W_SHOULDER + W_FEATURE + w_far_r
+
+	# Cap inner lateral span strictly under R_local * 0.80
+	if curv > 0.001 and r_local < 900.0:
+		total_w_r = minf(total_w_r, maxf(half_w + 3.5, r_local * 0.75))
+	elif curv < -0.001 and r_local < 900.0:
+		total_w_l = minf(total_w_l, maxf(half_w + 3.5, r_local * 0.75))
+
+	var d_sh_l: float = half_w + minf(W_SHOULDER, (total_w_l - half_w) * 0.15)
+	var d_feat_l: float = d_sh_l + minf(W_FEATURE, (total_w_l - d_sh_l) * 0.35)
+	var d_far_l: float = total_w_l
+
+	var d_sh_r: float = half_w + minf(W_SHOULDER, (total_w_r - half_w) * 0.15)
+	var d_feat_r: float = d_sh_r + minf(W_FEATURE, (total_w_r - d_sh_r) * 0.35)
+	var d_far_r: float = total_w_r
 
 	# Left side positions (-b)
 	var pos_l_road: Vector3 = pt - binorm * half_w
-	var pos_l_sh: Vector3 = pt - binorm * d_sh
-	var pos_l_feat: Vector3 = pt - binorm * d_feat
-	var pos_l_far: Vector3 = pt - binorm * d_far
+	var pos_l_sh: Vector3 = pt - binorm * d_sh_l
+	var pos_l_feat: Vector3 = pt - binorm * d_feat_l
+	var pos_l_far: Vector3 = pt - binorm * d_far_l
 
 	# Right side positions (+b)
 	var pos_r_road: Vector3 = pt + binorm * half_w
-	var pos_r_sh: Vector3 = pt + binorm * d_sh
-	var pos_r_feat: Vector3 = pt + binorm * d_feat
-	var pos_r_far: Vector3 = pt + binorm * d_far
+	var pos_r_sh: Vector3 = pt + binorm * d_sh_r
+	var pos_r_feat: Vector3 = pt + binorm * d_feat_r
+	var pos_r_far: Vector3 = pt + binorm * d_far_r
 
 	# 2. Detail and macro height sampling
 	var center_macro: float = get_macro_elevation(pt.x, pt.z)
@@ -210,15 +243,16 @@ func compute_cross_section(
 	var h_sh_r: float = -0.02 # Slight drainage dip
 
 	# 3. Final 3D Vertex positions
-	# V3 and V4 have EXACT zero offset from road edge
-	var v3: Vector3 = pos_l_road
-	var v4: Vector3 = pos_r_road
+	# Beveled Verge: terrain edge sits 3.5cm below physical road surface to eliminate Z-fighting
+	const VERGE_STEP_HEIGHT: float = 0.035
+	var v3: Vector3 = pos_l_road - norm * VERGE_STEP_HEIGHT
+	var v4: Vector3 = pos_r_road - norm * VERGE_STEP_HEIGHT
 
-	var v2: Vector3 = pos_l_sh + norm * h_sh_l
+	var v2: Vector3 = pos_l_sh + norm * (h_sh_l - VERGE_STEP_HEIGHT)
 	var v1: Vector3 = pos_l_feat + norm * h_feat_l
 	var v0: Vector3 = pos_l_far + norm * h_far_l
 
-	var v5: Vector3 = pos_r_sh + norm * h_sh_r
+	var v5: Vector3 = pos_r_sh + norm * (h_sh_r - VERGE_STEP_HEIGHT)
 	var v6: Vector3 = pos_r_feat + norm * h_feat_r
 	var v7: Vector3 = pos_r_far + norm * h_far_r
 
@@ -244,11 +278,34 @@ func compute_cross_section(
 	if eval.danger_right:
 		danger_mask |= 2
 
+	var offsets := PackedFloat32Array([-d_far_l, -d_feat_l, -d_sh_l, -half_w, half_w, d_sh_r, d_feat_r, d_far_r])
+
 	return {
 		"vertices": vertices,
+		"offsets": offsets,
 		"uvs": uvs,
 		"danger_mask": danger_mask,
 		"eval": eval,
 		"shoulder_left_pos": v2,
 		"shoulder_right_pos": v5
 	}
+
+## Precision Foliage Anchoring: computes exact 3D surface point on the cross-section
+## at given lateral offset in meters (negative = Left, positive = Right).
+static func get_surface_point_from_cross_section(cs: Dictionary, lat_offset: float) -> Vector3:
+	var verts: PackedVector3Array = cs.get("vertices", PackedVector3Array())
+	var offsets: PackedFloat32Array = cs.get("offsets", PackedFloat32Array())
+	if offsets.is_empty() or verts.size() < 8:
+		return cs.get("shoulder_left_pos", Vector3.ZERO)
+	if lat_offset <= offsets[0]:
+		return verts[0]
+	if lat_offset >= offsets[7]:
+		return verts[7]
+	for seg in range(7):
+		var o0: float = offsets[seg]
+		var o1: float = offsets[seg + 1]
+		if lat_offset >= o0 and lat_offset <= o1:
+			var span: float = o1 - o0
+			var t: float = (lat_offset - o0) / span if span > 0.0001 else 0.0
+			return verts[seg].lerp(verts[seg + 1], t)
+	return verts[3]
