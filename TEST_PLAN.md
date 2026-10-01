@@ -1,5 +1,7 @@
 # Slow Cycle — Verification & Testing Protocol
 
+> **Актуализация 01.10.2026 / WORLD-00B:** [текущее состояние](docs/CURRENT_PROJECT_STATE.md), [карта покрытия, частоты и replay/log contract](docs/TEST_COVERAGE_AND_REPLAY.md), [новый ограниченный baseline-отчёт](docs/sprints/world_00b_verification_report.md). Четыре headless runner завершились с exit 0, но имеют описанные ограничения и сообщение окружения certificate store; visual/ride gates этим не закрыты. Код/пороги/mandatory gates не менялись. Остальные PASS ниже — исторические записи, не свежая проверка `b6a5ff4`.
+
 ## Sprint 7 — Living Mountain Reality Check & Verification Results (2026-09-30)
 
 ### Sprint 7 Final Reality Check Status: 100% PASS (Math & Physics) / REOPENED for Visual Stabilization

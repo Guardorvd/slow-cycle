@@ -1,6 +1,20 @@
 # MTB World Generation — Handoff for the Next Chat
 
-Updated: 2026-09-27. This file is the single starting specification for continuing the procedural MTB world work. Read it together with `AGENTS.md`; the analysis and implementation plan linked below retain supporting detail.
+## Актуальная передача — 01.10.2026
+
+Начать с [CURRENT_PROJECT_STATE](docs/CURRENT_PROJECT_STATE.md), затем `AGENTS.md`, `.antigravity/rules/test-integrity.md`, активного блока [implementation_plan](implementation_plan.md), [глобального плана WORLD](docs/WORLD_GENERATION_GLOBAL_PLAN.md) и [карты покрытия/replay](docs/TEST_COVERAGE_AND_REPLAY.md). Пользователь одобрил последовательное выполнение: один ограниченный этап за раз. WORLD-00A/00B завершены; следующий отдельный технический scope — достоверные визуальные captures C01–C02 в WORLD-00.
+
+Цель: сначала цельная местность, затем дорога по ней и приятная поездка. Поле MountainMassifField существует, но отдельной поверхности окружающего мира и terrain-aware прокладки дороги ещё нет. Существующие велосипед, камера, controls, аудио и интерфейс переиспользуются. Первый игровой срез: местность на трёх seed, затем одна дорога примерно 1–2 км и настоящий проезд.
+
+WORLD-00B выполнил четыре headless baseline (exit 0, с отдельным certificate store ERROR) и временный lifecycle probe. Подтверждена поздняя смена seed в multi-seed capture; в visual capture `_init` seed успевает до ready, но сохранение PNG/actual point не проверяются. [Отчёт](docs/sprints/world_00b_verification_report.md) описывает ограничения. Исторические `125/125`, `17/17` не подтверждают готовность мира или обеих веток реальной физикой. Проверить HEAD/git status; не менять семантику тестов без согласования.
+
+**Prompt для нового диалога:** «Прочитай docs/CURRENT_PROJECT_STATE.md, AGENTS.md, .antigravity/rules/test-integrity.md, активный блок implementation_plan.md, docs/WORLD_GENERATION_GLOBAL_PLAN.md, docs/TEST_COVERAGE_AND_REPLAY.md и отчёт WORLD-00B. WORLD-00A/00B завершены без изменения кода проекта. Следующий scope — C01–C02, достоверность captures: исправить seed lifecycle multi-seed инструмента, подтвердить effective seed, PNG и actual capture point. В visual `_init` поздняя смена seed не подтверждена — смотри probe. Не выполнять весь backlog сразу, не принимать старые PASS за готовность мира. До технических изменений подготовь отдельный план и согласуй область; велосипед/камера/управление вне scope».
+
+---
+
+## Историческая передача — 27.09.2026 и последующие записи
+
+Ниже сохранён прежний handoff, включая его оценки завершения и старые prompts. Их ближайшие задачи заменены текущим порядком WORLD; старые показатели не перепроверялись этим этапом.
 
 ## 1. Product goal
 

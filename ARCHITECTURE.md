@@ -1,8 +1,10 @@
 # Slow Cycle — Architecture and Generation Boundaries
 
+> Сверка 01.10.2026, `b6a5ff4`, WORLD-00A: [актуальное состояние и карта источников](docs/CURRENT_PROJECT_STATE.md). Текущие границы ниже уточнены по исходникам. Исторические метрики последующих разделов не перепроверялись; ощущения поездки, безопасность и визуальное качество требуют engine/ride-подтверждения.
+
 ## 1. Purpose and source of truth
 
-This document describes the current runtime contracts and the intended direction without presenting future systems as implemented. `DEVELOPMENT_ROADMAP.md` owns the full product path; `ROAD_GENERATION.md` owns geometry limits; `implementation_plan.md` owns the active task and its execution report; `TEST_PLAN.md` owns reproducible checks and measured outcomes. `AGENTS.md` and `.antigravity/rules/test-integrity.md` remain mandatory.
+Use `docs/CURRENT_PROJECT_STATE.md` as the current entry point and `docs/WORLD_GENERATION_GLOBAL_PLAN.md` for the sequential product direction. `DEVELOPMENT_ROADMAP.md` preserves the previous product path; `ROAD_GENERATION.md` records geometry requirements, including unresolved mismatches with code; the opening block of `implementation_plan.md` owns the active task; `TEST_PLAN.md` preserves check instructions and historical outcomes. `AGENTS.md` and `.antigravity/rules/test-integrity.md` remain mandatory.
 
 The product target is a meditative, continuous ride through a coherent mountain world. A quiet pace is supported by readable singletracks, meaningful FLOW/TECHNICAL choices, rideable MTB features, a convincing landscape, and reliable road/terrain collision. “Meditative” does not mean featureless straight road; route rhythm and mountain scenery are part of the same goal.
 
@@ -36,12 +38,12 @@ mode_select.tscn
 3. `ChunkStreamer` checks whether the generated horizon needs another chunk. Fork spacing remains a seeded minimum-distance schedule. Once that minimum is reached, `ForkSitePlanner` evaluates the available endpoint before any fork approach widening, graph mutation or fork mesh commit. Rejected sites take the ordinary chunk path; streaming retries on a later chunk boundary.
 4. For an accepted site, existing `RoadLogic` queues a braking approach; the streamer widens the junction, constructs LEFT/RIGHT paths, registers graph edges, and commits `RoadChunk` meshes and colliders.
 5. `ForkDecisionModel` compares the rider to those actual edge centerlines. `RoadGraph` is authoritative for the chosen edge and branch ID; `ChunkStreamer` still owns chunk lifetime, preloading and dormant branch state.
-6. `RoadChunk` consumes committed road samples. `TerrainCarver` shapes local roadside strips from the same centerline plus seeded lateral relief. The current terrain is migrating to a shared 2D mountain massif field (`MountainMassifField`).
+6. `RoadChunk` consumes committed road samples. `TerrainCarver` shapes local roadside strips from the same centerline plus seeded lateral relief. `MountainMassifField` contributes height differences between the road center and flank; the mesh remains road-relative. There is no independent world-covering XZ terrain mesh or route fitting to this field yet.
 7. The bicycle observes world collision and its own telemetry signals. It does not participate in route generation and is not changed by world generation refactoring.
 
-### 2.1. 5 изолированных слоев мира (Sprint 7 Unidirectional Architecture)
+### 2.1. Целевые слои мира и текущая граница реализации
 
-Для исключения регрессий и защиты физики велосипеда в кодовой базе утверждается **5-слойный конвейер однонаправленного потока данных (Unidirectional Data Flow)**:
+Следующая схема задаёт направление разработки, а не полностью работающий production-конвейер. В текущем коде поле гор используется придорожным карвером; генератор пути не выбирает маршрут по нему.
 
 ```mermaid
 flowchart TD
@@ -49,40 +51,40 @@ flowchart TD
     L1 -->|Траектория P(s), радиусы, ширина полотна| L2["Слой 2: Инженерная врезка полотна (Roadbed Carver)"]
     L0 -->|Высота рельефа на флангах| L2
     L2 -->|Геометрия полотна и скальных откосов| L3["Слой 3: Окружение и декорации (Environment & Props)"]
-    L2 -->|Физические слои Collision Layer 2 и Layer 4| L4["Слой 4: Физика и игрок (BicycleController)"]
+    L2 -->|Collision bit masks 2 road / 4 terrain| L4["Слой 4: Физика и игрок (BicycleController)"]
 ```
 
-#### Контракты изоляции слоев:
+#### Целевые контракты изоляции слоев:
 1. **Слой 0 (Macro Mountain Field):** Чистая математика $H(x, z)$ и градиент $\nabla H(x, z)$ по сиду. Не имеет зависимостей ни от нод сцены, ни от полотна дороги, ни от физики.
 2. **Слой 1 (Route & Grammar):** Генерирует $C^1$-непрерывную осевую линию дороги $P(s)$, ширину $w(s)$, крен полотна и развилки. Опрашивает Слой 0 для выбора естественного спуска по полкам долины, сохраняя автономность математики сплайна.
 3. **Слой 2 (Roadbed Carver):** Принимает геометрию пути $P(s)$ и тело горы Слой 0. Выполняет инженерную выемку (Cut) и насыпь (Fill), строит меш дороги и скальных откосов с разнесением высот (Beveled Verge, ступенька 3–4 см).
 4. **Слой 3 (Environment & Props):** Расставляет деревья, валуны. Маркерные вешки, защитные столбики и указатели полностью исключены из игры (Zero-Post Mandate). Высота посадки берется строго из полигональной поверхности Слоя 2. Расстановка жестко заблокирована в коридоре безопасности $w(s)/2 + 1.2$м.
-5. **Слой 4 (BicycleController):** Чистый потребитель коллизий. Взаимодействует с миром строго через лучи колес (`Collision Layer 2` — полотно, `Collision Layer 4` — земля). Никакой код террейна не проникает внутрь контроллера.
+5. **Слой 4 (BicycleController):** Потребитель коллизий. Для поверхности используются битовые маски 2 (дорога, Godot layer 2) и 4 (земля, Godot layer 3); маска 16 дополнительно обозначает rough road. Никакой код террейна не проникает внутрь контроллера.
 
-#### Ключевые инженерные решения Спринта 7:
+#### Состояние решений прежнего Sprint 7 на 01.10.2026:
 - **Ликвидация «стрел в небе» (Adaptive Curvature Clamping):** Внутренняя кромка юбки адаптивно сжимается на виражах:
   $$d_{\text{inner}}(s) = \min\left(W_{\text{FAR}}, \max\left(8.0, R(s) \cdot 0.70\right)\right)$$
-  Для $R = 19$м внутренняя юбка ужимается до $13.3$м, исключая схлопывание треугольников через эволюту.
+  Это историческое описание намерения. Текущий `TerrainCarver` использует `W_FAR = 38м` и другую формулу сжатия (`pow(t_k, 0.35)`); приведённая формула не описывает текущую реализацию и не доказывает отсутствие складок. Требуется визуальная проверка.
 - **Инженерная фаска обочины (Beveled Verge):** Профиль дороги приподнимается над основанием обочины на микро-ступеньку (фаску) высотой 3–4 см:
   - Вершина кромки полотна: $P_{\text{road}} = P_{\text{center}} \pm \mathbf{b} \cdot \frac{w}{2}$
   - Дно водоотводной канавки обочины: $P_{\text{ditch}} = P_{\text{center}} \pm \mathbf{b} \cdot \left(\frac{w}{2} + 0.35\right) - \mathbf{n} \cdot 0.04$
-  - Откос скалы/насыпи стартует от $P_{\text{ditch}}$. Полная ликвидация Z-fighting и заступа полигонов травы на дорогу.
-- **Разделение бюджетов Near vs Far:**
-  - Ближняя зона ($\le 12$м от оси): визуальный меш + коллизия (`ConcavePolygonShape3D` Layer 4).
-  - Дальняя зона ($12\dots 45$м): только визуальный меш (`collision_layer = 0`). Снижение нагрузки на PhysicsServer на 65%.
+  - Текущая фаска задаётся `VERGE_STEP_HEIGHT = 0.035м` в `TerrainCarver`. Отсутствие Z-fighting и заступов на всех маршрутах этим обзором не подтверждено.
+- **Разделение бюджетов Near vs Far — не реализовано:**
+  - `RoadChunk.commit()` передаёт весь `prep.terrain_faces` в `ConcavePolygonShape3D`; битовая маска земли — 4 (Godot layer 3).
+  - Отдельного near-only terrain collider нет. Прежнее утверждение о снижении нагрузки на 65% не подтверждено текущей реализацией/замером.
 - **Прецизионная посадка объектов (Props Alignment) & Zero-Post Mandate:**
   - Полный демонтаж столбиков и вешек: никаких столбиков и дорожных знаков на полотне и обочине.
   - Стволы деревьев утапливаются на 10 см по реальному сечению $Y_{\text{terrain}}(s, d_{\text{lat}})$.
-- **Герметизация горизонта (Horizon Sealing via Fog):**
-  - Экструзия рельефа вдоль бинормали полотна строго ограничена $W \le 45$м, чтобы не пересекать эволюту кривизны.
-  - Горизонт герметизируется настройкой расстояний атмосферного тумана (`fog_depth_begin` 38м, `fog_depth_end` 95м), исключая появление серых пустот за пределами меша.
+- **Граница местности и туман:**
+  - Текущий внешний фланг: `W_FAR = 38м`; это ограниченная дорожная лента, не поверхность всего мира.
+  - `forest_env.tres` задаёт `fog_depth_begin = 32м`, `fog_depth_end = 115м`. Туман не служит подтверждением отсутствия пустот за границей меша.
 
 ## 3. Implemented contract versus target architecture
 
 | Concern | Implemented now | Later target |
 |---|---|---|
-| Determinism | Stable world/profile/grammar/fork sub-seeds and deterministic geometry for the same seed/choice sequence | Keep deterministic independent streams as landscape, ecology and route planning expand |
-| Large terrain shape | 1D `MountainProfile` contributes a bounded elevation overlay; `TerrainCarver` creates local roadside flanks | One shared seeded 2D mountain/valley/ridge field used by distant horizon, rideable terrain and trail planning |
+| Determinism | Seeded world/profile/grammar/fork streams exist; full replay across streaming/branch schedules is not freshly verified | Preserve deterministic geometry and foliage independent of generation scheduling |
+| Large terrain shape | 1D `MountainProfile` contributes a bounded elevation overlay; `TerrainCarver` uses 2D `MountainMassifField` height differences for road-relative flanks | One shared seeded 2D field and final surface used by surrounding terrain and trail planning |
 | Route intent | FLOW and TECHNICAL have distinct authored openings; later grammar remains seeded | Plan leg composition, terrain corridor and both alternatives before committing fork topology/mesh |
 | Planning data | `RouteIntent` exports the current queue and phase envelopes; `RoutePlan` stores measured intervals/profile/telemetry with stable signatures | Use measured intent/plan to preview paired branch corridors before mesh creation |
 | Fork location | Seeded distance threshold, followed by endpoint preflight in P2.1 | Select among terrain/sightline/grade/clearance/composition-qualified candidate corridors |
@@ -240,6 +242,8 @@ MountainProfile (get_mountain_weight_at(s) ∈ [0.0, 1.0])
 
 ## 13. Curvature Synthesis, Adaptive Macro-Heading & Soft-Repair Architecture
 
+> Предел 19м и ограничение fatal fallback ниже — требования AGENTS, а не доказательство их выполнения. В коде `RoadGenerationContract.MIN_RADIUS = 18м`; `RoadLogic` вызывает conservative fallback после любой неуспешной повторной валидации без проверки класса ошибки. Расхождения открыты, код в WORLD-00A не менялся.
+
 Sprint 6 v4 removes historical straightfall traps (the 400m opening curtain and 450m post-fork queues) and adopts perceptual curvature dynamics:
 
 1. **Perceptual Curvature Noise**:
@@ -277,21 +281,23 @@ Visual perception and physics are calibrated to reflect mountain steepness and c
    - The camera X-rotation now couples directly with `visual_pitch` (ground-plane pitch). Steep downhill sections ($-10^\circ \dots -14^\circ$) are visibly perceived as steep descents with the valley floor opening below.
 
 3. **Field of View (FOV)**:
-   - Base cockpit FOV is calibrated to $70^\circ$ (dynamic range $70^\circ \dots 75^\circ$ on speed), eliminating perspective compression and restoring depth to mountain slopes.
+   - Текущие defaults `BikeCamera`: кокпит $78^\circ \dots 83^\circ$, третье лицо $68^\circ \dots 72^\circ$. Прежнее описание $70^\circ \dots 75^\circ$ не соответствует коду. В WORLD-00A камера не перенастраивалась.
 
-4. **Kinematic Steer Limit Expansion**:
-   - In `BicycleController`, `high_speed_steer_limit` at $35$ km/h is expanded from $0.045$ rad to $0.062$ rad ($3.55^\circ$).
-   - This physically allows the bicycle to follow curves down to $R = 19.0$m on speed without understeering into roadside terrain.
+4. **Текущий предел руления**:
+   - `BicycleController.high_speed_steer_limit = 0.045` rad. В `bicycle.tscn` override до 0.062 не найден.
+   - Проходимость конкретного радиуса на скорости требует настоящего физического заезда; она не выводится из прежнего описания настройки.
 
 ---
 
 ## 15. Observability, Diagnostics & Structured Telemetry
 
-To guarantee full transparency across all procedural subsystems, Sprint 6 v4 introduces the Observability Suite:
+Статус по коду на 01.10.2026: диагностические заготовки существуют, но полная запись обычного заезда не подключена.
 
-1. **Diagnostic Singleton `SlowCycleLogger` (`scripts/core/slow_cycle_logger.gd`)**:
-   - Thread-safe 5000-line circular in-memory buffer with periodic flush to `user://slow_cycle_diagnostics.log`.
-   - Tagged diagnostic channels:
+1. **`SlowCycleLogger` (`scripts/core/slow_cycle_logger.gd`)**:
+   - Статический кольцевой буфер 5000 строк; `flush()` перезаписывает `user://slow_cycle_diagnostics.log` текущим буфером. Полный архив долгой сессии не обеспечен.
+   - Авто-flush каждые 2с находится в `_process()` экземпляра Node. Logger не подключён как Autoload и не найден как экземпляр сцен, поэтому этот путь обычной игры не активен. Некоторые тесты вызывают flush явно.
+   - Синхронизации для параллельной записи в классе нет; гарантия thread-safe не установлена.
+   - Production-вызовы найдены для смены стиля GRAMMAR и repair/fallback GEOM. Следующий список — назначение объявленных каналов; он не означает, что все события уже пишутся:
      - `[WORLD]`: World seed, session lifecycle, active chunk window, memory budget.
      - `[GRAMMAR]`: FSM phase changes, route style transitions, candidate queue states.
      - `[GEOM]`: Centerline evaluation, curvature $R$, Soft-Repair events, seam deltas.
@@ -307,7 +313,8 @@ To guarantee full transparency across all procedural subsystems, Sprint 6 v4 int
 ## 16. Entry points and references
 
 - `project.godot` starts `res://scenes/mode_select.tscn`; `res://scenes/main.tscn` hosts the ride.
-- Full product stages and intermediate build gates: `DEVELOPMENT_ROADMAP.md`.
+- Current status and source map: [CURRENT_PROJECT_STATE](docs/CURRENT_PROJECT_STATE.md).
+- Sequential direction: [WORLD_GENERATION_GLOBAL_PLAN](docs/WORLD_GENERATION_GLOBAL_PLAN.md); previous product stages: `DEVELOPMENT_ROADMAP.md`.
 - Geometry/event limits and P0–P2 behavior: `ROAD_GENERATION.md`.
 - Current sprint plan and actual execution log: `implementation_plan.md`.
 - Reproducible test commands, results and limits: `TEST_PLAN.md`.
