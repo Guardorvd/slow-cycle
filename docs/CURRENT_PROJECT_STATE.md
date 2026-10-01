@@ -1,6 +1,6 @@
 # Slow Cycle — актуальное состояние и точка входа
 
-Дата: 01.10.2026. Исходная передача WORLD-00A/00B — `7c33004`. Все сегодняшние изменения C01–C02, WORLD-00-LOG и C03–C04 сведены в локальную передачу; точный новый SHA и clean status проверяются после коммита и записываются в артефакт `outputs/world00-surface/commit-verification.json`. [Сводка дня](TODAY_CHANGES_2026_10_01.md).
+Дата: 01.10.2026. Исходная передача WORLD-00A/00B — `7c33004`. Код сегодняшних C01–C02, WORLD-00-LOG и C03–C04 сохранён коммитом `ce3b175c95d85664a110031161ebbc10c5486720` (`main`); после него рабочая копия проверена и была чистой. Закрытие дня меняет только документацию отдельным коммитом; в новом чате проверить фактический HEAD/status. Проверка основного коммита — `C:/Users/Luisa/Documents/Codex/2026-10-01/slow-cycle-c-users-luisa-documents/outputs/world00-surface/commit-verification.json`; проверка закрытия дня — `C:/Users/Luisa/Documents/Codex/2026-10-01/slow-cycle-c-users-luisa-documents/outputs/world00-surface/day-close-verification.json`. [Сводка дня](TODAY_CHANGES_2026_10_01.md).
 
 C01–C02: seed до инициализации; фактический генератор/участок/позиция/камера/Image/save/reload/metadata/run_id. 27 checks и 19 достоверных PNG. Аналогичный прежний seed дефект visual `_init` не подтверждён. [Отчёт captures](sprints/world_00_c01_c02_verification_report.md).
 
