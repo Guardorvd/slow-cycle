@@ -1,165 +1,69 @@
 extends SceneTree
 
-var current_seed_idx: int = 0
-var test_seeds: Array[int] = [184729, 42, 77777]
-
-var state: String = "INIT_SEED"
-var frames_in_state: int = 0
-
-var main_node: Node3D
-var player_bike: CharacterBody3D
-var world_mgr: Node3D
-var streamer: Node3D
-var active_path: RefCounted
-
-var cur_dist: float = 0.0
-var fork_pos: Vector3 = Vector3.ZERO
-var fork_found: bool = false
+const Audit = preload("res://scripts/test/capture_audit_support.gd")
+var audit: Audit = Audit.new()
+var expected_frames := 0
 
 func _init() -> void:
-	print("\n=== STARTING MULTI-SEED VISUAL AUDIT ===")
+	call_deferred("_run")
 
-func _process(delta: float) -> bool:
-	frames_in_state += 1
-
-	match state:
-		"INIT_SEED":
-			if current_seed_idx >= test_seeds.size():
-				print("=== MULTI-SEED VISUAL AUDIT COMPLETE ===")
-				quit()
-				return true
-
-			var s: int = test_seeds[current_seed_idx]
-			print("\n--- Initializing Seed %d (%d/%d) ---" % [s, current_seed_idx + 1, test_seeds.size()])
-
-			var main_scene = load("res://scenes/main.tscn").instantiate()
-			root.add_child(main_scene)
-			main_node = main_scene
-			world_mgr = main_node.get_node("WorldManager")
-			player_bike = main_node.get_node("Bicycle")
-
-			world_mgr.world_seed = s
-			world_mgr.randomize_world_seed_on_start = false
-
-			cur_dist = 0.0
-			fork_found = false
-			fork_pos = Vector3.ZERO
-			frames_in_state = 0
-			state = "WAIT_READY"
-
-		"WAIT_READY":
-			if frames_in_state < 15:
-				return false
-			streamer = world_mgr.chunk_streamer if world_mgr else null
-			if not streamer or not player_bike:
-				return false
-
-			var active_b = streamer.get_active_branch()
-			if not active_b or not active_b.road_path or active_b.road_path.size() < 10:
-				return false
-
-			active_path = active_b.road_path
-			frames_in_state = 0
-			state = "CAPTURE_START"
-
-		"CAPTURE_START":
-			# Position at 2.5m (enclosed by Chunk 0, safe margin behind near-plane)
-			_position_bike_at_dist(2.5)
-			if frames_in_state >= 15:
-				_save_screenshot("seed_%d_01_start_000m.png" % test_seeds[current_seed_idx])
-				cur_dist = 10.0
-				frames_in_state = 0
-				state = "STEP_TO_100M"
-
-		"STEP_TO_100M":
-			# Advance progressively so streamer builds chunks
-			if cur_dist < 100.0:
-				cur_dist = minf(100.0, cur_dist + 15.0)
-				_position_bike_at_dist(cur_dist)
-			else:
-				_position_bike_at_dist(100.0)
-				if frames_in_state >= 15:
-					_save_screenshot("seed_%d_02_straight_100m.png" % test_seeds[current_seed_idx])
-					frames_in_state = 0
-					state = "SEARCH_FORK"
-
-		"SEARCH_FORK":
-			# Advance ahead until fork spawns or up to 650m
-			if not fork_found and cur_dist < 650.0:
-				cur_dist += 15.0
-				_position_bike_at_dist(cur_dist)
-
-				# Check if alternative branch spawned
-				if streamer.branches.size() > 1:
-					for b in streamer.branches.values():
-						if b.branch_id != 0 and b.fork_node_pos != Vector3.ZERO:
-							fork_found = true
-							fork_pos = b.fork_node_pos
-							print("  [FORK DETECTED] Seed %d: Fork spawned at pos=%s (bike dist=%.1fm)" % [
-								test_seeds[current_seed_idx], str(fork_pos), cur_dist
-							])
-							var active_b = streamer.get_active_branch()
-							var p = active_b.road_path
-							var fork_idx = p.find_closest_index(fork_pos)
-							var fork_dist_on_path = p.cumulative_distances[fork_idx]
-							var view_dist = maxf(0.0, fork_dist_on_path - 22.0)
-							_position_bike_at_dist(view_dist)
-							frames_in_state = 0
-							state = "WAIT_FORK_STABILIZE"
-							break
-			elif cur_dist >= 650.0:
-				# Reached 650m without fork; capture wherever we are
-				print("  [NOTE] Seed %d: No fork before 650m, capturing singletrack" % test_seeds[current_seed_idx])
-				_save_screenshot("seed_%d_03_corridor_600m.png" % test_seeds[current_seed_idx])
-				frames_in_state = 0
-				state = "NEXT_SEED"
-
-		"WAIT_FORK_STABILIZE":
-			var active_b = streamer.get_active_branch()
-			var p = active_b.road_path
-			var fork_idx = p.find_closest_index(fork_pos)
-			var fork_dist_on_path = p.cumulative_distances[fork_idx]
-			var view_dist = maxf(0.0, fork_dist_on_path - 22.0)
-			_position_bike_at_dist(view_dist)
-
-			# Allow 25 full frames for all chunk meshes to commit, old chunks to clear, and camera to settle
-			if frames_in_state >= 25:
-				_save_screenshot("seed_%d_03_first_fork.png" % test_seeds[current_seed_idx])
-				frames_in_state = 0
-				state = "NEXT_SEED"
-
-		"NEXT_SEED":
-			if main_node:
-				main_node.free()
-				main_node = null
-			current_seed_idx += 1
-			frames_in_state = 0
-			state = "INIT_SEED"
-
+func _process(_delta: float) -> bool:
+	if audit.tree and not audit.finished and not audit.alive():
+		audit.finish(expected_frames)
 	return false
 
-func _position_bike_at_dist(target_dist: float) -> void:
-	if not streamer or not player_bike:
+func _run() -> void:
+	var defaults := [184729, 42, 77777]
+	if not audit.begin(self, "capture_seed_audit", defaults):
+		audit.finish(0)
 		return
-	var active_b = streamer.get_active_branch()
-	if not active_b or not active_b.road_path:
+	var seeds := defaults.duplicate()
+	if audit.cli_seed() != null:
+		seeds = [int(audit.cli_seed())]
+	var filter: String = audit.option("--audit-frame", "all")
+	if filter not in ["all", "start", "100m", "fork"]:
+		audit.reject("UNKNOWN_FRAME_FILTER")
+		audit.finish(0)
 		return
-	var p = active_b.road_path
-	var sample = p.get_sample_at_distance(target_dist)
-	var pt: Vector3 = sample.get("position", Vector3.ZERO)
-	var tang: Vector3 = sample.get("tangent", Vector3.FORWARD)
-	var norm: Vector3 = sample.get("normal", Vector3.UP)
+	expected_frames = seeds.size() * (3 if filter == "all" else 1)
+	for seed_value in seeds:
+		if not await audit.start_world(seed_value):
+			break
+		if filter in ["all", "start"]:
+			if not await audit.capture({"name": "seed_%d_01_start_002.5m.png" % seed_value, "dist": 2.5, "mode": "fp"}):
+				break
+		if filter in ["all", "100m"]:
+			if not await audit.advance_to(100.0) or not await audit.capture({"name": "seed_%d_02_straight_100m.png" % seed_value, "dist": 100.0, "mode": "fp"}):
+				break
+		if filter in ["all", "fork"]:
+			var fork_info: Dictionary = await _find_fork()
+			if fork_info.is_empty():
+				break
+			if not await audit.advance_to(fork_info.view_s):
+				break
+			if not await audit.capture({"name": "seed_%d_03_first_fork.png" % seed_value, "dist": fork_info.view_s, "mode": "fp"}, {"fork": fork_info}):
+				break
+		audit.close_world()
+	audit.finish(expected_frames)
 
-	player_bike.global_position = pt + norm * 0.4
-	var horiz = Vector3(tang.x, 0.0, tang.z).normalized()
-	if not horiz.is_zero_approx():
-		player_bike.global_basis = Basis.looking_at(horiz, Vector3.UP)
-
-	streamer.update_streaming(player_bike.global_position, tang * 12.0, 0.016)
-
-func _save_screenshot(filename: String) -> void:
-	var img = root.get_viewport().get_texture().get_image()
-	if img != null:
-		var save_path = "res://screenshots/" + filename
-		img.save_png(save_path)
-		print("[CAPTURED] Saved %s" % filename)
+func _find_fork() -> Dictionary:
+	while audit.alive():
+		var parent = audit.streamer.get_active_branch()
+		if parent and parent.is_fork_spawned:
+			var fork_s: float = parent.distance_at_last_fork
+			if fork_s > 650.0:
+				audit.reject("FORK_OUTSIDE_SEARCH_RANGE")
+				return {}
+			var reason: String = Audit.fork_reason(audit.streamer, parent)
+			if reason.is_empty():
+				var alternate = audit.streamer.branches[parent.child_branch_ids[0]]
+				return {"parent_branch_id": parent.branch_id, "alternate_branch_id": alternate.branch_id, "fork_id": alternate.fork_id, "origin": Audit.vec(parent.fork_node_pos), "origin_s": fork_s, "view_s": fork_s - 22.0, "search_range_m": [0, 650], "both_arm_meshes_committed": true}
+		elif audit.last_s >= 650.0:
+			audit.reject("FORK_MISSING_BEFORE_650M")
+			return {}
+		var next_s: float = minf(650.0, audit.last_s + 15.0)
+		if parent and Audit.path_reason(parent.road_path, next_s).is_empty():
+			if audit.position_at(next_s).is_empty():
+				return {}
+		await process_frame
+	return {}

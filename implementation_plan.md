@@ -1,4 +1,161 @@
-# Активный этап: WORLD-00B — карта проверок и минимальные логи
+# WORLD-00 C03–C04 и сверка документации за 01.10.2026
+
+HEAD: `7c33004`. Сохранить незакоммиченные C01–C02 и WORLD-00-LOG. Пользователь поручил реализацию следующего небольшого этапа, отчёт, согласование всей документации с сегодняшними изменениями и локальный Git-коммит. Согласование конкретного плана и mutations получено в ответ на показанный план/вопрос: «я не знаю — я не инженер. сделай как лучше». Выбран полный C03–C04 с исправлением двух predicates и сохранением прежних порогов; дальнейшие внутренние шаги и локальный коммит выполняются самостоятельно.
+
+**Результат этапа:** реализован; 168 focused checks, 333/333 committed contacts, 21 окончательный PNG, обе прежние watchdog и обязательные gates выполнены. Декор/велосипед/камера/route/field не менялись. Replay-final-1 дал 6 ObjectDB warning; общая чистая приёмка INCOMPLETE. Документация дня сведена; локальный коммит проверяется после записи отчёта. [Отчёт](docs/sprints/world_00_c03_c04_verification_report.md). Следующее действие — отдельно согласовать WORLD-01/C05, не начинать код следующего этапа автоматически. Нижние планы/результаты сохранены как история их запусков.
+
+### TASK: [WORLD-00-C03-C04] Видимость существующей земли и честная проверка опоры
+
+**Goal:** исправить подтверждённую обратную ориентацию граней существующей дорожной земли; сделать отсутствие mesh/опоры явной ошибкой. Это ограниченная правка дорожных полос, не полноценный terrain-only мир.
+
+**Do:**
+1. Сохранить исходные результаты. В `road_chunk.gd` поменять только ориентацию terrain strip/wedge indices и соответствующих collision faces на Godot CW; нормали должны смотреть наружу. Сохранить вершины, дорогу, culling материалов, генерацию траектории и физику велосипеда. Добавить данные фактического диапазона wedge triangles в PreparedChunkData вместо magic offset в проверке.
+2. Исправить `test_terrain_topology_watchdog.gd`: внешний face normal для CW считать через отрицательный cross; прежние геометрические пороги сохранить. Пустые/недостаточные arrays/triangles и отсутствие ожидаемого wedge — failure. Не обещать committed render, когда проверяются только prepared arrays. Wedge проверять по его фактическому диапазону, а не после 240 triangles.
+3. Исправить `test_foliage_contact_watchdog.gd`: missing_ground входит в failure; отдельно считать expected props/проверенные contacts; пустая земля и неожиданный нулевой набор props — failure. Сохранить dh > 0.05 и dh < −0.35. Проверить обе настоящие fork arm из ChunkStreamer (новый focused runner), не выдавать искусственный fork за настоящую развилку.
+4. Добавить небольшие negative fixtures через те же predicates: пустой mesh, перевёрнутый порядок, отсутствующий wedge, отсутствие terrain faces под настоящим объектом, props +0.06/−0.36 м относительно поверхности, пустые props. Нормальная CW-плоскость и существующая опора проходят. Для физики — настоящий collision ray сверху; для render — отдельный Vulkan снимок верх/низ с backface culling. Никаких fake generators.
+5. Если строгий contact check выявит настоящий дефект размещения, локально исправить привязку в RoadChunk/ChunkFoliage к реальной поверхности, сохранив прежние положения XZ и seed/RNG. Не скрывать ошибку удалением всех props. Не расширять задачу на горное поле, развилки или переделку декора.
+6. Обновить текущие README/ARCHITECTURE/TEST_PLAN/ROAD_GENERATION/roadmaps/BACKLOG/handoff/глобальный план/coverage/current state/implementation_plan. Исторические отчёты сохранить, обозначить их статус и сослаться на текущую сводку. Учесть прочитанный чат «Изучить архитектуру проекта»: WORLD-00A/00B уже в 7c33004, код ими не менялся. Сделать итоговый отчёт дня, документацию по реальным scripts/limits/результатам, проверить локальные ссылки.
+7. Перед коммитом проверить scope, HEAD, staged diff и whitespace. Локально закоммитить все проверенные сегодняшние изменения этого репозитория; исходные чужие изменения не откатывать. Авторизацию на push не предполагаем.
+
+**Согласуемые mutations:** только два указанных watchdog. CW predicate заменяет неверную конвенцию, а не снимает проверку ориентации. Missing mesh/ground/props усиливают полноту проверки. Пороги площади, границ, folds, evolute, floating/buried сохраняются; assertions остальных старых тестов не меняются.
+
+**Do not:** менять велосипед, камеру, управление, материалы на CULL_DISABLED, route/field алгоритмы, границу долины, radius/fallback policy, старые branch/rider thresholds; начинать WORLD-01/02, QA framework, новые механики или оптимизацию всего мира.
+
+**Acceptance Criteria:** непустая существующая поверхность видна сверху и culled снизу; prepared indices/normals/collision faces согласованы; реальные props/fork support проверены; negative scenarios отказывают по нужной причине; seed/траектория сохранены; mandatory gates результаты и warnings честно записаны; документация имеет единую актуальную точку входа; коммит проверен, рабочая копия чистая либо оставшиеся изменения явно перечислены. Поверхность за пределами полос не считается готовой.
+
+**Tests:** оба исправленных watchdog, новый focused contract/runtime/GPU runner, terrain carver/review/seams/verge/clearance по затронутой поверхности; AGENTS diversity/monotony/real rider/Vulkan visual audit; multi-seed captures 184729/42/77777; небольшие logger checks после surface integration. Один процесс ≤60 с. Существующие branch failures/ObjectDB/performance результаты остаются открытыми, если нет доказанного исправления в scope.
+
+**Files:** `scripts/world/road_chunk.gd`, условно `scripts/world/chunk_foliage.gd`; два перечисленных watchdog; небольшой `scripts/test/surface_audit_support.gd`, `scripts/test/test_surface_audit_contract.gd`, `scripts/test/capture_surface_culling_audit.gd` для реальных fork/collision/GPU coverage; актуальные Markdown документы и новый `docs/sprints/world_00_c03_c04_verification_report.md`, `docs/TODAY_CHANGES_2026_10_01.md`. Временные инструменты/большие PNG только в work/outputs текущего чата.
+
+**Следующий этап:** отдельный terrain-only прототип на трёх seed; граница долины исправляется вместе с полем. Далее одна дорога 1–2 км и настоящий проезд.
+
+---
+
+# WORLD-00-LOG — минимальные логи и повторение ошибки
+
+Дата: 01.10.2026. HEAD `7c33004`; исходное dirty tree — сохранённые изменения C01–C02 (8 файлов), не откатывать и не смешивать с новой задачей.
+
+**Согласование:** пользователь прямо поручил этот следующий этап: «сделай … небольшой план минимальных логов и воспроизведения ошибок, реализуй его, сделай отчет». Это разрешение выполнить описанный узкий этап самостоятельно. Новые изменения существующих assertions не входят в согласование. План записывается до кода, история C01–C02 сохраняется.
+
+### TASK: [WORLD-00-LOG] Сохранить контекст сессии и проверить ограниченный геометрический replay
+
+**Goal**: при ошибке иметь seed, версию, параметры, место, выборы маршрута и причину; повторить проверенные точки на настоящем генераторе. Не обещать воспроизведение физики, всего бесконечного мира или исправление поверхности.
+
+**Do**:
+
+1. Переиспользовать SlowCycleLogger: один Node owner в WorldManager, запуск после разрешения seed и до первого генератора; уникальный run_id и отдельная директория `user://slow_cycle_sessions/<run_id>` либо CLI `--diagnostics-root=...`. Старые статические log/flush API сохраняются.
+2. Хранить manifest и журнал редких структурированных событий отдельно от ring 5000 строк. Header/выборы/checkpoints не теряются при вытеснении строк. Fresh session очищает старый ring. Выборы и checkpoints ограничены небольшим явным бюджетом; при его превышении replay_complete=false, а не фиктивная полнота.
+3. Сохранять requested/effective seed, revision/dirty/source SHA256 и копии исходников, Godot/реальный renderer, scene/config. Недоступные данные явно обозначать; полнота replay требует подтверждённых входов. Подключить автоматический flush 2 с, явное сохранение ошибки/checkpoint и SESSION_END при выходе сцены/закрытии окна.
+4. В WorldManager добавить только диагностический snapshot и явный checkpoint/problem API: реальная поза/скорость игрока, active branch, сохранённый path range/ближайший sample, generation horizon. Отсутствующие player/path/surface обозначать, не трактовать как успешную проверку. Не вводить поток BIKE/TERRAIN каждого кадра и новую клавишу управления.
+5. В ChunkStreamer записать подтверждённые FORK_COMMIT/FORK_CHOICE: фактический origin, parent/child seed/route identity, LEFT/RIGHT, позицию/local s и tick. Изменить только наблюдение, не выбор/стриминг/геометрию.
+6. В RoadLogic дополнить существующие rejection/soft-repair/fallback события точными violations, seed/branch/range/phase/coordinates и текущими лимитами. Записать первый rejection до перезаписи validity report. Генерационные формулы, fallback-условия, радиусы и validator не менять.
+7. Ошибки открытия/записи/reload дают явное сообщение с путём/кодом и diagnostic status INCOMPLETE; повтор одного I/O сбоя не засоряет stderr. Не считать ENGINE ERROR или ObjectDB warning чистым PASS по exit 0: сохранить внешний engine log и итог отдельно.
+8. Добавить один focused logger/session test и один bounded replay runner. Replay читает manifest, проверяет источник/конфигурацию, создаёт настоящую main с effective seed до add_child, применяет записанные route choices и сравнивает непустые checkpoints (sample/geometry signature). Пустой/недоступный checkpoint, неверный seed/source/config/выбор или timeout дают nonzero/INCOMPLETE. Replay — телепортированный контроль геометрии, не physical ride.
+
+**Do not**: менять старые assertions/test thresholds, capture-инструменты C01–C02, велосипед/камеру/управление, world/terrain формулы, материалы, culling, генерацию маршрутов или fallback safety policy; делать framework, input recorder, потоки, бесконечный архив и долгий soak. Непостоянный ObjectDB warning прошлого rider — открытая ошибка; этот этап не объявляет её исправленной.
+
+**Acceptance Criteria**:
+
+- Обычная main создаёт отдельный читаемый manifest до генерации; на quit/scene change есть финальный snapshot/SESSION_END.
+- Две сессии изолированы. После >5000 строк обязательный header, choices, checkpoint и problem-context сохранены; старые статические log вызовы работают.
+- Реальные LEFT и RIGHT записаны; проверенные checkpoint подписи воспроизводятся по seed+choices+config на фиксированных seed `[184729, 42, 77777]` (короткие отдельные запуски).
+- Negative I/O использует только файл вместо директории внутри fixture; параметры и права пользователя не портятся. Non-finite значения сохраняются явно; сообщения об ошибке не подавляются.
+- Replay negative scenarios отвергаются по точной причине, completion marker и непустому покрытию; произвольное падение не считается ожидаемым успехом.
+- Headless/runtime и Vulkan подтверждены отдельно; zero parse errors/leaks для принятого запуска. Известные сообщения окружения/непостоянные предупреждения фиксируются, общая приёмка не подменяется зелёным счётчиком.
+
+**Tests**: новый focused runner (ring overflow, fresh session, manifest/journal/snapshot, авто-flush/quit, реальное fork logging, I/O failure, source/config/seed/empty-checkpoint negatives); отдельный replay на записанных LEFT/RIGHT и трёх seed; неизменённые session seed и branch integration; AGENTS seed diversity/monotony/real rider и Vulkan visual capture как контроль observer integration. Каждый процесс максимум 60 с; старые Test Integrity gates сохраняются. Мастер и длинный soak не нужны.
+
+**Files**: `scripts/core/slow_cycle_logger.gd`, `scripts/world/world_manager.gd`, `scripts/world/chunk_streamer.gd`, `scripts/world/road_logic.gd`; новые `scripts/test/test_session_diagnostics.gd`, `scripts/test/replay_session_diagnostic.gd` (и `.uid`, если создаются движком). Документация: `implementation_plan.md`, `docs/CURRENT_PROJECT_STATE.md`, запись результата в `docs/TEST_COVERAGE_AND_REPLAY.md`, новый `docs/sprints/world_00_logs_verification_report.md`. Вспомогательный bounded launcher только в `work/` чата. Артефакты в `outputs/world00-logs/<run_id>/` текущего чата; прежние C01–C02 artifacts сохраняются.
+
+**Порядок**: записанный план → минимальная observer integration → focused/negative проверки → replay → обязательные контрольные gates/реальный PNG → отчёт и актуальный статус. Следующий этап не начинается автоматически: необходимые corrections поверхности и её проверок (C03–C04), затем поле/граница долины вместе с terrain-only WORLD-01.
+
+**Test Integrity Verification — план**: код пока не менялся; новые tests разрешены как новая функциональность; существующие assertions неизменны; подавления/skip не предлагаются; работоспособность игры и полный replay не заявляются.
+
+**Результат 01.10.2026:** реализация выполнена, 37 focused checks, три replay (3 checkpoints/1 choice каждый), 13 expected negative отказов и 8 Vulkan PNG. 48 runtime copies/hash и совпадение открывающей геометрии до/после логов подтверждены. Общая чистая приёмка **INCOMPLETE**: один ObjectDB warning replay RIGHT; прежний route/branch failure воспроизведён на HEAD; benchmark текущего branch запуска нарушил два порога. Причины/ограничения и все ранние неудачные запуски сохранены в `docs/sprints/world_00_logs_verification_report.md`. Старые tests/assertions, capture C01–C02, велосипед/камера и генерационные формулы не менялись. Следующий этап — отдельный согласованный план C03–C04; сейчас не начинается.
+
+
+---
+
+
+# Реализация WORLD-00 / C01–C02 — достоверные визуальные снимки
+
+Дата: 01.10.2026. Передача и проверенный HEAD: `7c33004ee5c383eb304cfb7fdc9fdad0a3a5f6a2`. До подготовки плана `git status --short` пуст.
+
+**Согласование: получено 01.10.2026.** Пользователь подтвердил этот план и перечисленные mutations: «делай - потом отчет и кратко что дальше». Внутренние шаги выполняются самостоятельно по AGENTS §1.12; scope C01–C02 сохраняется. WORLD-00A/00B завершены; их аудит не повторяется, исторические задачи не возобновляются.
+
+### TASK: [WORLD-00-C01-C02] Сделать происхождение и сохранение каждого кадра проверяемыми
+
+**Goal**: получить реальные PNG с подтверждёнными seed генератора, участком дороги, точкой и камерой съёмки; исключить ложный успех при отсутствующем участке, Image или файле. Это подготовка к воспроизведению визуальных ошибок, не создание полноценной поверхности мира.
+
+**Подтверждённая исходная точка**:
+
+- Lifecycle probe WORLD-00B: в `capture_seed_audit._process` после `add_child` ready уже выполнен; последующее присваивание seed не меняет seed RoadLogic. В `capture_visual_audit._init` ready отложен, seed успевает установиться. Одного и того же дефекта в обоих инструментах не установлено.
+- Оба capture игнорируют результат `save_png`; visual продвигает очередь даже без Image. Ожидание основано на числе кадров, но не подтверждает нужный участок и сохранённый файл.
+- `RoadPathData.get_sample_at_distance` возвращает крайнюю точку при запросе за концом пути. Наличие sample само по себе не доказывает запрошенную дистанцию. После pruning учитывать также начало сохранённого диапазона.
+- Streamer предоставляет активную ветку, её path, active_chunks и интервалы чанков; RoadChunk содержит зарегистрированные road/terrain MeshInstance3D. Эти данные читать через существующие API, production не менять.
+
+**Do**:
+
+1. В seed capture установить `world_seed` и `randomize_world_seed_on_start=false` на экземпляре WorldManager до `root.add_child(main_scene)`. В visual перенести настройку до add_child как явную границу конфигурации; не называть это исправлением подтверждённой seed-ошибки его `_init`.
+2. Явно разрешать CLI `--seed` с тем же приоритетом, что у WorldManager. По умолчанию multi-seed battery `[184729, 42, 77777]`, visual `184729`; при CLI override multi-seed выполняет только явно запрошенный seed. Записывать default/battery seed, CLI override, ожидаемый effective seed и фактический `WorldManager.road_logic.world_seed`. После ready сравнивать их, а также seed streamer; производные seed веток фиксировать отдельно, не требовать равенства session seed.
+3. До позиционирования проверить конечные данные path и доступный диапазон `[first_s, last_s]`, без молчаливого clamp. Продвигаться небольшими шагами для стриминга; ждать реального commit непустого дорожного меша и mesh земли в целевом чанке. Проверять, что запрошенная точка лежит в его интервале; записывать ветку/чанк и фактический sample. Наличие mesh не объявлять доказательством отсутствия дыр или правильного winding.
+4. Для capture отключать физическое движение только экземпляра велосипеда в инструменте, удерживать позу, дать камере стабилизироваться и дождаться отрисованного кадра. Проверить конечную фактическую позу велосипеда относительно sample (допуск 1 см) и наличие текущей ожидаемой Camera3D. Записать реальную позу/режим/FOV камеры и размер viewport. Код контроллера, камеры и их настройки не менять. Это телепорт-съёмка, не физическая поездка.
+5. Сохранить существующие виды fp/tp/drone и запросы дистанций; в multi-seed явно подписать старт 2.5 м. Для fork-кадра подтвердить реальную развилку, origin и загруженные обе arm в области её начала. Если fork не найден в объявленном диапазоне, отметить fork coverage как INCOMPLETE и завершить соответствующую проверку ненулевым кодом; возможный диагностический corridor PNG назвать по фактической точке, не выдавать за fork или 600 м.
+6. Проверять texture/Image, ненулевые размеры и соответствие viewport; return code `save_png`, существование ненулевого PNG, повторную загрузку Image и совпадение размеров. Только после этого и успешной записи metadata отмечать кадр сохранённым и продвигать очередь.
+7. Каждый запуск получает новый `run_id` и отдельную директорию без перезаписи. Сохранять manifest/итог и metadata кадров: revision, dirty state, digest затронутых runtime-исходников, Godot/реальный renderer, seed/default/override, маршрутные решения и их отсутствие, requested/actual local s, path range, branch/chunk/fork, sample/bike/camera transforms, geometry signature фиксированного checkpoint, viewport/PNG размеры, пути/результаты записи, статус/причину. Поля, которые не удалось получить, отмечать явно; не подставлять фиктивные данные. Не создавать общий session logger этого этапа.
+8. Ограничить ожидание ready/coverage/render и весь процесс: не более 60 секунд на одиночный запуск. Для батареи использовать отдельные bounded запуски и узкие фильтры seed/кадров, если полный набор не укладывается. Timeout = INCOMPLETE и ненулевой код; внешнее прерывание без summary также не является успехом.
+9. Добавить один небольшой общий capture helper только для одинаковых guards/PNG/metadata двух инструментов и один focused test runner. Отрицательные случаи идут через те же проверки, что реальные captures; менять только входы/внешнюю I/O-границу fixtures, не ломать production и не подменять генератор заглушкой.
+
+**Do not**: менять production генератор, поле горы/границу долины, terrain/carver/winding, декор, streamer, scene/resources/project settings, велосипед, камеру, управление, logger; делать framework, долгий soak или повтор полного аудита; удалять/ослаблять существующие assertions; начинать C03–C08 либо WORLD-01/02.
+
+**Явно согласуемые изменения существующих проверок**:
+
+- Только `capture_seed_audit.gd` и `capture_visual_audit.gd`: порядок настройки, guards seed/coverage/camera/Image/PNG/metadata, bounded ожидание, run_id, CLI/filter параметры и честные completion/failure markers.
+- Их прежнее сообщение «сохранено/всё успешно» заменяется подтверждённым результатом. Очередь не пропускает неудачный кадр. Отсутствующая развилка больше не закрывается кадром singletrack.
+- Assertions любых остальных существующих tests остаются неизменными. Новый focused runner допустим как проверка новой функциональности (test-integrity §4.1). При обнаружении нужды изменить чужой assertion — отдельное объяснение и согласование.
+
+**Acceptance Criteria**:
+
+- PNG двух инструментов имеют проверяемый effective seed и actual capture point; нет успеха при несовпадении seed/неполном участке/отсутствующей камере или меше.
+- Полный объявленный набор кадров имеет PNG + metadata; каждый PNG повторно читается. Итог не смешивает сохранение кадров с оценкой красоты мира.
+- Повтор одинакового seed даёт одинаковую geometry signature на одном фиксированном диапазоне и одинаковые target/sample данные. Побитовое равенство GPU-кадров и всей физики не обещается.
+- Два запуска имеют разные run_id и не изменяют файлы первого. CLI override явно проверен и не маскирует battery seed.
+- Каждая negative fixture вызывает ожидаемую причину и ненулевой результат проверяемого capture; test driver принимает именно ожидаемую ошибку, а не произвольное падение.
+- Отдельно учитываются parse/runtime errors, certificate store ERROR и leak warnings. При environment blocker — BLOCKED_ENV, при неполном результате — INCOMPLETE; чистый PASS не заявляется по exit 0.
+
+**Tests**:
+
+1. До правок — сохранить имеющийся lifecycle evidence WORLD-00B и ограниченный воспроизводящий запуск текущего seed capture; не повторять весь аудит и не считать его PNG достоверными.
+2. Headless import/parse, новый focused runner, неизменённый `test_world_session_seed.gd`.
+3. Happy path: реальная main/генератор + GPU Vulkan; оба captures; seed battery `184729/42/77777` для multi-seed; все 8 запрошенных видов visual; повтор seed `184729` на фиксированном checkpoint. Осмотреть PNG и сверить metadata.
+4. Negative fixtures: фактический seed расходится с ожидаемым после настоящего ready; корректный CLI override и непредвиденный mismatch; пустой path/target за концом и до retained начала; нет committed mesh/ожидаемой fork arm или камеры; null Image/пустой Image; неверный output path (файл вместо директории внутри fixture, без смены прав пользователя); повреждённый/нечитаемый PNG; timeout. Для каждого — конкретная причина, отсутствие success marker, bounded завершение. End-to-end проверить хотя бы seed mismatch, missing target и save failure; guards Image/reload дополнительно проверить fixtures на реальном Godot Image.
+5. Сохранить обязательные AGENTS gates. Как контроль неизменённой main запустить `test_seed_diversity_matrix.gd`, `test_monotony_profiler.gd`, `test_virtual_rider_bot.gd` и обновлённый `capture_visual_audit.gd` в Vulkan; отдельно фиксировать их фактическое покрытие. Это не приёмка новой поверхности, которая здесь не создаётся.
+6. `git diff --check`, сверка списка изменённых файлов и отсутствия ослабленных/отключённых assertions. Отчёт с Test Integrity Verification и статусом каждого запуска.
+
+**Files**:
+
+- Изменить после одобрения: `scripts/test/capture_seed_audit.gd`, `scripts/test/capture_visual_audit.gd`.
+- Добавить: `scripts/test/capture_audit_support.gd`, `scripts/test/test_capture_audit_contract.gd` и соответствующие Godot `.uid`, если создаются движком.
+- Документация только по результату этого scope: `implementation_plan.md`, `docs/CURRENT_PROJECT_STATE.md`, запись C01–C02 в `docs/TEST_COVERAGE_AND_REPLAY.md`, новый `docs/sprints/world_00_c01_c02_verification_report.md`.
+- Вспомогательный запуск при необходимости — короткий скрипт в `work/` текущего чата, без общего runner framework. Артефакты через явно заданный output root: `C:/Users/Luisa/Documents/Codex/2026-10-01/slow-cycle-c-users-luisa-documents/outputs/world00-c01-c02/<run_id>/`; не изменять старые screenshots репозитория. Без output argument допустим новый run directory в `user://`.
+
+**Порядок**: одобрение scope и mutations → bounded baseline → минимальная правка двух captures/helper → положительные/отрицательные проверки → контрольные gates и просмотр PNG → короткий отчёт/статус. Остановка после C01–C02. Следующая отдельная задача: минимальные логи и воспроизведение ошибок; поверхность — позже по согласованному плану.
+
+**Риски и условия остановки**: старый streamer может не дать запрошенный участок/fork в бюджете; Vulkan или запись могут быть недоступны; настоящие кадры могут показать прежние дефекты поверхности. Фиксировать факты и replay, не расширять scope ради зелёного результата. Если нужна production-правка либо изменение другого теста — подготовить отдельное решение. Если контекста перестаёт хватать для точности — сообщить и подготовить передачу.
+
+**Итог 01.10.2026:** C01–C02 реализованы и точечно проверены: 27 focused checks; 19 PNG окончательного кода (8 visual, 9 seed battery, повтор, CLI); четыре end-to-end ошибки дают ожидаемый nonzero/INCOMPLETE. Seed/metadata/coverage/PNG/replay checkpoint подтверждены. Production и остальные existing assertions не изменены. Обязательные gates запущены; в неизменённом physical rider наблюдался непостоянный ObjectDB warning (verbose повтор чистый), поэтому общая чистая приёмка остаётся INCOMPLETE. Реально проехано 355.9/500 м по прежнему порогу runner. Полноценная поверхность и полная поездка не заявляются. [Отчёт](docs/sprints/world_00_c01_c02_verification_report.md). Следующий отдельный scope — минимальные логи/replay и воспроизведение ошибок; он не начат.
+
+**Test Integrity Verification — подготовка плана (исторический снимок до кода)**:
+
+- [ ] Реальная работа обновлённых проверок доказана: нет, код и запускаемые тесты пока не менялись.
+- [x] Файлы tests и существующие assertions не изменены; предложенные mutations перечислены выше.
+- [x] Подавления, skip/todo, обходы типов и закомментированные проверки не добавлены.
+- [ ] Зелёный статус означает полную работоспособность: не заявляется; рендер, геометрия, физическая поездка и человеческая оценка остаются разными доказательствами.
+
+---
+
+
+# Выполненный этап: WORLD-00B — карта проверок и минимальные логи
 
 Дата: 01.10.2026. Исходная ревизия: `b6a5ff4`.
 

@@ -145,6 +145,7 @@ func plan_next_chunk() -> void:
 	# If candidate violates any contract, first attempt Soft-Repair in-place parameter clamping.
 	# The destructive straight fallback is strictly banned for curve violations (Rule 6).
 	if not last_validity_report.is_valid:
+		SlowCycleLogger.log_geom("GEOM_REJECT: candidate failed validation", _diagnostic_geometry_context(spec.phase, start_idx, end_idx))
 		last_chunk_passed = false
 		road_path.truncate_to(start_idx + 1)
 		last_point = snap_pt
@@ -160,11 +161,11 @@ func plan_next_chunk() -> void:
 		_apply_macro_profile_to_range(start_idx, end_idx)
 		last_validity_report = ValidatorClass.validate_segment(road_path, start_idx, end_idx)
 		if last_validity_report.is_valid:
-			SlowCycleLogger.log_geom("SOFT_REPAIR: Successfully repaired chunk %d (phase %d) preserving curve intent (R>=19m)" % [chunks_generated, spec.phase])
+			SlowCycleLogger.log_geom("SOFT_REPAIR: Successfully repaired chunk %d (phase %d) preserving curve intent (R>=19m)" % [chunks_generated, spec.phase], _diagnostic_geometry_context(spec.phase, start_idx, end_idx))
 			last_chunk_passed = true
 		else:
 			# Fatal fallback reserved strictly for unrecoverable seam tears or NaN (Rule 6)
-			SlowCycleLogger.log_geom("FATAL_FALLBACK: Chunk %d (phase %d) unrecoverable; invoking emergency safe corridor" % [chunks_generated, spec.phase])
+			SlowCycleLogger.log_geom("FATAL_FALLBACK: Chunk %d (phase %d) unrecoverable; invoking emergency safe corridor" % [chunks_generated, spec.phase], _diagnostic_geometry_context(spec.phase, start_idx, end_idx))
 			road_path.truncate_to(start_idx + 1)
 			last_point = snap_pt
 			last_tangent = snap_tang
@@ -181,6 +182,9 @@ func plan_next_chunk() -> void:
 		last_chunk_passed = true
 
 	chunks_generated += 1
+
+func _diagnostic_geometry_context(phase: int, start_idx: int, end_idx: int) -> Dictionary:
+	return {"seed": world_seed, "branch_id": road_path.branch_id, "route_origin_m": profile_distance_origin_m, "chunk_number": chunks_generated, "phase": phase, "range_m": [road_path.cumulative_distances[start_idx], road_path.cumulative_distances[end_idx]], "start_position": road_path.points[start_idx], "end_position": road_path.points[end_idx], "min_radius_limit_m": Contract.MIN_RADIUS, "is_valid": last_validity_report.is_valid, "violations": last_validity_report.violations.duplicate(true), "stats": last_validity_report.stats.duplicate(true)}
 
 ## Shares a world profile across a child branch and anchors its local distance at the fork.
 func set_mountain_profile(profile: RefCounted, distance_origin_m: float, inherited_offset_m: float = 0.0) -> void:

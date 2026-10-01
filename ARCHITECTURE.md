@@ -291,19 +291,15 @@ Visual perception and physics are calibrated to reflect mountain steepness and c
 
 ## 15. Observability, Diagnostics & Structured Telemetry
 
-Статус по коду на 01.10.2026: диагностические заготовки существуют, но полная запись обычного заезда не подключена.
+Статус по коду на 01.10.2026 после WORLD-00-LOG: обычная main создаёт диагностическую сессию. Это ограниченный geometry replay, не input/physics recorder.
 
 1. **`SlowCycleLogger` (`scripts/core/slow_cycle_logger.gd`)**:
-   - Статический кольцевой буфер 5000 строк; `flush()` перезаписывает `user://slow_cycle_diagnostics.log` текущим буфером. Полный архив долгой сессии не обеспечен.
-   - Авто-flush каждые 2с находится в `_process()` экземпляра Node. Logger не подключён как Autoload и не найден как экземпляр сцен, поэтому этот путь обычной игры не активен. Некоторые тесты вызывают flush явно.
-   - Синхронизации для параллельной записи в классе нет; гарантия thread-safe не установлена.
-   - Production-вызовы найдены для смены стиля GRAMMAR и repair/fallback GEOM. Следующий список — назначение объявленных каналов; он не означает, что все события уже пишутся:
-     - `[WORLD]`: World seed, session lifecycle, active chunk window, memory budget.
-     - `[GRAMMAR]`: FSM phase changes, route style transitions, candidate queue states.
-     - `[GEOM]`: Centerline evaluation, curvature $R$, Soft-Repair events, seam deltas.
-     - `[FORK]`: Fork preflight, preview corridor, decision intent, branch states.
-     - `[TERRAIN]`: Carver cross-section selection, rock cut/shelf offsets, skirt generation.
-     - `[BIKE]`: Speed, cadence, lateral acceleration $a_{\text{lat}}$, frame roll, camera pitch.
+   - Один Node owner под WorldManager, создан после разрешения requested/effective seed, до RoadLogic/streamer. `run_id` содержит UTC время, PID и случайный suffix; RNG геометрии не затрагивается.
+   - Ring 5000 строк сохраняется в diagnostics.log; manifest/events.jsonl держат header, choices/checkpoints и редкие события отдельно. Каждый запуск в user://slow_cycle_sessions или --diagnostics-root. Старые static log/flush API сохранены; legacy flush без owner всё ещё пишет прежний diagnostics log.
+   - Авто-flush раз в 2 с и явный flush при checkpoint/problem/scene exit/window-close request. Последний доступный live snapshot сохраняется при teardown. Hard kill/полный crash recovery не реализованы. I/O error даёт код/путь и INCOMPLETE; SESSION_CLOSED описывает только запись.
+   - Manifest: фактический seed/config, Godot/renderer, git revision/dirty, SHA256 и копии конкретных 48 runtime files. Данные player/path отсутствуют явно; surface_checked=false. Ближайший sample не выдаётся за точную физическую дистанцию.
+   - Подключены SESSION_START/END, FORK_COMMIT/CHOICE, GEOM с реальными emitter violations/stats до перезаписи report, явный PROBLEM API. Все terrain hits и push_error движка автоматически не перехватываются; внешний engine log нужен отдельно. Покадровая BIKE/TERRAIN телеметрия не записывается.
+   - Replay inputs ограничены 128 шагами; overflow отмечает replay_complete=false. Runner сверяет source/config/seed/fork и signatures непустых checkpoints, телепортирует тестовый велосипед; физика не воспроизводится. Синхронизации потоков нет. Подробнее [отчёт LOG](docs/sprints/world_00_logs_verification_report.md).
 
 2. **F3 Debug HUD (`scripts/ui/debug_hud.gd`)**:
    - Live runtime overlay showing: Seed, active biome & `mountain_weight`, instantaneous curve radius $R$, adaptive $\theta_{\text{macro}}$, slope grade, lateral $a_{\text{lat}}$, bicycle banking $\phi_{\text{bike}}$, and camera roll/pitch.
@@ -320,3 +316,6 @@ Visual perception and physics are calibrated to reflect mountain steepness and c
 - Reproducible test commands, results and limits: `TEST_PLAN.md`.
 - Current handoff summary: `MTB_WORLD_GENERATION_HANDOFF.md`.
 
+## Изменение поверхности C03–C04 — 01.10.2026
+
+RoadChunk сохраняет прежние вершины/дорогу/RNG и выдаёт terrain strip/wedge indices по Godot CW; collision faces повторяют эти треугольники. PreparedChunkData хранит фактический first/count splitter wedge. Culling материалов сохранён. Contact watchdog считает missing_ground и checked_contacts; прежние +0.05/−0.35 м сохранены. Реальные committed MultiMesh/collision проверены обеими arm на трёх seed; это не terrain-only поверхность мира. [Отчёт](docs/sprints/world_00_c03_c04_verification_report.md).

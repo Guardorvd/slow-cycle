@@ -1,4 +1,6 @@
 # Slow Cycle — Sprint 6 v4 Completion Report
+
+> Исторический документ. Сверка дня 01.10.2026: [актуальный статус](../../docs/CURRENT_PROJECT_STATE.md), [результаты сегодняшних этапов](../../docs/TODAY_CHANGES_2026_10_01.md). Исходные измерения и утверждения ниже сохранены; они не подтверждают текущую готовность мира и не определяют ближайшую задачу.
 **Sprint Focus:** Living Mountain Generation: Observability & TDD First  
 **Date:** 2026-09-29  
 **Engine & Target:** Godot 4.7.2 Mono (Console Headless & Runtime), Vulkan Forward+, Windows  

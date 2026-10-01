@@ -519,6 +519,8 @@ func _spawn_procedural_fork(parent_branch: RoadBranch) -> void:
 
 	# 5. Preload 1 additional chunk for alt_branch (reaches 100m total preloaded)
 	_spawn_chunk_sync(alt_branch)
+	if world_manager and "diagnostics_logger" in world_manager and is_instance_valid(world_manager.diagnostics_logger):
+		world_manager.diagnostics_logger.record_event("FORK_COMMIT", {"fork_id": fork_id, "origin": fork_pos, "origin_s": parent_branch.distance_at_last_fork, "parent_branch_id": parent_branch.branch_id, "parent_seed": parent_branch.road_logic.world_seed, "parent_route_origin_m": parent_branch.road_logic.profile_distance_origin_m, "left_branch_id": parent_branch.branch_id, "left_seed": parent_branch.road_logic.world_seed, "right_branch_id": alt_branch.branch_id, "right_seed": alt_branch.road_logic.world_seed})
 
 func _create_alternative_fork_branch(
 	fork_id: int,
@@ -720,6 +722,13 @@ func _on_branch_locked(fork_id: int, chosen_choice: int, parent_branch_id: int) 
 		push_error("ChunkStreamer: chosen_branch_id %d not found in branches during branch lock!" % chosen_branch_id)
 		return
 
+	var choice_context := {"fork_id": fork_id, "choice": chosen_choice, "parent_branch_id": parent.branch_id, "parent_seed": parent.road_logic.world_seed, "parent_route_origin_m": parent.road_logic.profile_distance_origin_m, "fork_origin": parent.fork_node_pos, "fork_origin_s": parent.distance_at_last_fork, "selected_branch_id": selected_branch.branch_id, "selected_seed": selected_branch.road_logic.world_seed, "physics_tick": Engine.get_physics_frames()}
+	if world_manager and "player" in world_manager and is_instance_valid(world_manager.player) and parent.road_path.size() > 0:
+		var nearest: int = parent.road_path.find_closest_index(world_manager.player.global_position)
+		choice_context["parent_player_sample_s"] = parent.road_path.cumulative_distances[nearest]
+		choice_context["sampled_route_s"] = parent.road_logic.profile_distance_origin_m + parent.road_path.cumulative_distances[nearest]
+		choice_context["player_position"] = world_manager.player.global_position
+
 	if selected_branch != parent:
 		selected_branch.state = BranchState.ACTIVE
 		selected_branch.distance_at_last_fork = 0.0
@@ -743,6 +752,8 @@ func _on_branch_locked(fork_id: int, chosen_choice: int, parent_branch_id: int) 
 	if parent.decision_model:
 		parent.decision_model = null
 	parent.graph_fork_node_id = -1
+	if world_manager and "diagnostics_logger" in world_manager and is_instance_valid(world_manager.diagnostics_logger):
+		world_manager.diagnostics_logger.record_route_choice(choice_context)
 
 # ==============================================================================
 # PHYSICAL 3D ROLLBACK SAFETY ENVELOPE (DORMANT -> UNLOADED)

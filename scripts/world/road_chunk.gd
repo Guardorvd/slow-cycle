@@ -5,7 +5,7 @@ extends Node3D
 ## Pure geometry container and scene-commit node.
 ## Decouples asynchronous/off-physics geometry computation (prepare_geometry_data)
 ## from main-thread-safe scene and physics registration (commit).
-## Guaranteed commit budget <= 0.5 ms via precomputed ConcavePolygonShape3D faces.
+## Commit uses precomputed collision faces; measured budgets require a runtime benchmark.
 
 const ChunkFoliageClass = preload("res://scripts/world/chunk_foliage.gd")
 const RoadPathDataClass = preload("res://scripts/world/road_path_data.gd")
@@ -29,6 +29,8 @@ class PreparedChunkData extends RefCounted:
 	var terrain_arrays: Array = []              ## SurfaceTool mesh arrays for terrain
 	var road_faces: PackedVector3Array = PackedVector3Array()    ## Raw triangle faces for instant collision
 	var terrain_faces: PackedVector3Array = PackedVector3Array() ## Raw triangle faces for instant collision
+	var terrain_wedge_first_triangle: int = 0
+	var terrain_wedge_triangle_count: int = 0
 	var foliage_transforms: Dictionary = {}
 	var timings: Dictionary = {}
 
@@ -247,8 +249,8 @@ static func prepare_geometry_data(
 				i_a2 = i1; i_b2 = i3; i_c2 = i2
 				p_a2 = p1; p_b2 = p3; p_c2 = p2
 
-			# Tri 1: strictly oriented UP along seg_norm
-			if (p_b1 - p_a1).cross(p_c1 - p_a1).dot(seg_norm) >= 0.0:
+			# Godot CW front face: negative cross points outward along seg_norm
+			if (p_b1 - p_a1).cross(p_c1 - p_a1).dot(seg_norm) <= 0.0:
 				st_terr.add_index(i_a1); st_terr.add_index(i_b1); st_terr.add_index(i_c1)
 				terr_faces[t_face_idx] = p_a1; t_face_idx += 1
 				terr_faces[t_face_idx] = p_b1; t_face_idx += 1
@@ -259,8 +261,8 @@ static func prepare_geometry_data(
 				terr_faces[t_face_idx] = p_c1; t_face_idx += 1
 				terr_faces[t_face_idx] = p_b1; t_face_idx += 1
 
-			# Tri 2: strictly oriented UP along seg_norm
-			if (p_b2 - p_a2).cross(p_c2 - p_a2).dot(seg_norm) >= 0.0:
+			# Same CW orientation for the second triangle
+			if (p_b2 - p_a2).cross(p_c2 - p_a2).dot(seg_norm) <= 0.0:
 				st_terr.add_index(i_a2); st_terr.add_index(i_b2); st_terr.add_index(i_c2)
 				terr_faces[t_face_idx] = p_a2; t_face_idx += 1
 				terr_faces[t_face_idx] = p_b2; t_face_idx += 1
@@ -271,7 +273,8 @@ static func prepare_geometry_data(
 				terr_faces[t_face_idx] = p_c2; t_face_idx += 1
 				terr_faces[t_face_idx] = p_b2; t_face_idx += 1
 
-	# 3. Splitter Wedge (Phase 7R: Normalized CCW Triangulation & Seamless Alignment)
+	# 3. Splitter wedge: same Godot CW front face as the strips
+	prep.terrain_wedge_first_triangle = terr_faces.size() / 3
 	# Connects road_verts_right (Left arm inner) to wedge_opposite (Right arm inner)
 	var wedge_count: int = mini(count, wedge_opposite.size())
 	if not wedge_opposite.is_empty() and wedge_count >= 2:
@@ -314,8 +317,8 @@ static func prepare_geometry_data(
 				var uvB: Vector2 = tri[4]
 				var uvC: Vector2 = tri[5]
 
-				# Strictly enforce upward CCW face orientation along seg_norm
-				if (vB - vA).cross(vC - vA).dot(seg_norm) < 0.0:
+				# Keep the outward Godot CW normal aligned with seg_norm
+				if (vB - vA).cross(vC - vA).dot(seg_norm) > 0.0:
 					var tmp_v = vB; vB = vC; vC = tmp_v
 					var tmp_uv = uvB; uvB = uvC; uvC = tmp_uv
 
@@ -328,6 +331,7 @@ static func prepare_geometry_data(
 				terr_faces.append(vA); terr_faces.append(vB); terr_faces.append(vC)
 				curr_w_base += 3
 
+	prep.terrain_wedge_triangle_count = terr_faces.size() / 3 - prep.terrain_wedge_first_triangle
 	st_terr.generate_normals()
 	prep.terrain_arrays = st_terr.commit_to_arrays()
 	prep.terrain_faces = terr_faces
@@ -342,7 +346,7 @@ static func prepare_geometry_data(
 	return prep
 
 # ==============================================================================
-# PHASE 2: SYNCHRONOUS SCENE & PHYSICS COMMIT (Budget <= 0.5 ms)
+# PHASE 2: SYNCHRONOUS SCENE & PHYSICS COMMIT (Measured runtime budget)
 # ==============================================================================
 
 func commit(

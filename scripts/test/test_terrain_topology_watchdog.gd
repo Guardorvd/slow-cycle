@@ -1,19 +1,21 @@
 extends SceneTree
 
 ## Slow Cycle — Sprint 7 Watchdog #2: Upgraded Terrain Topology & Horizon Boundary Watchdog
-## Audits 100% of real committed visual terrain mesh vertices and triangles across demanding seeds.
+## Audits prepared terrain arrays; committed GPU/physics are checked separately.
 ## Verifies:
 ## 1. Zero degenerate triangles (area >= 0.0005).
 ## 2. Strictly upward face normal orientation (n . seg_norm > 0.0, zero CW culling inversions).
 ## 3. Strict lateral boundary envelope (|d_lat_horiz| <= 40.5m, zero 75m/180m sky-spikes).
 ## 4. Evolute clearance on sharp turns (inner horizontal span <= R * 0.70).
 ## 5. Topological ribbon forward-progression invariant: (V_{i+1} - V_i) . road_step_dir > 0 (zero ribbon folds).
-## 6. Real Fork Chunk Splitter Wedge verification (watertight, CCW upward orientation).
+## 6. Real Fork Chunk Splitter Wedge verification (nonempty Godot CW orientation).
 
 const RoadPathDataClass = preload("res://scripts/world/road_path_data.gd")
 const RoadLogicClass = preload("res://scripts/world/road_logic.gd")
 const RoadChunkClass = preload("res://scripts/world/road_chunk.gd")
 const TerrainCarverClass = preload("res://scripts/world/terrain_carver.gd")
+
+const SurfaceAudit = preload("res://scripts/test/surface_audit_support.gd")
 
 const TEST_SEEDS: Array[int] = [184729, 42, 77777, 99999, 12345]
 const CHUNKS_PER_SEED: int = 15
@@ -21,7 +23,7 @@ const CHUNKS_PER_SEED: int = 15
 func _init() -> void:
 	print("\n========================================================")
 	print("🔍 UPGRADED SPRINT 7 WATCHDOG #2: TERRAIN TOPOLOGY AUDIT")
-	print("Direct audit of committed mesh arrays across %d seeds" % TEST_SEEDS.size())
+	print("Direct audit of prepared mesh arrays across %d seeds" % TEST_SEEDS.size())
 	print("========================================================\n")
 
 	var total_triangles_checked: int = 0
@@ -33,6 +35,7 @@ func _init() -> void:
 	var ribbon_fold_count: int = 0
 	var wedge_triangles_checked: int = 0
 	var wedge_inverted_count: int = 0
+	var missing_mesh_count: int = 0
 
 	for s in TEST_SEEDS:
 		var path_data = RoadPathDataClass.new()
@@ -63,7 +66,10 @@ func _init() -> void:
 				path_data, s_idx, e_idx, c, shared_mats
 			)
 
-			if prep.terrain_arrays.is_empty():
+			if not SurfaceAudit.mesh_report(prep.terrain_arrays).available:
+				missing_mesh_count += 1
+				seed_defects += 1
+				printerr("[MESH MISSING] seed=%d chunk=%d" % [s, c])
 				continue
 
 			var v_mesh: PackedVector3Array = prep.terrain_arrays[Mesh.ARRAY_VERTEX]
@@ -178,7 +184,7 @@ func _init() -> void:
 					seed_defects += 1
 					continue
 
-				var face_norm: Vector3 = cross.normalized()
+				var face_norm: Vector3 = -cross.normalized() # Godot CW outward normal
 				# Check orientation against road normal of this chunk
 				var mid_idx: int = clampi(s_idx + count_pts / 2, 0, path_data.size() - 1)
 				var ref_norm: Vector3 = path_data.normals[mid_idx]
@@ -225,7 +231,7 @@ func _init() -> void:
 
 		var fork_ctx := {
 			"terrain_side_mask": 1,
-			"wedge_opposite_inner_verts": simulated_opposite,
+			"wedge_opposite_inner_verts": Array(simulated_opposite),
 			"is_fork_arm": true
 		}
 
@@ -235,14 +241,12 @@ func _init() -> void:
 
 		var tf: PackedVector3Array = prep_fork.terrain_faces
 		var num_faces: int = tf.size() / 3
-		if num_faces < 240:
-			printerr("  [WEDGE MISSING] Seed %d: fork chunk produced insufficient faces (%d)" % [s, num_faces])
+		if not SurfaceAudit.wedge_valid(prep_fork, true):
+			printerr("[WEDGE MISSING/INVALID] seed=%d range=%d+%d" % [s, prep_fork.terrain_wedge_first_triangle, prep_fork.terrain_wedge_triangle_count])
 			wedge_inverted_count += 1
-			continue
-
-		# Faces starting at index 240 * 3 are the splitter wedge triangles
-		var wedge_face_start: int = 240
-		for t_i in range(wedge_face_start, num_faces):
+		var wedge_face_start: int = prep_fork.terrain_wedge_first_triangle
+		var wedge_face_end: int = wedge_face_start + prep_fork.terrain_wedge_triangle_count
+		for t_i in range(wedge_face_start, wedge_face_end):
 			wedge_triangles_checked += 1
 			var p0: Vector3 = tf[t_i * 3 + 0]
 			var p1: Vector3 = tf[t_i * 3 + 1]
@@ -252,7 +256,7 @@ func _init() -> void:
 			if area < 0.0005:
 				degenerate_triangles_count += 1
 				continue
-			var n: Vector3 = cross.normalized()
+			var n: Vector3 = -cross.normalized()
 			if n.y < 0.20:
 				wedge_inverted_count += 1
 				printerr("  [WEDGE INVERSION] Seed %d Fork Wedge Tri %d: Ny=%.3f < 0.20!" % [s, t_i, n.y])
@@ -272,10 +276,12 @@ func _init() -> void:
 	print("  - Inverted faces: %d" % inverted_faces_count)
 	print("  - Wedge inverted faces: %d" % wedge_inverted_count)
 
-	var total_defects: int = lateral_spikes_count + evolute_crossings_count + ribbon_fold_count + degenerate_triangles_count + inverted_faces_count + wedge_inverted_count
+	var total_defects: int = missing_mesh_count + lateral_spikes_count + evolute_crossings_count + ribbon_fold_count + degenerate_triangles_count + inverted_faces_count + wedge_inverted_count
+	if total_triangles_checked == 0 or wedge_triangles_checked == 0:
+		total_defects += 1
 	if total_defects > 0:
 		print("❌ [WATCHDOG FAIL] Terrain topology defects detected (%d violations)" % total_defects)
 		quit(1)
 	else:
-		print("✅ [WATCHDOG PASS] 100% terrain topology validity guaranteed without blind spots!")
+		print("✅ [WATCHDOG PASS] Prepared terrain checks passed; GPU/physics require separate coverage.")
 		quit(0)

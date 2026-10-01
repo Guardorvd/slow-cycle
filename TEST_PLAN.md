@@ -1,5 +1,7 @@
 # Slow Cycle — Verification & Testing Protocol
 
+> **Актуализация 01.10.2026:** [текущий статус](docs/CURRENT_PROJECT_STATE.md), [сводка изменений дня](docs/TODAY_CHANGES_2026_10_01.md) и [активный план](implementation_plan.md). WORLD-00A/00B, C01–C04 и минимальные LOG/replay выполнены в описанном scope; общая чистая приёмка INCOMPLETE. C03–C04 выполнен по согласованному плану; пороги сохранены. Следующий отдельный план — WORLD-01/C05, цельная местность и граница долины вместе с полем. Исторические результаты/«следующие шаги» ниже сохраняются как история и не заменяют этот порядок.
+
 > **Актуализация 01.10.2026 / WORLD-00B:** [текущее состояние](docs/CURRENT_PROJECT_STATE.md), [карта покрытия, частоты и replay/log contract](docs/TEST_COVERAGE_AND_REPLAY.md), [новый ограниченный baseline-отчёт](docs/sprints/world_00b_verification_report.md). Четыре headless runner завершились с exit 0, но имеют описанные ограничения и сообщение окружения certificate store; visual/ride gates этим не закрыты. Код/пороги/mandatory gates не менялись. Остальные PASS ниже — исторические записи, не свежая проверка `b6a5ff4`.
 
 ## Sprint 7 — Living Mountain Reality Check & Verification Results (2026-09-30)
@@ -519,4 +521,3 @@ One batched route-integration execution printed `6 ObjectDB instances leaked`; i
    - **Команда**: `godot --rendering-driver vulkan --path . --script res://scripts/test/capture_visual_audit.gd`
    - **Методология**: Захватывает реальные GPU Vulkan кадры в разрешении $1280 \times 720$ на 3 сидах (`184729`, `42`, `77777`) с трех ракурсов: вид из кокпита руля, кинематографическая камера 3-го лица и высотный дрон.
    - **Критерий PASS**: Подтверждение видимости горного рельефа, перепадов высот, скальных полок и отсутствия дыр террейна в радиусе 45м.
-

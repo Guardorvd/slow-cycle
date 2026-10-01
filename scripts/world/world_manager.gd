@@ -5,6 +5,7 @@ const RoadPathDataClass = preload("res://scripts/world/road_path_data.gd")
 const RoadLogicClass = preload("res://scripts/world/road_logic.gd")
 const ChunkStreamerClass = preload("res://scripts/world/chunk_streamer.gd")
 const TerrainCarverClass = preload("res://scripts/world/terrain_carver.gd")
+const LoggerClass = preload("res://scripts/core/slow_cycle_logger.gd")
 
 @export var world_seed: int = 184729
 @export var randomize_world_seed_on_start: bool = false
@@ -13,12 +14,19 @@ const TerrainCarverClass = preload("res://scripts/world/terrain_carver.gd")
 var road_path: RefCounted
 var road_logic: RefCounted
 var chunk_streamer: Node3D
+var diagnostics_logger: Node
+var _opening_diagnostic_recorded: bool = false
 
 var shared_materials: Dictionary = {}
 var shared_meshes: Dictionary = {}
 
 func _ready() -> void:
+	var requested_seed: int = world_seed
 	_resolve_session_seed(OS.get_cmdline_args(), OS.get_cmdline_user_args())
+	diagnostics_logger = LoggerClass.new()
+	diagnostics_logger.name = "SessionDiagnostics"
+	diagnostics_logger.start_session({"scene": get_parent().scene_file_path, "requested_seed": requested_seed, "effective_seed": world_seed, "randomize_on_start": randomize_world_seed_on_start}, self)
+	add_child(diagnostics_logger)
 
 	_init_shared_resources()
 	
@@ -29,6 +37,8 @@ func _ready() -> void:
 	chunk_streamer = ChunkStreamerClass.new()
 	chunk_streamer.setup(self, road_path, road_logic, shared_materials, shared_meshes)
 	add_child(chunk_streamer)
+	diagnostics_logger.manifest["generation_config"] = diagnostic_generation_config()
+	diagnostics_logger.save_session()
 
 ## Keep the generator deterministic after choosing its session seed. Normal gameplay
 ## can request a fresh value, while explicit CLI seeds always win for replay/tests.
@@ -63,6 +73,66 @@ func _process(delta: float) -> void:
 			player_vel = player.linear_velocity
 	if chunk_streamer:
 		chunk_streamer.update_streaming(player_pos, player_vel, delta)
+		if not _opening_diagnostic_recorded and is_instance_valid(diagnostics_logger):
+			var branch = chunk_streamer.get_active_branch()
+			if branch and branch.road_path and branch.road_path.size() >= 2 and branch.road_path.get_total_distance() >= 100.0:
+				_opening_diagnostic_recorded = true
+				diagnostics_logger.record_checkpoint("automatic_opening", 0.0, 100.0)
+
+## Diagnostic observation only. No commands to the bicycle or generator.
+func diagnostic_generation_config() -> Dictionary:
+	if not is_instance_valid(chunk_streamer):
+		return {"available": false}
+	return {"available": true, "ahead_m": chunk_streamer.AHEAD_DISTANCE, "behind_m": chunk_streamer.BEHIND_DISTANCE, "first_fork_m": chunk_streamer.first_fork_distance, "fork_interval_m": chunk_streamer.fork_interval_dist, "preload_m": chunk_streamer.preload_distance, "max_chunks_per_frame": chunk_streamer.MAX_CHUNKS_PER_FRAME, "safety_corridor_m": chunk_streamer.safety_corridor_margin, "fork_safety_radius_m": chunk_streamer.fork_safety_radius}
+
+func diagnostic_snapshot() -> Dictionary:
+	var result := {"context_available": true, "effective_seed": world_seed, "player_available": (is_instance_valid(player) and player.is_inside_tree()), "path_available": false, "surface_checked": false}
+	if (is_instance_valid(player) and player.is_inside_tree()):
+		result["player_pose"] = player.global_transform
+		result["speed_m_s"] = player.velocity.length() if "velocity" in player else null
+	if not is_instance_valid(chunk_streamer):
+		return result
+	var branch = chunk_streamer.get_active_branch()
+	if branch == null or branch.road_path == null or branch.road_path.size() < 2:
+		return result
+	var path: RefCounted = branch.road_path
+	result["path_available"] = true
+	result["branch_id"] = branch.branch_id
+	result["branch_seed"] = branch.road_logic.world_seed
+	result["route_origin_m"] = branch.road_logic.profile_distance_origin_m
+	result["path_range_m"] = [path.cumulative_distances[0], path.cumulative_distances[-1]]
+	result["active_chunks"] = branch.active_chunks.keys()
+	if (is_instance_valid(player) and player.is_inside_tree()):
+		var index: int = path.find_closest_index(player.global_position)
+		result["nearest_sample_s"] = path.cumulative_distances[index]
+		result["nearest_sample_position"] = path.points[index]
+		result["sampled_route_s"] = branch.road_logic.profile_distance_origin_m + path.cumulative_distances[index]
+	return result
+
+func diagnostic_checkpoint(start_s: float, end_s: float) -> Dictionary:
+	if not is_instance_valid(chunk_streamer):
+		return {"available": false, "reason": "STREAMER_MISSING"}
+	var branch = chunk_streamer.get_active_branch()
+	if branch == null or branch.road_path == null or branch.road_path.size() < 2:
+		return {"available": false, "reason": "PATH_MISSING"}
+	var path: RefCounted = branch.road_path
+	if not is_finite(start_s) or not is_finite(end_s) or start_s >= end_s or start_s < path.cumulative_distances[0] or end_s > path.cumulative_distances[-1]:
+		return {"available": false, "reason": "CHECKPOINT_OUTSIDE_PATH"}
+	var signature_parts := PackedStringArray()
+	var s := start_s
+	var count := 0
+	while s <= end_s:
+		var sample: Dictionary = path.get_sample_at_distance(s)
+		if not sample.position.is_finite() or not sample.tangent.is_finite() or not sample.normal.is_finite():
+			return {"available": false, "reason": "CHECKPOINT_NONFINITE"}
+		signature_parts.append("%s|%s|%s" % [sample.position, sample.tangent, sample.normal])
+		count += 1
+		s += 2.0
+	return {"available": true, "branch_id": branch.branch_id, "branch_seed": branch.road_logic.world_seed, "route_origin_m": branch.road_logic.profile_distance_origin_m, "range_m": [start_s, end_s], "step_m": 2.0, "samples": count, "signature": "\n".join(signature_parts).sha256_text(), "start_position": path.get_sample_at_distance(start_s).position, "snapshot": diagnostic_snapshot()}
+
+func report_diagnostic_problem(code: String, details: Dictionary = {}) -> void:
+	if is_instance_valid(diagnostics_logger):
+		diagnostics_logger.record_problem(code, details)
 
 func request_bike_recovery(current_pos: Vector3) -> Transform3D:
 	var active_path: RefCounted = road_path
