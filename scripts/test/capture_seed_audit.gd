@@ -63,9 +63,9 @@ func _process(delta: float) -> bool:
 			state = "CAPTURE_START"
 
 		"CAPTURE_START":
-			# Position at 0m
-			_position_bike_at_dist(0.0)
-			if frames_in_state >= 8:
+			# Position at 2.5m (enclosed by Chunk 0, safe margin behind near-plane)
+			_position_bike_at_dist(2.5)
+			if frames_in_state >= 15:
 				_save_screenshot("seed_%d_01_start_000m.png" % test_seeds[current_seed_idx])
 				cur_dist = 10.0
 				frames_in_state = 0
@@ -78,13 +78,13 @@ func _process(delta: float) -> bool:
 				_position_bike_at_dist(cur_dist)
 			else:
 				_position_bike_at_dist(100.0)
-				if frames_in_state >= 8:
+				if frames_in_state >= 15:
 					_save_screenshot("seed_%d_02_straight_100m.png" % test_seeds[current_seed_idx])
 					frames_in_state = 0
 					state = "SEARCH_FORK"
 
 		"SEARCH_FORK":
-			# Advance ahead until fork spawns or up to 600m
+			# Advance ahead until fork spawns or up to 650m
 			if not fork_found and cur_dist < 650.0:
 				cur_dist += 15.0
 				_position_bike_at_dist(cur_dist)
@@ -98,24 +98,33 @@ func _process(delta: float) -> bool:
 							print("  [FORK DETECTED] Seed %d: Fork spawned at pos=%s (bike dist=%.1fm)" % [
 								test_seeds[current_seed_idx], str(fork_pos), cur_dist
 							])
+							var active_b = streamer.get_active_branch()
+							var p = active_b.road_path
+							var fork_idx = p.find_closest_index(fork_pos)
+							var fork_dist_on_path = p.cumulative_distances[fork_idx]
+							var view_dist = maxf(0.0, fork_dist_on_path - 22.0)
+							_position_bike_at_dist(view_dist)
+							frames_in_state = 0
+							state = "WAIT_FORK_STABILIZE"
 							break
-			elif fork_found:
-				# Position bike 25m BEFORE fork node facing the fork
-				var active_b = streamer.get_active_branch()
-				var p = active_b.road_path
-				var fork_idx = p.find_closest_index(fork_pos)
-				var fork_dist_on_path = p.cumulative_distances[fork_idx]
-				var view_dist = maxf(0.0, fork_dist_on_path - 22.0)
-				_position_bike_at_dist(view_dist)
-
-				if frames_in_state >= 12: # Wait 12 frames for fork meshes to fully stabilize
-					_save_screenshot("seed_%d_03_first_fork.png" % test_seeds[current_seed_idx])
-					frames_in_state = 0
-					state = "NEXT_SEED"
-			else:
+			elif cur_dist >= 650.0:
 				# Reached 650m without fork; capture wherever we are
 				print("  [NOTE] Seed %d: No fork before 650m, capturing singletrack" % test_seeds[current_seed_idx])
 				_save_screenshot("seed_%d_03_corridor_600m.png" % test_seeds[current_seed_idx])
+				frames_in_state = 0
+				state = "NEXT_SEED"
+
+		"WAIT_FORK_STABILIZE":
+			var active_b = streamer.get_active_branch()
+			var p = active_b.road_path
+			var fork_idx = p.find_closest_index(fork_pos)
+			var fork_dist_on_path = p.cumulative_distances[fork_idx]
+			var view_dist = maxf(0.0, fork_dist_on_path - 22.0)
+			_position_bike_at_dist(view_dist)
+
+			# Allow 25 full frames for all chunk meshes to commit, old chunks to clear, and camera to settle
+			if frames_in_state >= 25:
+				_save_screenshot("seed_%d_03_first_fork.png" % test_seeds[current_seed_idx])
 				frames_in_state = 0
 				state = "NEXT_SEED"
 

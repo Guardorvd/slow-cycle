@@ -144,15 +144,16 @@ func _audit_sequence(seed_value: int, scenario: Dictionary) -> Dictionary:
 		road_error = maxf(road_error, _max_nearest_error(right_road_boundary_faces, road_boundary_targets))
 
 		var half_width: float = path.road_widths[boundary_idx] * 0.5 if not path.road_widths.is_empty() else RoadChunkClass.ROAD_HALF_WIDTH
+		var signed_curv: float = path.get_signed_curvature(boundary_idx)
 		var cross_section: Dictionary = terrain_carver.compute_cross_section(path.points[boundary_idx], path.tangents[boundary_idx],
-			path.normals[boundary_idx], path.binormals[boundary_idx], half_width, path.curvatures[boundary_idx],
+			path.normals[boundary_idx], path.binormals[boundary_idx], half_width, signed_curv,
 			path.segment_types[boundary_idx], path.cumulative_distances[boundary_idx])
 		var terrain_row: PackedVector3Array = cross_section.vertices
 		var active_terrain_row: PackedVector3Array = PackedVector3Array()
-		for vertex_idx: int in [0, 1, 2, 4, 5, 6]:
+		for vertex_idx: int in range(12):
 			active_terrain_row.append(terrain_row[vertex_idx])
-		var left_terrain_boundary_faces: PackedVector3Array = left_prep.terrain_faces.slice(left_prep.terrain_faces.size() - 36, left_prep.terrain_faces.size())
-		var right_terrain_boundary_faces: PackedVector3Array = right_prep.terrain_faces.slice(0, 36)
+		var left_terrain_boundary_faces: PackedVector3Array = left_prep.terrain_faces.slice(left_prep.terrain_faces.size() - 60, left_prep.terrain_faces.size())
+		var right_terrain_boundary_faces: PackedVector3Array = right_prep.terrain_faces.slice(0, 60)
 		var terrain_error: float = maxf(
 			_max_nearest_error(left_terrain, active_terrain_row),
 			_max_nearest_error(right_terrain, active_terrain_row))
@@ -163,13 +164,13 @@ func _audit_sequence(seed_value: int, scenario: Dictionary) -> Dictionary:
 		if road_error > 0.000001 or terrain_error > 0.000001:
 			rows_match = false
 		var expected_road_faces: int = (left_range.y - left_range.x) * 6 + (right_range.y - right_range.x) * 6
-		var expected_terrain_faces: int = (left_range.y - left_range.x + right_range.y - right_range.x) * 36
+		var expected_terrain_faces: int = (left_range.y - left_range.x + right_range.y - right_range.x) * 60
 		road_face_count += left_prep.road_faces.size() + right_prep.road_faces.size()
 		terrain_face_count += left_prep.terrain_faces.size() + right_prep.terrain_faces.size()
 		if left_prep.road_faces.size() != (left_range.y - left_range.x) * 6 \
 				or right_prep.road_faces.size() != (right_range.y - right_range.x) * 6 \
-				or left_prep.terrain_faces.size() != (left_range.y - left_range.x) * 36 \
-				or right_prep.terrain_faces.size() != (right_range.y - right_range.x) * 36 \
+				or left_prep.terrain_faces.size() != (left_range.y - left_range.x) * 60 \
+				or right_prep.terrain_faces.size() != (right_range.y - right_range.x) * 60 \
 				or not _faces_are_finite_and_non_degenerate(left_prep.road_faces) \
 				or not _faces_are_finite_and_non_degenerate(right_prep.road_faces) \
 				or not _faces_are_finite_and_non_degenerate(left_prep.terrain_faces) \

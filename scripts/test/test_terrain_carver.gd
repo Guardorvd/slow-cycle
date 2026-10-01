@@ -89,19 +89,19 @@ func test_seam_invariant_and_cross_section_structure() -> void:
 		var cs: Dictionary = carver.compute_cross_section(pt, tang, norm, binorm, half_w, 0.0, 0, dist)
 		var verts: PackedVector3Array = cs.vertices
 
-		assert_true(verts.size() == 8, "Cross-section has exactly 8 vertices at sample %d" % i)
+		assert_true(verts.size() == 12, "Cross-section has exactly 12 vertices at sample %d" % i)
 
-		# V3 is Left Road Edge with Beveled Verge offset (-norm * 0.035)
-		var expected_v3: Vector3 = (pt - binorm * half_w) - norm * 0.035
-		var delta_left: float = verts[3].distance_to(expected_v3)
+		# V5 is Left Road Edge with Beveled Verge offset (-norm * 0.035)
+		var expected_v5: Vector3 = (pt - binorm * half_w) - norm * 0.035
+		var delta_left: float = verts[5].distance_to(expected_v5)
 		max_seam_error_left = maxf(max_seam_error_left, delta_left)
 
-		# V4 is Right Road Edge with Beveled Verge offset (-norm * 0.035)
-		var expected_v4: Vector3 = (pt + binorm * half_w) - norm * 0.035
-		var delta_right: float = verts[4].distance_to(expected_v4)
+		# V6 is Right Road Edge with Beveled Verge offset (-norm * 0.035)
+		var expected_v6: Vector3 = (pt + binorm * half_w) - norm * 0.035
+		var delta_right: float = verts[6].distance_to(expected_v6)
 		max_seam_error_right = maxf(max_seam_error_right, delta_right)
 
-		# Verify lateral ordering: V0 < V1 < V2 < V3 < V4 < V5 < V6 < V7 along binormal
+		# Verify lateral ordering: V0 < V1 < V2 < V3 < V4 < V5 and V6 < V7 < V8 < V9 < V10 < V11 along binormal
 		var proj_0: float = (verts[0] - pt).dot(binorm)
 		var proj_1: float = (verts[1] - pt).dot(binorm)
 		var proj_2: float = (verts[2] - pt).dot(binorm)
@@ -110,9 +110,13 @@ func test_seam_invariant_and_cross_section_structure() -> void:
 		var proj_5: float = (verts[5] - pt).dot(binorm)
 		var proj_6: float = (verts[6] - pt).dot(binorm)
 		var proj_7: float = (verts[7] - pt).dot(binorm)
+		var proj_8: float = (verts[8] - pt).dot(binorm)
+		var proj_9: float = (verts[9] - pt).dot(binorm)
+		var proj_10: float = (verts[10] - pt).dot(binorm)
+		var proj_11: float = (verts[11] - pt).dot(binorm)
 
-		assert_true(proj_0 < proj_1 and proj_1 < proj_2 and proj_2 < proj_3, "Left side lateral vertices monotonically ordered at sample %d" % i)
-		assert_true(proj_4 < proj_5 and proj_5 < proj_6 and proj_6 < proj_7, "Right side lateral vertices monotonically ordered at sample %d" % i)
+		assert_true(proj_0 < proj_1 and proj_1 < proj_2 and proj_2 < proj_3 and proj_3 < proj_4 and proj_4 < proj_5, "Left side lateral vertices monotonically ordered at sample %d" % i)
+		assert_true(proj_6 < proj_7 and proj_7 < proj_8 and proj_8 < proj_9 and proj_9 < proj_10 and proj_10 < proj_11, "Right side lateral vertices monotonically ordered at sample %d" % i)
 
 	assert_almost_equal(max_seam_error_left, 0.0, 0.0001, "Max left seam error <= 0.1 mm (measured: %.6f m)" % max_seam_error_left)
 	assert_almost_equal(max_seam_error_right, 0.0, 0.0001, "Max right seam error <= 0.1 mm (measured: %.6f m)" % max_seam_error_right)
@@ -148,7 +152,7 @@ func test_chunk_boundary_continuity() -> void:
 	var verts_next: PackedVector3Array = cs_chunk_k_plus_1.vertices
 
 	var max_boundary_delta: float = 0.0
-	for j in range(8):
+	for j in range(12):
 		var delta_j: float = verts_k[j].distance_to(verts_next[j])
 		max_boundary_delta = maxf(max_boundary_delta, delta_j)
 
@@ -202,7 +206,7 @@ func test_seed_determinism() -> void:
 		var cs_a = carver_a.compute_cross_section(p, t, n, b, 2.0, 0.01, 0, float(step) * 2.0)
 		var cs_b = carver_b.compute_cross_section(p, t, n, b, 2.0, 0.01, 0, float(step) * 2.0)
 
-		for v in range(8):
+		for v in range(12):
 			var d: float = cs_a.vertices[v].distance_to(cs_b.vertices[v])
 			max_diff = maxf(max_diff, d)
 
@@ -278,8 +282,8 @@ func test_partitioned_benchmarks() -> void:
 		var cs = carver.compute_cross_section(p, Vector3.FORWARD, Vector3.UP, Vector3.RIGHT, 2.0, 0.01, 0, float(i) * 2.0)
 	var t1: int = Time.get_ticks_usec()
 	var math_ms: float = float(t1 - t0) / 1000.0
-	print("  [Benchmark 1] TerrainCarver 2500 samples pure math: %.2f ms (Limit <= 85.0 ms, avg %.4f ms/sample)" % [math_ms, math_ms / 2500.0])
-	assert_true(math_ms < 85.0, "Pure CPU math benchmark passed (under 85 ms for 2500 samples, avg < 0.034 ms/sample)")
+	print("  [Benchmark 1] TerrainCarver 2500 samples pure math: %.2f ms (Limit <= 125.0 ms, avg %.4f ms/sample)" % [math_ms, math_ms / 2500.0])
+	assert_true(math_ms < 125.0, "Pure CPU math benchmark passed (under 125 ms for 2500 samples, avg < 0.050 ms/sample)")
 
 	# 2. SurfaceTool Extrusion & ArrayMesh Commit Benchmark: 20 chunks
 	var test_path = RoadPathDataClass.new()
@@ -296,13 +300,13 @@ func test_partitioned_benchmarks() -> void:
 		for i in range(26):
 			var pt: Vector3 = test_path.points[i]
 			var cs = carver.compute_cross_section(pt, Vector3.FORWARD, Vector3.UP, Vector3.RIGHT, 2.0, 0.0, 0, float(i) * 2.0)
-			for v_idx in range(8):
+			for v_idx in range(12):
 				st.set_uv(cs.uvs[v_idx])
 				st.add_vertex(cs.vertices[v_idx])
-		const STRIP_COLS: Array[int] = [0, 1, 2, 4, 5, 6]
+		const STRIP_COLS: Array[int] = [0, 1, 2, 3, 4, 6, 7, 8, 9, 10]
 		for i in range(25):
-			var r_curr: int = i * 8
-			var r_next: int = (i + 1) * 8
+			var r_curr: int = i * 12
+			var r_next: int = (i + 1) * 12
 			for col in STRIP_COLS:
 				st.add_index(r_curr + col); st.add_index(r_next + col); st.add_index(r_curr + col + 1)
 				st.add_index(r_curr + col + 1); st.add_index(r_next + col); st.add_index(r_next + col + 1)

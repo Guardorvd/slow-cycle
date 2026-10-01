@@ -39,15 +39,9 @@ func _init() -> void:
 	var terr_verts1: PackedVector3Array = terr_mesh1.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
 
 	var max_terr_seam_delta: float = 0.0
-	var c0_count: int = 26
 	var seam_verts_0: Array[Vector3] = []
-	for vi in range(8):
-		seam_verts_0.append(terr_verts0[25 * 8 + vi])
-	if terr_verts0.size() >= c0_count * 12:
-		seam_verts_0.append(terr_verts0[c0_count * 8 + 25])
-		seam_verts_0.append(terr_verts0[c0_count * 9 + 25])
-		seam_verts_0.append(terr_verts0[c0_count * 10 + 25])
-		seam_verts_0.append(terr_verts0[c0_count * 11 + 25])
+	for vi in range(12):
+		seam_verts_0.append(terr_verts0[25 * 12 + vi])
 
 	for v0: Vector3 in seam_verts_0:
 		var min_d: float = 1e9

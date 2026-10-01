@@ -22,7 +22,7 @@ enum ProfileType {
 # Cross-section lateral width dimensions (meters from road edge)
 const W_SHOULDER: float = 0.8   ## Shoulder / drainage swale
 const W_FEATURE: float = 4.5    ## Feature breakline (Cut face or Cliff lip)
-const W_FAR: float = 45.0       ## Outer mountain flank (expanded 45m outer skirt)
+const W_FAR: float = 38.0       ## Outer mountain flank (sealed 38m corridor)
 
 # Danger threshold for visual guard post placement (meters drop below shoulder)
 const DANGER_DROP_THRESHOLD: float = 2.5
@@ -193,80 +193,102 @@ func compute_cross_section(
 	var k_turn: float = clampf(curv, -0.06, 0.06)
 	var abs_k: float = absf(k_turn)
 
-	# Clamping threshold: curves with R < 65m (abs_k > 0.015) smoothly contract the inner flank.
-	# At abs_k <= 0.015, inner width equals W_FAR (no clamping, zero discontinuity when passing curv=0).
+	# Continuous C1 Lateral Envelope: curves with R < 62m (abs_k > 0.016) smoothly contract the inner flank.
+	# Uses convex power blend pow(t, 0.35) guaranteeing W_inner <= R * 0.65 - half_w at every point,
+	# eliminating evolute crossings while guaranteeing forward ribbon progression across all segments.
 	var w_far_l: float = W_FAR
 	var w_far_r: float = W_FAR
 
-	if abs_k > 0.0001:
-		var r_local: float = 1.0 / abs_k
-		# Inner flank must strictly satisfy total span <= R * 0.70 to eliminate evolute crossings
-		var max_inner_w: float = maxf(8.0, r_local * 0.70 - half_w)
-		var d_clamped: float = minf(W_FAR, max_inner_w)
+	if abs_k > 0.016:
+		var t_k: float = clampf((abs_k - 0.016) / (0.053 - 0.016), 0.0, 1.0)
+		var min_flank: float = maxf(8.0, 19.0 * 0.65 - half_w)
+		var d_clamped: float = lerpf(W_FAR, min_flank, pow(t_k, 0.35))
 
 		if k_turn > 0.0:
 			w_far_r = d_clamped
 		else:
 			w_far_l = d_clamped
 
-	# Strictly enforce monotonic ordering of offsets: half_w < d_sh < d_feat < d_far
+	# Strictly enforce monotonic ordering of offsets: half_w < d_sh < d_feat < d_mid1 < d_mid2 < d_far
 	var d_sh_l: float = half_w + W_SHOULDER
 	var d_feat_l: float = d_sh_l + W_FEATURE
 	var d_far_l: float = maxf(d_feat_l + 1.5, half_w + w_far_l)
+	var d_span_l: float = d_far_l - d_feat_l
+	var d_mid1_l: float = d_feat_l + d_span_l * 0.333
+	var d_mid2_l: float = d_feat_l + d_span_l * 0.667
 
 	var d_sh_r: float = half_w + W_SHOULDER
 	var d_feat_r: float = d_sh_r + W_FEATURE
 	var d_far_r: float = maxf(d_feat_r + 1.5, half_w + w_far_r)
+	var d_span_r: float = d_far_r - d_feat_r
+	var d_mid1_r: float = d_feat_r + d_span_r * 0.333
+	var d_mid2_r: float = d_feat_r + d_span_r * 0.667
 
 	# Left side positions (-b)
 	var pos_l_road: Vector3 = pt - binorm * half_w
 	var pos_l_sh: Vector3 = pt - binorm * d_sh_l
 	var pos_l_feat: Vector3 = pt - binorm * d_feat_l
+	var pos_l_mid1: Vector3 = pt - binorm * d_mid1_l
+	var pos_l_mid2: Vector3 = pt - binorm * d_mid2_l
 	var pos_l_far: Vector3 = pt - binorm * d_far_l
 
 	# Right side positions (+b)
 	var pos_r_road: Vector3 = pt + binorm * half_w
 	var pos_r_sh: Vector3 = pt + binorm * d_sh_r
 	var pos_r_feat: Vector3 = pt + binorm * d_feat_r
+	var pos_r_mid1: Vector3 = pt + binorm * d_mid1_r
+	var pos_r_mid2: Vector3 = pt + binorm * d_mid2_r
 	var pos_r_far: Vector3 = pt + binorm * d_far_r
 
 	# 2. Detail and macro height sampling
 	var center_macro: float = get_macro_elevation(pt.x, pt.z)
 	var center_detail: float = get_detail_elevation(pt.x, pt.z)
 	var h_far_l: float = get_macro_elevation(pos_l_far.x, pos_l_far.z) - center_macro + get_detail_elevation(pos_l_far.x, pos_l_far.z) - center_detail
+	var h_mid2_l: float = get_macro_elevation(pos_l_mid2.x, pos_l_mid2.z) - center_macro + get_detail_elevation(pos_l_mid2.x, pos_l_mid2.z) - center_detail
+	var h_mid1_l: float = get_macro_elevation(pos_l_mid1.x, pos_l_mid1.z) - center_macro + get_detail_elevation(pos_l_mid1.x, pos_l_mid1.z) - center_detail
 	var h_feat_l: float = dh_left + get_detail_elevation(pos_l_feat.x, pos_l_feat.z) * 0.5
 	var h_sh_l: float = -0.02 # Slight drainage dip
 
 	var h_far_r: float = get_macro_elevation(pos_r_far.x, pos_r_far.z) - center_macro + get_detail_elevation(pos_r_far.x, pos_r_far.z) - center_detail
+	var h_mid2_r: float = get_macro_elevation(pos_r_mid2.x, pos_r_mid2.z) - center_macro + get_detail_elevation(pos_r_mid2.x, pos_r_mid2.z) - center_detail
+	var h_mid1_r: float = get_macro_elevation(pos_r_mid1.x, pos_r_mid1.z) - center_macro + get_detail_elevation(pos_r_mid1.x, pos_r_mid1.z) - center_detail
 	var h_feat_r: float = dh_right + get_detail_elevation(pos_r_feat.x, pos_r_feat.z) * 0.5
 	var h_sh_r: float = -0.02 # Slight drainage dip
 
 	# 3. Final 3D Vertex positions
 	# Beveled Verge: terrain edge sits 3.5cm below physical road surface to eliminate Z-fighting
 	const VERGE_STEP_HEIGHT: float = 0.035
-	var v3: Vector3 = pos_l_road - norm * VERGE_STEP_HEIGHT
-	var v4: Vector3 = pos_r_road - norm * VERGE_STEP_HEIGHT
+	var v5: Vector3 = pos_l_road - norm * VERGE_STEP_HEIGHT
+	var v6: Vector3 = pos_r_road - norm * VERGE_STEP_HEIGHT
 
-	var v2: Vector3 = pos_l_sh + norm * (h_sh_l - VERGE_STEP_HEIGHT)
-	var v1: Vector3 = pos_l_feat + norm * h_feat_l
-	var v0: Vector3 = pos_l_far + norm * h_far_l
+	var v4: Vector3 = pos_l_sh + norm * (h_sh_l - VERGE_STEP_HEIGHT)
+	var v3: Vector3 = pos_l_feat + norm * h_feat_l
+	var v2: Vector3 = pos_l_mid1 + Vector3.UP * h_mid1_l
+	var v1: Vector3 = pos_l_mid2 + Vector3.UP * h_mid2_l
+	var v0: Vector3 = pos_l_far + Vector3.UP * h_far_l
 
-	var v5: Vector3 = pos_r_sh + norm * (h_sh_r - VERGE_STEP_HEIGHT)
-	var v6: Vector3 = pos_r_feat + norm * h_feat_r
-	var v7: Vector3 = pos_r_far + norm * h_far_r
+	var v7: Vector3 = pos_r_sh + norm * (h_sh_r - VERGE_STEP_HEIGHT)
+	var v8: Vector3 = pos_r_feat + norm * h_feat_r
+	var v9: Vector3 = pos_r_mid1 + Vector3.UP * h_mid1_r
+	var v10: Vector3 = pos_r_mid2 + Vector3.UP * h_mid2_r
+	var v11: Vector3 = pos_r_far + Vector3.UP * h_far_r
 
-	var vertices := PackedVector3Array([v0, v1, v2, v3, v4, v5, v6, v7])
+	var vertices := PackedVector3Array([v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11])
 
 	# 4. UV coordinates (normalized along corridor width and longitudinal distance)
 	var v_coord: float = dist * 0.15
 	var uvs := PackedVector2Array([
 		Vector2(0.00, v_coord),
-		Vector2(0.18, v_coord),
+		Vector2(0.08, v_coord),
+		Vector2(0.16, v_coord),
+		Vector2(0.22, v_coord),
 		Vector2(0.24, v_coord),
 		Vector2(0.26, v_coord), # Left road edge
 		Vector2(0.74, v_coord), # Right road edge
 		Vector2(0.76, v_coord),
-		Vector2(0.82, v_coord),
+		Vector2(0.78, v_coord),
+		Vector2(0.84, v_coord),
+		Vector2(0.92, v_coord),
 		Vector2(1.00, v_coord)
 	])
 
@@ -277,7 +299,10 @@ func compute_cross_section(
 	if eval.danger_right:
 		danger_mask |= 2
 
-	var offsets := PackedFloat32Array([-d_far_l, -d_feat_l, -d_sh_l, -half_w, half_w, d_sh_r, d_feat_r, d_far_r])
+	var offsets := PackedFloat32Array([
+		-d_far_l, -d_mid2_l, -d_mid1_l, -d_feat_l, -d_sh_l, -half_w,
+		half_w, d_sh_r, d_feat_r, d_mid1_r, d_mid2_r, d_far_r
+	])
 
 	return {
 		"vertices": vertices,
@@ -285,8 +310,10 @@ func compute_cross_section(
 		"uvs": uvs,
 		"danger_mask": danger_mask,
 		"eval": eval,
-		"shoulder_left_pos": v2,
-		"shoulder_right_pos": v5
+		"shoulder_left_pos": v4,
+		"shoulder_right_pos": v7,
+		"road_left_pos": v5,
+		"road_right_pos": v6
 	}
 
 ## Precision Foliage Anchoring: computes exact 3D surface point on the cross-section
@@ -294,17 +321,18 @@ func compute_cross_section(
 static func get_surface_point_from_cross_section(cs: Dictionary, lat_offset: float) -> Vector3:
 	var verts: PackedVector3Array = cs.get("vertices", PackedVector3Array())
 	var offsets: PackedFloat32Array = cs.get("offsets", PackedFloat32Array())
-	if offsets.is_empty() or verts.size() < 8:
+	var n: int = mini(verts.size(), offsets.size())
+	if n < 2:
 		return cs.get("shoulder_left_pos", Vector3.ZERO)
 	if lat_offset <= offsets[0]:
 		return verts[0]
-	if lat_offset >= offsets[7]:
-		return verts[7]
-	for seg in range(7):
+	if lat_offset >= offsets[n - 1]:
+		return verts[n - 1]
+	for seg in range(n - 1):
 		var o0: float = offsets[seg]
 		var o1: float = offsets[seg + 1]
 		if lat_offset >= o0 and lat_offset <= o1:
 			var span: float = o1 - o0
 			var t: float = (lat_offset - o0) / span if span > 0.0001 else 0.0
 			return verts[seg].lerp(verts[seg + 1], t)
-	return verts[3]
+	return verts[n / 2]

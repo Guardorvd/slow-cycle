@@ -58,6 +58,22 @@ func get_total_distance() -> float:
 		return 0.0
 	return cumulative_distances[-1]
 
+## Computes canonical signed lateral curvature (+b = turning right, -b = turning left).
+func get_signed_curvature(idx: int) -> float:
+	if curvatures.is_empty() or idx < 0 or idx >= curvatures.size():
+		return 0.0
+	var curv: float = curvatures[idx]
+	if curv <= 0.0001:
+		return 0.0
+	var next_idx: int = mini(idx + 1, size() - 1)
+	var prev_idx: int = maxi(0, idx - 1)
+	if next_idx == prev_idx:
+		return curv
+	var dt: Vector3 = tangents[next_idx] - tangents[prev_idx]
+	var turn_proj: float = dt.dot(binormals[idx])
+	var sgn: float = 1.0 if turn_proj >= 0.0 else -1.0
+	return curv * sgn
+
 func append_sample(
 	pos: Vector3,
 	tang: Vector3,

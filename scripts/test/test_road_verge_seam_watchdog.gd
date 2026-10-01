@@ -68,11 +68,11 @@ func _init() -> void:
 				# Left seam: road edge vs terrain shoulder/swale vertex
 				# In current code: v3 is pos_l_road, v2 is pos_l_sh
 				# In beveled architecture: road edge must sit higher than ditch by 0.02m .. 0.05m
-				var v_terr_inner_l: Vector3 = verts[3] # Terrain seam vertex (Left)
-				var v_terr_ditch_l: Vector3 = verts[2] # Terrain ditch swale vertex (Left)
+				var v_terr_inner_l: Vector3 = verts[5] # Terrain seam vertex (Left)
+				var v_terr_ditch_l: Vector3 = verts[4] # Terrain ditch swale vertex (Left)
 
-				var v_terr_inner_r: Vector3 = verts[4] # Terrain seam vertex (Right)
-				var v_terr_ditch_r: Vector3 = verts[5] # Terrain ditch swale vertex (Right)
+				var v_terr_inner_r: Vector3 = verts[6] # Terrain seam vertex (Right)
+				var v_terr_ditch_r: Vector3 = verts[7] # Terrain ditch swale vertex (Right)
 
 				# Check step height: Road edge Y minus Terrain seam Y
 				var dh_l: float = p_road_l.y - v_terr_inner_l.y

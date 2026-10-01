@@ -348,7 +348,7 @@ func _generate_fork_arm_samples(
 	fork_binorm: Vector3,
 	fork_heading: float,
 	fork_slope: float,
-	samples_count: int = 25,
+	samples_count: int = 26,
 	step_len: float = 2.0
 ) -> Array[Vector3]:
 	var r_path: RefCounted = branch.road_path
