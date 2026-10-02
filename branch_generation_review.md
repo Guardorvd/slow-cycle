@@ -1,3 +1,17 @@
+# Documentation status — D0
+
+STATUS: HISTORICAL
+
+Scope: сохранённая legacy документация; численные результаты, команды, критерии и прежние prompts ниже имеют историческую область. Source revision: `ed7d1322da1a5700a8c64425708e1c813213c7f6`; исходные даты отдельных записей сохранены в теле.
+
+Current source of truth / Replacement: [TARGET_GAME_BLUEPRINT](docs/TARGET_GAME_BLUEPRINT.md); [MASTER_IMPLEMENTATION_PLAN](docs/MASTER_IMPLEMENTATION_PLAN.md).
+
+Current state: [CURRENT_PROJECT_STATE](docs/CURRENT_PROJECT_STATE.md); navigation: [docs index](docs/README.md); historical catalogue: [history](docs/history/README.md).
+
+**Historical next-step notice:** все прежние «актуально», «главный план», «следующий этап», approvals и инструкции следующему чату в теле — история, не действующий task scope. D0 завершает смену authority; далее требуется отдельный план D1. Старые WORLD/P/B scopes не возобновляются автоматически. PASS относится только к указанной ревизии/coverage; это не новый PASS игры.
+
+---
+
 # Разбор процедурной генерации MTB-трассы и развилок
 
 > Исторический документ. Сверка дня 01.10.2026: [актуальный статус](docs/CURRENT_PROJECT_STATE.md), [результаты сегодняшних этапов](docs/TODAY_CHANGES_2026_10_01.md). Исходные измерения и утверждения ниже сохранены; они не подтверждают текущую готовность мира и не определяют ближайшую задачу.
@@ -21,25 +35,25 @@
 
 ### 1. Генератор в основном строит осевую линию, а не сеть троп
 
-`RoadLogic` генерирует путь чанками длиной 50 м с шагом семплирования 2 м ([road_logic.gd](/C:/Users/Luisa/Documents/antigravity/goofy-chandrasekhar/scripts/world/road_logic.gd:19)). `RoadGrammar` выдаёт фазы спуска, торможения, шпильки, микро-дропа, прыжка и восстановления ([road_grammar.gd](/C:/Users/Luisa/Documents/antigravity/goofy-chandrasekhar/scripts/world/road_grammar.gd:12)). Эти фазы описывают локальный профиль одного пути; в данных фазы нет цели маршрута или семантического различия ветвей вроде «длиннее, плавнее» против «короче, техничнее».
+`RoadLogic` генерирует путь чанками длиной 50 м с шагом семплирования 2 м ([road_logic.gd](scripts/world/road_logic.gd) (historical source line 19 at `ed7d132`)). `RoadGrammar` выдаёт фазы спуска, торможения, шпильки, микро-дропа, прыжка и восстановления ([road_grammar.gd](scripts/world/road_grammar.gd) (historical source line 12 at `ed7d132`)). Эти фазы описывают локальный профиль одного пути; в данных фазы нет цели маршрута или семантического различия ветвей вроде «длиннее, плавнее» против «короче, техничнее».
 
 ### 2. Развилки встроены в стример жёсткими правилами
 
-Стример планирует первую развилку на 450 м и следующие примерно через 700 м ([chunk_streamer.gd](/C:/Users/Luisa/Documents/antigravity/goofy-chandrasekhar/scripts/world/chunk_streamer.gd:32), [условие генерации](/C:/Users/Luisa/Documents/antigravity/goofy-chandrasekhar/scripts/world/chunk_streamer.gd:185)). При создании всегда строится одна и та же двусторонняя схема: углы ±14°, ширины начала 3.25 м и конечные ширины 1.8/3.2 м ([код плеч развилки](/C:/Users/Luisa/Documents/antigravity/goofy-chandrasekhar/scripts/world/chunk_streamer.gd:269)). Описание веток, их сложность, длина, целевой рельеф и способ повторного соединения не выбираются как единое содержание сети.
+Стример планирует первую развилку на 450 м и следующие примерно через 700 м ([chunk_streamer.gd](scripts/world/chunk_streamer.gd) (historical source line 32 at `ed7d132`), [условие генерации](scripts/world/chunk_streamer.gd) (historical source line 185 at `ed7d132`)). При создании всегда строится одна и та же двусторонняя схема: углы ±14°, ширины начала 3.25 м и конечные ширины 1.8/3.2 м ([код плеч развилки](scripts/world/chunk_streamer.gd) (historical source line 269 at `ed7d132`)). Описание веток, их сложность, длина, целевой рельеф и способ повторного соединения не выбираются как единое содержание сети.
 
 ### 3. Есть две конкурирующие модели ветвления
 
-`RoadGraph` содержит граф узлов и рёбер, проверку DAG и перевод ребра в `RoadPathData` ([road_graph.gd](/C:/Users/Luisa/Documents/antigravity/goofy-chandrasekhar/scripts/world/road_graph.gd:1)). Но поиском по `scripts/world` вызовов `RoadGraph.new()`/`add_fork_node()` в runtime-коде не найдено: реальный стример хранит собственный `Dictionary` объектов `RoadBranch` и напрямую переключает `active_branch_id`.
+`RoadGraph` содержит граф узлов и рёбер, проверку DAG и перевод ребра в `RoadPathData` ([road_graph.gd](scripts/world/road_graph.gd) (historical source line 1 at `ed7d132`)). Но поиском по `scripts/world` вызовов `RoadGraph.new()`/`add_fork_node()` в runtime-коде не найдено: реальный стример хранит собственный `Dictionary` объектов `RoadBranch` и напрямую переключает `active_branch_id`.
 
-Контракт графа и активная геометрия также расходятся. Graph-тест создаёт обе осевые линии из одного и того же fork point с одинаковой начальной касательной, а затем разводит их постепенно ([test_road_graph.gd](/C:/Users/Luisa/Documents/antigravity/goofy-chandrasekhar/scripts/test/test_road_graph.gd:231)). Runtime-генератор сразу начинает центры плеч со смещений ±1.625 м ([chunk_streamer.gd](/C:/Users/Luisa/Documents/antigravity/goofy-chandrasekhar/scripts/world/chunk_streamer.gd:278)). Изолированный графовый тест поэтому не подтверждает, что произведённая стримером развилка удовлетворяет модели графа.
+Контракт графа и активная геометрия также расходятся. Graph-тест создаёт обе осевые линии из одного и того же fork point с одинаковой начальной касательной, а затем разводит их постепенно ([test_road_graph.gd](scripts/test/test_road_graph.gd) (historical source line 231 at `ed7d132`)). Runtime-генератор сразу начинает центры плеч со смещений ±1.625 м ([chunk_streamer.gd](scripts/world/chunk_streamer.gd) (historical source line 278 at `ed7d132`)). Изолированный графовый тест поэтому не подтверждает, что произведённая стримером развилка удовлетворяет модели графа.
 
 ### 4. Текущие целевые размеры плохо выражают «небольшую прокатанную тропу»
 
-Общий контракт задаёт стандартную ширину дороги 4 м и ширину перед Y-развилкой до 10 м ([road_generation_contract.gd](/C:/Users/Luisa/Documents/antigravity/goofy-chandrasekhar/scripts/world/road_generation_contract.gd:45)). Тест геометрии считает успехом расхождение плеч более 18 м уже через 50 м; фактически он измеряет 18.92 м ([test_fork_geometry_verification.gd](/C:/Users/Luisa/Documents/antigravity/goofy-chandrasekhar/scripts/test/test_fork_geometry_verification.gd:104)). Такие значения могут быть хороши для широкой дороги, но сами по себе не формируют характер узкого singletrack.
+Общий контракт задаёт стандартную ширину дороги 4 м и ширину перед Y-развилкой до 10 м ([road_generation_contract.gd](scripts/world/road_generation_contract.gd) (historical source line 45 at `ed7d132`)). Тест геометрии считает успехом расхождение плеч более 18 м уже через 50 м; фактически он измеряет 18.92 м ([test_fork_geometry_verification.gd](scripts/test/test_fork_geometry_verification.gd) (historical source line 104 at `ed7d132`)). Такие значения могут быть хороши для широкой дороги, но сами по себе не формируют характер узкого singletrack.
 
 ### 5. Пейзаж сделан полосой профилей вокруг пути
 
-`TerrainCarver` строит поперечный профиль с внешней полосой шириной 20 м за shoulder и feature-полосой ([terrain_carver.gd](/C:/Users/Luisa/Documents/antigravity/goofy-chandrasekhar/scripts/world/terrain_carver.gd:22)), а `RoadChunk` соединяет профили только в пределах конкретного участка ([road_chunk.gd](/C:/Users/Luisa/Documents/antigravity/goofy-chandrasekhar/scripts/world/road_chunk.gd:150)). Это полезный локальный карвер, но не непрерывная поверхность горы с общей высотной целью и топологией drainage/bench-cut, через которую проходят все альтернативные тропы.
+`TerrainCarver` строит поперечный профиль с внешней полосой шириной 20 м за shoulder и feature-полосой ([terrain_carver.gd](scripts/world/terrain_carver.gd) (historical source line 22 at `ed7d132`)), а `RoadChunk` соединяет профили только в пределах конкретного участка ([road_chunk.gd](scripts/world/road_chunk.gd) (historical source line 150 at `ed7d132`)). Это полезный локальный карвер, но не непрерывная поверхность горы с общей высотной целью и топологией drainage/bench-cut, через которую проходят все альтернативные тропы.
 
 ## Почему прежние итерации могли давать «PASS», но не давать нужный результат
 

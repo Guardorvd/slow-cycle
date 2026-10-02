@@ -1,6 +1,20 @@
+# Documentation status — D0
+
+STATUS: SUPERSEDED
+
+Scope: сохранённая legacy документация; численные результаты, команды, критерии и прежние prompts ниже имеют историческую область. Source revision: `ed7d1322da1a5700a8c64425708e1c813213c7f6`; исходные даты отдельных записей сохранены в теле.
+
+Current source of truth / Replacement: [TARGET_GAME_BLUEPRINT](docs/TARGET_GAME_BLUEPRINT.md); [MASTER_IMPLEMENTATION_PLAN](docs/MASTER_IMPLEMENTATION_PLAN.md).
+
+Current state: [CURRENT_PROJECT_STATE](docs/CURRENT_PROJECT_STATE.md); navigation: [docs index](docs/README.md); historical catalogue: [history](docs/history/README.md).
+
+**Historical next-step notice:** все прежние «актуально», «главный план», «следующий этап», approvals и инструкции следующему чату в теле — история, не действующий task scope. D0 завершает смену authority; далее требуется отдельный план D1. Старые WORLD/P/B scopes не возобновляются автоматически. PASS относится только к указанной ревизии/coverage; это не новый PASS игры.
+
+---
+
 # Project Slow Cycle — Atomic Backlog
 
-> **Актуализация 01.10.2026:** [текущий статус](docs/CURRENT_PROJECT_STATE.md), [сводка изменений дня](docs/TODAY_CHANGES_2026_10_01.md) и [активный план](implementation_plan.md). WORLD-00A/00B, C01–C04 и минимальные LOG/replay выполнены в описанном scope; общая чистая приёмка INCOMPLETE. C03–C04 выполнен по согласованному плану; пороги сохранены. Следующий отдельный план — WORLD-01/C05, цельная местность и граница долины вместе с полем. Исторические результаты/«следующие шаги» ниже сохраняются как история и не заменяют этот порядок.
+> **Актуализация 01.10.2026:** [текущий статус](docs/CURRENT_PROJECT_STATE.md), [сводка изменений дня](docs/TODAY_CHANGES_2026_10_01.md) и [активный план](docs/plans/history/IMPLEMENTATION_PLAN_PRE_D0_ed7d132.md). WORLD-00A/00B, C01–C04 и минимальные LOG/replay выполнены в описанном scope; общая чистая приёмка INCOMPLETE. C03–C04 выполнен по согласованному плану; пороги сохранены. Следующий отдельный план — WORLD-01/C05, цельная местность и граница долины вместе с полем. Исторические результаты/«следующие шаги» ниже сохраняются как история и не заменяют этот порядок.
 
 ## Завершённые спринты
 

@@ -1,5 +1,21 @@
 # Slow Cycle — Agent Directives & Operating Protocol
 
+STATUS: CURRENT
+
+## Documentation authority after D0
+
+Product source of truth: [TARGET_GAME_BLUEPRINT](docs/TARGET_GAME_BLUEPRINT.md). Migration strategy and phase order: [MASTER_IMPLEMENTATION_PLAN](docs/MASTER_IMPLEMENTATION_PLAN.md). [Documentation index](docs/README.md), [target architecture](docs/TARGET_ARCHITECTURE.md), [migration matrix](docs/LEGACY_MIGRATION_MATRIX.md), [test strategy](docs/TEST_STRATEGY.md), [current state](docs/CURRENT_PROJECT_STATE.md).
+
+Explicit current user instructions and approval define task scope. Implemented code and historical roadmaps/tests inform safe migration; they do not override the approved region-first target. A legacy DAG requirement does not forbid a future loop/merge-capable RegionRouteGraph. Existing assertions are nevertheless unchanged: any test mutation/reclassification needs its own explicit human approval; D0 assigns no new suite categories and removes no mandatory gates.
+
+Rules 1–12 and the task template below are retained unchanged. Rule 6's numerical geometry/fallback requirements protect the current legacy road subsystem; known 18/19m/fallback mismatches remain open. Rule 10's per-chunk grouping describes current foliage locality/culling, not a mandatory target partition: the approved target uses spatial cells and type-local MultiMeshes. Neither rule grants permission to alter runtime, limits or tests during D0.
+
+D0 scope is documentation only: no production/test GDScript, scenes/resources, physics/camera, generation algorithms or runtime changes. Feature/generation engine gates remain mandatory in their scope; a docs-only diff is checked for links/authority/preservation/scope, not represented as E0–E7 runtime PASS. D0 is complete; [completed plan](docs/plans/completed/D0.md). [Root plan slot](implementation_plan.md) has no active plan. D1/scoped AGENTS/skills and Q/R phases require the next separately approved plan.
+
+The frozen [.antigravity test-integrity rule](.antigravity/rules/test-integrity.md) continues to protect tests; its universal test-as-product-authority wording is recorded as [D0-C10](docs/DOCUMENTATION_AUDIT.md) for D1/Q0. It cannot restore the superseded product architecture. This precedence clarifies documentation authority without changing test semantics.
+
+---
+
 This document governs all actions of AI agents (AntiGravity and subagents) working in this repository.
 
 ---

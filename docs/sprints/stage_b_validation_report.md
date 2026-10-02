@@ -1,3 +1,17 @@
+# Documentation status — D0
+
+STATUS: HISTORICAL
+
+Scope: сохранённая legacy документация; численные результаты, команды, критерии и прежние prompts ниже имеют историческую область. Source revision: `ed7d1322da1a5700a8c64425708e1c813213c7f6`; исходные даты отдельных записей сохранены в теле.
+
+Current source of truth / Replacement: [TARGET_GAME_BLUEPRINT](../TARGET_GAME_BLUEPRINT.md); [MASTER_IMPLEMENTATION_PLAN](../MASTER_IMPLEMENTATION_PLAN.md).
+
+Current state: [CURRENT_PROJECT_STATE](../CURRENT_PROJECT_STATE.md); navigation: [docs index](../README.md); historical catalogue: [history](../history/README.md).
+
+**Historical next-step notice:** все прежние «актуально», «главный план», «следующий этап», approvals и инструкции следующему чату в теле — история, не действующий task scope. D0 завершает смену authority; далее требуется отдельный план D1. Старые WORLD/P/B scopes не возобновляются автоматически. PASS относится только к указанной ревизии/coverage; это не новый PASS игры.
+
+---
+
 # Отчёт об официальном завершении и валидации Этапа B (Stage B Validation Report)
 
 > Исторический документ. Сверка дня 01.10.2026: [актуальный статус](../../docs/CURRENT_PROJECT_STATE.md), [результаты сегодняшних этапов](../../docs/TODAY_CHANGES_2026_10_01.md). Исходные измерения и утверждения ниже сохранены; они не подтверждают текущую готовность мира и не определяют ближайшую задачу.
@@ -11,7 +25,7 @@
 
 ## 1. Executive Summary
 
-В соответствии с генеральной дорожной картой проекта ([`DEVELOPMENT_ROADMAP.md`](file:///c:/Users/Luisa/Documents/antigravity/goofy-chandrasekhar/DEVELOPMENT_ROADMAP.md)) и директивами архитектурного протокола ([`AGENTS.md`](file:///c:/Users/Luisa/Documents/antigravity/goofy-chandrasekhar/AGENTS.md)), завершены все 6 подэтапов **Этапа B** («Надёжная rideable geometry и особенности MTB-трассы»).
+В соответствии с генеральной дорожной картой проекта ([`DEVELOPMENT_ROADMAP.md`](../../DEVELOPMENT_ROADMAP.md)) и директивами архитектурного протокола ([`AGENTS.md`](../../AGENTS.md)), завершены все 6 подэтапов **Этапа B** («Надёжная rideable geometry и особенности MTB-трассы»).
 
 Все геометрические, кинематические, физические и топологические контракты верифицированы независимыми автоматическими сьюитами в headless-режиме консоли Godot Engine с нулевыми ошибками и нулевыми утечками памяти.
 
@@ -64,7 +78,7 @@
 
 ## 4. UI/UX Инженерия и Телеметрия (Debug HUD)
 
-В оверлей F3 ([`scripts/ui/debug_hud.gd`](file:///c:/Users/Luisa/Documents/antigravity/goofy-chandrasekhar/scripts/ui/debug_hud.gd)) интегрированы ключевые улучшения:
+В оверлей F3 ([`scripts/ui/debug_hud.gd`](../../scripts/ui/debug_hud.gd)) интегрированы ключевые улучшения:
 1. **Троттлинг обновления текстового оверлея (20 Гц)**: Защита от мусорных аллокаций строк (GC pressure) при сохранении 60+ FPS замера кадровых пиков.
 2. **Семантические бейджи топологии**:
    - `Route: Branch #N [FLOW / TECHNICAL / BALANCED]`

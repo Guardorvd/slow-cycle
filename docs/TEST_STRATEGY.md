@@ -1,0 +1,57 @@
+# Slow Cycle — Test Strategy and Evidence Authority
+
+STATUS: CURRENT
+
+Scope: производная стратегия [Master §§V–VI, Q0–Q2, Definition of Done](MASTER_IMPLEMENTATION_PLAN.md) в пределах [Blueprint human acceptance](TARGET_GAME_BLUEPRINT.md). [Index](README.md), [as-is state](CURRENT_PROJECT_STATE.md), [conflicts](DOCUMENTATION_AUDIT.md). **D0 не запускает suites и не назначает им новые категории.**
+
+## 1. Product authority и test integrity
+
+Blueprint/Master определяют целевую игру и архитектуру; assertions защищают своё согласованное требование/реализованную систему. Старый DAG test не вправе заставлять будущий RegionRouteGraph отказаться от loops. Это не разрешение менять тест либо игнорировать падение текущего RoadGraph: conflict сначала записывается с requirement/owner/evidence, затем конкретная reclassification/mutation согласуется человеком.
+
+Текущие tests, assertions, thresholds, coverage и mandatory generation gates неизменны. [Frozen test-integrity](../.antigravity/rules/test-integrity.md) не изменён байт-в-байт. Его универсальная test-as-product-source формулировка отмечена D0-C10: целевая authority установлена уже сейчас, полный governance rewrite — D1, suite authority map — Q0. Нельзя считать старые тесты автоматически retired только из-за этой стратегии.
+
+## 2. Категории Master — определения, не выполненная классификация
+
+| Категория | Смысл | Change/acceptance boundary |
+|---|---|---|
+| ACTIVE_CONTRACT | Текущая спецификация конкретного контракта | Падение блокирует; assertion mutation только с human approval |
+| REGRESSION_GUARD | Защита работающей системы от случайной поломки | Падение блокирует, если система входит в scope или могла быть затронута |
+| LEGACY_CONTRACT | Проверяет архитектуру, сознательно заменяемую новым approved дизайном | Не переписывать молча; конфликт → evidence + approval reclassification, не возврат target к старому invariant |
+| OBSERVATIONAL | Измеряет performance/coverage/monotony/statistics | Нет PASS/FAIL по цифре без согласованного budget |
+| HISTORICAL | Сохранённая проверка sprint history | Не входит автоматически в новый acceptance; category требует Q0 decision, а не rename файла |
+
+Q0 создаст TEST_MATRIX с name/owner/category/E-level/required-for/limitations/status. Legacy [coverage/replay map](TEST_COVERAGE_AND_REPLAY.md) — 59-file snapshot WORLD-00B, не новая TEST_MATRIX. D0 не меняет его распределение suites/частоту и не превращает предложения в approval.
+
+## 3. Evidence ladder
+
+| Уровень | Доказательство | Ограничение |
+|---|---|---|
+| E0 Parse | Engine parse/start без parse errors | Не domain/world correctness |
+| E1 Pure Domain | Real math/data contract, где возможно без scene tree | Не integration/render/ride |
+| E2 Integration | Соседние реальные production системы | Prepared mesh не live collider |
+| E3 Runtime | Main или production-equivalent scene реально содержит систему | Teleport не Input-driven ride |
+| E4 Physics | Реальный велосипед/registered collision взаимодействуют | Проверенные seed/дистанция/ветки, не весь мир |
+| E5 Vulkan Visual | Настоящий renderer, saved/read PNG + context | Headless/имя файла не substitute |
+| E6 Soak/Performance | Продолжительность, frame timings, memory/lifecycle | Average FPS не доказывает отсутствие hitches |
+| E7 Human Ride | Человек едет по заявленному scope без debug UI | AI не объявляет E7 PASS самостоятельно |
+
+Уровни обозначают разные требования к evidence; более высокий label не поглощает непроверенные lower contracts. Выбор required levels зависит от task; недостающее обязательное evidence означает INCOMPLETE, не «похоже работает».
+
+## 4. Честный результат
+
+Q1 будущий bounded launcher должен учитывать revision/dirty/source digest, effective seed и derived identities, choices, expected/actual coverage, фактические assertions, completion marker, timeout, errors/warnings/leaks и result. PASS только при полной declared coverage/completion и отсутствии unexpected errors/leaks. Exit 0 и expected budget master не measured assertion count.
+
+Expected negative fixture проверяет точный failure/reason через реальную логику; произвольный crash не доказывает чувствительность. Нельзя добавлять production hooks для подмены поведения, skips/suppression или fixtures, зеркально повторяющие implementation. Input/physics replay не выводится из geometry checkpoints.
+
+В отчёте отдельно указывать PASS/FAIL/INCOMPLETE и известные environment limitations, без объявления «чистый PASS» по одному subprocess status. Human complaints не отменяются численным PASS: выявить blind spot и проверить независимо.
+
+## 5. Existing evidence и будущие фазы
+
+- [Legacy test commands/results](../TEST_PLAN.md), [sprint reports](history/README.md) сохраняют свои даты/revisions/limitations. Старые 125 expected checks, 70% rider coverage и 100% claims не сертифицируют новый мир.
+- D1: согласованные root/scoped instructions/skills/protocol; Q0: authority map; Q1: bounded harness; Q2: frozen runtime baseline и отдельная ObjectDB investigation. Все — отдельные планы.
+- Code/geometry changes потом требуют соответствующих targeted/negative/integration/determinism checks; generation gates AGENTS остаются действующими в своей области до явного approval изменения.
+- Collision/ride tasks требуют real physics, visual world tasks — настоящий Vulkan capture, product slice — E7. Новая surface не «принимается» контрольной регрессией старой main.
+
+## 6. Что проверено в D0
+
+D0 проверяет только links/anchors, authority consistency, archival preservation, whitelist и hashes. Godot/E0–E7: NOT_RUN / NOT_APPLICABLE к docs-only diff; это не новый exemption для feature/generation задач. Старый runtime INCOMPLETE и known failures сохраняются. Test files/semantics/categories unchanged.

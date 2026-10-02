@@ -1,3 +1,19 @@
+# Documentation status — D0
+
+STATUS: SUPERSEDED
+
+Scope: сохранённая legacy документация; численные результаты, команды, критерии и прежние prompts ниже имеют историческую область. Source revision: `ed7d1322da1a5700a8c64425708e1c813213c7f6`; исходные даты отдельных записей сохранены в теле.
+
+Current source of truth / Replacement: [TARGET_GAME_BLUEPRINT](TARGET_GAME_BLUEPRINT.md); [MASTER_IMPLEMENTATION_PLAN](MASTER_IMPLEMENTATION_PLAN.md); [TEST_STRATEGY](TEST_STRATEGY.md).
+
+Current state: [CURRENT_PROJECT_STATE](CURRENT_PROJECT_STATE.md); navigation: [docs index](README.md); historical catalogue: [history](history/README.md).
+
+**Historical next-step notice:** все прежние «актуально», «главный план», «следующий этап», approvals и инструкции следующему чату в теле — история, не действующий task scope. D0 завершает смену authority; далее требуется отдельный план D1. Старые WORLD/P/B scopes не возобновляются автоматически. PASS относится только к указанной ревизии/coverage; это не новый PASS игры.
+
+D0 не меняет команды исполнения, assertions, thresholds, suite categories или mandatory gates. Это legacy reference; future test authority map создаётся только в Q0.
+
+---
+
 # WORLD-00B — карта проверок и минимальный replay/log contract
 
 Дата: 01.10.2026. Исходники: `b6a5ff4`. Статический разбор, четыре headless baseline и временный seed lifecycle probe; отчёт запусков: [WORLD-00B](sprints/world_00b_verification_report.md). Код проекта и assertions не менялись. Эта карта определяет область следующего исправления, а не объявляет игру проверенной.

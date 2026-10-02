@@ -1,3 +1,17 @@
+# Documentation status — D0
+
+STATUS: HISTORICAL
+
+Scope: сохранённая legacy документация; численные результаты, команды, критерии и прежние prompts ниже имеют историческую область. Source revision: `ed7d1322da1a5700a8c64425708e1c813213c7f6`; исходные даты отдельных записей сохранены в теле.
+
+Current source of truth / Replacement: [TARGET_GAME_BLUEPRINT](../TARGET_GAME_BLUEPRINT.md); [MASTER_IMPLEMENTATION_PLAN](../MASTER_IMPLEMENTATION_PLAN.md).
+
+Current state: [CURRENT_PROJECT_STATE](../CURRENT_PROJECT_STATE.md); navigation: [docs index](../README.md); historical catalogue: [history](../history/README.md).
+
+**Historical next-step notice:** все прежние «актуально», «главный план», «следующий этап», approvals и инструкции следующему чату в теле — история, не действующий task scope. D0 завершает смену authority; далее требуется отдельный план D1. Старые WORLD/P/B scopes не возобновляются автоматически. PASS относится только к указанной ревизии/coverage; это не новый PASS игры.
+
+---
+
 # WORLD-00 C03–C04 — поверхность и проверка опоры
 
 Дата: 01.10.2026. Исходный HEAD `7c33004ee5c383eb304cfb7fdc9fdad0a3a5f6a2`. План был представлен до кода; на вопрос о двух точных mutations пользователь ответил «я не знаю — я не инженер. сделай как лучше». Выполнен согласованный полный scope, численные пороги сохранены. Локальный коммит объединяет C01–C02, LOG и этот этап; точный SHA/status вынесен в commit-verification.json после коммита.

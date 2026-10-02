@@ -1,6 +1,22 @@
+# Documentation status — D0
+
+STATUS: SUPERSEDED
+
+Scope: сохранённая legacy документация; численные результаты, команды, критерии и прежние prompts ниже имеют историческую область. Source revision: `ed7d1322da1a5700a8c64425708e1c813213c7f6`; исходные даты отдельных записей сохранены в теле.
+
+Current source of truth / Replacement: [TARGET_GAME_BLUEPRINT](docs/TARGET_GAME_BLUEPRINT.md); [MASTER_IMPLEMENTATION_PLAN](docs/MASTER_IMPLEMENTATION_PLAN.md); [TEST_STRATEGY](docs/TEST_STRATEGY.md).
+
+Current state: [CURRENT_PROJECT_STATE](docs/CURRENT_PROJECT_STATE.md); navigation: [docs index](docs/README.md); historical catalogue: [history](docs/history/README.md).
+
+**Historical next-step notice:** все прежние «актуально», «главный план», «следующий этап», approvals и инструкции следующему чату в теле — история, не действующий task scope. D0 завершает смену authority; далее требуется отдельный план D1. Старые WORLD/P/B scopes не возобновляются автоматически. PASS относится только к указанной ревизии/coverage; это не новый PASS игры.
+
+D0 не меняет команды исполнения, assertions, thresholds, suite categories или mandatory gates. Это legacy reference; future test authority map создаётся только в Q0.
+
+---
+
 # Slow Cycle — Verification & Testing Protocol
 
-> **Актуализация 01.10.2026:** [текущий статус](docs/CURRENT_PROJECT_STATE.md), [сводка изменений дня](docs/TODAY_CHANGES_2026_10_01.md) и [активный план](implementation_plan.md). WORLD-00A/00B, C01–C04 и минимальные LOG/replay выполнены в описанном scope; общая чистая приёмка INCOMPLETE. C03–C04 выполнен по согласованному плану; пороги сохранены. Следующий отдельный план — WORLD-01/C05, цельная местность и граница долины вместе с полем. Исторические результаты/«следующие шаги» ниже сохраняются как история и не заменяют этот порядок.
+> **Актуализация 01.10.2026:** [текущий статус](docs/CURRENT_PROJECT_STATE.md), [сводка изменений дня](docs/TODAY_CHANGES_2026_10_01.md) и [активный план](docs/plans/history/IMPLEMENTATION_PLAN_PRE_D0_ed7d132.md). WORLD-00A/00B, C01–C04 и минимальные LOG/replay выполнены в описанном scope; общая чистая приёмка INCOMPLETE. C03–C04 выполнен по согласованному плану; пороги сохранены. Следующий отдельный план — WORLD-01/C05, цельная местность и граница долины вместе с полем. Исторические результаты/«следующие шаги» ниже сохраняются как история и не заменяют этот порядок.
 
 > **Актуализация 01.10.2026 / WORLD-00B:** [текущее состояние](docs/CURRENT_PROJECT_STATE.md), [карта покрытия, частоты и replay/log contract](docs/TEST_COVERAGE_AND_REPLAY.md), [новый ограниченный baseline-отчёт](docs/sprints/world_00b_verification_report.md). Четыре headless runner завершились с exit 0, но имеют описанные ограничения и сообщение окружения certificate store; visual/ride gates этим не закрыты. Код/пороги/mandatory gates не менялись. Остальные PASS ниже — исторические записи, не свежая проверка `b6a5ff4`.
 
