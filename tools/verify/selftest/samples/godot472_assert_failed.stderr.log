@@ -1,0 +1,4 @@
+SCRIPT ERROR: Assertion failed: deliberate
+   at: _init (res://probes/assertfail.gd:4)
+   GDScript backtrace (most recent call first):
+       [0] _init (res://probes/assertfail.gd:4)

@@ -1,0 +1,4 @@
+SCRIPT ERROR: Invalid call. Nonexistent function 'foo' in base 'Nil'.
+   at: _init (res://probes/rterr.gd:5)
+   GDScript backtrace (most recent call first):
+       [0] _init (res://probes/rterr.gd:5)

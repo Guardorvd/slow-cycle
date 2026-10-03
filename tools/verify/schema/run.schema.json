@@ -1,0 +1,63 @@
+{
+  "title": "slow-cycle.verify.run/1",
+  "type": "object",
+  "required": [
+    "schema",
+    "run_id",
+    "purpose",
+    "revision",
+    "selected",
+    "checks",
+    "counts",
+    "overall",
+    "not_run",
+    "start_time",
+    "end_time",
+    "probe_matrix"
+  ],
+  "properties": {
+    "schema": {
+      "const": "slow-cycle.verify.run/1"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "purpose": {
+      "type": "string"
+    },
+    "overall": {
+      "enum": [
+        "PASS",
+        "FAIL",
+        "INCOMPLETE"
+      ]
+    },
+    "selected": {
+      "type": "array"
+    },
+    "not_run": {
+      "type": "array"
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "suite_id",
+          "result",
+          "reason_code",
+          "exit_code",
+          "duration"
+        ]
+      }
+    },
+    "counts": {
+      "type": "object",
+      "required": [
+        "PASS",
+        "FAIL",
+        "INCOMPLETE"
+      ]
+    }
+  }
+}

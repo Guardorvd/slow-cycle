@@ -1,0 +1,7 @@
+; Harness-owned probe project (Q1). Used only to test sc_verify classification. Not part of Slow Cycle.
+config_version=5
+
+[application]
+
+config/name="SC Verify Probe"
+config/features=PackedStringArray("4.7")

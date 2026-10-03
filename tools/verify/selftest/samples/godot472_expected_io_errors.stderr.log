@@ -1,0 +1,6 @@
+ERROR: Could not create directory: '<PATH>/pilot/diag/blocked-21632/2026-10-03T13-48-17-21632-8ab3c5086570a469'.
+   at: make_dir_recursive (core/io/dir_access.cpp:179)
+   GDScript backtrace (most recent call first):
+       [0] start_session (res://scripts/core/slow_cycle_logger.gd:56)
+       [1] _run (res://scripts/test/test_session_diagnostics.gd:110)
+DIAGNOSTIC_IO_ERROR code=DIRECTORY_UNAVAILABLE path=<PATH>/pilot/diag/blocked-21632/2026-10-03T13-48-17-21632-8ab3c5086570a469 run=2026-10-03T13-48-17-21632-8ab3c5086570a469

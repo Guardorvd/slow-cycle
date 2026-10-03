@@ -1,0 +1,241 @@
+{
+  "$comment": "Subset validator in harness/report.py: type/required/enum/const/items. Unknown data is null, 'UNKNOWN' or basis 'not_measurable' - never invented.",
+  "title": "slow-cycle.verify.result/1",
+  "type": "object",
+  "required": [
+    "schema",
+    "run_id",
+    "purpose",
+    "attempt",
+    "revision",
+    "git_identity",
+    "suite_id",
+    "kind",
+    "origin",
+    "test_matrix",
+    "authority_category",
+    "evidence_capability",
+    "seed",
+    "config",
+    "command",
+    "environment",
+    "expected_coverage",
+    "actual_coverage",
+    "expected_checks_if_truly_known",
+    "certified_actual_checks_if_measurable",
+    "completion_marker",
+    "artifacts",
+    "exit_code",
+    "timeout",
+    "errors",
+    "warnings",
+    "leaks",
+    "environment_messages",
+    "engine_messages",
+    "start_time",
+    "end_time",
+    "duration",
+    "result",
+    "reason_code",
+    "reasons",
+    "limitations",
+    "evidence_gates",
+    "contract_report",
+    "measurements",
+    "raw"
+  ],
+  "properties": {
+    "schema": {
+      "const": "slow-cycle.verify.result/1"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "attempt": {
+      "const": 1
+    },
+    "revision": {
+      "type": "string"
+    },
+    "git_identity": {
+      "type": "object",
+      "required": [
+        "head",
+        "branch",
+        "tree",
+        "dirty",
+        "status_porcelain",
+        "staged",
+        "unstaged",
+        "untracked",
+        "tracked_diff_sha256",
+        "worktree_raw"
+      ]
+    },
+    "suite_id": {
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "check",
+        "expected_negative"
+      ]
+    },
+    "origin": {
+      "enum": [
+        "repo",
+        "probe"
+      ]
+    },
+    "test_matrix": {
+      "type": "object",
+      "required": [
+        "rows",
+        "categories"
+      ]
+    },
+    "seed": {
+      "type": "object",
+      "required": [
+        "basis",
+        "certified"
+      ]
+    },
+    "command": {
+      "type": "object",
+      "required": [
+        "argv",
+        "cwd"
+      ]
+    },
+    "environment": {
+      "type": "object",
+      "required": [
+        "engine",
+        "platform",
+        "python",
+        "env_overrides"
+      ]
+    },
+    "expected_coverage": {
+      "type": "array"
+    },
+    "actual_coverage": {
+      "type": "array"
+    },
+    "expected_checks_if_truly_known": {
+      "type": "object",
+      "required": [
+        "value",
+        "basis"
+      ]
+    },
+    "certified_actual_checks_if_measurable": {
+      "type": "object",
+      "required": [
+        "value",
+        "basis"
+      ]
+    },
+    "completion_marker": {
+      "type": "object",
+      "required": [
+        "required",
+        "observed",
+        "satisfied"
+      ]
+    },
+    "artifacts": {
+      "type": "array"
+    },
+    "exit_code": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "timeout": {
+      "type": "object",
+      "required": [
+        "timeout_s",
+        "timed_out",
+        "kill"
+      ]
+    },
+    "errors": {
+      "type": "object",
+      "required": [
+        "project_errors",
+        "parse_errors",
+        "script_errors",
+        "assertion_failures"
+      ]
+    },
+    "warnings": {
+      "type": "array"
+    },
+    "leaks": {
+      "type": "array"
+    },
+    "environment_messages": {
+      "type": "array"
+    },
+    "engine_messages": {
+      "type": "object",
+      "required": [
+        "project_errors",
+        "warnings",
+        "objectdb_or_leak_warnings",
+        "expected_environment_messages",
+        "unknown_engine_messages",
+        "log_complete"
+      ]
+    },
+    "start_time": {
+      "type": "string"
+    },
+    "end_time": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "duration": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "result": {
+      "enum": [
+        "PASS",
+        "FAIL",
+        "INCOMPLETE"
+      ]
+    },
+    "reason_code": {
+      "type": "string"
+    },
+    "reasons": {
+      "type": "array"
+    },
+    "limitations": {
+      "type": "array"
+    },
+    "evidence_gates": {
+      "type": "object"
+    },
+    "contract_report": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "measurements": {
+      "type": "object"
+    },
+    "raw": {
+      "type": "object"
+    }
+  }
+}

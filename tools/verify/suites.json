@@ -1,0 +1,2179 @@
+{
+ "schema": "slow-cycle.verify.suites/1",
+ "purpose": "Q1 bounded verification harness: coverage manifest for harness probes and the representative real-suite pilot. Not a Q2 baseline.",
+ "matrix": {
+  "path": "docs/TEST_MATRIX.md",
+  "version": "Q0-TEST-MATRIX-ACCEPTED-1.2",
+  "git_blob": "48477ee1aaae3f7a03fa9ff544272a0a5df84566",
+  "accepted_lf_sha256": "7aa5b5b6fdecf6d2bcdfb690d92abfe8c5cdf36536e53faef201e9c59a9e54d2",
+  "note": "accepted digest reproduces only on LF-normalised bytes (compatibility value); git blob is canonical"
+ },
+ "environment_allowlist": [],
+ "sets": {
+  "probes": [
+   "probe_p01_pass",
+   "probe_p02_assert_fail",
+   "probe_p03_contract_violation",
+   "probe_p04_infra_nonzero",
+   "probe_p05_hang_timeout",
+   "probe_p05b_grandchild_timeout",
+   "probe_p05c_warning_then_timeout",
+   "probe_p06_no_marker",
+   "probe_p07_missing_coverage",
+   "probe_p08_missing_artifact",
+   "probe_p09_stale_artifact",
+   "probe_p10a_negative_wrong_reason",
+   "probe_p10b_negative_accepted",
+   "probe_p10c_negative_correct",
+   "probe_p10d_negative_crash",
+   "probe_p11a_parse_error",
+   "probe_p11b_runtime_error",
+   "probe_p12_leak_zero_gate",
+   "probe_p13_vulkan_claim_headless",
+   "probe_p14_malformed_summary",
+   "probe_p15_warning_not_fatal",
+   "probe_p16_unknown_stderr_line"
+  ],
+  "pilot": [
+   "road_graph",
+   "seed_diversity",
+   "monotony",
+   "master_native_tiers",
+   "child_diagnostics",
+   "child_track_verification",
+   "child_track_ride",
+   "child_riding_lab",
+   "child_gravel_loop",
+   "virtual_rider",
+   "route_branch_integration",
+   "session_diagnostics",
+   "replay_session",
+   "capture_visual_vulkan",
+   "neg_contract_seed_mismatch",
+   "neg_contract_missing_target",
+   "neg_contract_save_failure",
+   "neg_capture_audit_timeout",
+   "neg_capture_unknown_frame",
+   "neg_replay_no_manifest"
+  ]
+ },
+ "suites": [
+  {
+   "id": "probe_p01_pass",
+   "kind": "check",
+   "origin": "probe",
+   "entry": "res://probes/p01_pass.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 30
+   },
+   "matrix": {
+    "rows": [],
+    "categories": {},
+    "role": "harness probe (tests the harness, not Slow Cycle)",
+    "authority_category": null,
+    "e_capability": []
+   },
+   "expected_verdict": {
+    "result": "PASS",
+    "reason": "ALL_REQUIRED_EVIDENCE_SATISFIED"
+   },
+   "limitations": [
+    "harness-owned probe: classification test only; never a Slow Cycle gameplay/test result"
+   ],
+   "completion": [
+    {
+     "id": "marker",
+     "kind": "stdout_regex",
+     "pattern": "^PROBE_COMPLETE name=p01$"
+    }
+   ],
+   "coverage": [
+    {
+     "id": "items>=3",
+     "kind": "distinct_min",
+     "pattern": "^PROBE_COVERAGE item=(\\w+)$",
+     "min": 3,
+     "basis": "probe declares three coverage items a,b,c"
+    }
+   ],
+   "summaries": [
+    {
+     "id": "probe_summary",
+     "pattern": "^PROBE_SUMMARY checks=(\\d+) failures=(\\d+)$",
+     "failures_group": 2,
+     "total_group": 1,
+     "loose_pattern": "^PROBE_SUMMARY"
+    }
+   ],
+   "assertions": {
+    "expected": null,
+    "expected_basis": "probe declares no expected count",
+    "actual_from": {
+     "kind": "counter_regex",
+     "pattern": "^PROBE_SUMMARY checks=(\\d+) "
+    }
+   }
+  },
+  {
+   "id": "probe_p02_assert_fail",
+   "kind": "check",
+   "origin": "probe",
+   "entry": "res://probes/p02_assert_fail.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 30
+   },
+   "matrix": {
+    "rows": [],
+    "categories": {},
+    "role": "harness probe (tests the harness, not Slow Cycle)",
+    "authority_category": null,
+    "e_capability": []
+   },
+   "expected_verdict": {
+    "result": "FAIL",
+    "reason": "ASSERTION_FAILED"
+   },
+   "limitations": [
+    "harness-owned probe: classification test only; never a Slow Cycle gameplay/test result"
+   ],
+   "completion": [
+    {
+     "id": "marker",
+     "kind": "stdout_regex",
+     "pattern": "^PROBE_COMPLETE name=p02$"
+    }
+   ],
+   "summaries": [
+    {
+     "id": "probe_summary",
+     "pattern": "^PROBE_SUMMARY checks=(\\d+) failures=(\\d+)$",
+     "failures_group": 2,
+     "total_group": 1,
+     "loose_pattern": "^PROBE_SUMMARY"
+    }
+   ]
+  },
+  {
+   "id": "probe_p03_contract_violation",
+   "kind": "check",
+   "origin": "probe",
+   "entry": "res://probes/p03_contract_violation.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 30
+   },
+   "matrix": {
+    "rows": [],
+    "categories": {},
+    "role": "harness probe (tests the harness, not Slow Cycle)",
+    "authority_category": null,
+    "e_capability": []
+   },
+   "expected_verdict": {
+    "result": "FAIL",
+    "reason": "ASSERTION_FAILED"
+   },
+   "limitations": [
+    "harness-owned probe: classification test only; never a Slow Cycle gameplay/test result"
+   ],
+   "completion": [
+    {
+     "id": "marker",
+     "kind": "stdout_regex",
+     "pattern": "^PROBE_COMPLETE name=p03$"
+    }
+   ],
+   "fail_markers": [
+    "^PROBE_CONTRACT_VIOLATION"
+   ]
+  },
+  {
+   "id": "probe_p04_infra_nonzero",
+   "kind": "check",
+   "origin": "probe",
+   "entry": "res://probes/p04_infra_nonzero.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 30
+   },
+   "matrix": {
+    "rows": [],
+    "categories": {},
+    "role": "harness probe (tests the harness, not Slow Cycle)",
+    "authority_category": null,
+    "e_capability": []
+   },
+   "expected_verdict": {
+    "result": "INCOMPLETE",
+    "reason": "NONZERO_EXIT_UNEXPLAINED"
+   },
+   "limitations": [
+    "harness-owned probe: classification test only; never a Slow Cycle gameplay/test result"
+   ],
+   "completion": [
+    {
+     "id": "marker",
+     "kind": "stdout_regex",
+     "pattern": "^PROBE_COMPLETE name=p04$"
+    }
+   ]
+  },
+  {
+   "id": "probe_p05_hang_timeout",
+   "kind": "check",
+   "origin": "probe",
+   "entry": "res://probes/p05_hang.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 6
+   },
+   "matrix": {
+    "rows": [],
+    "categories": {},
+    "role": "harness probe (tests the harness, not Slow Cycle)",
+    "authority_category": null,
+    "e_capability": []
+   },
+   "expected_verdict": {
+    "result": "INCOMPLETE",
+    "reason": "TIMEOUT"
+   },
+   "limitations": [
+    "harness-owned probe: classification test only; never a Slow Cycle gameplay/test result"
+   ],
+   "completion": [
+    {
+     "id": "marker",
+     "kind": "stdout_regex",
+     "pattern": "^PROBE_COMPLETE name=p05$"
+    }
+   ]
+  },
+  {
+   "id": "probe_p05b_grandchild_timeout",
+   "kind": "check",
+   "origin": "probe",
+   "entry": "res://probes/p05b_grandchild_hang.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 8
+   },
+   "matrix": {
+    "rows": [],
+    "categories": {},
+    "role": "harness probe (tests the harness, not Slow Cycle)",
+    "authority_category": null,
+    "e_capability": []
+   },
+   "expected_verdict": {
+    "result": "INCOMPLETE",
+    "reason": "TIMEOUT"
+   },
+   "limitations": [
+    "harness-owned probe: classification test only; never a Slow Cycle gameplay/test result"
+   ],
+   "completion": [
+    {
+     "id": "marker",
+     "kind": "stdout_regex",
+     "pattern": "^PROBE_COMPLETE name=p05b$"
+    }
+   ]
+  },
+  {
+   "id": "probe_p05c_warning_then_timeout",
+   "kind": "check",
+   "origin": "probe",
+   "entry": "res://probes/p05c_warning_then_hang.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 6
+   },
+   "matrix": {
+    "rows": [],
+    "categories": {},
+    "role": "harness probe (tests the harness, not Slow Cycle)",
+    "authority_category": null,
+    "e_capability": []
+   },
+   "expected_verdict": {
+    "result": "INCOMPLETE",
+    "reason": "TIMEOUT"
+   },
+   "limitations": [
+    "harness-owned probe: classification test only; never a Slow Cycle gameplay/test result"
+   ],
+   "completion": [
+    {
+     "id": "marker",
+     "kind": "stdout_regex",
+     "pattern": "^PROBE_COMPLETE name=p05c$"
+    }
+   ]
+  },
+  {
+   "id": "probe_p06_no_marker",
+   "kind": "check",
+   "origin": "probe",
+   "entry": "res://probes/p06_no_marker.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 30
+   },
+   "matrix": {
+    "rows": [],
+    "categories": {},
+    "role": "harness probe (tests the harness, not Slow Cycle)",
+    "authority_category": null,
+    "e_capability": []
+   },
+   "expected_verdict": {
+    "result": "INCOMPLETE",
+    "reason": "COMPLETION_NOT_PROVEN"
+   },
+   "limitations": [
+    "harness-owned probe: classification test only; never a Slow Cycle gameplay/test result"
+   ],
+   "completion": [
+    {
+     "id": "marker",
+     "kind": "stdout_regex",
+     "pattern": "^PROBE_COMPLETE name=p06$"
+    }
+   ],
+   "summaries": [
+    {
+     "id": "probe_summary",
+     "pattern": "^PROBE_SUMMARY checks=(\\d+) failures=(\\d+)$",
+     "failures_group": 2,
+     "total_group": 1,
+     "loose_pattern": "^PROBE_SUMMARY"
+    }
+   ]
+  },
+  {
+   "id": "probe_p07_missing_coverage",
+   "kind": "check",
+   "origin": "probe",
+   "entry": "res://probes/p07_missing_coverage.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 30
+   },
+   "matrix": {
+    "rows": [],
+    "categories": {},
+    "role": "harness probe (tests the harness, not Slow Cycle)",
+    "authority_category": null,
+    "e_capability": []
+   },
+   "expected_verdict": {
+    "result": "INCOMPLETE",
+    "reason": "COVERAGE_MISSING"
+   },
+   "limitations": [
+    "harness-owned probe: classification test only; never a Slow Cycle gameplay/test result"
+   ],
+   "completion": [
+    {
+     "id": "marker",
+     "kind": "stdout_regex",
+     "pattern": "^PROBE_COMPLETE name=p07$"
+    }
+   ],
+   "coverage": [
+    {
+     "id": "items>=3",
+     "kind": "distinct_min",
+     "pattern": "^PROBE_COVERAGE item=(\\w+)$",
+     "min": 3,
+     "basis": "probe declares three coverage items a,b,c"
+    }
+   ],
+   "summaries": [
+    {
+     "id": "probe_summary",
+     "pattern": "^PROBE_SUMMARY checks=(\\d+) failures=(\\d+)$",
+     "failures_group": 2,
+     "total_group": 1,
+     "loose_pattern": "^PROBE_SUMMARY"
+    }
+   ]
+  },
+  {
+   "id": "probe_p08_missing_artifact",
+   "kind": "check",
+   "origin": "probe",
+   "entry": "res://probes/p08_missing_artifact.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 30
+   },
+   "matrix": {
+    "rows": [],
+    "categories": {},
+    "role": "harness probe (tests the harness, not Slow Cycle)",
+    "authority_category": null,
+    "e_capability": []
+   },
+   "expected_verdict": {
+    "result": "INCOMPLETE",
+    "reason": "ARTIFACT_MISSING"
+   },
+   "limitations": [
+    "harness-owned probe: classification test only; never a Slow Cycle gameplay/test result"
+   ],
+   "completion": [
+    {
+     "id": "marker",
+     "kind": "stdout_regex",
+     "pattern": "^PROBE_COMPLETE name=p08$"
+    }
+   ],
+   "artifacts": [
+    {
+     "glob": "out/result.bin",
+     "role": "probe_output",
+     "min_count": 1
+    }
+   ]
+  },
+  {
+   "id": "probe_p09_stale_artifact",
+   "kind": "check",
+   "origin": "probe",
+   "entry": "res://probes/p09_stale_artifact.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 30
+   },
+   "matrix": {
+    "rows": [],
+    "categories": {},
+    "role": "harness probe (tests the harness, not Slow Cycle)",
+    "authority_category": null,
+    "e_capability": []
+   },
+   "expected_verdict": {
+    "result": "INCOMPLETE",
+    "reason": "ARTIFACT_STALE"
+   },
+   "limitations": [
+    "harness-owned probe: classification test only; never a Slow Cycle gameplay/test result"
+   ],
+   "completion": [
+    {
+     "id": "marker",
+     "kind": "stdout_regex",
+     "pattern": "^PROBE_COMPLETE name=p09$"
+    }
+   ],
+   "artifacts": [
+    {
+     "glob": "out/result.bin",
+     "role": "probe_output",
+     "min_count": 1
+    }
+   ],
+   "preplant": [
+    {
+     "path": "out/result.bin",
+     "age_s": 3600
+    }
+   ]
+  },
+  {
+   "id": "probe_p10a_negative_wrong_reason",
+   "kind": "expected_negative",
+   "origin": "probe",
+   "entry": "res://probes/p10a_negative_wrong_reason.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 30
+   },
+   "matrix": {
+    "rows": [],
+    "categories": {},
+    "role": "harness probe (tests the harness, not Slow Cycle)",
+    "authority_category": null,
+    "e_capability": []
+   },
+   "expected_verdict": {
+    "result": "FAIL",
+    "reason": "NEGATIVE_WRONG_REASON"
+   },
+   "limitations": [
+    "harness-owned probe: classification test only; never a Slow Cycle gameplay/test result"
+   ],
+   "expected_negative": {
+    "reason": "^EXPECTED_REASON$",
+    "reason_extract": "^PROBE_NEGATIVE status=\\S+ reason=(\\S*)$",
+    "not_exercised": [
+     "RENDERER_UNAVAILABLE"
+    ]
+   }
+  },
+  {
+   "id": "probe_p10b_negative_accepted",
+   "kind": "expected_negative",
+   "origin": "probe",
+   "entry": "res://probes/p10b_negative_accepted.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 30
+   },
+   "matrix": {
+    "rows": [],
+    "categories": {},
+    "role": "harness probe (tests the harness, not Slow Cycle)",
+    "authority_category": null,
+    "e_capability": []
+   },
+   "expected_verdict": {
+    "result": "FAIL",
+    "reason": "NEGATIVE_ACCEPTED"
+   },
+   "limitations": [
+    "harness-owned probe: classification test only; never a Slow Cycle gameplay/test result"
+   ],
+   "expected_negative": {
+    "reason": "^EXPECTED_REASON$",
+    "reason_extract": "^PROBE_NEGATIVE status=\\S+ reason=(\\S*)$",
+    "not_exercised": [
+     "RENDERER_UNAVAILABLE"
+    ]
+   }
+  },
+  {
+   "id": "probe_p10c_negative_correct",
+   "kind": "expected_negative",
+   "origin": "probe",
+   "entry": "res://probes/p10c_negative_correct.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 30
+   },
+   "matrix": {
+    "rows": [],
+    "categories": {},
+    "role": "harness probe (tests the harness, not Slow Cycle)",
+    "authority_category": null,
+    "e_capability": []
+   },
+   "expected_verdict": {
+    "result": "PASS",
+    "reason": "ALL_REQUIRED_EVIDENCE_SATISFIED"
+   },
+   "limitations": [
+    "harness-owned probe: classification test only; never a Slow Cycle gameplay/test result"
+   ],
+   "expected_negative": {
+    "reason": "^EXPECTED_REASON$",
+    "reason_extract": "^PROBE_NEGATIVE status=\\S+ reason=(\\S*)$",
+    "not_exercised": [
+     "RENDERER_UNAVAILABLE"
+    ]
+   }
+  },
+  {
+   "id": "probe_p10d_negative_crash",
+   "kind": "expected_negative",
+   "origin": "probe",
+   "entry": "res://probes/p10d_negative_crash.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 30
+   },
+   "matrix": {
+    "rows": [],
+    "categories": {},
+    "role": "harness probe (tests the harness, not Slow Cycle)",
+    "authority_category": null,
+    "e_capability": []
+   },
+   "expected_verdict": {
+    "result": "INCOMPLETE",
+    "reason": "NEGATIVE_NOT_EXERCISED"
+   },
+   "limitations": [
+    "harness-owned probe: classification test only; never a Slow Cycle gameplay/test result"
+   ],
+   "expected_negative": {
+    "reason": "^EXPECTED_REASON$",
+    "reason_extract": "^PROBE_NEGATIVE status=\\S+ reason=(\\S*)$",
+    "not_exercised": [
+     "RENDERER_UNAVAILABLE"
+    ]
+   }
+  },
+  {
+   "id": "probe_p11a_parse_error",
+   "kind": "check",
+   "origin": "probe",
+   "entry": "res://probes/p11a_parse_error.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 30
+   },
+   "matrix": {
+    "rows": [],
+    "categories": {},
+    "role": "harness probe (tests the harness, not Slow Cycle)",
+    "authority_category": null,
+    "e_capability": []
+   },
+   "expected_verdict": {
+    "result": "FAIL",
+    "reason": "ENGINE_PARSE_ERROR"
+   },
+   "limitations": [
+    "harness-owned probe: classification test only; never a Slow Cycle gameplay/test result"
+   ],
+   "completion": [
+    {
+     "id": "marker",
+     "kind": "stdout_regex",
+     "pattern": "^PROBE_COMPLETE name=p11a$"
+    }
+   ]
+  },
+  {
+   "id": "probe_p11b_runtime_error",
+   "kind": "check",
+   "origin": "probe",
+   "entry": "res://probes/p11b_runtime_error.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 8
+   },
+   "matrix": {
+    "rows": [],
+    "categories": {},
+    "role": "harness probe (tests the harness, not Slow Cycle)",
+    "authority_category": null,
+    "e_capability": []
+   },
+   "expected_verdict": {
+    "result": "FAIL",
+    "reason": "UNEXPECTED_ENGINE_ERROR"
+   },
+   "limitations": [
+    "harness-owned probe: classification test only; never a Slow Cycle gameplay/test result"
+   ],
+   "completion": [
+    {
+     "id": "marker",
+     "kind": "stdout_regex",
+     "pattern": "^PROBE_COMPLETE name=p11b$"
+    }
+   ]
+  },
+  {
+   "id": "probe_p12_leak_zero_gate",
+   "kind": "check",
+   "origin": "probe",
+   "entry": "res://probes/p12_leak.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 30
+   },
+   "matrix": {
+    "rows": [],
+    "categories": {},
+    "role": "harness probe (tests the harness, not Slow Cycle)",
+    "authority_category": null,
+    "e_capability": []
+   },
+   "expected_verdict": {
+    "result": "FAIL",
+    "reason": "UNEXPECTED_LEAK"
+   },
+   "limitations": [
+    "harness-owned probe: classification test only; never a Slow Cycle gameplay/test result"
+   ],
+   "completion": [
+    {
+     "id": "marker",
+     "kind": "stdout_regex",
+     "pattern": "^PROBE_COMPLETE name=p12$"
+    }
+   ],
+   "summaries": [
+    {
+     "id": "probe_summary",
+     "pattern": "^PROBE_SUMMARY checks=(\\d+) failures=(\\d+)$",
+     "failures_group": 2,
+     "total_group": 1,
+     "loose_pattern": "^PROBE_SUMMARY"
+    }
+   ],
+   "engine_policy": {
+    "errors": "zero_unexpected",
+    "leaks": "zero_unexpected"
+   }
+  },
+  {
+   "id": "probe_p13_vulkan_claim_headless",
+   "kind": "check",
+   "origin": "probe",
+   "entry": "res://probes/p13_vulkan_claim_headless.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 30
+   },
+   "matrix": {
+    "rows": [],
+    "categories": {},
+    "role": "harness probe (tests the harness, not Slow Cycle)",
+    "authority_category": null,
+    "e_capability": []
+   },
+   "expected_verdict": {
+    "result": "INCOMPLETE",
+    "reason": "VULKAN_EVIDENCE_MISSING"
+   },
+   "limitations": [
+    "harness-owned probe: classification test only; never a Slow Cycle gameplay/test result"
+   ],
+   "completion": [
+    {
+     "id": "marker",
+     "kind": "stdout_regex",
+     "pattern": "^PROBE_COMPLETE name=p13$"
+    }
+   ],
+   "summaries": [
+    {
+     "id": "probe_summary",
+     "pattern": "^PROBE_SUMMARY checks=(\\d+) failures=(\\d+)$",
+     "failures_group": 2,
+     "total_group": 1,
+     "loose_pattern": "^PROBE_SUMMARY"
+    }
+   ],
+   "evidence_gate": {
+    "E5": {
+     "requires": [
+      "driver_vulkan"
+     ],
+     "human_review": "required"
+    }
+   }
+  },
+  {
+   "id": "probe_p14_malformed_summary",
+   "kind": "check",
+   "origin": "probe",
+   "entry": "res://probes/p14_malformed_summary.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 30
+   },
+   "matrix": {
+    "rows": [],
+    "categories": {},
+    "role": "harness probe (tests the harness, not Slow Cycle)",
+    "authority_category": null,
+    "e_capability": []
+   },
+   "expected_verdict": {
+    "result": "INCOMPLETE",
+    "reason": "MALFORMED_RESULT"
+   },
+   "limitations": [
+    "harness-owned probe: classification test only; never a Slow Cycle gameplay/test result"
+   ],
+   "completion": [
+    {
+     "id": "marker",
+     "kind": "stdout_regex",
+     "pattern": "^PROBE_COMPLETE name=p14$"
+    }
+   ],
+   "summaries": [
+    {
+     "id": "probe_summary",
+     "pattern": "^PROBE_SUMMARY checks=(\\d+) failures=(\\d+)$",
+     "failures_group": 2,
+     "total_group": 1,
+     "loose_pattern": "^PROBE_SUMMARY"
+    }
+   ]
+  },
+  {
+   "id": "probe_p15_warning_not_fatal",
+   "kind": "check",
+   "origin": "probe",
+   "entry": "res://probes/p15_warning_pass.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 30
+   },
+   "matrix": {
+    "rows": [],
+    "categories": {},
+    "role": "harness probe (tests the harness, not Slow Cycle)",
+    "authority_category": null,
+    "e_capability": []
+   },
+   "expected_verdict": {
+    "result": "PASS",
+    "reason": "ALL_REQUIRED_EVIDENCE_SATISFIED"
+   },
+   "limitations": [
+    "harness-owned probe: classification test only; never a Slow Cycle gameplay/test result"
+   ],
+   "completion": [
+    {
+     "id": "marker",
+     "kind": "stdout_regex",
+     "pattern": "^PROBE_COMPLETE name=p15$"
+    }
+   ],
+   "summaries": [
+    {
+     "id": "probe_summary",
+     "pattern": "^PROBE_SUMMARY checks=(\\d+) failures=(\\d+)$",
+     "failures_group": 2,
+     "total_group": 1,
+     "loose_pattern": "^PROBE_SUMMARY"
+    }
+   ]
+  },
+  {
+   "id": "probe_p16_unknown_stderr_line",
+   "kind": "check",
+   "origin": "probe",
+   "entry": "res://probes/p16_unknown_stderr.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 30
+   },
+   "matrix": {
+    "rows": [],
+    "categories": {},
+    "role": "harness probe (tests the harness, not Slow Cycle)",
+    "authority_category": null,
+    "e_capability": []
+   },
+   "expected_verdict": {
+    "result": "INCOMPLETE",
+    "reason": "UNKNOWN_ENGINE_MESSAGE"
+   },
+   "limitations": [
+    "harness-owned probe: classification test only; never a Slow Cycle gameplay/test result"
+   ],
+   "completion": [
+    {
+     "id": "marker",
+     "kind": "stdout_regex",
+     "pattern": "^PROBE_COMPLETE name=p16$"
+    }
+   ],
+   "summaries": [
+    {
+     "id": "probe_summary",
+     "pattern": "^PROBE_SUMMARY checks=(\\d+) failures=(\\d+)$",
+     "failures_group": 2,
+     "total_group": 1,
+     "loose_pattern": "^PROBE_SUMMARY"
+    }
+   ]
+  },
+  {
+   "id": "road_graph",
+   "kind": "check",
+   "origin": "repo",
+   "entry": "res://scripts/test/test_road_graph.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 240,
+    "user_args": []
+   },
+   "matrix": {
+    "rows": [
+     "GRAPH-KIN",
+     "GRAPH-PATH",
+     "GRAPH-TOPO",
+     "GRAPH-DAG",
+     "GRAPH-FORK",
+     "GRAPH-PERF"
+    ],
+    "categories": {
+     "GRAPH-KIN": "ACTIVE_CONTRACT",
+     "GRAPH-PATH": "ACTIVE_CONTRACT",
+     "GRAPH-TOPO": "REGRESSION_GUARD",
+     "GRAPH-DAG": "LEGACY_CONTRACT",
+     "GRAPH-FORK": "REGRESSION_GUARD",
+     "GRAPH-PERF": "REGRESSION_GUARD"
+    },
+    "authority_category": "ACTIVE_CONTRACT",
+    "role": "runner (pure/domain)",
+    "e_capability": [
+     "E1"
+    ]
+   },
+   "completion": [
+    {
+     "id": "final_success_line",
+     "kind": "stdout_regex",
+     "pattern": "^\\s*OVERALL VERDICT\\s*:\\s*ALL CHECKS PASSED"
+    }
+   ],
+   "summaries": [
+    {
+     "id": "failed_counter",
+     "pattern": "^\\s*FAILED\\s*:\\s*(\\d+)\\s*$",
+     "failures_group": 1
+    }
+   ],
+   "assertions": {
+    "expected": null,
+    "expected_basis": "no declared total",
+    "actual_from": {
+     "kind": "counter_regex",
+     "pattern": "^\\s*TOTAL ASSERTIONS\\s*:\\s*(\\d+)"
+    }
+   },
+   "fail_markers": [
+    "\\[FAIL[^\\]]*\\]",
+    "\\[FAILURE\\]",
+    "WATCHDOG FAILED",
+    "SUITE FAILED",
+    "SESSION_LOG_CHECK_FAIL",
+    "^\\s*\\[ERROR\\]",
+    "MASTER_VERIFICATION_FAIL"
+   ],
+   "not_claimed": [
+    "E2+",
+    "DAG rows are LEGACY (C01)"
+   ],
+   "limitations": [
+    "GRAPH-DAG is LEGACY_CONTRACT (C01)"
+   ]
+  },
+  {
+   "id": "seed_diversity",
+   "kind": "check",
+   "origin": "repo",
+   "entry": "res://scripts/test/test_seed_diversity_matrix.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 240,
+    "user_args": []
+   },
+   "matrix": {
+    "rows": [
+     "DIVERSITY"
+    ],
+    "categories": {
+     "DIVERSITY": "REGRESSION_GUARD"
+    },
+    "authority_category": "REGRESSION_GUARD",
+    "role": "runner (G gate)",
+    "e_capability": [
+     "E1"
+    ]
+   },
+   "completion": [
+    {
+     "id": "final_success_line",
+     "kind": "stdout_regex",
+     "pattern": "SEED DIVERSITY WATCHDOG PASSED"
+    }
+   ],
+   "coverage": [
+    {
+     "id": "four_criteria_pass",
+     "kind": "distinct_min",
+     "pattern": "^\\s*(\\d)\\. .* -> PASS$",
+     "min": 4,
+     "basis": "four diversity criteria printed by the runner"
+    }
+   ],
+   "fail_markers": [
+    "\\[FAIL[^\\]]*\\]",
+    "\\[FAILURE\\]",
+    "WATCHDOG FAILED",
+    "SUITE FAILED",
+    "SESSION_LOG_CHECK_FAIL",
+    "^\\s*\\[ERROR\\]",
+    "MASTER_VERIFICATION_FAIL"
+   ],
+   "engine_policy": {
+    "errors": "zero_unexpected",
+    "leaks": "zero_unexpected"
+   },
+   "limitations": [
+    "aggregate boolean gate (C04)"
+   ]
+  },
+  {
+   "id": "monotony",
+   "kind": "check",
+   "origin": "repo",
+   "entry": "res://scripts/test/test_monotony_profiler.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 240,
+    "user_args": []
+   },
+   "matrix": {
+    "rows": [
+     "MONOTONY"
+    ],
+    "categories": {
+     "MONOTONY": "REGRESSION_GUARD"
+    },
+    "authority_category": "REGRESSION_GUARD",
+    "role": "runner (G gate)",
+    "e_capability": [
+     "E1"
+    ]
+   },
+   "completion": [
+    {
+     "id": "final_success_line",
+     "kind": "stdout_regex",
+     "pattern": "MONOTONY PROFILER WATCHDOG PASSED"
+    }
+   ],
+   "coverage": [
+    {
+     "id": "three_seeds_analyzed",
+     "kind": "distinct_min",
+     "pattern": "^--- Analyzing Seed (\\d+) ---$",
+     "min": 3,
+     "basis": "TEST_SEEDS has 3 seeds"
+    }
+   ],
+   "summaries": [
+    {
+     "id": "violations",
+     "pattern": "^Watchdog Summary: (\\d+) total violations found across \\d+ seeds",
+     "failures_group": 1
+    }
+   ],
+   "fail_markers": [
+    "\\[FAIL[^\\]]*\\]",
+    "\\[FAILURE\\]",
+    "WATCHDOG FAILED",
+    "SUITE FAILED",
+    "SESSION_LOG_CHECK_FAIL",
+    "^\\s*\\[ERROR\\]",
+    "MASTER_VERIFICATION_FAIL"
+   ],
+   "engine_policy": {
+    "errors": "zero_unexpected",
+    "leaks": "zero_unexpected"
+   },
+   "limitations": [
+    "a 'No mountain sections' observation would be vacuous coverage (C04)"
+   ]
+  },
+  {
+   "id": "master_native_tiers",
+   "kind": "check",
+   "origin": "repo",
+   "entry": "res://scripts/test/test_sprint_4m_master.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 420,
+    "user_args": []
+   },
+   "matrix": {
+    "rows": [
+     "MASTER-AIR",
+     "MASTER-SEED",
+     "MASTER-SCENE",
+     "MASTER-SUB"
+    ],
+    "categories": {
+     "MASTER-AIR": "REGRESSION_GUARD",
+     "MASTER-SEED": "ACTIVE_CONTRACT",
+     "MASTER-SCENE": "REGRESSION_GUARD",
+     "MASTER-SUB": "REGRESSION_GUARD"
+    },
+    "authority_category": "REGRESSION_GUARD",
+    "role": "runner (mixed, subprocess master)",
+    "e_capability": [
+     "E2",
+     "E3"
+    ]
+   },
+   "completion": [
+    {
+     "id": "final_success_line",
+     "kind": "stdout_regex",
+     "pattern": "^\\[MASTER_VERIFICATION_PASS"
+    }
+   ],
+   "coverage": [
+    {
+     "id": "airborne_invariants_1_6",
+     "kind": "distinct_min",
+     "pattern": "^\\s*- Invariant (\\d) .*PASS",
+     "min": 6,
+     "basis": "six airborne invariants"
+    },
+    {
+     "id": "determinism_seeds_5",
+     "kind": "distinct_min",
+     "pattern": "^\\s*- Seed (\\d+): MATCH",
+     "min": 5,
+     "basis": "five seeds"
+    }
+   ],
+   "assertions": {
+    "expected": 125,
+    "expected_basis": "fixed budget literal in master (C02); NOT a measured count; master discards child output",
+    "actual_from": null
+   },
+   "fail_markers": [
+    "\\[FAIL[^\\]]*\\]",
+    "\\[FAILURE\\]",
+    "WATCHDOG FAILED",
+    "SUITE FAILED",
+    "SESSION_LOG_CHECK_FAIL",
+    "^\\s*\\[ERROR\\]",
+    "MASTER_VERIFICATION_FAIL",
+    "^\\s+Tier .*:\\s+FAIL\\b"
+   ],
+   "limitations": [
+    "125 = expected budget, never reported as actual (C02)",
+    "children certified only by direct runs",
+    "Tier 7 '0 Leaks' has no leak oracle (F4)"
+   ],
+   "not_claimed": [
+    "actual 68/6/8/15/16 assertions"
+   ]
+  },
+  {
+   "id": "child_diagnostics",
+   "kind": "check",
+   "origin": "repo",
+   "entry": "res://scripts/test/test_diagnostics.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 240,
+    "user_args": []
+   },
+   "matrix": {
+    "rows": [
+     "DIAG-01",
+     "DIAG-02",
+     "DIAG-03",
+     "DIAG-04",
+     "DIAG-05",
+     "DIAG-06",
+     "DIAG-07",
+     "DIAG-08",
+     "DIAG-09",
+     "DIAG-10",
+     "DIAG-11",
+     "DIAG-12",
+     "DIAG-13",
+     "DIAG-14",
+     "DIAG-15",
+     "DIAG-16",
+     "DIAG-17",
+     "DIAG-18",
+     "DIAG-19",
+     "DIAG-20",
+     "DIAG-21",
+     "DIAG-22",
+     "DIAG-23",
+     "DIAG-24",
+     "DIAG-25",
+     "DIAG-26",
+     "DIAG-27",
+     "DIAG-28",
+     "DIAG-29",
+     "DIAG-30",
+     "DIAG-31",
+     "DIAG-32",
+     "DIAG-33",
+     "DIAG-34",
+     "DIAG-35",
+     "DIAG-36",
+     "DIAG-37",
+     "DIAG-38",
+     "DIAG-39",
+     "DIAG-40",
+     "DIAG-41",
+     "DIAG-42",
+     "DIAG-43",
+     "DIAG-44",
+     "DIAG-45",
+     "DIAG-46",
+     "DIAG-47",
+     "DIAG-48",
+     "DIAG-49",
+     "DIAG-50",
+     "DIAG-51",
+     "DIAG-52",
+     "DIAG-53",
+     "DIAG-54",
+     "DIAG-55",
+     "DIAG-56",
+     "DIAG-57",
+     "DIAG-58",
+     "DIAG-59",
+     "DIAG-60",
+     "DIAG-61",
+     "DIAG-62",
+     "DIAG-63",
+     "DIAG-64",
+     "DIAG-65",
+     "DIAG-66",
+     "DIAG-67",
+     "DIAG-68"
+    ],
+    "categories": {
+     "DIAG-01": "REGRESSION_GUARD",
+     "DIAG-02": "REGRESSION_GUARD",
+     "DIAG-03": "REGRESSION_GUARD",
+     "DIAG-04": "REGRESSION_GUARD",
+     "DIAG-05": "REGRESSION_GUARD",
+     "DIAG-06": "REGRESSION_GUARD",
+     "DIAG-07": "REGRESSION_GUARD",
+     "DIAG-08": "REGRESSION_GUARD",
+     "DIAG-09": "REGRESSION_GUARD",
+     "DIAG-10": "REGRESSION_GUARD",
+     "DIAG-11": "REGRESSION_GUARD",
+     "DIAG-12": "REGRESSION_GUARD",
+     "DIAG-13": "REGRESSION_GUARD",
+     "DIAG-14": "REGRESSION_GUARD",
+     "DIAG-15": "REGRESSION_GUARD",
+     "DIAG-16": "REGRESSION_GUARD",
+     "DIAG-17": "REGRESSION_GUARD",
+     "DIAG-18": "REGRESSION_GUARD",
+     "DIAG-19": "REGRESSION_GUARD",
+     "DIAG-20": "REGRESSION_GUARD",
+     "DIAG-21": "REGRESSION_GUARD",
+     "DIAG-22": "REGRESSION_GUARD",
+     "DIAG-23": "REGRESSION_GUARD",
+     "DIAG-24": "REGRESSION_GUARD",
+     "DIAG-25": "ACTIVE_CONTRACT",
+     "DIAG-26": "REGRESSION_GUARD",
+     "DIAG-27": "REGRESSION_GUARD",
+     "DIAG-28": "REGRESSION_GUARD",
+     "DIAG-29": "REGRESSION_GUARD",
+     "DIAG-30": "REGRESSION_GUARD",
+     "DIAG-31": "REGRESSION_GUARD",
+     "DIAG-32": "REGRESSION_GUARD",
+     "DIAG-33": "REGRESSION_GUARD",
+     "DIAG-34": "REGRESSION_GUARD",
+     "DIAG-35": "REGRESSION_GUARD",
+     "DIAG-36": "REGRESSION_GUARD",
+     "DIAG-37": "REGRESSION_GUARD",
+     "DIAG-38": "REGRESSION_GUARD",
+     "DIAG-39": "REGRESSION_GUARD",
+     "DIAG-40": "REGRESSION_GUARD",
+     "DIAG-41": "REGRESSION_GUARD",
+     "DIAG-42": "REGRESSION_GUARD",
+     "DIAG-43": "REGRESSION_GUARD",
+     "DIAG-44": "ACTIVE_CONTRACT",
+     "DIAG-45": "REGRESSION_GUARD",
+     "DIAG-46": "REGRESSION_GUARD",
+     "DIAG-47": "REGRESSION_GUARD",
+     "DIAG-48": "ACTIVE_CONTRACT",
+     "DIAG-49": "REGRESSION_GUARD",
+     "DIAG-50": "REGRESSION_GUARD",
+     "DIAG-51": "REGRESSION_GUARD",
+     "DIAG-52": "REGRESSION_GUARD",
+     "DIAG-53": "REGRESSION_GUARD",
+     "DIAG-54": "ACTIVE_CONTRACT",
+     "DIAG-55": "REGRESSION_GUARD",
+     "DIAG-56": "REGRESSION_GUARD",
+     "DIAG-57": "REGRESSION_GUARD",
+     "DIAG-58": "REGRESSION_GUARD",
+     "DIAG-59": "REGRESSION_GUARD",
+     "DIAG-60": "REGRESSION_GUARD",
+     "DIAG-61": "REGRESSION_GUARD",
+     "DIAG-62": "REGRESSION_GUARD",
+     "DIAG-63": "ACTIVE_CONTRACT",
+     "DIAG-64": "REGRESSION_GUARD",
+     "DIAG-65": "REGRESSION_GUARD",
+     "DIAG-66": "ACTIVE_CONTRACT",
+     "DIAG-67": "REGRESSION_GUARD",
+     "DIAG-68": "ACTIVE_CONTRACT"
+    },
+    "authority_category": "REGRESSION_GUARD",
+    "role": "child of master (Tier 1)",
+    "e_capability": [
+     "E2"
+    ]
+   },
+   "completion": [
+    {
+     "id": "final_success_line",
+     "kind": "stdout_regex",
+     "pattern": "ALL SYSTEM VERIFICATIONS PASSED \\[68/68"
+    }
+   ],
+   "assertions": {
+    "expected": 68,
+    "expected_basis": "68 labelled verifications in source",
+    "actual_from": {
+     "kind": "label_count",
+     "pattern": "^\\[VERIFICATION #(\\d+)\\]"
+    }
+   },
+   "coverage": [
+    {
+     "id": "verification_labels_68",
+     "kind": "distinct_min",
+     "pattern": "^\\[VERIFICATION #(\\d+)\\]",
+     "min": 68,
+     "basis": "labels observed in stdout"
+    }
+   ],
+   "fail_markers": [
+    "\\[FAIL[^\\]]*\\]",
+    "\\[FAILURE\\]",
+    "WATCHDOG FAILED",
+    "SUITE FAILED",
+    "SESSION_LOG_CHECK_FAIL",
+    "^\\s*\\[ERROR\\]",
+    "MASTER_VERIFICATION_FAIL"
+   ],
+   "limitations": [
+    "'68/68' is a fixed label (C02); measured = distinct observed [VERIFICATION #n] labels",
+    "optional-node skips are not detected (C02/C07)"
+   ]
+  },
+  {
+   "id": "child_track_verification",
+   "kind": "check",
+   "origin": "repo",
+   "entry": "res://scripts/test/test_track_verification.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 240,
+    "user_args": []
+   },
+   "matrix": {
+    "rows": [
+     "TRACK-GEO",
+     "TRACK-STRUCT"
+    ],
+    "categories": {
+     "TRACK-GEO": "REGRESSION_GUARD",
+     "TRACK-STRUCT": "REGRESSION_GUARD"
+    },
+    "authority_category": "REGRESSION_GUARD",
+    "role": "child of master (Tier 2A)",
+    "e_capability": [
+     "E2"
+    ]
+   },
+   "completion": [
+    {
+     "id": "final_success_line",
+     "kind": "stdout_regex",
+     "pattern": "ALL TEST TRACK VERIFICATION CHECKS PASSED"
+    }
+   ],
+   "assertions": {
+    "expected": 6,
+    "expected_basis": "master budget label (C02)",
+    "actual_from": {
+     "kind": "label_count",
+     "pattern": "^\\[PASS\\] (.+)$"
+    }
+   },
+   "fail_markers": [
+    "\\[FAIL[^\\]]*\\]",
+    "\\[FAILURE\\]",
+    "WATCHDOG FAILED",
+    "SUITE FAILED",
+    "SESSION_LOG_CHECK_FAIL",
+    "^\\s*\\[ERROR\\]",
+    "MASTER_VERIFICATION_FAIL"
+   ],
+   "limitations": [
+    "fixed budget label; measured = distinct '[PASS] <text>' lines",
+    "optional-node skips not detected"
+   ]
+  },
+  {
+   "id": "child_track_ride",
+   "kind": "check",
+   "origin": "repo",
+   "entry": "res://scripts/test/test_track_ride.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 240,
+    "user_args": []
+   },
+   "matrix": {
+    "rows": [
+     "TRACK-RIDE",
+     "TRACK-HUD"
+    ],
+    "categories": {
+     "TRACK-RIDE": "REGRESSION_GUARD",
+     "TRACK-HUD": "REGRESSION_GUARD"
+    },
+    "authority_category": "REGRESSION_GUARD",
+    "role": "child of master (Tier 2B)",
+    "e_capability": [
+     "E3"
+    ]
+   },
+   "completion": [
+    {
+     "id": "final_success_line",
+     "kind": "stdout_regex",
+     "pattern": "ALL LIVE TEST TRACK RIDE CHECKS PASSED"
+    }
+   ],
+   "assertions": {
+    "expected": 8,
+    "expected_basis": "master budget label (C02)",
+    "actual_from": {
+     "kind": "label_count",
+     "pattern": "^\\[PASS\\] (.+)$"
+    }
+   },
+   "fail_markers": [
+    "\\[FAIL[^\\]]*\\]",
+    "\\[FAILURE\\]",
+    "WATCHDOG FAILED",
+    "SUITE FAILED",
+    "SESSION_LOG_CHECK_FAIL",
+    "^\\s*\\[ERROR\\]",
+    "MASTER_VERIFICATION_FAIL"
+   ],
+   "limitations": [
+    "fixed budget label; measured = distinct '[PASS] <text>' lines"
+   ]
+  },
+  {
+   "id": "child_riding_lab",
+   "kind": "check",
+   "origin": "repo",
+   "entry": "res://scripts/test/test_riding_lab.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 240,
+    "user_args": []
+   },
+   "matrix": {
+    "rows": [
+     "LAB-GEO",
+     "LAB-STRUCT"
+    ],
+    "categories": {
+     "LAB-GEO": "REGRESSION_GUARD",
+     "LAB-STRUCT": "REGRESSION_GUARD"
+    },
+    "authority_category": "REGRESSION_GUARD",
+    "role": "child of master (Tier 3)",
+    "e_capability": [
+     "E2"
+    ]
+   },
+   "completion": [
+    {
+     "id": "final_success_line",
+     "kind": "stdout_regex",
+     "pattern": "ALL 15 RIDING LAB VERIFICATION CHECKS PASSED"
+    }
+   ],
+   "assertions": {
+    "expected": 15,
+    "expected_basis": "fixed label in source (C02)",
+    "actual_from": {
+     "kind": "label_count",
+     "pattern": "^\\[PASS ([A-Z]\\d+)\\]"
+    }
+   },
+   "coverage": [
+    {
+     "id": "pass_labels_15",
+     "kind": "distinct_min",
+     "pattern": "^\\s*\\[PASS ([A-Z]\\d+)\\]",
+     "min": 15,
+     "basis": "labels observed in stdout"
+    }
+   ],
+   "fail_markers": [
+    "\\[FAIL[^\\]]*\\]",
+    "\\[FAILURE\\]",
+    "WATCHDOG FAILED",
+    "SUITE FAILED",
+    "SESSION_LOG_CHECK_FAIL",
+    "^\\s*\\[ERROR\\]",
+    "MASTER_VERIFICATION_FAIL"
+   ],
+   "limitations": [
+    "fixed label '15'; measured = distinct [PASS xx] labels (C02)"
+   ]
+  },
+  {
+   "id": "child_gravel_loop",
+   "kind": "check",
+   "origin": "repo",
+   "entry": "res://scripts/test/test_gravel_loop.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 240,
+    "user_args": []
+   },
+   "matrix": {
+    "rows": [
+     "GRAVEL-GEO",
+     "GRAVEL-STRUCT"
+    ],
+    "categories": {
+     "GRAVEL-GEO": "REGRESSION_GUARD",
+     "GRAVEL-STRUCT": "REGRESSION_GUARD"
+    },
+    "authority_category": "REGRESSION_GUARD",
+    "role": "child of master (Tier 4)",
+    "e_capability": [
+     "E2"
+    ]
+   },
+   "completion": [
+    {
+     "id": "final_success_line",
+     "kind": "stdout_regex",
+     "pattern": "ALL 16 GRAVEL TRAINING LOOP CHECKS PASSED"
+    }
+   ],
+   "assertions": {
+    "expected": 16,
+    "expected_basis": "fixed label in source (C02)",
+    "actual_from": {
+     "kind": "label_count",
+     "pattern": "^\\s*\\[PASS ([A-Z]\\d+)\\]"
+    }
+   },
+   "coverage": [
+    {
+     "id": "pass_labels_16",
+     "kind": "distinct_min",
+     "pattern": "^\\s*\\[PASS ([A-Z]\\d+)\\]",
+     "min": 16,
+     "basis": "labels observed in stdout"
+    }
+   ],
+   "fail_markers": [
+    "\\[FAIL[^\\]]*\\]",
+    "\\[FAILURE\\]",
+    "WATCHDOG FAILED",
+    "SUITE FAILED",
+    "SESSION_LOG_CHECK_FAIL",
+    "^\\s*\\[ERROR\\]",
+    "MASTER_VERIFICATION_FAIL"
+   ],
+   "limitations": [
+    "fixed label '16'; measured = distinct [PASS xx] labels (C02)"
+   ]
+  },
+  {
+   "id": "virtual_rider",
+   "kind": "check",
+   "origin": "repo",
+   "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 240,
+    "user_args": []
+   },
+   "matrix": {
+    "rows": [
+     "RIDER"
+    ],
+    "categories": {
+     "RIDER": "REGRESSION_GUARD"
+    },
+    "authority_category": "REGRESSION_GUARD",
+    "role": "runner (physical bot, G gate)",
+    "e_capability": [
+     "E3",
+     "E4"
+    ]
+   },
+   "completion": [
+    {
+     "id": "final_success_line",
+     "kind": "stdout_regex",
+     "pattern": "VIRTUAL PHYSICAL RIDER BOT COMPLETED SUCCESSFULLY"
+    }
+   ],
+   "measurements": {
+    "actual_progress": {
+     "pattern": "Distance Covered:\\s*([\\d.]+)m / [\\d.]+m",
+     "group": 1,
+     "unit": "m"
+    }
+   },
+   "contract_report": {
+    "declared_target": {
+     "value": 500,
+     "unit": "m"
+    },
+    "existing_pass_threshold": {
+     "value": 350,
+     "unit": "m",
+     "basis": "existing gate in test_virtual_rider_bot.gd (>=350 m); unchanged by Q1"
+    },
+    "measurement_semantics": "active-branch local s distance; can reset on branch change (TEST_MATRIX C03)",
+    "limitation": "A PASS at the existing 350 m threshold is NOT full 500 m route acceptance; not both routes, not all seeds, not E7"
+   },
+   "fail_markers": [
+    "\\[FAIL[^\\]]*\\]",
+    "\\[FAILURE\\]",
+    "WATCHDOG FAILED",
+    "SUITE FAILED",
+    "SESSION_LOG_CHECK_FAIL",
+    "^\\s*\\[ERROR\\]",
+    "MASTER_VERIFICATION_FAIL"
+   ],
+   "engine_policy": {
+    "errors": "zero_unexpected",
+    "leaks": "zero_unexpected"
+   },
+   "limitations": [
+    "gate threshold 350/500 unchanged (C03)",
+    "distance is branch-local; not a full 500 m route acceptance"
+   ],
+   "not_claimed": [
+    "full 500 m route accepted",
+    "E7"
+   ]
+  },
+  {
+   "id": "route_branch_integration",
+   "kind": "check",
+   "origin": "repo",
+   "entry": "res://scripts/test/test_route_branch_integration.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 240,
+    "user_args": []
+   },
+   "matrix": {
+    "rows": [
+     "ROUTE-LOCK",
+     "ROUTE-SPACE"
+    ],
+    "categories": {
+     "ROUTE-LOCK": "REGRESSION_GUARD",
+     "ROUTE-SPACE": "LEGACY_CONTRACT"
+    },
+    "authority_category": "REGRESSION_GUARD",
+    "role": "runner (teleport/proxy)",
+    "e_capability": [
+     "E2"
+    ]
+   },
+   "completion": [
+    {
+     "id": "final_success_line",
+     "kind": "stdout_regex",
+     "pattern": "^ROUTE_INTEGRATION_SUMMARY failures=\\d+ routes=\\d+$"
+    }
+   ],
+   "summaries": [
+    {
+     "id": "route_summary",
+     "pattern": "^ROUTE_INTEGRATION_SUMMARY failures=(\\d+) routes=(\\d+)$",
+     "failures_group": 1,
+     "total_group": 2,
+     "loose_pattern": "^ROUTE_INTEGRATION_SUMMARY"
+    }
+   ],
+   "coverage": [
+    {
+     "id": "routes>=8",
+     "kind": "counter_min",
+     "pattern": "^ROUTE_INTEGRATION_SUMMARY failures=\\d+ routes=(\\d+)$",
+     "min": 8,
+     "basis": "declared expected routes = 8 (plan section 7)"
+    }
+   ],
+   "fail_markers": [
+    "\\[FAIL[^\\]]*\\]",
+    "\\[FAILURE\\]",
+    "WATCHDOG FAILED",
+    "SUITE FAILED",
+    "SESSION_LOG_CHECK_FAIL",
+    "^\\s*\\[ERROR\\]",
+    "MASTER_VERIFICATION_FAIL"
+   ],
+   "limitations": [
+    "teleport proxy, not a physical ride (C03)",
+    "known legacy failures are recorded, not repaired"
+   ],
+   "not_claimed": [
+    "E4 physical ride"
+   ]
+  },
+  {
+   "id": "session_diagnostics",
+   "kind": "check",
+   "origin": "repo",
+   "entry": "res://scripts/test/test_session_diagnostics.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 240,
+    "user_args": []
+   },
+   "matrix": {
+    "rows": [
+     "LOG-RUNTIME",
+     "LOG-UNIT"
+    ],
+    "categories": {
+     "LOG-RUNTIME": "REGRESSION_GUARD",
+     "LOG-UNIT": "ACTIVE_CONTRACT"
+    },
+    "authority_category": "REGRESSION_GUARD",
+    "role": "runner (diagnostics/logger)",
+    "e_capability": [
+     "E2",
+     "E3"
+    ]
+   },
+   "completion": [
+    {
+     "id": "final_success_line",
+     "kind": "stdout_regex",
+     "pattern": "^SESSION_LOG_TEST_SUMMARY checks=\\d+ failures=\\d+ summary="
+    }
+   ],
+   "summaries": [
+    {
+     "id": "session_summary",
+     "pattern": "^SESSION_LOG_TEST_SUMMARY checks=(\\d+) failures=(\\d+) summary=",
+     "failures_group": 2,
+     "total_group": 1,
+     "loose_pattern": "^SESSION_LOG_TEST_SUMMARY"
+    }
+   ],
+   "assertions": {
+    "expected": null,
+    "expected_basis": "no declared total",
+    "actual_from": {
+     "kind": "counter_regex",
+     "pattern": "^SESSION_LOG_TEST_SUMMARY checks=(\\d+) "
+    }
+   },
+   "seeds": {
+    "requested": [
+     184729,
+     42,
+     77777
+    ],
+    "observed": {
+     "glob": "diag/*/manifest.json",
+     "field": "effective_seed"
+    },
+    "require_observed": true
+   },
+   "artifacts": [
+    {
+     "glob": "diag/*/manifest.json",
+     "role": "session_manifest",
+     "min_count": 3
+    },
+    {
+     "glob": "diag/session-test-*.json",
+     "role": "session_summary_json",
+     "min_count": 1
+    }
+   ],
+   "engine_policy": {
+    "errors": "zero_unexpected",
+    "leaks": "record",
+    "expected": [
+     "^ERROR: Could not create directory: .*[/\\\\]diag[/\\\\]blocked-\\d+[/\\\\]",
+     "^DIAGNOSTIC_IO_ERROR code=DIRECTORY_UNAVAILABLE path=.*[/\\\\]diag[/\\\\]blocked-\\d+[/\\\\]"
+    ]
+   },
+   "fail_markers": [
+    "\\[FAIL[^\\]]*\\]",
+    "\\[FAILURE\\]",
+    "WATCHDOG FAILED",
+    "SUITE FAILED",
+    "SESSION_LOG_CHECK_FAIL",
+    "^\\s*\\[ERROR\\]",
+    "MASTER_VERIFICATION_FAIL"
+   ],
+   "limitations": [
+    "intentional I/O negative cases are declared as expected messages"
+   ]
+  },
+  {
+   "id": "replay_session",
+   "kind": "check",
+   "origin": "repo",
+   "entry": "res://scripts/test/replay_session_diagnostic.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 240,
+    "user_args": []
+   },
+   "matrix": {
+    "rows": [
+     "REPLAY"
+    ],
+    "categories": {
+     "REPLAY": "ACTIVE_CONTRACT"
+    },
+    "authority_category": "ACTIVE_CONTRACT",
+    "role": "runner (replay)",
+    "e_capability": [
+     "E2"
+    ]
+   },
+   "completion": [
+    {
+     "id": "final_success_line",
+     "kind": "stdout_regex",
+     "pattern": "^REPLAY_DIAGNOSTIC_SUMMARY status=PASS reason= checkpoints=\\d+ choices=\\d+$"
+    }
+   ],
+   "coverage": [
+    {
+     "id": "checkpoints>=3",
+     "kind": "counter_min",
+     "pattern": "checkpoints=(\\d+) choices=",
+     "min": 3,
+     "basis": "session diagnostics manifest has 3 checkpoints"
+    },
+    {
+     "id": "choices>=1",
+     "kind": "counter_min",
+     "pattern": "choices=(\\d+)$",
+     "min": 1,
+     "basis": "manifest records 1 route choice"
+    }
+   ],
+   "replay_from": {
+    "check": "session_diagnostics",
+    "glob": "diag/*/manifest.json"
+   },
+   "fail_markers": [
+    "\\[FAIL[^\\]]*\\]",
+    "\\[FAILURE\\]",
+    "WATCHDOG FAILED",
+    "SUITE FAILED",
+    "SESSION_LOG_CHECK_FAIL",
+    "^\\s*\\[ERROR\\]",
+    "MASTER_VERIFICATION_FAIL"
+   ],
+   "limitations": [
+    "geometry-only replay, not input/physics replay (C06)",
+    "manifest is taken from the earlier session_diagnostics check of the same run"
+   ]
+  },
+  {
+   "id": "capture_visual_vulkan",
+   "kind": "check",
+   "origin": "repo",
+   "entry": "res://scripts/test/capture_visual_audit.gd",
+   "launch": {
+    "mode": "vulkan",
+    "timeout_s": 180,
+    "user_args": []
+   },
+   "matrix": {
+    "rows": [
+     "CAP-VIS"
+    ],
+    "categories": {
+     "CAP-VIS": "OBSERVATIONAL"
+    },
+    "authority_category": "OBSERVATIONAL",
+    "role": "capture (G gate, Vulkan)",
+    "e_capability": [
+     "E5"
+    ]
+   },
+   "completion": [
+    {
+     "id": "audit_complete",
+     "kind": "stdout_regex",
+     "pattern": "^AUDIT_COMPLETE status=CAPTURE_COMPLETE reason= frames=8/8 "
+    }
+   ],
+   "coverage": [
+    {
+     "id": "frames_8",
+     "kind": "counter_min",
+     "pattern": "^AUDIT_COMPLETE .* frames=(\\d+)/8 ",
+     "min": 8,
+     "basis": "capture_queue has 8 frames"
+    },
+    {
+     "id": "captured_seed_184729_frames_8",
+     "kind": "distinct_min",
+     "pattern": "^\\[CAPTURED\\] seed=184729 s=([\\d.]+) camera=(\\w+)",
+     "min": 8,
+     "basis": "effective seed 184729 observed in per-frame [CAPTURED] lines"
+    }
+   ],
+   "artifacts": [
+    {
+     "glob": "audit/*/*.png",
+     "role": "capture_png",
+     "min_count": 8,
+     "checks": [
+      "png_header"
+     ],
+     "png_size": [
+      1280,
+      720
+     ]
+    },
+    {
+     "glob": "audit/*/manifest.json",
+     "role": "capture_manifest",
+     "min_count": 1
+    }
+   ],
+   "evidence_gate": {
+    "E5": {
+     "requires": [
+      "driver_vulkan",
+      "frames_saved"
+     ],
+     "manifest": {
+      "glob": "audit/*/manifest.json"
+     },
+     "human_review": "required"
+    }
+   },
+   "fail_markers": [
+    "\\[FAIL[^\\]]*\\]",
+    "\\[FAILURE\\]",
+    "WATCHDOG FAILED",
+    "SUITE FAILED",
+    "SESSION_LOG_CHECK_FAIL",
+    "^\\s*\\[ERROR\\]",
+    "MASTER_VERIFICATION_FAIL"
+   ],
+   "engine_policy": {
+    "errors": "zero_unexpected",
+    "leaks": "zero_unexpected"
+   },
+   "limitations": [
+    "E5 stays human_review_pending: PNGs were not visually reviewed by the harness",
+    "teleport-style capture (C05)"
+   ],
+   "not_claimed": [
+    "E5 visual acceptance",
+    "E7"
+   ]
+  },
+  {
+   "id": "neg_contract_seed_mismatch",
+   "kind": "expected_negative",
+   "origin": "repo",
+   "entry": "res://scripts/test/test_capture_audit_contract.gd",
+   "launch": {
+    "mode": "vulkan",
+    "timeout_s": 90,
+    "user_args": [
+     "--audit-case=seed_mismatch"
+    ]
+   },
+   "matrix": {
+    "rows": [
+     "CAP-CONTRACT"
+    ],
+    "categories": {
+     "CAP-CONTRACT": "ACTIVE_CONTRACT"
+    },
+    "authority_category": "ACTIVE_CONTRACT",
+    "role": "existing negative (Vulkan)",
+    "e_capability": [
+     "E2"
+    ]
+   },
+   "expected_negative": {
+    "reason": "^SEED_MISMATCH$",
+    "reason_extract": "^AUDIT_COMPLETE status=\\S+ reason=(\\S*) frames=",
+    "not_exercised": [
+     "RENDERER_UNAVAILABLE"
+    ]
+   }
+  },
+  {
+   "id": "neg_contract_missing_target",
+   "kind": "expected_negative",
+   "origin": "repo",
+   "entry": "res://scripts/test/test_capture_audit_contract.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 90,
+    "user_args": [
+     "--audit-case=missing_target"
+    ]
+   },
+   "matrix": {
+    "rows": [
+     "CAP-CONTRACT"
+    ],
+    "categories": {
+     "CAP-CONTRACT": "ACTIVE_CONTRACT"
+    },
+    "authority_category": "ACTIVE_CONTRACT",
+    "role": "existing negative (headless)",
+    "e_capability": [
+     "E2"
+    ]
+   },
+   "expected_negative": {
+    "reason": "^(TARGET_OUTSIDE_PATH|COMMITTED_TARGET_MISSING)$",
+    "reason_extract": "^AUDIT_COMPLETE status=\\S+ reason=(\\S*) frames=",
+    "not_exercised": [
+     "RENDERER_UNAVAILABLE"
+    ]
+   }
+  },
+  {
+   "id": "neg_contract_save_failure",
+   "kind": "expected_negative",
+   "origin": "repo",
+   "entry": "res://scripts/test/test_capture_audit_contract.gd",
+   "launch": {
+    "mode": "vulkan",
+    "timeout_s": 90,
+    "user_args": [
+     "--audit-case=save_failure"
+    ]
+   },
+   "matrix": {
+    "rows": [
+     "CAP-CONTRACT"
+    ],
+    "categories": {
+     "CAP-CONTRACT": "ACTIVE_CONTRACT"
+    },
+    "authority_category": "ACTIVE_CONTRACT",
+    "role": "existing negative (Vulkan)",
+    "e_capability": [
+     "E2"
+    ]
+   },
+   "expected_negative": {
+    "reason": "^PNG_SAVE_FAILED:",
+    "reason_extract": "^AUDIT_COMPLETE status=\\S+ reason=(\\S*) frames=",
+    "not_exercised": [
+     "RENDERER_UNAVAILABLE"
+    ]
+   },
+   "engine_policy": {
+    "errors": "zero_unexpected",
+    "leaks": "record",
+    "expected": [
+     "^ERROR: Can't save PNG at path: '.*[/\\\\]blocked[/\\\\]e2e\\.png'\\."
+    ]
+   }
+  },
+  {
+   "id": "neg_capture_audit_timeout",
+   "kind": "expected_negative",
+   "origin": "repo",
+   "entry": "res://scripts/test/capture_visual_audit.gd",
+   "launch": {
+    "mode": "vulkan",
+    "timeout_s": 90,
+    "user_args": [
+     "--audit-timeout=0.01"
+    ]
+   },
+   "matrix": {
+    "rows": [
+     "CAP-VIS"
+    ],
+    "categories": {
+     "CAP-VIS": "OBSERVATIONAL"
+    },
+    "authority_category": "OBSERVATIONAL",
+    "role": "existing negative (Vulkan)",
+    "e_capability": [
+     "E2"
+    ]
+   },
+   "expected_negative": {
+    "reason": "^TIMEOUT$",
+    "reason_extract": "^AUDIT_COMPLETE status=\\S+ reason=(\\S*) frames=",
+    "not_exercised": [
+     "RENDERER_UNAVAILABLE"
+    ]
+   }
+  },
+  {
+   "id": "neg_capture_unknown_frame",
+   "kind": "expected_negative",
+   "origin": "repo",
+   "entry": "res://scripts/test/capture_visual_audit.gd",
+   "launch": {
+    "mode": "vulkan",
+    "timeout_s": 90,
+    "user_args": [
+     "--audit-frame=zz"
+    ]
+   },
+   "matrix": {
+    "rows": [
+     "CAP-VIS"
+    ],
+    "categories": {
+     "CAP-VIS": "OBSERVATIONAL"
+    },
+    "authority_category": "OBSERVATIONAL",
+    "role": "existing negative (Vulkan)",
+    "e_capability": [
+     "E2"
+    ]
+   },
+   "expected_negative": {
+    "reason": "^UNKNOWN_FRAME_FILTER$",
+    "reason_extract": "^AUDIT_COMPLETE status=\\S+ reason=(\\S*) frames=",
+    "not_exercised": [
+     "RENDERER_UNAVAILABLE"
+    ]
+   }
+  },
+  {
+   "id": "neg_replay_no_manifest",
+   "kind": "expected_negative",
+   "origin": "repo",
+   "entry": "res://scripts/test/replay_session_diagnostic.gd",
+   "launch": {
+    "mode": "headless",
+    "timeout_s": 90,
+    "user_args": []
+   },
+   "matrix": {
+    "rows": [
+     "REPLAY"
+    ],
+    "categories": {
+     "REPLAY": "ACTIVE_CONTRACT"
+    },
+    "authority_category": "ACTIVE_CONTRACT",
+    "role": "existing negative (headless)",
+    "e_capability": [
+     "E2"
+    ]
+   },
+   "expected_negative": {
+    "reason": "^MANIFEST_MISSING$",
+    "reason_extract": "^REPLAY_DIAGNOSTIC_SUMMARY status=\\S+ reason=(\\S*) checkpoints=",
+    "not_exercised": []
+   }
+  }
+ ]
+}

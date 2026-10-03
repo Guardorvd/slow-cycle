@@ -16,6 +16,7 @@ Scope: навигация после D0/D1 и Q0 authority approval. Решен�
 | Что сохраняем/адаптируем/заменяем? | [LEGACY_MIGRATION_MATRIX](LEGACY_MIGRATION_MATRIX.md) | Future migration decisions и parity gates |
 | Какие доказательства нужны? | [TEST_STRATEGY](TEST_STRATEGY.md) | Категории/уровни evidence; без reclassification suites в D0 |
 | Что реально проверяет каждый test/tool? | [TEST_MATRIX](TEST_MATRIX.md) | Accepted Q0 authority/capability map; C10/C12 OPEN, runtime NOT_RUN |
+| Чем bounded-запускать существующие tests и получать PASS/FAIL/INCOMPLETE? | [tools/verify](../tools/verify/README.md) | Q1 harness (COMPLETE: VERIFY PASS + independent REVIEW PASS); pilot-результаты не являются baseline, acceptance или Q2 |
 | Что фактически работает сейчас? | [CURRENT_PROJECT_STATE](CURRENT_PROJECT_STATE.md), [ARCHITECTURE](../ARCHITECTURE.md) | Датированное состояние/as-is runtime |
 | Что разрешено выполнять? | [AGENTS](../AGENTS.md), [active-plan slot](../implementation_plan.md) | Ограничения и явное approval одного task |
 | Что стало историей и почему? | [DOCUMENTATION_AUDIT](DOCUMENTATION_AUDIT.md), [history](history/README.md) | Статусы/конфликты/source traceability |
@@ -25,7 +26,7 @@ Scope: навигация после D0/D1 и Q0 authority approval. Решен�
 
 Новый task: Blueprint → Master → AGENTS → current state → target/matrix/strategy по области → один утверждённый ExecPlan. Код читать для safe migration, не для выбора иной цели.
 
-D0 завершён; [согласованный план и документационный отчёт](plans/completed/D0.md) сохранены. D1 завершён: [completed record](plans/completed/D1.md). Q0 [authority map](TEST_MATRIX.md) принята digest-bound checkpoint B; Q0 COMPLETE после documentary VERIFY PASS и fresh independent REVIEW PASS; [completed Q0](plans/completed/Q0.md), [root NO_ACTIVE_PLAN](../implementation_plan.md). Это не runtime acceptance: C10/C12 OPEN, gates сохранены. Q1/Q2/R0 не начаты и требуют отдельных планов/approval.
+D0 завершён; [согласованный план и документационный отчёт](plans/completed/D0.md) сохранены. D1 завершён: [completed record](plans/completed/D1.md). Q0 [authority map](TEST_MATRIX.md) принята digest-bound checkpoint B; Q0 COMPLETE после documentary VERIFY PASS и fresh independent REVIEW PASS; [completed Q0](plans/completed/Q0.md), [root NO_ACTIVE_PLAN](../implementation_plan.md). Это не runtime acceptance: C10/C12 OPEN, gates сохранены. Q1 Bounded Verification Harness COMPLETE: fresh VERIFY PASS и fresh independent REVIEW PASS (R1 REJECT исправлен, R2 PASS); [completed record](plans/completed/Q1.md). Q1 подтверждает механизм верификации, а не whole-game runtime acceptance: runtime/game acceptance остаётся INCOMPLETE; `route_branch_integration` — известный текущий failure pilot Q1 (failures=9 routes=4); ObjectDB leak был непостоянным в evidence Q1 и не имеет найденной причины; C10 и C12 OPEN. Q2 НЕ начат; R0 НЕ начат. Q2/R0 требуют отдельных планов/approval.
 
 ## История и evidence
 
