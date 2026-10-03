@@ -1,3 +1,5 @@
+Q0 navigation (2026-10-03): [accepted Test Authority Map](TEST_MATRIX.md), Q0-TEST-MATRIX-ACCEPTED-1.2, human checkpoint B bound to draft SHA256 `ef994313228752bac7bb93b448e178e9ea9b45ff8483f9ef39856b77eea41ea8`. Categories: 41 ACTIVE_CONTRACT /125 REGRESSION_GUARD /16 LEGACY_CONTRACT /12 OBSERVATIONAL /10 HISTORICAL; non-check artifacts are N/A, not a sixth category. C10 numeric requirements and C12 stale oracle remain OPEN. Existing gates and runtime INCOMPLETE are retained; no Q1/Q2/R0. Task lifecycle/reports: [root plan slot](../implementation_plan.md).
+
 # Documentation status — D0
 
 STATUS: SUPERSEDED

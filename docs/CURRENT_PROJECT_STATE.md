@@ -1,4 +1,4 @@
-# Slow Cycle — current project state after D1
+# Slow Cycle — current project state after D1 / Q0 authority approval
 
 STATUS: CURRENT
 
@@ -8,7 +8,7 @@ STATUS: CURRENT
 
 [Blueprint](TARGET_GAME_BLUEPRINT.md) — продукт; [Master](MASTER_IMPLEMENTATION_PLAN.md) — стратегия/pivot и порядок фаз. [Target architecture](TARGET_ARCHITECTURE.md), [migration matrix](LEGACY_MIGRATION_MATRIX.md), [test strategy](TEST_STRATEGY.md) — производные. [AGENTS](../AGENTS.md)/[plan slot](../implementation_plan.md) регулируют разрешённое действие; [as-is architecture](../ARCHITECTURE.md) и код — факты/миграционный контекст. [Index](README.md), [audit](DOCUMENTATION_AUDIT.md), [decision](DECISIONS/D0-001-documentation-authority.md).
 
-D0 завершён как документационная фаза; [approved ExecPlan и отчёт](plans/completed/D0.md). D1 COMPLETE: компактный root/scoped AGENTS, `.agent/PLANS.md`, ровно три repo skills, actual instruction-discovery probes, VERIFY PASS и fresh independent REVIEW PASS; [approved plan, отчёты и ограничения](plans/completed/D1.md). [Root plan slot](../implementation_plan.md) — NO_ACTIVE_PLAN. Пользователь принял local master `83bcbfe` как базу и разрешил локальный коммит. Push/credentials/branch cleanup не выполнялись. Q0/Q1/Q2/R0 не начаты и не имеют активного плана; новая задача требует отдельного запроса, конкретного ExecPlan и approval. WORLD-01/C05 и старые B/P/sprint next steps SUPERSEDED. D1 подтверждает только governance; runtime acceptance остаётся INCOMPLETE.
+D0 завершён как документационная фаза; [approved ExecPlan и отчёт](plans/completed/D0.md). D1 COMPLETE: компактный root/scoped AGENTS, `.agent/PLANS.md`, ровно три repo skills, actual instruction-discovery probes, VERIFY PASS и fresh independent REVIEW PASS; [approved plan, отчёты и ограничения](plans/completed/D1.md). [Root plan slot](../implementation_plan.md) содержит статус текущей задачи или ссылку на completed record. Пользователь принял local master `83bcbfe` как базу и разрешил локальный коммит. Push/credentials/branch cleanup не выполнялись. Q0 authority map [TEST_MATRIX](TEST_MATRIX.md) принята checkpoint B для draft digest `ef994313228752bac7bb93b448e178e9ea9b45ff8483f9ef39856b77eea41ea8`; 204 категории accepted, N/A applicability не шестая категория. C10 numeric requirements и C12 stale oracle остаются OPEN; no failure waiver. Q0 COMPLETE как документационная задача после VERIFY PASS и fresh independent REVIEW PASS: [accepted plan, reports и ограничения](plans/completed/Q0.md); runtime acceptance остаётся INCOMPLETE. Q1/Q2/R0 не начаты; новая задача требует отдельного запроса, конкретного ExecPlan и approval. WORLD-01/C05 и старые B/P/sprint next steps SUPERSEDED. D1 подтверждает только governance; runtime acceptance остаётся INCOMPLETE.
 
 ## 2. Что фактически есть
 

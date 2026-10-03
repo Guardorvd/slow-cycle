@@ -4,6 +4,8 @@ STATUS: CURRENT
 
 Scope: производная стратегия [Master §§V–VI, Q0–Q2, Definition of Done](MASTER_IMPLEMENTATION_PLAN.md) в пределах [Blueprint human acceptance](TARGET_GAME_BLUEPRINT.md). [Index](README.md), [as-is state](CURRENT_PROJECT_STATE.md), [conflicts](DOCUMENTATION_AUDIT.md). **D0 не запускает suites и не назначает им новые категории.**
 
+Q0 navigation (2026-10-03): [accepted Test Authority Map](TEST_MATRIX.md), Q0-TEST-MATRIX-ACCEPTED-1.2, human checkpoint B bound to draft SHA256 `ef994313228752bac7bb93b448e178e9ea9b45ff8483f9ef39856b77eea41ea8`. Categories: 41 ACTIVE_CONTRACT /125 REGRESSION_GUARD /16 LEGACY_CONTRACT /12 OBSERVATIONAL /10 HISTORICAL; non-check artifacts are N/A, not a sixth category. C10 numeric requirements and C12 stale oracle remain OPEN. Existing gates and runtime INCOMPLETE are retained; no Q1/Q2/R0. Task lifecycle/reports: [root plan slot](../implementation_plan.md).
+
 ## 1. Product authority и test integrity
 
 Blueprint/Master определяют целевую игру и архитектуру; assertions защищают своё согласованное требование/реализованную систему. Старый DAG test не вправе заставлять будущий RegionRouteGraph отказаться от loops. Это не разрешение менять тест либо игнорировать падение текущего RoadGraph: conflict сначала записывается с requirement/owner/evidence, затем конкретная reclassification/mutation согласуется человеком.
@@ -20,7 +22,7 @@ Blueprint/Master определяют целевую игру и архитек�
 | OBSERVATIONAL | Измеряет performance/coverage/monotony/statistics | Нет PASS/FAIL по цифре без согласованного budget |
 | HISTORICAL | Сохранённая проверка sprint history | Не входит автоматически в новый acceptance; category требует Q0 decision, а не rename файла |
 
-Q0 создаст TEST_MATRIX с name/owner/category/E-level/required-for/limitations/status. Legacy [coverage/replay map](TEST_COVERAGE_AND_REPLAY.md) — 59-file snapshot WORLD-00B, не новая TEST_MATRIX. D0 не меняет его распределение suites/частоту и не превращает предложения в approval.
+Q0 создал accepted [TEST_MATRIX](TEST_MATRIX.md) с name/owner/category/E-level/required-for/limitations/status; checkpoint B принимает authority, не runtime PASS. Legacy [coverage/replay map](TEST_COVERAGE_AND_REPLAY.md) — 59-file snapshot WORLD-00B, не новая TEST_MATRIX. D0 не меняет его распределение suites/частоту и не превращает предложения в approval.
 
 ## 3. Evidence ladder
 
