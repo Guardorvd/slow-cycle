@@ -2174,6 +2174,2036 @@
     "reason_extract": "^REPLAY_DIAGNOSTIC_SUMMARY status=\\S+ reason=(\\S*) checkpoints=",
     "not_exercised": []
    }
+  },
+{
+ "id": "q2a_rider_s184729",
+ "kind": "check",
+ "origin": "repo",
+ "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+ "launch": {
+  "mode": "headless",
+  "timeout_s": 240,
+  "user_args": [
+   "--seed=184729"
+  ]
+ },
+ "matrix": {
+  "rows": [
+   "RIDER"
+  ],
+  "categories": {
+   "RIDER": "REGRESSION_GUARD"
+  },
+  "authority_category": "REGRESSION_GUARD",
+  "role": "runner (physical bot, G gate)",
+  "e_capability": [
+   "E3",
+   "E4"
+  ]
+ },
+ "completion": [
+  {
+   "id": "final_success_line",
+   "kind": "stdout_regex",
+   "pattern": "VIRTUAL PHYSICAL RIDER BOT COMPLETED SUCCESSFULLY"
   }
+ ],
+ "measurements": {
+  "actual_progress": {
+   "pattern": "Distance Covered:\\s*([\\d.]+)m / [\\d.]+m",
+   "group": 1,
+   "unit": "m"
+  }
+ },
+ "contract_report": {
+  "declared_target": {
+   "value": 500,
+   "unit": "m"
+  },
+  "existing_pass_threshold": {
+   "value": 350,
+   "unit": "m",
+   "basis": "existing gate in test_virtual_rider_bot.gd (>=350 m); unchanged by Q1"
+  },
+  "measurement_semantics": "active-branch local s distance; can reset on branch change (TEST_MATRIX C03)",
+  "limitation": "A PASS at the existing 350 m threshold is NOT full 500 m route acceptance; not both routes, not all seeds, not E7"
+ },
+ "fail_markers": [
+  "\\[FAIL[^\\]]*\\]",
+  "\\[FAILURE\\]",
+  "WATCHDOG FAILED",
+  "SUITE FAILED",
+  "SESSION_LOG_CHECK_FAIL",
+  "^\\s*\\[ERROR\\]",
+  "MASTER_VERIFICATION_FAIL"
+ ],
+ "engine_policy": {
+  "errors": "zero_unexpected",
+  "leaks": "zero_unexpected"
+ },
+ "limitations": [
+  "gate threshold 350/500 unchanged (C03)",
+  "distance is branch-local; not a full 500 m route acceptance"
+ ],
+ "not_claimed": [
+  "full 500 m route accepted",
+  "E7"
+ ],
+ "seeds": {
+  "requested": [
+   184729
+  ],
+  "observed": {
+   "glob": "diag/*/manifest.json",
+   "field": "effective_seed"
+  },
+  "require_observed": true
+ },
+ "seed_policy": "CLI certified; header labels are not effective-seed evidence"
+},
+{
+ "id": "q2a_rider_s42",
+ "kind": "check",
+ "origin": "repo",
+ "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+ "launch": {
+  "mode": "headless",
+  "timeout_s": 240,
+  "user_args": [
+   "--seed=42"
+  ]
+ },
+ "matrix": {
+  "rows": [
+   "RIDER"
+  ],
+  "categories": {
+   "RIDER": "REGRESSION_GUARD"
+  },
+  "authority_category": "REGRESSION_GUARD",
+  "role": "runner (physical bot, G gate)",
+  "e_capability": [
+   "E3",
+   "E4"
+  ]
+ },
+ "completion": [
+  {
+   "id": "final_success_line",
+   "kind": "stdout_regex",
+   "pattern": "VIRTUAL PHYSICAL RIDER BOT COMPLETED SUCCESSFULLY"
+  }
+ ],
+ "measurements": {
+  "actual_progress": {
+   "pattern": "Distance Covered:\\s*([\\d.]+)m / [\\d.]+m",
+   "group": 1,
+   "unit": "m"
+  }
+ },
+ "contract_report": {
+  "declared_target": {
+   "value": 500,
+   "unit": "m"
+  },
+  "existing_pass_threshold": {
+   "value": 350,
+   "unit": "m",
+   "basis": "existing gate in test_virtual_rider_bot.gd (>=350 m); unchanged by Q1"
+  },
+  "measurement_semantics": "active-branch local s distance; can reset on branch change (TEST_MATRIX C03)",
+  "limitation": "A PASS at the existing 350 m threshold is NOT full 500 m route acceptance; not both routes, not all seeds, not E7"
+ },
+ "fail_markers": [
+  "\\[FAIL[^\\]]*\\]",
+  "\\[FAILURE\\]",
+  "WATCHDOG FAILED",
+  "SUITE FAILED",
+  "SESSION_LOG_CHECK_FAIL",
+  "^\\s*\\[ERROR\\]",
+  "MASTER_VERIFICATION_FAIL"
+ ],
+ "engine_policy": {
+  "errors": "zero_unexpected",
+  "leaks": "zero_unexpected"
+ },
+ "limitations": [
+  "gate threshold 350/500 unchanged (C03)",
+  "distance is branch-local; not a full 500 m route acceptance"
+ ],
+ "not_claimed": [
+  "full 500 m route accepted",
+  "E7"
+ ],
+ "seeds": {
+  "requested": [
+   42
+  ],
+  "observed": {
+   "glob": "diag/*/manifest.json",
+   "field": "effective_seed"
+  },
+  "require_observed": true
+ },
+ "seed_policy": "CLI certified; header labels are not effective-seed evidence"
+},
+{
+ "id": "q2a_rider_s77777",
+ "kind": "check",
+ "origin": "repo",
+ "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+ "launch": {
+  "mode": "headless",
+  "timeout_s": 240,
+  "user_args": [
+   "--seed=77777"
+  ]
+ },
+ "matrix": {
+  "rows": [
+   "RIDER"
+  ],
+  "categories": {
+   "RIDER": "REGRESSION_GUARD"
+  },
+  "authority_category": "REGRESSION_GUARD",
+  "role": "runner (physical bot, G gate)",
+  "e_capability": [
+   "E3",
+   "E4"
+  ]
+ },
+ "completion": [
+  {
+   "id": "final_success_line",
+   "kind": "stdout_regex",
+   "pattern": "VIRTUAL PHYSICAL RIDER BOT COMPLETED SUCCESSFULLY"
+  }
+ ],
+ "measurements": {
+  "actual_progress": {
+   "pattern": "Distance Covered:\\s*([\\d.]+)m / [\\d.]+m",
+   "group": 1,
+   "unit": "m"
+  }
+ },
+ "contract_report": {
+  "declared_target": {
+   "value": 500,
+   "unit": "m"
+  },
+  "existing_pass_threshold": {
+   "value": 350,
+   "unit": "m",
+   "basis": "existing gate in test_virtual_rider_bot.gd (>=350 m); unchanged by Q1"
+  },
+  "measurement_semantics": "active-branch local s distance; can reset on branch change (TEST_MATRIX C03)",
+  "limitation": "A PASS at the existing 350 m threshold is NOT full 500 m route acceptance; not both routes, not all seeds, not E7"
+ },
+ "fail_markers": [
+  "\\[FAIL[^\\]]*\\]",
+  "\\[FAILURE\\]",
+  "WATCHDOG FAILED",
+  "SUITE FAILED",
+  "SESSION_LOG_CHECK_FAIL",
+  "^\\s*\\[ERROR\\]",
+  "MASTER_VERIFICATION_FAIL"
+ ],
+ "engine_policy": {
+  "errors": "zero_unexpected",
+  "leaks": "zero_unexpected"
+ },
+ "limitations": [
+  "gate threshold 350/500 unchanged (C03)",
+  "distance is branch-local; not a full 500 m route acceptance"
+ ],
+ "not_claimed": [
+  "full 500 m route accepted",
+  "E7"
+ ],
+ "seeds": {
+  "requested": [
+   77777
+  ],
+  "observed": {
+   "glob": "diag/*/manifest.json",
+   "field": "effective_seed"
+  },
+  "require_observed": true
+ },
+ "seed_policy": "CLI certified; header labels are not effective-seed evidence"
+},
+{
+ "id": "q2a_rider_s351697566",
+ "kind": "check",
+ "origin": "repo",
+ "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+ "launch": {
+  "mode": "headless",
+  "timeout_s": 240,
+  "user_args": [
+   "--seed=351697566"
+  ]
+ },
+ "matrix": {
+  "rows": [
+   "RIDER"
+  ],
+  "categories": {
+   "RIDER": "REGRESSION_GUARD"
+  },
+  "authority_category": "REGRESSION_GUARD",
+  "role": "runner (physical bot, G gate)",
+  "e_capability": [
+   "E3",
+   "E4"
+  ]
+ },
+ "completion": [
+  {
+   "id": "final_success_line",
+   "kind": "stdout_regex",
+   "pattern": "VIRTUAL PHYSICAL RIDER BOT COMPLETED SUCCESSFULLY"
+  }
+ ],
+ "measurements": {
+  "actual_progress": {
+   "pattern": "Distance Covered:\\s*([\\d.]+)m / [\\d.]+m",
+   "group": 1,
+   "unit": "m"
+  }
+ },
+ "contract_report": {
+  "declared_target": {
+   "value": 500,
+   "unit": "m"
+  },
+  "existing_pass_threshold": {
+   "value": 350,
+   "unit": "m",
+   "basis": "existing gate in test_virtual_rider_bot.gd (>=350 m); unchanged by Q1"
+  },
+  "measurement_semantics": "active-branch local s distance; can reset on branch change (TEST_MATRIX C03)",
+  "limitation": "A PASS at the existing 350 m threshold is NOT full 500 m route acceptance; not both routes, not all seeds, not E7"
+ },
+ "fail_markers": [
+  "\\[FAIL[^\\]]*\\]",
+  "\\[FAILURE\\]",
+  "WATCHDOG FAILED",
+  "SUITE FAILED",
+  "SESSION_LOG_CHECK_FAIL",
+  "^\\s*\\[ERROR\\]",
+  "MASTER_VERIFICATION_FAIL"
+ ],
+ "engine_policy": {
+  "errors": "zero_unexpected",
+  "leaks": "zero_unexpected"
+ },
+ "limitations": [
+  "gate threshold 350/500 unchanged (C03)",
+  "distance is branch-local; not a full 500 m route acceptance"
+ ],
+ "not_claimed": [
+  "full 500 m route accepted",
+  "E7"
+ ],
+ "seeds": {
+  "requested": [
+   351697566
+  ],
+  "observed": {
+   "glob": "diag/*/manifest.json",
+   "field": "effective_seed"
+  },
+  "require_observed": true
+ },
+ "seed_policy": "CLI certified; header labels are not effective-seed evidence"
+},
+{
+ "id": "q2a_rider_s1027766269",
+ "kind": "check",
+ "origin": "repo",
+ "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+ "launch": {
+  "mode": "headless",
+  "timeout_s": 240,
+  "user_args": [
+   "--seed=1027766269"
+  ]
+ },
+ "matrix": {
+  "rows": [
+   "RIDER"
+  ],
+  "categories": {
+   "RIDER": "REGRESSION_GUARD"
+  },
+  "authority_category": "REGRESSION_GUARD",
+  "role": "runner (physical bot, G gate)",
+  "e_capability": [
+   "E3",
+   "E4"
+  ]
+ },
+ "completion": [
+  {
+   "id": "final_success_line",
+   "kind": "stdout_regex",
+   "pattern": "VIRTUAL PHYSICAL RIDER BOT COMPLETED SUCCESSFULLY"
+  }
+ ],
+ "measurements": {
+  "actual_progress": {
+   "pattern": "Distance Covered:\\s*([\\d.]+)m / [\\d.]+m",
+   "group": 1,
+   "unit": "m"
+  }
+ },
+ "contract_report": {
+  "declared_target": {
+   "value": 500,
+   "unit": "m"
+  },
+  "existing_pass_threshold": {
+   "value": 350,
+   "unit": "m",
+   "basis": "existing gate in test_virtual_rider_bot.gd (>=350 m); unchanged by Q1"
+  },
+  "measurement_semantics": "active-branch local s distance; can reset on branch change (TEST_MATRIX C03)",
+  "limitation": "A PASS at the existing 350 m threshold is NOT full 500 m route acceptance; not both routes, not all seeds, not E7"
+ },
+ "fail_markers": [
+  "\\[FAIL[^\\]]*\\]",
+  "\\[FAILURE\\]",
+  "WATCHDOG FAILED",
+  "SUITE FAILED",
+  "SESSION_LOG_CHECK_FAIL",
+  "^\\s*\\[ERROR\\]",
+  "MASTER_VERIFICATION_FAIL"
+ ],
+ "engine_policy": {
+  "errors": "zero_unexpected",
+  "leaks": "zero_unexpected"
+ },
+ "limitations": [
+  "gate threshold 350/500 unchanged (C03)",
+  "distance is branch-local; not a full 500 m route acceptance"
+ ],
+ "not_claimed": [
+  "full 500 m route accepted",
+  "E7"
+ ],
+ "seeds": {
+  "requested": [
+   1027766269
+  ],
+  "observed": {
+   "glob": "diag/*/manifest.json",
+   "field": "effective_seed"
+  },
+  "require_observed": true
+ },
+ "seed_policy": "CLI certified; header labels are not effective-seed evidence"
+},
+{
+ "id": "q2a_rider_s874341432",
+ "kind": "check",
+ "origin": "repo",
+ "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+ "launch": {
+  "mode": "headless",
+  "timeout_s": 240,
+  "user_args": [
+   "--seed=874341432"
+  ]
+ },
+ "matrix": {
+  "rows": [
+   "RIDER"
+  ],
+  "categories": {
+   "RIDER": "REGRESSION_GUARD"
+  },
+  "authority_category": "REGRESSION_GUARD",
+  "role": "runner (physical bot, G gate)",
+  "e_capability": [
+   "E3",
+   "E4"
+  ]
+ },
+ "completion": [
+  {
+   "id": "final_success_line",
+   "kind": "stdout_regex",
+   "pattern": "VIRTUAL PHYSICAL RIDER BOT COMPLETED SUCCESSFULLY"
+  }
+ ],
+ "measurements": {
+  "actual_progress": {
+   "pattern": "Distance Covered:\\s*([\\d.]+)m / [\\d.]+m",
+   "group": 1,
+   "unit": "m"
+  }
+ },
+ "contract_report": {
+  "declared_target": {
+   "value": 500,
+   "unit": "m"
+  },
+  "existing_pass_threshold": {
+   "value": 350,
+   "unit": "m",
+   "basis": "existing gate in test_virtual_rider_bot.gd (>=350 m); unchanged by Q1"
+  },
+  "measurement_semantics": "active-branch local s distance; can reset on branch change (TEST_MATRIX C03)",
+  "limitation": "A PASS at the existing 350 m threshold is NOT full 500 m route acceptance; not both routes, not all seeds, not E7"
+ },
+ "fail_markers": [
+  "\\[FAIL[^\\]]*\\]",
+  "\\[FAILURE\\]",
+  "WATCHDOG FAILED",
+  "SUITE FAILED",
+  "SESSION_LOG_CHECK_FAIL",
+  "^\\s*\\[ERROR\\]",
+  "MASTER_VERIFICATION_FAIL"
+ ],
+ "engine_policy": {
+  "errors": "zero_unexpected",
+  "leaks": "zero_unexpected"
+ },
+ "limitations": [
+  "gate threshold 350/500 unchanged (C03)",
+  "distance is branch-local; not a full 500 m route acceptance"
+ ],
+ "not_claimed": [
+  "full 500 m route accepted",
+  "E7"
+ ],
+ "seeds": {
+  "requested": [
+   874341432
+  ],
+  "observed": {
+   "glob": "diag/*/manifest.json",
+   "field": "effective_seed"
+  },
+  "require_observed": true
+ },
+ "seed_policy": "CLI certified; header labels are not effective-seed evidence"
+},
+{
+ "id": "q2a_rider_s9954360",
+ "kind": "check",
+ "origin": "repo",
+ "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+ "launch": {
+  "mode": "headless",
+  "timeout_s": 240,
+  "user_args": [
+   "--seed=9954360"
+  ]
+ },
+ "matrix": {
+  "rows": [
+   "RIDER"
+  ],
+  "categories": {
+   "RIDER": "REGRESSION_GUARD"
+  },
+  "authority_category": "REGRESSION_GUARD",
+  "role": "runner (physical bot, G gate)",
+  "e_capability": [
+   "E3",
+   "E4"
+  ]
+ },
+ "completion": [
+  {
+   "id": "final_success_line",
+   "kind": "stdout_regex",
+   "pattern": "VIRTUAL PHYSICAL RIDER BOT COMPLETED SUCCESSFULLY"
+  }
+ ],
+ "measurements": {
+  "actual_progress": {
+   "pattern": "Distance Covered:\\s*([\\d.]+)m / [\\d.]+m",
+   "group": 1,
+   "unit": "m"
+  }
+ },
+ "contract_report": {
+  "declared_target": {
+   "value": 500,
+   "unit": "m"
+  },
+  "existing_pass_threshold": {
+   "value": 350,
+   "unit": "m",
+   "basis": "existing gate in test_virtual_rider_bot.gd (>=350 m); unchanged by Q1"
+  },
+  "measurement_semantics": "active-branch local s distance; can reset on branch change (TEST_MATRIX C03)",
+  "limitation": "A PASS at the existing 350 m threshold is NOT full 500 m route acceptance; not both routes, not all seeds, not E7"
+ },
+ "fail_markers": [
+  "\\[FAIL[^\\]]*\\]",
+  "\\[FAILURE\\]",
+  "WATCHDOG FAILED",
+  "SUITE FAILED",
+  "SESSION_LOG_CHECK_FAIL",
+  "^\\s*\\[ERROR\\]",
+  "MASTER_VERIFICATION_FAIL"
+ ],
+ "engine_policy": {
+  "errors": "zero_unexpected",
+  "leaks": "zero_unexpected"
+ },
+ "limitations": [
+  "gate threshold 350/500 unchanged (C03)",
+  "distance is branch-local; not a full 500 m route acceptance"
+ ],
+ "not_claimed": [
+  "full 500 m route accepted",
+  "E7"
+ ],
+ "seeds": {
+  "requested": [
+   9954360
+  ],
+  "observed": {
+   "glob": "diag/*/manifest.json",
+   "field": "effective_seed"
+  },
+  "require_observed": true
+ },
+ "seed_policy": "CLI certified; header labels are not effective-seed evidence"
+},
+{
+ "id": "q2a_capture_s184729",
+ "kind": "check",
+ "origin": "repo",
+ "entry": "res://scripts/test/capture_visual_audit.gd",
+ "launch": {
+  "mode": "vulkan",
+  "timeout_s": 180,
+  "user_args": [
+   "--seed=184729"
+  ]
+ },
+ "matrix": {
+  "rows": [
+   "CAP-VIS"
+  ],
+  "categories": {
+   "CAP-VIS": "OBSERVATIONAL"
+  },
+  "authority_category": "OBSERVATIONAL",
+  "role": "capture (G gate, Vulkan)",
+  "e_capability": [
+   "E5"
+  ]
+ },
+ "completion": [
+  {
+   "id": "audit_complete",
+   "kind": "stdout_regex",
+   "pattern": "^AUDIT_COMPLETE status=CAPTURE_COMPLETE reason= frames=8/8 "
+  }
+ ],
+ "coverage": [
+  {
+   "id": "frames_8",
+   "kind": "counter_min",
+   "pattern": "^AUDIT_COMPLETE .* frames=(\\d+)/8 ",
+   "min": 8,
+   "basis": "capture_queue has 8 frames"
+  },
+  {
+   "id": "captured_seed_184729_frames_8",
+   "kind": "distinct_min",
+   "pattern": "^\\[CAPTURED\\] seed=184729 s=([\\d.]+) camera=(\\w+)",
+   "min": 8,
+   "basis": "effective CLI seed from per-frame output"
+  }
+ ],
+ "artifacts": [
+  {
+   "glob": "audit/*/*.png",
+   "role": "capture_png",
+   "min_count": 8,
+   "checks": [
+    "png_header"
+   ],
+   "png_size": [
+    1280,
+    720
+   ]
+  },
+  {
+   "glob": "audit/*/manifest.json",
+   "role": "capture_manifest",
+   "min_count": 1
+  }
+ ],
+ "evidence_gate": {
+  "E5": {
+   "requires": [
+    "driver_vulkan",
+    "frames_saved"
+   ],
+   "manifest": {
+    "glob": "audit/*/manifest.json"
+   },
+   "human_review": "required"
+  }
+ },
+ "fail_markers": [
+  "\\[FAIL[^\\]]*\\]",
+  "\\[FAILURE\\]",
+  "WATCHDOG FAILED",
+  "SUITE FAILED",
+  "SESSION_LOG_CHECK_FAIL",
+  "^\\s*\\[ERROR\\]",
+  "MASTER_VERIFICATION_FAIL"
+ ],
+ "engine_policy": {
+  "errors": "zero_unexpected",
+  "leaks": "zero_unexpected"
+ },
+ "limitations": [
+  "E5 stays human_review_pending: PNGs were not visually reviewed by the harness",
+  "teleport-style capture (C05)"
+ ],
+ "not_claimed": [
+  "E5 visual acceptance",
+  "E7"
+ ],
+ "seeds": {
+  "requested": [
+   184729
+  ],
+  "observed": {
+   "glob": "diag/*/manifest.json",
+   "field": "effective_seed"
+  },
+  "require_observed": true
+ },
+ "seed_policy": "CLI certified; header labels are not effective-seed evidence"
+},
+{
+ "id": "q2a_capture_s42",
+ "kind": "check",
+ "origin": "repo",
+ "entry": "res://scripts/test/capture_visual_audit.gd",
+ "launch": {
+  "mode": "vulkan",
+  "timeout_s": 180,
+  "user_args": [
+   "--seed=42"
+  ]
+ },
+ "matrix": {
+  "rows": [
+   "CAP-VIS"
+  ],
+  "categories": {
+   "CAP-VIS": "OBSERVATIONAL"
+  },
+  "authority_category": "OBSERVATIONAL",
+  "role": "capture (G gate, Vulkan)",
+  "e_capability": [
+   "E5"
+  ]
+ },
+ "completion": [
+  {
+   "id": "audit_complete",
+   "kind": "stdout_regex",
+   "pattern": "^AUDIT_COMPLETE status=CAPTURE_COMPLETE reason= frames=8/8 "
+  }
+ ],
+ "coverage": [
+  {
+   "id": "frames_8",
+   "kind": "counter_min",
+   "pattern": "^AUDIT_COMPLETE .* frames=(\\d+)/8 ",
+   "min": 8,
+   "basis": "capture_queue has 8 frames"
+  },
+  {
+   "id": "captured_seed_42_frames_8",
+   "kind": "distinct_min",
+   "pattern": "^\\[CAPTURED\\] seed=42 s=([\\d.]+) camera=(\\w+)",
+   "min": 8,
+   "basis": "effective CLI seed from per-frame output"
+  }
+ ],
+ "artifacts": [
+  {
+   "glob": "audit/*/*.png",
+   "role": "capture_png",
+   "min_count": 8,
+   "checks": [
+    "png_header"
+   ],
+   "png_size": [
+    1280,
+    720
+   ]
+  },
+  {
+   "glob": "audit/*/manifest.json",
+   "role": "capture_manifest",
+   "min_count": 1
+  }
+ ],
+ "evidence_gate": {
+  "E5": {
+   "requires": [
+    "driver_vulkan",
+    "frames_saved"
+   ],
+   "manifest": {
+    "glob": "audit/*/manifest.json"
+   },
+   "human_review": "required"
+  }
+ },
+ "fail_markers": [
+  "\\[FAIL[^\\]]*\\]",
+  "\\[FAILURE\\]",
+  "WATCHDOG FAILED",
+  "SUITE FAILED",
+  "SESSION_LOG_CHECK_FAIL",
+  "^\\s*\\[ERROR\\]",
+  "MASTER_VERIFICATION_FAIL"
+ ],
+ "engine_policy": {
+  "errors": "zero_unexpected",
+  "leaks": "zero_unexpected"
+ },
+ "limitations": [
+  "E5 stays human_review_pending: PNGs were not visually reviewed by the harness",
+  "teleport-style capture (C05)"
+ ],
+ "not_claimed": [
+  "E5 visual acceptance",
+  "E7"
+ ],
+ "seeds": {
+  "requested": [
+   42
+  ],
+  "observed": {
+   "glob": "diag/*/manifest.json",
+   "field": "effective_seed"
+  },
+  "require_observed": true
+ },
+ "seed_policy": "CLI certified; header labels are not effective-seed evidence"
+},
+{
+ "id": "q2a_capture_s77777",
+ "kind": "check",
+ "origin": "repo",
+ "entry": "res://scripts/test/capture_visual_audit.gd",
+ "launch": {
+  "mode": "vulkan",
+  "timeout_s": 180,
+  "user_args": [
+   "--seed=77777"
+  ]
+ },
+ "matrix": {
+  "rows": [
+   "CAP-VIS"
+  ],
+  "categories": {
+   "CAP-VIS": "OBSERVATIONAL"
+  },
+  "authority_category": "OBSERVATIONAL",
+  "role": "capture (G gate, Vulkan)",
+  "e_capability": [
+   "E5"
+  ]
+ },
+ "completion": [
+  {
+   "id": "audit_complete",
+   "kind": "stdout_regex",
+   "pattern": "^AUDIT_COMPLETE status=CAPTURE_COMPLETE reason= frames=8/8 "
+  }
+ ],
+ "coverage": [
+  {
+   "id": "frames_8",
+   "kind": "counter_min",
+   "pattern": "^AUDIT_COMPLETE .* frames=(\\d+)/8 ",
+   "min": 8,
+   "basis": "capture_queue has 8 frames"
+  },
+  {
+   "id": "captured_seed_77777_frames_8",
+   "kind": "distinct_min",
+   "pattern": "^\\[CAPTURED\\] seed=77777 s=([\\d.]+) camera=(\\w+)",
+   "min": 8,
+   "basis": "effective CLI seed from per-frame output"
+  }
+ ],
+ "artifacts": [
+  {
+   "glob": "audit/*/*.png",
+   "role": "capture_png",
+   "min_count": 8,
+   "checks": [
+    "png_header"
+   ],
+   "png_size": [
+    1280,
+    720
+   ]
+  },
+  {
+   "glob": "audit/*/manifest.json",
+   "role": "capture_manifest",
+   "min_count": 1
+  }
+ ],
+ "evidence_gate": {
+  "E5": {
+   "requires": [
+    "driver_vulkan",
+    "frames_saved"
+   ],
+   "manifest": {
+    "glob": "audit/*/manifest.json"
+   },
+   "human_review": "required"
+  }
+ },
+ "fail_markers": [
+  "\\[FAIL[^\\]]*\\]",
+  "\\[FAILURE\\]",
+  "WATCHDOG FAILED",
+  "SUITE FAILED",
+  "SESSION_LOG_CHECK_FAIL",
+  "^\\s*\\[ERROR\\]",
+  "MASTER_VERIFICATION_FAIL"
+ ],
+ "engine_policy": {
+  "errors": "zero_unexpected",
+  "leaks": "zero_unexpected"
+ },
+ "limitations": [
+  "E5 stays human_review_pending: PNGs were not visually reviewed by the harness",
+  "teleport-style capture (C05)"
+ ],
+ "not_claimed": [
+  "E5 visual acceptance",
+  "E7"
+ ],
+ "seeds": {
+  "requested": [
+   77777
+  ],
+  "observed": {
+   "glob": "diag/*/manifest.json",
+   "field": "effective_seed"
+  },
+  "require_observed": true
+ },
+ "seed_policy": "CLI certified; header labels are not effective-seed evidence"
+},
+{
+ "id": "q2a_capture_s351697566",
+ "kind": "check",
+ "origin": "repo",
+ "entry": "res://scripts/test/capture_visual_audit.gd",
+ "launch": {
+  "mode": "vulkan",
+  "timeout_s": 180,
+  "user_args": [
+   "--seed=351697566"
+  ]
+ },
+ "matrix": {
+  "rows": [
+   "CAP-VIS"
+  ],
+  "categories": {
+   "CAP-VIS": "OBSERVATIONAL"
+  },
+  "authority_category": "OBSERVATIONAL",
+  "role": "capture (G gate, Vulkan)",
+  "e_capability": [
+   "E5"
+  ]
+ },
+ "completion": [
+  {
+   "id": "audit_complete",
+   "kind": "stdout_regex",
+   "pattern": "^AUDIT_COMPLETE status=CAPTURE_COMPLETE reason= frames=8/8 "
+  }
+ ],
+ "coverage": [
+  {
+   "id": "frames_8",
+   "kind": "counter_min",
+   "pattern": "^AUDIT_COMPLETE .* frames=(\\d+)/8 ",
+   "min": 8,
+   "basis": "capture_queue has 8 frames"
+  },
+  {
+   "id": "captured_seed_351697566_frames_8",
+   "kind": "distinct_min",
+   "pattern": "^\\[CAPTURED\\] seed=351697566 s=([\\d.]+) camera=(\\w+)",
+   "min": 8,
+   "basis": "effective CLI seed from per-frame output"
+  }
+ ],
+ "artifacts": [
+  {
+   "glob": "audit/*/*.png",
+   "role": "capture_png",
+   "min_count": 8,
+   "checks": [
+    "png_header"
+   ],
+   "png_size": [
+    1280,
+    720
+   ]
+  },
+  {
+   "glob": "audit/*/manifest.json",
+   "role": "capture_manifest",
+   "min_count": 1
+  }
+ ],
+ "evidence_gate": {
+  "E5": {
+   "requires": [
+    "driver_vulkan",
+    "frames_saved"
+   ],
+   "manifest": {
+    "glob": "audit/*/manifest.json"
+   },
+   "human_review": "required"
+  }
+ },
+ "fail_markers": [
+  "\\[FAIL[^\\]]*\\]",
+  "\\[FAILURE\\]",
+  "WATCHDOG FAILED",
+  "SUITE FAILED",
+  "SESSION_LOG_CHECK_FAIL",
+  "^\\s*\\[ERROR\\]",
+  "MASTER_VERIFICATION_FAIL"
+ ],
+ "engine_policy": {
+  "errors": "zero_unexpected",
+  "leaks": "zero_unexpected"
+ },
+ "limitations": [
+  "E5 stays human_review_pending: PNGs were not visually reviewed by the harness",
+  "teleport-style capture (C05)"
+ ],
+ "not_claimed": [
+  "E5 visual acceptance",
+  "E7"
+ ],
+ "seeds": {
+  "requested": [
+   351697566
+  ],
+  "observed": {
+   "glob": "diag/*/manifest.json",
+   "field": "effective_seed"
+  },
+  "require_observed": true
+ },
+ "seed_policy": "CLI certified; header labels are not effective-seed evidence"
+},
+{
+ "id": "q2a_capture_s1027766269",
+ "kind": "check",
+ "origin": "repo",
+ "entry": "res://scripts/test/capture_visual_audit.gd",
+ "launch": {
+  "mode": "vulkan",
+  "timeout_s": 180,
+  "user_args": [
+   "--seed=1027766269"
+  ]
+ },
+ "matrix": {
+  "rows": [
+   "CAP-VIS"
+  ],
+  "categories": {
+   "CAP-VIS": "OBSERVATIONAL"
+  },
+  "authority_category": "OBSERVATIONAL",
+  "role": "capture (G gate, Vulkan)",
+  "e_capability": [
+   "E5"
+  ]
+ },
+ "completion": [
+  {
+   "id": "audit_complete",
+   "kind": "stdout_regex",
+   "pattern": "^AUDIT_COMPLETE status=CAPTURE_COMPLETE reason= frames=8/8 "
+  }
+ ],
+ "coverage": [
+  {
+   "id": "frames_8",
+   "kind": "counter_min",
+   "pattern": "^AUDIT_COMPLETE .* frames=(\\d+)/8 ",
+   "min": 8,
+   "basis": "capture_queue has 8 frames"
+  },
+  {
+   "id": "captured_seed_1027766269_frames_8",
+   "kind": "distinct_min",
+   "pattern": "^\\[CAPTURED\\] seed=1027766269 s=([\\d.]+) camera=(\\w+)",
+   "min": 8,
+   "basis": "effective CLI seed from per-frame output"
+  }
+ ],
+ "artifacts": [
+  {
+   "glob": "audit/*/*.png",
+   "role": "capture_png",
+   "min_count": 8,
+   "checks": [
+    "png_header"
+   ],
+   "png_size": [
+    1280,
+    720
+   ]
+  },
+  {
+   "glob": "audit/*/manifest.json",
+   "role": "capture_manifest",
+   "min_count": 1
+  }
+ ],
+ "evidence_gate": {
+  "E5": {
+   "requires": [
+    "driver_vulkan",
+    "frames_saved"
+   ],
+   "manifest": {
+    "glob": "audit/*/manifest.json"
+   },
+   "human_review": "required"
+  }
+ },
+ "fail_markers": [
+  "\\[FAIL[^\\]]*\\]",
+  "\\[FAILURE\\]",
+  "WATCHDOG FAILED",
+  "SUITE FAILED",
+  "SESSION_LOG_CHECK_FAIL",
+  "^\\s*\\[ERROR\\]",
+  "MASTER_VERIFICATION_FAIL"
+ ],
+ "engine_policy": {
+  "errors": "zero_unexpected",
+  "leaks": "zero_unexpected"
+ },
+ "limitations": [
+  "E5 stays human_review_pending: PNGs were not visually reviewed by the harness",
+  "teleport-style capture (C05)"
+ ],
+ "not_claimed": [
+  "E5 visual acceptance",
+  "E7"
+ ],
+ "seeds": {
+  "requested": [
+   1027766269
+  ],
+  "observed": {
+   "glob": "diag/*/manifest.json",
+   "field": "effective_seed"
+  },
+  "require_observed": true
+ },
+ "seed_policy": "CLI certified; header labels are not effective-seed evidence"
+},
+{
+ "id": "q2a_capture_s874341432",
+ "kind": "check",
+ "origin": "repo",
+ "entry": "res://scripts/test/capture_visual_audit.gd",
+ "launch": {
+  "mode": "vulkan",
+  "timeout_s": 180,
+  "user_args": [
+   "--seed=874341432"
+  ]
+ },
+ "matrix": {
+  "rows": [
+   "CAP-VIS"
+  ],
+  "categories": {
+   "CAP-VIS": "OBSERVATIONAL"
+  },
+  "authority_category": "OBSERVATIONAL",
+  "role": "capture (G gate, Vulkan)",
+  "e_capability": [
+   "E5"
+  ]
+ },
+ "completion": [
+  {
+   "id": "audit_complete",
+   "kind": "stdout_regex",
+   "pattern": "^AUDIT_COMPLETE status=CAPTURE_COMPLETE reason= frames=8/8 "
+  }
+ ],
+ "coverage": [
+  {
+   "id": "frames_8",
+   "kind": "counter_min",
+   "pattern": "^AUDIT_COMPLETE .* frames=(\\d+)/8 ",
+   "min": 8,
+   "basis": "capture_queue has 8 frames"
+  },
+  {
+   "id": "captured_seed_874341432_frames_8",
+   "kind": "distinct_min",
+   "pattern": "^\\[CAPTURED\\] seed=874341432 s=([\\d.]+) camera=(\\w+)",
+   "min": 8,
+   "basis": "effective CLI seed from per-frame output"
+  }
+ ],
+ "artifacts": [
+  {
+   "glob": "audit/*/*.png",
+   "role": "capture_png",
+   "min_count": 8,
+   "checks": [
+    "png_header"
+   ],
+   "png_size": [
+    1280,
+    720
+   ]
+  },
+  {
+   "glob": "audit/*/manifest.json",
+   "role": "capture_manifest",
+   "min_count": 1
+  }
+ ],
+ "evidence_gate": {
+  "E5": {
+   "requires": [
+    "driver_vulkan",
+    "frames_saved"
+   ],
+   "manifest": {
+    "glob": "audit/*/manifest.json"
+   },
+   "human_review": "required"
+  }
+ },
+ "fail_markers": [
+  "\\[FAIL[^\\]]*\\]",
+  "\\[FAILURE\\]",
+  "WATCHDOG FAILED",
+  "SUITE FAILED",
+  "SESSION_LOG_CHECK_FAIL",
+  "^\\s*\\[ERROR\\]",
+  "MASTER_VERIFICATION_FAIL"
+ ],
+ "engine_policy": {
+  "errors": "zero_unexpected",
+  "leaks": "zero_unexpected"
+ },
+ "limitations": [
+  "E5 stays human_review_pending: PNGs were not visually reviewed by the harness",
+  "teleport-style capture (C05)"
+ ],
+ "not_claimed": [
+  "E5 visual acceptance",
+  "E7"
+ ],
+ "seeds": {
+  "requested": [
+   874341432
+  ],
+  "observed": {
+   "glob": "diag/*/manifest.json",
+   "field": "effective_seed"
+  },
+  "require_observed": true
+ },
+ "seed_policy": "CLI certified; header labels are not effective-seed evidence"
+},
+{
+ "id": "q2a_capture_s9954360",
+ "kind": "check",
+ "origin": "repo",
+ "entry": "res://scripts/test/capture_visual_audit.gd",
+ "launch": {
+  "mode": "vulkan",
+  "timeout_s": 180,
+  "user_args": [
+   "--seed=9954360"
+  ]
+ },
+ "matrix": {
+  "rows": [
+   "CAP-VIS"
+  ],
+  "categories": {
+   "CAP-VIS": "OBSERVATIONAL"
+  },
+  "authority_category": "OBSERVATIONAL",
+  "role": "capture (G gate, Vulkan)",
+  "e_capability": [
+   "E5"
+  ]
+ },
+ "completion": [
+  {
+   "id": "audit_complete",
+   "kind": "stdout_regex",
+   "pattern": "^AUDIT_COMPLETE status=CAPTURE_COMPLETE reason= frames=8/8 "
+  }
+ ],
+ "coverage": [
+  {
+   "id": "frames_8",
+   "kind": "counter_min",
+   "pattern": "^AUDIT_COMPLETE .* frames=(\\d+)/8 ",
+   "min": 8,
+   "basis": "capture_queue has 8 frames"
+  },
+  {
+   "id": "captured_seed_9954360_frames_8",
+   "kind": "distinct_min",
+   "pattern": "^\\[CAPTURED\\] seed=9954360 s=([\\d.]+) camera=(\\w+)",
+   "min": 8,
+   "basis": "effective CLI seed from per-frame output"
+  }
+ ],
+ "artifacts": [
+  {
+   "glob": "audit/*/*.png",
+   "role": "capture_png",
+   "min_count": 8,
+   "checks": [
+    "png_header"
+   ],
+   "png_size": [
+    1280,
+    720
+   ]
+  },
+  {
+   "glob": "audit/*/manifest.json",
+   "role": "capture_manifest",
+   "min_count": 1
+  }
+ ],
+ "evidence_gate": {
+  "E5": {
+   "requires": [
+    "driver_vulkan",
+    "frames_saved"
+   ],
+   "manifest": {
+    "glob": "audit/*/manifest.json"
+   },
+   "human_review": "required"
+  }
+ },
+ "fail_markers": [
+  "\\[FAIL[^\\]]*\\]",
+  "\\[FAILURE\\]",
+  "WATCHDOG FAILED",
+  "SUITE FAILED",
+  "SESSION_LOG_CHECK_FAIL",
+  "^\\s*\\[ERROR\\]",
+  "MASTER_VERIFICATION_FAIL"
+ ],
+ "engine_policy": {
+  "errors": "zero_unexpected",
+  "leaks": "zero_unexpected"
+ },
+ "limitations": [
+  "E5 stays human_review_pending: PNGs were not visually reviewed by the harness",
+  "teleport-style capture (C05)"
+ ],
+ "not_claimed": [
+  "E5 visual acceptance",
+  "E7"
+ ],
+ "seeds": {
+  "requested": [
+   9954360
+  ],
+  "observed": {
+   "glob": "diag/*/manifest.json",
+   "field": "effective_seed"
+  },
+  "require_observed": true
+ },
+ "seed_policy": "CLI certified; header labels are not effective-seed evidence"
+},
+{
+ "id": "q2a_capture_seed_audit",
+ "kind": "check",
+ "origin": "repo",
+ "entry": "res://scripts/test/capture_seed_audit.gd",
+ "launch": {
+  "mode": "vulkan",
+  "timeout_s": 180,
+  "user_args": []
+ },
+ "matrix": {
+  "rows": [
+   "CAP-SEED"
+  ],
+  "categories": {
+   "CAP-SEED": "OBSERVATIONAL"
+  },
+  "role": "existing runner; Q2 baseline",
+  "e_capability": [
+   "E3"
+  ]
+ },
+ "completion": [
+  {
+   "id": "runner_summary",
+   "kind": "stdout_regex",
+   "pattern": "^AUDIT_COMPLETE status=CAPTURE_COMPLETE reason= frames=9/9 "
+  }
+ ],
+ "fail_markers": [
+  "\\[FAIL[^\\]]*\\]",
+  "CHECKS FAILED",
+  "SUITE FAILED",
+  "WORLD_SESSION_SEED_FAIL",
+  "SURFACE_CHECK_FAIL",
+  "MACRO_PROFILE_ROAD_INTEGRATION_FAIL"
+ ],
+ "engine_policy": {
+  "errors": "zero_unexpected",
+  "leaks": "record"
+ },
+ "limitations": [
+  "existing TEST_MATRIX limitations retained; no E5/E7 acceptance"
+ ],
+ "artifacts": [
+  {
+   "glob": "audit/*/*.png",
+   "role": "capture_png",
+   "min_count": 9,
+   "checks": [
+    "png_header"
+   ],
+   "png_size": [
+    1280,
+    720
+   ]
+  },
+  {
+   "glob": "audit/*/manifest.json",
+   "role": "capture_manifest",
+   "min_count": 1
+  }
+ ],
+ "evidence_gate": {
+  "E5": {
+   "requires": [
+    "driver_vulkan",
+    "frames_saved"
+   ],
+   "manifest": {
+    "glob": "audit/*/manifest.json"
+   },
+   "human_review": "required"
+  }
+ },
+ "coverage": [
+  {
+   "id": "nine_frames",
+   "kind": "counter_min",
+   "pattern": "^AUDIT_COMPLETE .* frames=(\\d+)/9 ",
+   "min": 9
+  }
+ ]
+},
+{
+ "id": "q2a_surface_contract",
+ "kind": "check",
+ "origin": "repo",
+ "entry": "res://scripts/test/test_surface_audit_contract.gd",
+ "launch": {
+  "mode": "vulkan",
+  "timeout_s": 180,
+  "user_args": []
+ },
+ "matrix": {
+  "rows": [
+   "SURFACE-NEG",
+   "SURFACE-LIVE"
+  ],
+  "categories": {
+   "SURFACE-NEG": "ACTIVE_CONTRACT",
+   "SURFACE-LIVE": "REGRESSION_GUARD"
+  },
+  "role": "existing runner; Q2 baseline",
+  "e_capability": [
+   "E3"
+  ]
+ },
+ "completion": [
+  {
+   "id": "runner_summary",
+   "kind": "stdout_regex",
+   "pattern": "^SURFACE_CONTRACT_SUMMARY status=\\w+ checks=\\d+ failures=\\d+"
+  }
+ ],
+ "fail_markers": [
+  "\\[FAIL[^\\]]*\\]",
+  "CHECKS FAILED",
+  "SUITE FAILED",
+  "WORLD_SESSION_SEED_FAIL",
+  "SURFACE_CHECK_FAIL",
+  "MACRO_PROFILE_ROAD_INTEGRATION_FAIL"
+ ],
+ "engine_policy": {
+  "errors": "zero_unexpected",
+  "leaks": "record"
+ },
+ "limitations": [
+  "existing TEST_MATRIX limitations retained; no E5/E7 acceptance"
+ ],
+ "summaries": [
+  {
+   "id": "failed",
+   "pattern": "^SURFACE_CONTRACT_SUMMARY status=\\w+ checks=(\\d+) failures=(\\d+)",
+   "failures_group": 2,
+   "loose_pattern": "^SURFACE_CONTRACT_SUMMARY status=\\w+"
+  }
+ ],
+ "assertions": {
+  "expected": null,
+  "actual_from": {
+   "kind": "counter_regex",
+   "pattern": "^SURFACE_CONTRACT_SUMMARY status=\\w+ checks=(\\d+) failures=(\\d+)"
+  }
+ }
+},
+{
+ "id": "q2a_world_session_seed",
+ "kind": "check",
+ "origin": "repo",
+ "entry": "res://scripts/test/test_world_session_seed.gd",
+ "launch": {
+  "mode": "headless",
+  "timeout_s": 120,
+  "user_args": []
+ },
+ "matrix": {
+  "rows": [
+   "SESSION-SEED"
+  ],
+  "categories": {
+   "SESSION-SEED": "ACTIVE_CONTRACT"
+  },
+  "role": "existing runner; Q2 baseline",
+  "e_capability": [
+   "E1"
+  ]
+ },
+ "completion": [
+  {
+   "id": "runner_summary",
+   "kind": "stdout_regex",
+   "pattern": "^WORLD_SESSION_SEED_SUMMARY checks=\\d+ failures=\\d+"
+  }
+ ],
+ "fail_markers": [
+  "\\[FAIL[^\\]]*\\]",
+  "CHECKS FAILED",
+  "SUITE FAILED",
+  "WORLD_SESSION_SEED_FAIL",
+  "SURFACE_CHECK_FAIL",
+  "MACRO_PROFILE_ROAD_INTEGRATION_FAIL"
+ ],
+ "engine_policy": {
+  "errors": "zero_unexpected",
+  "leaks": "record"
+ },
+ "limitations": [
+  "existing TEST_MATRIX limitations retained; no E5/E7 acceptance"
+ ],
+ "summaries": [
+  {
+   "id": "failed",
+   "pattern": "^WORLD_SESSION_SEED_SUMMARY checks=(\\d+) failures=(\\d+)",
+   "failures_group": 2,
+   "loose_pattern": "^WORLD_SESSION_SEED_SUMMARY"
+  }
+ ],
+ "assertions": {
+  "expected": null,
+  "actual_from": {
+   "kind": "counter_regex",
+   "pattern": "^WORLD_SESSION_SEED_SUMMARY checks=(\\d+) failures=(\\d+)"
+  }
+ },
+ "coverage": [
+  {
+   "id": "seven_checks",
+   "kind": "counter_min",
+   "pattern": "^WORLD_SESSION_SEED_SUMMARY checks=(\\d+)",
+   "min": 7
+  }
+ ]
+},
+{
+ "id": "q2a_branch_streaming",
+ "kind": "check",
+ "origin": "repo",
+ "entry": "res://scripts/test/test_branch_streaming.gd",
+ "launch": {
+  "mode": "headless",
+  "timeout_s": 300,
+  "user_args": []
+ },
+ "matrix": {
+  "rows": [
+   "BRANCH-MESH",
+   "BRANCH-FSM",
+   "BRANCH-DRESS",
+   "BRANCH-PERF",
+   "BRANCH-NOPOST",
+   "BRANCH-DAG",
+   "BRANCH-NOPOST2",
+   "BRANCH-SEED"
+  ],
+  "categories": {
+   "BRANCH-MESH": "REGRESSION_GUARD",
+   "BRANCH-FSM": "REGRESSION_GUARD",
+   "BRANCH-DRESS": "REGRESSION_GUARD",
+   "BRANCH-PERF": "REGRESSION_GUARD",
+   "BRANCH-NOPOST": "LEGACY_CONTRACT",
+   "BRANCH-DAG": "LEGACY_CONTRACT",
+   "BRANCH-NOPOST2": "LEGACY_CONTRACT",
+   "BRANCH-SEED": "OBSERVATIONAL"
+  },
+  "role": "existing runner; Q2 baseline",
+  "e_capability": [
+   "E1"
+  ]
+ },
+ "completion": [
+  {
+   "id": "runner_summary",
+   "kind": "stdout_regex",
+   "pattern": "^\\s*OVERALL VERDICT\\s*:"
+  }
+ ],
+ "fail_markers": [
+  "\\[FAIL[^\\]]*\\]",
+  "CHECKS FAILED",
+  "SUITE FAILED",
+  "WORLD_SESSION_SEED_FAIL",
+  "SURFACE_CHECK_FAIL",
+  "MACRO_PROFILE_ROAD_INTEGRATION_FAIL"
+ ],
+ "engine_policy": {
+  "errors": "zero_unexpected",
+  "leaks": "record"
+ },
+ "limitations": [
+  "existing TEST_MATRIX limitations retained; no E5/E7 acceptance"
+ ],
+ "summaries": [
+  {
+   "id": "failed",
+   "pattern": "^\\s*FAILED\\s*:\\s*(\\d+)\\s*$",
+   "failures_group": 1,
+   "loose_pattern": "^\\s*OVERALL VERDICT\\s*:"
+  }
+ ],
+ "assertions": {
+  "expected": null,
+  "actual_from": {
+   "kind": "counter_regex",
+   "pattern": "^\\s*TOTAL ASSERTIONS\\s*:\\s*(\\d+)"
+  }
+ }
+},
+{
+ "id": "q2a_terrain_carver",
+ "kind": "check",
+ "origin": "repo",
+ "entry": "res://scripts/test/test_terrain_carver.gd",
+ "launch": {
+  "mode": "headless",
+  "timeout_s": 240,
+  "user_args": []
+ },
+ "matrix": {
+  "rows": [
+   "CARVER-LAYOUT",
+   "CARVER-NOPOST",
+   "CARVER-ANCHOR",
+   "CARVER-CLASS",
+   "CARVER-LAYER",
+   "CARVER-PERF"
+  ],
+  "categories": {
+   "CARVER-LAYOUT": "LEGACY_CONTRACT",
+   "CARVER-NOPOST": "LEGACY_CONTRACT",
+   "CARVER-ANCHOR": "ACTIVE_CONTRACT",
+   "CARVER-CLASS": "REGRESSION_GUARD",
+   "CARVER-LAYER": "REGRESSION_GUARD",
+   "CARVER-PERF": "REGRESSION_GUARD"
+  },
+  "role": "existing runner; Q2 baseline",
+  "e_capability": [
+   "E1"
+  ]
+ },
+ "completion": [
+  {
+   "id": "runner_summary",
+   "kind": "stdout_regex",
+   "pattern": "^\\s*OVERALL VERDICT\\s*:"
+  }
+ ],
+ "fail_markers": [
+  "\\[FAIL[^\\]]*\\]",
+  "CHECKS FAILED",
+  "SUITE FAILED",
+  "WORLD_SESSION_SEED_FAIL",
+  "SURFACE_CHECK_FAIL",
+  "MACRO_PROFILE_ROAD_INTEGRATION_FAIL"
+ ],
+ "engine_policy": {
+  "errors": "zero_unexpected",
+  "leaks": "record"
+ },
+ "limitations": [
+  "existing TEST_MATRIX limitations retained; no E5/E7 acceptance"
+ ],
+ "summaries": [
+  {
+   "id": "failed",
+   "pattern": "^\\s*FAILED\\s*:\\s*(\\d+)\\s*$",
+   "failures_group": 1,
+   "loose_pattern": "^\\s*OVERALL VERDICT\\s*:"
+  }
+ ],
+ "assertions": {
+  "expected": null,
+  "actual_from": {
+   "kind": "counter_regex",
+   "pattern": "^\\s*TOTAL ASSERTIONS\\s*:\\s*(\\d+)"
+  }
+ }
+},
+{
+ "id": "q2a_road_grammar",
+ "kind": "check",
+ "origin": "repo",
+ "entry": "res://scripts/test/test_road_grammar.gd",
+ "launch": {
+  "mode": "headless",
+  "timeout_s": 240,
+  "user_args": []
+ },
+ "matrix": {
+  "rows": [
+   "GRAMMAR-DET",
+   "GRAMMAR-SAFE",
+   "GRAMMAR-PERF",
+   "GRAMMAR-BIOME"
+  ],
+  "categories": {
+   "GRAMMAR-DET": "ACTIVE_CONTRACT",
+   "GRAMMAR-SAFE": "REGRESSION_GUARD",
+   "GRAMMAR-PERF": "REGRESSION_GUARD",
+   "GRAMMAR-BIOME": "LEGACY_CONTRACT"
+  },
+  "role": "existing runner; Q2 baseline",
+  "e_capability": [
+   "E1"
+  ]
+ },
+ "completion": [
+  {
+   "id": "runner_summary",
+   "kind": "stdout_regex",
+   "pattern": "^\\s*OVERALL VERDICT:"
+  }
+ ],
+ "fail_markers": [
+  "\\[FAIL[^\\]]*\\]",
+  "CHECKS FAILED",
+  "SUITE FAILED",
+  "WORLD_SESSION_SEED_FAIL",
+  "SURFACE_CHECK_FAIL",
+  "MACRO_PROFILE_ROAD_INTEGRATION_FAIL"
+ ],
+ "engine_policy": {
+  "errors": "zero_unexpected",
+  "leaks": "record"
+ },
+ "limitations": [
+  "existing TEST_MATRIX limitations retained; no E5/E7 acceptance"
+ ]
+},
+{
+ "id": "q2a_road_contract",
+ "kind": "check",
+ "origin": "repo",
+ "entry": "res://scripts/test/test_road_contract.gd",
+ "launch": {
+  "mode": "headless",
+  "timeout_s": 240,
+  "user_args": []
+ },
+ "matrix": {
+  "rows": [
+   "ROAD-VALID",
+   "ROAD-GEN",
+   "ROAD-PERF"
+  ],
+  "categories": {
+   "ROAD-VALID": "ACTIVE_CONTRACT",
+   "ROAD-GEN": "REGRESSION_GUARD",
+   "ROAD-PERF": "REGRESSION_GUARD"
+  },
+  "role": "existing runner; Q2 baseline",
+  "e_capability": [
+   "E1"
+  ]
+ },
+ "completion": [
+  {
+   "id": "runner_summary",
+   "kind": "stdout_regex",
+   "pattern": "^\\s*TOTAL TESTS EVALUATED: \\d+ / \\d+ PASSED"
+  }
+ ],
+ "fail_markers": [
+  "\\[FAIL[^\\]]*\\]",
+  "CHECKS FAILED",
+  "SUITE FAILED",
+  "WORLD_SESSION_SEED_FAIL",
+  "SURFACE_CHECK_FAIL",
+  "MACRO_PROFILE_ROAD_INTEGRATION_FAIL"
+ ],
+ "engine_policy": {
+  "errors": "zero_unexpected",
+  "leaks": "record"
+ },
+ "limitations": [
+  "existing TEST_MATRIX limitations retained; no E5/E7 acceptance"
+ ]
+},
+{
+ "id": "q2a_macro_profile",
+ "kind": "check",
+ "origin": "repo",
+ "entry": "res://scripts/test/test_macro_profile_road_integration.gd",
+ "launch": {
+  "mode": "headless",
+  "timeout_s": 240,
+  "user_args": []
+ },
+ "matrix": {
+  "rows": [
+   "MACRO-ROAD",
+   "MACRO-TERR"
+  ],
+  "categories": {
+   "MACRO-ROAD": "ACTIVE_CONTRACT",
+   "MACRO-TERR": "REGRESSION_GUARD"
+  },
+  "role": "existing runner; Q2 baseline",
+  "e_capability": [
+   "E1"
+  ]
+ },
+ "completion": [
+  {
+   "id": "runner_summary",
+   "kind": "stdout_regex",
+   "pattern": "^MACRO_PROFILE_ROAD_INTEGRATION_SUMMARY checks=\\d+ failures=\\d+ seeds=\\d+"
+  }
+ ],
+ "fail_markers": [
+  "\\[FAIL[^\\]]*\\]",
+  "CHECKS FAILED",
+  "SUITE FAILED",
+  "WORLD_SESSION_SEED_FAIL",
+  "SURFACE_CHECK_FAIL",
+  "MACRO_PROFILE_ROAD_INTEGRATION_FAIL"
+ ],
+ "engine_policy": {
+  "errors": "zero_unexpected",
+  "leaks": "record"
+ },
+ "limitations": [
+  "existing TEST_MATRIX limitations retained; no E5/E7 acceptance"
+ ],
+ "summaries": [
+  {
+   "id": "failed",
+   "pattern": "^MACRO_PROFILE_ROAD_INTEGRATION_SUMMARY checks=(\\d+) failures=(\\d+) seeds=(\\d+)",
+   "failures_group": 2,
+   "loose_pattern": "^MACRO_PROFILE_ROAD_INTEGRATION_SUMMARY"
+  }
+ ],
+ "assertions": {
+  "expected": null,
+  "actual_from": {
+   "kind": "counter_regex",
+   "pattern": "^MACRO_PROFILE_ROAD_INTEGRATION_SUMMARY checks=(\\d+) failures=(\\d+) seeds=(\\d+)"
+  }
+ }
+},
+{
+ "id": "q2a_soak_asis",
+ "kind": "check",
+ "origin": "repo",
+ "entry": "res://scripts/test/test_soak_run.gd",
+ "launch": {
+  "mode": "headless",
+  "timeout_s": 1500,
+  "user_args": []
+ },
+ "matrix": {
+  "rows": [
+   "SOAK-STATE",
+   "SOAK-MEM"
+  ],
+  "categories": {
+   "SOAK-STATE": "REGRESSION_GUARD",
+   "SOAK-MEM": "OBSERVATIONAL"
+  },
+  "role": "existing runner; Q2 baseline",
+  "e_capability": [
+   "E1"
+  ]
+ },
+ "completion": [
+  {
+   "id": "runner_summary",
+   "kind": "stdout_regex",
+   "pattern": "ALL SOAK TESTS PASSED|\\[FAIL\\] SOAK TEST FAILED"
+  }
+ ],
+ "fail_markers": [
+  "\\[FAIL[^\\]]*\\]",
+  "CHECKS FAILED",
+  "SUITE FAILED",
+  "WORLD_SESSION_SEED_FAIL",
+  "SURFACE_CHECK_FAIL",
+  "MACRO_PROFILE_ROAD_INTEGRATION_FAIL"
+ ],
+ "engine_policy": {
+  "errors": "zero_unexpected",
+  "leaks": "record"
+ },
+ "limitations": [
+  "existing TEST_MATRIX limitations retained; no E5/E7 acceptance"
+ ],
+ "coverage": [
+  {
+   "id": "three_completed_seeds",
+   "kind": "distinct_min",
+   "pattern": "\\[SUCCESS\\] Seed (\\d+): Completed",
+   "min": 3
+  }
+ ],
+ "seed_policy": "uncontrolled random effective seeds; C08"
+},
+{
+ "id": "q2a_soak_pin184729",
+ "kind": "check",
+ "origin": "repo",
+ "entry": "res://scripts/test/test_soak_run.gd",
+ "launch": {
+  "mode": "headless",
+  "timeout_s": 1500,
+  "user_args": [
+   "--seed=184729"
+  ]
+ },
+ "matrix": {
+  "rows": [
+   "SOAK-STATE",
+   "SOAK-MEM"
+  ],
+  "categories": {
+   "SOAK-STATE": "REGRESSION_GUARD",
+   "SOAK-MEM": "OBSERVATIONAL"
+  },
+  "role": "existing runner; Q2 baseline",
+  "e_capability": [
+   "E1"
+  ]
+ },
+ "completion": [
+  {
+   "id": "runner_summary",
+   "kind": "stdout_regex",
+   "pattern": "ALL SOAK TESTS PASSED|\\[FAIL\\] SOAK TEST FAILED"
+  }
+ ],
+ "fail_markers": [
+  "\\[FAIL[^\\]]*\\]",
+  "CHECKS FAILED",
+  "SUITE FAILED",
+  "WORLD_SESSION_SEED_FAIL",
+  "SURFACE_CHECK_FAIL",
+  "MACRO_PROFILE_ROAD_INTEGRATION_FAIL"
+ ],
+ "engine_policy": {
+  "errors": "zero_unexpected",
+  "leaks": "record"
+ },
+ "limitations": [
+  "existing TEST_MATRIX limitations retained; no E5/E7 acceptance"
+ ],
+ "coverage": [
+  {
+   "id": "three_completed_seeds",
+   "kind": "distinct_min",
+   "pattern": "\\[SUCCESS\\] Seed (\\d+): Completed",
+   "min": 3
+  }
+ ],
+ "seed_policy": "CLI certified; header labels are not effective-seed evidence",
+ "seeds": {
+  "requested": [
+   184729
+  ],
+  "observed": {
+   "glob": "diag/*/manifest.json",
+   "field": "effective_seed"
+  },
+  "require_observed": true
+ }
+}
  ]
 }
