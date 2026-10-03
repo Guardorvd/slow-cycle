@@ -1,14 +1,14 @@
-# Slow Cycle — current project state after D0
+# Slow Cycle — current project state after D1
 
 STATUS: CURRENT
 
-Дата: 02.10.2026. Scope: состояние после documentation reset; runtime/source baseline `ed7d1322da1a5700a8c64425708e1c813213c7f6`, никаких игровых изменений в D0. Runtime evidence ниже датировано 01.10 или ранее и в D0 заново не запускалось. Точную текущую docs revision/branch определять через `git log -1`/`git status`; это не новый runtime baseline Q2.
+Дата governance: 03.10.2026. Scope: D0 documentation reset + завершённая локальная D1 governance implementation; runtime/source baseline `ed7d1322da1a5700a8c64425708e1c813213c7f6`, никаких игровых изменений в D0. Runtime evidence ниже датировано 01.10 или ранее и в D0 заново не запускалось. Точную текущую docs revision/branch определять через `git log -1`/`git status`; это не новый runtime baseline Q2.
 
 ## 1. Authority и ближайшая работа
 
 [Blueprint](TARGET_GAME_BLUEPRINT.md) — продукт; [Master](MASTER_IMPLEMENTATION_PLAN.md) — стратегия/pivot и порядок фаз. [Target architecture](TARGET_ARCHITECTURE.md), [migration matrix](LEGACY_MIGRATION_MATRIX.md), [test strategy](TEST_STRATEGY.md) — производные. [AGENTS](../AGENTS.md)/[plan slot](../implementation_plan.md) регулируют разрешённое действие; [as-is architecture](../ARCHITECTURE.md) и код — факты/миграционный контекст. [Index](README.md), [audit](DOCUMENTATION_AUDIT.md), [decision](DECISIONS/D0-001-documentation-authority.md).
 
-D0 завершён как документационная фаза; [approved ExecPlan и отчёт](plans/completed/D0.md). Активного плана нет. Следующий безопасный task — подготовка D1: отдельный ExecPlan и согласование до исполнения. D1/Q0/Q1/Q2/R0 не начаты. WORLD-01/C05 и старые B/P/sprint next steps SUPERSEDED, не разрешение продолжить код.
+D0 завершён как документационная фаза; [approved ExecPlan и отчёт](plans/completed/D0.md). D1 COMPLETE: компактный root/scoped AGENTS, `.agent/PLANS.md`, ровно три repo skills, actual instruction-discovery probes, VERIFY PASS и fresh independent REVIEW PASS; [approved plan, отчёты и ограничения](plans/completed/D1.md). [Root plan slot](../implementation_plan.md) — NO_ACTIVE_PLAN. Пользователь принял local master `83bcbfe` как базу и разрешил локальный коммит. Push/credentials/branch cleanup не выполнялись. Q0/Q1/Q2/R0 не начаты и не имеют активного плана; новая задача требует отдельного запроса, конкретного ExecPlan и approval. WORLD-01/C05 и старые B/P/sprint next steps SUPERSEDED. D1 подтверждает только governance; runtime acceptance остаётся INCOMPLETE.
 
 ## 2. Что фактически есть
 

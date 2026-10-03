@@ -217,7 +217,7 @@ RoadPathData
 
 # III. Настройка Codex перед разработкой
 
-Это будет первая реальная работа.
+D1 задаёт локальный governance перед разработкой; следующие Q/R фазы требуют отдельных согласованных задач.
 
 ## Структура инструкций
 
@@ -227,10 +227,8 @@ RoadPathData
 ├── .agent/
 │   └── PLANS.md
 │
-├── .codex/
+├── .agents/
 │   └── skills/
-│       ├── slow-cycle-plan/
-│       │   └── SKILL.md
 │       ├── slow-cycle-worldgen/
 │       │   └── SKILL.md
 │       ├── slow-cycle-verify/
@@ -249,51 +247,21 @@ RoadPathData
 
 Не нужно создавать двадцать skills.
 
-Четырёх достаточно.
+Ровно три узких repo skills; дополнительные требуют доказанной необходимости и отдельного scope approval.
 
 ---
 
-## Skill 1 — `slow-cycle-plan`
+## Planning — native Plan Mode и ExecPlan
 
-Используется для любой:
-
-- новой системы;
-- migration;
-- multi-file задачи;
-- архитектурного изменения.
-
-Обязан подготовить ExecPlan.
-
-ExecPlan содержит:
-
-```text
-Goal
-Observed current state
-Target architecture
-KEEP / ADAPT / REPLACE decisions
-Public contracts
-Dependency direction
-Allowed files
-Forbidden files
-Migration path
-Risks
-Tests
-Visual verification
-Runtime verification
-Performance verification
-Rollback boundary
-Legacy impact
-Documentation changes
-Definition of Done
-```
-
-После создания плана Codex **останавливается**.
-
-Код не пишет до согласования пользователя.
+Предварительное исследование выполняется в native Codex Plan Mode, где доступно.
+Root AGENTS определяет gate для фазовых/архитектурных/межсистемных/multi-file feature/значимых migration/длительных задач.
+Один конкретный ExecPlan сохраняется в `implementation_plan.md` по `.agent/PLANS.md`, затем STOP до явного approval задачи/версии/scope.
+Для небольшого локального исправления без изменения ownership/contracts/gates полный шаблон не нужен, если пользователь не требует его.
+Mode switching не означает approval. Отдельный planning skill не создаётся.
 
 ---
 
-## Skill 2 — `slow-cycle-worldgen`
+## Skill 1 — `slow-cycle-worldgen`
 
 Узкий skill архитектуры worldgen.
 
@@ -324,13 +292,13 @@ WORLD FIRST → ROUTE SECOND → ROAD THIRD
 
 ---
 
-## Skill 3 — `slow-cycle-verify`
+## Skill 2 — `slow-cycle-verify`
 
 Используется после implementation.
 
 Он не реализует feature.
 
-Только проверяет.
+Только проверяет approved plan/result diff с фактическими coverage/completion и reason/evidence. Не исправляет implementation/tests и не создаёт Q1 harness незаметно; missing evidence → INCOMPLETE.
 
 Обязательные действия:
 
@@ -365,7 +333,7 @@ INCOMPLETE
 
 ---
 
-## Skill 4 — `slow-cycle-review`
+## Skill 3 — `slow-cycle-review`
 
 Независимый критик.
 
@@ -404,7 +372,7 @@ REJECT
 
 Даже если все тесты зелёные.
 
-Это будет наша формальная версия твоего «саб-агента критика».
+Review выполняется в свежем независимом контексте по approved ExecPlan + resulting diff + verification report. Самопроверка автора не считается независимой; без независимого reviewer acceptance INCOMPLETE. Verdict только PASS / REJECT с reason/evidence.
 
 ---
 
@@ -470,13 +438,13 @@ No global mutable generator state.
 
 Старый тест **не всегда автоматически является вечным продуктовым требованием**.
 
-Вводим классификацию.
+D1 вводит authority/mutation governance, но не классифицирует existing suites. Current regression protection/assertions/thresholds/mandatory gates сохраняются. Mutation/reclassification требует конкретного human approval; новые test fixtures должны быть явно в approved whitelist. Frozen test-integrity не переписывается.
 
 ---
 
 # V. Новая система честности тестов
 
-Каждый существующий test получает одну категорию.
+Категории ниже — определения стратегии. Каждый existing suite получает категорию только в отдельно approved Q0 authority map; D1 не назначает ни одной категории и не отменяет gate.
 
 ## ACTIVE_CONTRACT
 
@@ -648,17 +616,19 @@ Current source of truth:
 
 ## PHASE D1 — Codex Operating System
 
+D1 governance завершён локально после actual VERIFY PASS + fresh independent REVIEW PASS: [approved plan, completion reports и ограничения](plans/completed/D1.md). Root plan slot — NO_ACTIVE_PLAN. Q0/Q1/Q2/R0 не начаты и требуют отдельного task/approval; D1 не является runtime PASS.
+
 ### Реализовать
 
 Root/scoped AGENTS.
 
 `.agent/PLANS.md`.
 
-Четыре Codex Skills.
+Ровно три repo skills в `.agents/skills`: `slow-cycle-worldgen`, `slow-cycle-verify`, `slow-cycle-review`. Native Plan Mode + root gate + `.agent/PLANS.md` отвечают за planning.
 
-Task specification template.
+Task specification/ExecPlan/report template в `.agent/PLANS.md`, без дублирования в root.
 
-Review protocol.
+Read-only verification и independent review protocol. Явное natural-language «Use the slow-cycle-verify skill» / «Use the slow-cycle-review skill» поддерживается наряду с named-skill syntax; literal `$` не единственный activation/acceptance путь. После blocking findings — approved-scope fixes и fresh verify/review.
 
 ### Каждый task должен проходить цикл
 

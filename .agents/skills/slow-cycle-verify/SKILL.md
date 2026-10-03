@@ -1,0 +1,20 @@
+---
+name: slow-cycle-verify
+description: Independently verify a Slow Cycle resulting diff against its approved plan with actual scope, completion and evidence. Read-only for implementation/tests; excludes feature fixes and harness development.
+---
+
+# Verify the result
+
+Use after an implementation/docs-governance milestone or an explicit verification request. “Use the slow-cycle-verify skill” and a named skill mention both select this workflow. Do not develop/fix the feature, reclassify suites or write a new harness. Reports may be saved only in an authorized evidence location.
+
+1. Read root/scoped instructions relevant to the audited result and `.agent/PLANS.md` report format. Obtain approved task/version, base/result revision, staged/unstaged/new-file diff, original dirty list and raw artifacts. Missing approval/result identity → INCOMPLETE. Fix required checks/coverage from the plan and current gates before running them.
+2. Audit exact scope, protected player/camera/tests/config/frozen rule, owners/contracts/dependency changes and other people's edits. Unapproved path/behavior/gate change → FAIL. Read access is allowed outside the mutation whitelist; implementation/test mutation is not.
+3. Run required targeted/integration checks on real production paths. Record commands, effective seeds/configuration, environment, limits, expected/actual assertions/coverage/completion and full stdout/stderr. Exit 0/expected budget is insufficient; a runner lacking required evidence → INCOMPLETE. Do not build Q1 to conceal the gap.
+4. Run available approved negative/boundary fixtures through real logic; match exact reasons and sensitivity. Arbitrary crash/timeout is not negative PASS. Missing required fixture → INCOMPLETE; wrong reason or invalid accepted → FAIL. Do not patch fixtures, hooks or expected values.
+5. Check repeated seeds/stable hashes and reorder/materialization independence when required. Declare actual tested identities, engine/configuration and limits; reference seeds 184729/42/77777 are not an already executed Q2 baseline. Do not claim cross-engine/platform byte determinism without its contract/evidence.
+6. Confirm actual completion and meaningful scene/branch/point/distance/duration coverage. Distinguish pure math, real integration, main/production-equivalent runtime, physical/Input replay and geometry/teleport proxy. A subprocess that omits required assertions cannot PASS.
+7. Inspect full logs for unexpected parse/runtime errors, warnings/leaks/ObjectDB, timeouts and aborts; match expected-negative diagnostics rather than suppressing them. Known baseline failures remain recorded and do not waive a required zero-error gate.
+8. For required physics use real registered collision/Input-driven bicycle; for required visuals real Vulkan saved/read captures with context; for performance bounded workload/soak/frame stalls/distributions/memory before-after; E7 only from a human. Missing a required level → INCOMPLETE. Justified N/A for a Markdown-only task does not waive future generation gates or certify runtime.
+9. Report source/diff identity and evidence. Do not fix implementation/tests: return defects to their owner, then rerun after changes. A stale PASS does not apply to a different source/diff even at the same HEAD.
+
+Result is **PASS / FAIL / INCOMPLETE**, with reason/evidence, using the PLANS verification format. FAIL is demonstrated violation; INCOMPLETE is missing/uncompleted required evidence. If both occur, FAIL and list missing coverage. PASS requires all required scope/checks/coverage/completion and no unexpected errors/leaks. State known failures, limitations and any approved test changes/reclassification; never infer global game readiness from a limited task PASS.
