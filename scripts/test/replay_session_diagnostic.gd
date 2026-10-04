@@ -1,6 +1,7 @@
 extends SceneTree
 
 const SessionLogger = preload("res://scripts/core/slow_cycle_logger.gd")
+const TeardownSettle = preload("res://scripts/test/teardown_settle_support.gd")
 var scene: Node3D
 var manager: Node3D
 var bike: CharacterBody3D
@@ -31,7 +32,7 @@ func _finish(reason: String = "") -> void:
 	print("REPLAY_DIAGNOSTIC_SUMMARY status=%s reason=%s checkpoints=%d choices=%d" % ["PASS" if reason.is_empty() else "INCOMPLETE", reason, checked, choices])
 	await process_frame
 	await process_frame
-	quit(0 if reason.is_empty() else 1)
+	await TeardownSettle.settle_then_quit(self, 0 if reason.is_empty() else 1)
 
 func _walk_to(s: float) -> void:
 	while not done and walked_s < s:

@@ -7,6 +7,7 @@ extends SceneTree
 
 const MainScene: PackedScene = preload("res://scenes/main.tscn")
 const SlowCycleLogger = preload("res://scripts/core/slow_cycle_logger.gd")
+const TeardownSettle = preload("res://scripts/test/teardown_settle_support.gd")
 
 const TEST_SEED: int = 184729
 const TARGET_RIDE_DISTANCE_M: float = 500.0 # Fast and thorough physical run
@@ -175,9 +176,9 @@ func _run_ride() -> void:
 	if not pass_run:
 		SlowCycleLogger.log_world("[FAIL] Virtual Rider Bot: run failed")
 		SlowCycleLogger.flush()
-		quit(1)
+		await TeardownSettle.settle_then_quit(self, 1)
 	else:
 		print("✅ [PASS] VIRTUAL PHYSICAL RIDER BOT COMPLETED SUCCESSFULLY!")
 		SlowCycleLogger.log_world("[PASS] Virtual Rider Bot: covered %.1fm, %d roll events" % [total_distance_covered, roll_events_count])
 		SlowCycleLogger.flush()
-		quit(0)
+		await TeardownSettle.settle_then_quit(self, 0)

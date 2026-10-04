@@ -1,0 +1,1445 @@
+{
+  "contract": "F1 approved with binding clarifications A/B/C",
+  "declared": 120,
+  "retries": 0,
+  "replacements": 0,
+  "infra_tolerance": 0,
+  "engine_sha256": "2445d009a5e0474fc7064b9767100e9d2c09521890ac5625476bfb81cf03f2d4",
+  "probe_seed": 184729,
+  "attempts": [
+    {
+      "ordinal": 1,
+      "block": "F-E0",
+      "arm": "PARSE",
+      "suite": "parse",
+      "entry": "res://scripts/test/teardown_settle_support.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": []
+    },
+    {
+      "ordinal": 2,
+      "block": "F-E0",
+      "arm": "PARSE",
+      "suite": "parse",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": []
+    },
+    {
+      "ordinal": 3,
+      "block": "F-E0",
+      "arm": "PARSE",
+      "suite": "parse",
+      "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": []
+    },
+    {
+      "ordinal": 4,
+      "block": "F-E0",
+      "arm": "PARSE",
+      "suite": "parse",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": []
+    },
+    {
+      "ordinal": 5,
+      "block": "F-SAN",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 6,
+      "block": "F-SAN",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ]
+    },
+    {
+      "ordinal": 7,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 1
+    },
+    {
+      "ordinal": 8,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 1
+    },
+    {
+      "ordinal": 9,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 2
+    },
+    {
+      "ordinal": 10,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 2
+    },
+    {
+      "ordinal": 11,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 3
+    },
+    {
+      "ordinal": 12,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 3
+    },
+    {
+      "ordinal": 13,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 4
+    },
+    {
+      "ordinal": 14,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 4
+    },
+    {
+      "ordinal": 15,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 5
+    },
+    {
+      "ordinal": 16,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 5
+    },
+    {
+      "ordinal": 17,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 6
+    },
+    {
+      "ordinal": 18,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 6
+    },
+    {
+      "ordinal": 19,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 7
+    },
+    {
+      "ordinal": 20,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 7
+    },
+    {
+      "ordinal": 21,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 8
+    },
+    {
+      "ordinal": 22,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 8
+    },
+    {
+      "ordinal": 23,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 9
+    },
+    {
+      "ordinal": 24,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 9
+    },
+    {
+      "ordinal": 25,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 10
+    },
+    {
+      "ordinal": 26,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 10
+    },
+    {
+      "ordinal": 27,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 11
+    },
+    {
+      "ordinal": 28,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 11
+    },
+    {
+      "ordinal": 29,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 12
+    },
+    {
+      "ordinal": 30,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 12
+    },
+    {
+      "ordinal": 31,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 13
+    },
+    {
+      "ordinal": 32,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 13
+    },
+    {
+      "ordinal": 33,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 14
+    },
+    {
+      "ordinal": 34,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 14
+    },
+    {
+      "ordinal": 35,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 15
+    },
+    {
+      "ordinal": 36,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 15
+    },
+    {
+      "ordinal": 37,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 16
+    },
+    {
+      "ordinal": 38,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 16
+    },
+    {
+      "ordinal": 39,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 17
+    },
+    {
+      "ordinal": 40,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 17
+    },
+    {
+      "ordinal": 41,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 18
+    },
+    {
+      "ordinal": 42,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 18
+    },
+    {
+      "ordinal": 43,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 19
+    },
+    {
+      "ordinal": 44,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 19
+    },
+    {
+      "ordinal": 45,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 20
+    },
+    {
+      "ordinal": 46,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 20
+    },
+    {
+      "ordinal": 47,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 21
+    },
+    {
+      "ordinal": 48,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 21
+    },
+    {
+      "ordinal": 49,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 22
+    },
+    {
+      "ordinal": 50,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 22
+    },
+    {
+      "ordinal": 51,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 23
+    },
+    {
+      "ordinal": 52,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 23
+    },
+    {
+      "ordinal": 53,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 24
+    },
+    {
+      "ordinal": 54,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 24
+    },
+    {
+      "ordinal": 55,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 25
+    },
+    {
+      "ordinal": 56,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 25
+    },
+    {
+      "ordinal": 57,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 26
+    },
+    {
+      "ordinal": 58,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 26
+    },
+    {
+      "ordinal": 59,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 27
+    },
+    {
+      "ordinal": 60,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 27
+    },
+    {
+      "ordinal": 61,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 28
+    },
+    {
+      "ordinal": 62,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 28
+    },
+    {
+      "ordinal": 63,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 29
+    },
+    {
+      "ordinal": 64,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 29
+    },
+    {
+      "ordinal": 65,
+      "block": "F-C",
+      "arm": "FIXED_SETTLED_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=FIXED_SETTLED_QUIT"
+      ],
+      "pair": 30
+    },
+    {
+      "ordinal": 66,
+      "block": "F-C",
+      "arm": "LEGACY_IMMEDIATE_QUIT",
+      "suite": "probe",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "timeout_s": 120,
+      "verbose": false,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ],
+      "pair": 30
+    },
+    {
+      "ordinal": 67,
+      "block": "F-RS",
+      "arm": "session_diagnostics",
+      "suite": "manifest_producer",
+      "entry": "res://scripts/test/test_session_diagnostics.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": []
+    },
+    {
+      "ordinal": 68,
+      "block": "F-RV",
+      "arm": "VERBOSE_REPLAY",
+      "suite": "verbose_replay",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "timeout_s": 240,
+      "verbose": true,
+      "args": []
+    },
+    {
+      "ordinal": 69,
+      "block": "F-RV",
+      "arm": "VERBOSE_REPLAY",
+      "suite": "verbose_replay",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "timeout_s": 240,
+      "verbose": true,
+      "args": []
+    },
+    {
+      "ordinal": 70,
+      "block": "F-RV",
+      "arm": "VERBOSE_REPLAY",
+      "suite": "verbose_replay",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "timeout_s": 240,
+      "verbose": true,
+      "args": []
+    },
+    {
+      "ordinal": 71,
+      "block": "F-RV",
+      "arm": "VERBOSE_REPLAY",
+      "suite": "verbose_replay",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "timeout_s": 240,
+      "verbose": true,
+      "args": []
+    },
+    {
+      "ordinal": 72,
+      "block": "F-RV",
+      "arm": "VERBOSE_REPLAY",
+      "suite": "verbose_replay",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "timeout_s": 240,
+      "verbose": true,
+      "args": []
+    },
+    {
+      "ordinal": 73,
+      "block": "F-RV",
+      "arm": "VERBOSE_REPLAY",
+      "suite": "verbose_replay",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "timeout_s": 240,
+      "verbose": true,
+      "args": []
+    },
+    {
+      "ordinal": 74,
+      "block": "F-RV",
+      "arm": "VERBOSE_REPLAY",
+      "suite": "verbose_replay",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "timeout_s": 240,
+      "verbose": true,
+      "args": []
+    },
+    {
+      "ordinal": 75,
+      "block": "F-RV",
+      "arm": "VERBOSE_REPLAY",
+      "suite": "verbose_replay",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "timeout_s": 240,
+      "verbose": true,
+      "args": []
+    },
+    {
+      "ordinal": 76,
+      "block": "F-RV",
+      "arm": "VERBOSE_REPLAY",
+      "suite": "verbose_replay",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "timeout_s": 240,
+      "verbose": true,
+      "args": []
+    },
+    {
+      "ordinal": 77,
+      "block": "F-RV",
+      "arm": "VERBOSE_REPLAY",
+      "suite": "verbose_replay",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "timeout_s": 240,
+      "verbose": true,
+      "args": []
+    },
+    {
+      "ordinal": 78,
+      "block": "F-Q",
+      "arm": "session_diagnostics",
+      "suite": "session_diagnostics",
+      "entry": "res://scripts/test/test_session_diagnostics.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 1,
+      "q1_group_size": 3
+    },
+    {
+      "ordinal": 79,
+      "block": "F-Q",
+      "arm": "replay_session",
+      "suite": "replay_session",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 1
+    },
+    {
+      "ordinal": 80,
+      "block": "F-Q",
+      "arm": "virtual_rider",
+      "suite": "virtual_rider",
+      "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 1
+    },
+    {
+      "ordinal": 81,
+      "block": "F-Q",
+      "arm": "virtual_rider",
+      "suite": "virtual_rider",
+      "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 1
+    },
+    {
+      "ordinal": 82,
+      "block": "F-Q",
+      "arm": "session_diagnostics",
+      "suite": "session_diagnostics",
+      "entry": "res://scripts/test/test_session_diagnostics.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 2,
+      "q1_group_size": 3
+    },
+    {
+      "ordinal": 83,
+      "block": "F-Q",
+      "arm": "replay_session",
+      "suite": "replay_session",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 2
+    },
+    {
+      "ordinal": 84,
+      "block": "F-Q",
+      "arm": "virtual_rider",
+      "suite": "virtual_rider",
+      "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 2
+    },
+    {
+      "ordinal": 85,
+      "block": "F-Q",
+      "arm": "virtual_rider",
+      "suite": "virtual_rider",
+      "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 2
+    },
+    {
+      "ordinal": 86,
+      "block": "F-Q",
+      "arm": "session_diagnostics",
+      "suite": "session_diagnostics",
+      "entry": "res://scripts/test/test_session_diagnostics.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 3,
+      "q1_group_size": 3
+    },
+    {
+      "ordinal": 87,
+      "block": "F-Q",
+      "arm": "replay_session",
+      "suite": "replay_session",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 3
+    },
+    {
+      "ordinal": 88,
+      "block": "F-Q",
+      "arm": "virtual_rider",
+      "suite": "virtual_rider",
+      "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 3
+    },
+    {
+      "ordinal": 89,
+      "block": "F-Q",
+      "arm": "virtual_rider",
+      "suite": "virtual_rider",
+      "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 3
+    },
+    {
+      "ordinal": 90,
+      "block": "F-Q",
+      "arm": "session_diagnostics",
+      "suite": "session_diagnostics",
+      "entry": "res://scripts/test/test_session_diagnostics.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 4,
+      "q1_group_size": 3
+    },
+    {
+      "ordinal": 91,
+      "block": "F-Q",
+      "arm": "replay_session",
+      "suite": "replay_session",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 4
+    },
+    {
+      "ordinal": 92,
+      "block": "F-Q",
+      "arm": "virtual_rider",
+      "suite": "virtual_rider",
+      "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 4
+    },
+    {
+      "ordinal": 93,
+      "block": "F-Q",
+      "arm": "virtual_rider",
+      "suite": "virtual_rider",
+      "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 4
+    },
+    {
+      "ordinal": 94,
+      "block": "F-Q",
+      "arm": "session_diagnostics",
+      "suite": "session_diagnostics",
+      "entry": "res://scripts/test/test_session_diagnostics.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 5,
+      "q1_group_size": 3
+    },
+    {
+      "ordinal": 95,
+      "block": "F-Q",
+      "arm": "replay_session",
+      "suite": "replay_session",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 5
+    },
+    {
+      "ordinal": 96,
+      "block": "F-Q",
+      "arm": "virtual_rider",
+      "suite": "virtual_rider",
+      "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 5
+    },
+    {
+      "ordinal": 97,
+      "block": "F-Q",
+      "arm": "virtual_rider",
+      "suite": "virtual_rider",
+      "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 5
+    },
+    {
+      "ordinal": 98,
+      "block": "F-Q",
+      "arm": "session_diagnostics",
+      "suite": "session_diagnostics",
+      "entry": "res://scripts/test/test_session_diagnostics.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 6,
+      "q1_group_size": 3
+    },
+    {
+      "ordinal": 99,
+      "block": "F-Q",
+      "arm": "replay_session",
+      "suite": "replay_session",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 6
+    },
+    {
+      "ordinal": 100,
+      "block": "F-Q",
+      "arm": "virtual_rider",
+      "suite": "virtual_rider",
+      "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 6
+    },
+    {
+      "ordinal": 101,
+      "block": "F-Q",
+      "arm": "virtual_rider",
+      "suite": "virtual_rider",
+      "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 6
+    },
+    {
+      "ordinal": 102,
+      "block": "F-Q",
+      "arm": "session_diagnostics",
+      "suite": "session_diagnostics",
+      "entry": "res://scripts/test/test_session_diagnostics.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 7,
+      "q1_group_size": 3
+    },
+    {
+      "ordinal": 103,
+      "block": "F-Q",
+      "arm": "replay_session",
+      "suite": "replay_session",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 7
+    },
+    {
+      "ordinal": 104,
+      "block": "F-Q",
+      "arm": "virtual_rider",
+      "suite": "virtual_rider",
+      "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 7
+    },
+    {
+      "ordinal": 105,
+      "block": "F-Q",
+      "arm": "virtual_rider",
+      "suite": "virtual_rider",
+      "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 7
+    },
+    {
+      "ordinal": 106,
+      "block": "F-Q",
+      "arm": "session_diagnostics",
+      "suite": "session_diagnostics",
+      "entry": "res://scripts/test/test_session_diagnostics.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 8,
+      "q1_group_size": 3
+    },
+    {
+      "ordinal": 107,
+      "block": "F-Q",
+      "arm": "replay_session",
+      "suite": "replay_session",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 8
+    },
+    {
+      "ordinal": 108,
+      "block": "F-Q",
+      "arm": "virtual_rider",
+      "suite": "virtual_rider",
+      "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 8
+    },
+    {
+      "ordinal": 109,
+      "block": "F-Q",
+      "arm": "virtual_rider",
+      "suite": "virtual_rider",
+      "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 8
+    },
+    {
+      "ordinal": 110,
+      "block": "F-Q",
+      "arm": "session_diagnostics",
+      "suite": "session_diagnostics",
+      "entry": "res://scripts/test/test_session_diagnostics.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 9,
+      "q1_group_size": 3
+    },
+    {
+      "ordinal": 111,
+      "block": "F-Q",
+      "arm": "replay_session",
+      "suite": "replay_session",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 9
+    },
+    {
+      "ordinal": 112,
+      "block": "F-Q",
+      "arm": "virtual_rider",
+      "suite": "virtual_rider",
+      "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 9
+    },
+    {
+      "ordinal": 113,
+      "block": "F-Q",
+      "arm": "virtual_rider",
+      "suite": "virtual_rider",
+      "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 9
+    },
+    {
+      "ordinal": 114,
+      "block": "F-Q",
+      "arm": "session_diagnostics",
+      "suite": "session_diagnostics",
+      "entry": "res://scripts/test/test_session_diagnostics.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 10,
+      "q1_group_size": 3
+    },
+    {
+      "ordinal": 115,
+      "block": "F-Q",
+      "arm": "replay_session",
+      "suite": "replay_session",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 10
+    },
+    {
+      "ordinal": 116,
+      "block": "F-Q",
+      "arm": "virtual_rider",
+      "suite": "virtual_rider",
+      "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 10
+    },
+    {
+      "ordinal": 117,
+      "block": "F-Q",
+      "arm": "virtual_rider",
+      "suite": "virtual_rider",
+      "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+      "timeout_s": 240,
+      "verbose": false,
+      "args": [],
+      "round": 10
+    },
+    {
+      "ordinal": 118,
+      "block": "F-N",
+      "arm": "neg_replay_no_manifest",
+      "suite": "neg_replay_no_manifest",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "timeout_s": 90,
+      "verbose": false,
+      "args": []
+    },
+    {
+      "ordinal": 119,
+      "block": "F-N",
+      "arm": "neg_replay_no_manifest",
+      "suite": "neg_replay_no_manifest",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "timeout_s": 90,
+      "verbose": false,
+      "args": []
+    },
+    {
+      "ordinal": 120,
+      "block": "F-N",
+      "arm": "neg_replay_no_manifest",
+      "suite": "neg_replay_no_manifest",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "timeout_s": 90,
+      "verbose": false,
+      "args": []
+    }
+  ]
+}

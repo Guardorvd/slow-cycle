@@ -1,0 +1,1596 @@
+{
+  "task": "Q2B",
+  "plan_version": "v1.1",
+  "declared_attempts": 150,
+  "seed": 184729,
+  "retries": 0,
+  "alpha": 0.01,
+  "sidedness": "one-sided",
+  "attempts": [
+    {
+      "ordinal": 1,
+      "block": "D1-P",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": true,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 2,
+      "block": "D1-P",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": true,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 3,
+      "block": "D1-P",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": true,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 4,
+      "block": "D1-P",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": true,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 5,
+      "block": "D1-P",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": true,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 6,
+      "block": "D1-P",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": true,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 7,
+      "block": "D1-P",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": true,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 8,
+      "block": "D1-P",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": true,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 9,
+      "block": "D1-P",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": true,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 10,
+      "block": "D1-P",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": true,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 11,
+      "block": "D1-P",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": true,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 12,
+      "block": "D1-P",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": true,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 13,
+      "block": "D1-P",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": true,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 14,
+      "block": "D1-P",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": true,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 15,
+      "block": "D1-P",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": true,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 16,
+      "block": "D1-P",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": true,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 17,
+      "block": "D1-P",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": true,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 18,
+      "block": "D1-P",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": true,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 19,
+      "block": "D1-P",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": true,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 20,
+      "block": "D1-P",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": true,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 21,
+      "block": "D1-S",
+      "arm": "SESSION",
+      "entry": "res://scripts/test/test_session_diagnostics.gd",
+      "verbose": false,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 22,
+      "block": "D1-R",
+      "arm": "REPLAY",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "verbose": true,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 23,
+      "block": "D1-R",
+      "arm": "REPLAY",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "verbose": true,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 24,
+      "block": "D1-R",
+      "arm": "REPLAY",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "verbose": true,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 25,
+      "block": "D1-R",
+      "arm": "REPLAY",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "verbose": true,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 26,
+      "block": "D1-R",
+      "arm": "REPLAY",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "verbose": true,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 27,
+      "block": "D1-R",
+      "arm": "REPLAY",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "verbose": true,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 28,
+      "block": "D1-R",
+      "arm": "REPLAY",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "verbose": true,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 29,
+      "block": "D1-R",
+      "arm": "REPLAY",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "verbose": true,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 30,
+      "block": "D1-R",
+      "arm": "REPLAY",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "verbose": true,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 31,
+      "block": "D1-R",
+      "arm": "REPLAY",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "verbose": true,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 32,
+      "block": "D1-V",
+      "arm": "RIDER",
+      "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+      "verbose": true,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 33,
+      "block": "D1-V",
+      "arm": "RIDER",
+      "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+      "verbose": true,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 34,
+      "block": "D1-V",
+      "arm": "RIDER",
+      "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+      "verbose": true,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 35,
+      "block": "D1-V",
+      "arm": "RIDER",
+      "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+      "verbose": true,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 36,
+      "block": "D1-V",
+      "arm": "RIDER",
+      "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+      "verbose": true,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 37,
+      "block": "D1-V",
+      "arm": "RIDER",
+      "entry": "res://scripts/test/test_virtual_rider_bot.gd",
+      "verbose": true,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 38,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 39,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 40,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 41,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 42,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 43,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 44,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 45,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 46,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 47,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 48,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 49,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 50,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 51,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 52,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 53,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 54,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 55,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 56,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 57,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 58,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 59,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 60,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 61,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 62,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 63,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 64,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 65,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 66,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 67,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 68,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 69,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 70,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 71,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 72,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 73,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 74,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 75,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 76,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 77,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 78,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 79,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 80,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 81,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 82,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 83,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 84,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 85,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 86,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 87,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 88,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 89,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 90,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 91,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 92,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 93,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 94,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 95,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 96,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 97,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 98,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 99,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 100,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 101,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 102,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 103,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 104,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 105,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 106,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 107,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 108,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 109,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 110,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 111,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 112,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 113,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 114,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 115,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 116,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 117,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 118,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 119,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 120,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 121,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 122,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 123,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 124,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 125,
+      "block": "D2-I",
+      "arm": "WAIT",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=WAIT"
+      ]
+    },
+    {
+      "ordinal": 126,
+      "block": "D2-I",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=NORMAL"
+      ]
+    },
+    {
+      "ordinal": 127,
+      "block": "D2-I",
+      "arm": "AUDIO_REMOVED",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 120,
+      "args": [
+        "--q2b-arm=AUDIO_REMOVED"
+      ]
+    },
+    {
+      "ordinal": 128,
+      "block": "D2-R",
+      "arm": "SESSION",
+      "entry": "res://scripts/test/test_session_diagnostics.gd",
+      "verbose": false,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 129,
+      "block": "D2-R",
+      "arm": "REPLAY",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "verbose": false,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 130,
+      "block": "D2-R",
+      "arm": "SESSION",
+      "entry": "res://scripts/test/test_session_diagnostics.gd",
+      "verbose": false,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 131,
+      "block": "D2-R",
+      "arm": "REPLAY",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "verbose": false,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 132,
+      "block": "D2-R",
+      "arm": "SESSION",
+      "entry": "res://scripts/test/test_session_diagnostics.gd",
+      "verbose": false,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 133,
+      "block": "D2-R",
+      "arm": "REPLAY",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "verbose": false,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 134,
+      "block": "D2-R",
+      "arm": "SESSION",
+      "entry": "res://scripts/test/test_session_diagnostics.gd",
+      "verbose": false,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 135,
+      "block": "D2-R",
+      "arm": "REPLAY",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "verbose": false,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 136,
+      "block": "D2-R",
+      "arm": "SESSION",
+      "entry": "res://scripts/test/test_session_diagnostics.gd",
+      "verbose": false,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 137,
+      "block": "D2-R",
+      "arm": "REPLAY",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "verbose": false,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 138,
+      "block": "D2-R",
+      "arm": "SESSION",
+      "entry": "res://scripts/test/test_session_diagnostics.gd",
+      "verbose": false,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 139,
+      "block": "D2-R",
+      "arm": "REPLAY",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "verbose": false,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 140,
+      "block": "D2-R",
+      "arm": "SESSION",
+      "entry": "res://scripts/test/test_session_diagnostics.gd",
+      "verbose": false,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 141,
+      "block": "D2-R",
+      "arm": "REPLAY",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "verbose": false,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 142,
+      "block": "D2-R",
+      "arm": "SESSION",
+      "entry": "res://scripts/test/test_session_diagnostics.gd",
+      "verbose": false,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 143,
+      "block": "D2-R",
+      "arm": "REPLAY",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "verbose": false,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 144,
+      "block": "D2-R",
+      "arm": "SESSION",
+      "entry": "res://scripts/test/test_session_diagnostics.gd",
+      "verbose": false,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 145,
+      "block": "D2-R",
+      "arm": "REPLAY",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "verbose": false,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 146,
+      "block": "D2-R",
+      "arm": "SESSION",
+      "entry": "res://scripts/test/test_session_diagnostics.gd",
+      "verbose": false,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 147,
+      "block": "D2-R",
+      "arm": "REPLAY",
+      "entry": "res://scripts/test/replay_session_diagnostic.gd",
+      "verbose": false,
+      "timeout_s": 240,
+      "args": []
+    },
+    {
+      "ordinal": 148,
+      "block": "D3",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 180,
+      "args": [
+        "--q2b-arm=NORMAL",
+        "--q2b-cycles=3",
+        "--q2b-walk=1",
+        "--q2b-settle-ms=500"
+      ]
+    },
+    {
+      "ordinal": 149,
+      "block": "D3",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 180,
+      "args": [
+        "--q2b-arm=NORMAL",
+        "--q2b-cycles=3",
+        "--q2b-walk=1",
+        "--q2b-settle-ms=500"
+      ]
+    },
+    {
+      "ordinal": 150,
+      "block": "D3",
+      "arm": "NORMAL",
+      "entry": "res://scripts/test/q2b/q2b_lifecycle_probe.gd",
+      "verbose": false,
+      "timeout_s": 180,
+      "args": [
+        "--q2b-arm=NORMAL",
+        "--q2b-cycles=3",
+        "--q2b-walk=1",
+        "--q2b-settle-ms=500"
+      ]
+    }
+  ]
+}
