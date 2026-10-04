@@ -37,6 +37,16 @@ IDENTITIES = {
         ('RI-DIV', r'^\s*\d+\s*\|', 'source_constant'), ('RI-MONO', r'^.*[Ss]eed.*(?:[Vv]iolation|[Dd]ead|[Rr]elief)', 'source_constant'),
         ('RI-RIDE', r'Distance Covered:|Max Lateral Deviation:|Peak Bike Roll Bank:|Active Cornering Roll Events:|Track Integrity Kept:|Roll Events Density:', 'REPEATABILITY_OBSERVATION')]} }
 LEAK = re.compile(r'^WARNING:\s*(\d+) ObjectDB instances? (?:was|were) leaked at exit.*$', re.M)
+SESSION_DECISION_FIELDS = ['fork_id', 'choice', 'selected_branch_id', 'selected_seed']
+
+
+def session_identity(steps, choices):
+    checkpoints = [{'label': s.get('label'), 'signature': s.get('signature')} for s in steps if s.get('label') in ['opening', 'selected_arm']]
+    decisions = [{k: c[k] for k in SESSION_DECISION_FIELDS if k in c} for c in choices]
+    complete = all(any(s['label'] == label and isinstance(s['signature'], str) and s['signature'] for s in checkpoints) for label in ['opening', 'selected_arm']) and all(all(k in c for k in SESSION_DECISION_FIELDS) for c in decisions)
+    # Only emitted geometry signatures and explicitly whitelisted decisions enter equality.
+    return {'checkpoints': checkpoints, 'decisions': decisions, 'status': 'OBSERVED' if complete else 'NOT_COMPARABLE', 'sha256': cjson.digest({'checkpoints': checkpoints, 'choices': decisions}) if complete else None,
+            'timing': {'label': 'REPEATABILITY_OBSERVATION', 'physics_tick': [c.get('physics_tick') for c in choices], 'status': 'OBSERVED' if choices and all('physics_tick' in c for c in choices) else 'NOT_OBSERVED'}}
 
 
 def text_identity(raw, pattern, sorted_lines=False, soak=False):
@@ -63,6 +73,43 @@ def png(path):
     return list(struct.unpack('>II', raw[16:24]))
 
 
+def capture_values(manifest, check, content):
+    values = []
+    for frame in content.get('frames', []):
+        ref = frame.get('metadata')
+        item = {'status': 'NOT_OBSERVED', 'signature': None, 'source_relpath': None, 'source_sha256': None, 'seed': frame.get('seed'), 'generation_config': None}
+        try:
+            if not isinstance(ref, str) or not ref:
+                raise FileNotFoundError('missing metadata reference')
+            normalized = ref.replace('\\', '/')
+            source = manifest.parent / Path(normalized).name
+            # Bind relocated absolute locators by their audit/session/frame suffix.
+            absolute = normalized.startswith('/') or bool(re.match(r'^[A-Za-z]:/', normalized))
+            if (absolute and not normalized.endswith('/audit/' + manifest.parent.name + '/' + source.name)) or (not absolute and (manifest.parent / normalized).resolve() != source.resolve()):
+                raise ValueError('ambiguous metadata path')
+            item['source_relpath'] = source.relative_to(check).as_posix()
+            if not source.is_file():
+                raise FileNotFoundError('referenced metadata absent')
+            item['source_sha256'] = cjson.sha(source)
+            meta = cjson.load(source)
+            seed = meta['seeds']['actual_generator_seed']
+            config = meta['seeds']['generation_config']
+            signature = meta['geometry_checkpoint']['signature']
+            if seed != frame.get('seed') or not any(s.get('actual_generator_seed') == seed and s.get('generation_config') == config for s in content.get('sessions', [])):
+                raise ValueError('metadata seed/config does not bind to manifest')
+            if Path(str(meta.get('png', '')).replace('\\', '/')).name != Path(str(frame.get('png', '')).replace('\\', '/')).name or source.stem != Path(str(frame.get('png', '')).replace('\\', '/')).stem:
+                raise ValueError('metadata frame does not bind to PNG')
+            if not isinstance(signature, str) or not re.fullmatch('[0-9a-f]{64}', signature):
+                raise ValueError('missing/malformed producer signature')
+            item.update(status='OBSERVED', signature=signature, seed=seed, generation_config=config, geometry_checkpoint=meta['geometry_checkpoint'], camera=meta.get('camera'), producer_run_id=meta.get('run_id'), source_digest=meta.get('source_digest'), seed_certified=all(meta['seeds'].get(k) == seed for k in ['expected_effective_seed', 'manager_seed', 'streamer_seed']) and config.get('randomize_on_start') is False)
+        except FileNotFoundError as exc:
+            item['reason'] = str(exc)
+        except (ValueError, KeyError, TypeError, AttributeError, OSError) as exc:
+            item.update(status='NOT_COMPARABLE', reason=str(exc))
+        values.append(item)
+    return values
+
+
 def extract(check):
     check = Path(check)
     r = cjson.load(check / 'result.json')
@@ -76,9 +123,9 @@ def extract(check):
         manifests.append(item)
         steps = [s['details'] for s in m.get('replay_steps', []) if s.get('type') == 'CHECKPOINT']
         openings += [{**item, 'signature': s.get('signature'), 'samples': s.get('samples'), 'range_m': s.get('range_m'), 'precision': 'implicit engine string formatting; 51 first-100m samples'} for s in steps if s.get('label') == 'automatic_opening']
-        kept = [{'label': s.get('label'), 'signature': s.get('signature')} for s in steps if s.get('label') in ['opening', 'selected_arm']]
-        if kept:
-            sessions.append({**item, 'checkpoints': kept, 'sha256': cjson.digest({'checkpoints': kept, 'choices': item['route_choices']})})
+        session = session_identity(steps, item['route_choices'])
+        if session['checkpoints']:
+            sessions.append({**{k: v for k, v in item.items() if k != 'route_choices'}, **session, 'source_relpath': item['relpath'], 'source_sha256': cjson.sha(p)})
         ev = p.parent / 'events.jsonl'
         if ev.exists():
             events = [json.loads(l, parse_float=str) for l in ev.read_text(encoding='utf-8').splitlines()]
@@ -88,7 +135,7 @@ def extract(check):
     vulkan = []
     for p in sorted(check.glob('audit/*/manifest.json')):
         m = cjson.load(p)
-        captures.append({'relpath': p.relative_to(check).as_posix(), 'sessions': m.get('sessions', []), 'frames': m.get('frames', []), 'source_digest': m.get('source_digest'), 'source_hashes': m.get('source_hashes', {})})
+        captures.extend(capture_values(p, check, m))
         vulkan.append({'driver': m.get('driver'), 'renderer': m.get('renderer'), 'display_server': m.get('display_server'), 'manifest': p.relative_to(check).as_posix(), 'source_digest': m.get('source_digest')})
     ident.update({'RI-OPEN': openings, 'RI-SESSION': sessions, 'RI-CAP': captures})
     leaks = {s: {'lines': LEAK.findall(v.decode('utf-8', 'replace')), 'at_lines': [l for l in v.decode('utf-8', 'replace').splitlines() if l.lstrip().startswith('at:')]} for s, v in raw.items() if s != 'stdout.log'}

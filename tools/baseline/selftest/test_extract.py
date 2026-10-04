@@ -1,10 +1,45 @@
 import unittest
+import tempfile
 from pathlib import Path
 from q2a import cjson
-from q2a import extract
+from q2a import extract, envinfo
 
 
 class Observations(unittest.TestCase):
+    def test_capture_reference_provenance_and_missing_malformed_metadata(self):
+        with tempfile.TemporaryDirectory() as d:
+            check = Path(d); manifest = check / 'audit/session/manifest.json'
+            source = manifest.with_name('frame.json')
+            config = {'randomize_on_start': False}
+            frame = {'metadata': 'frame.json', 'png': 'frame.png', 'seed': 42}
+            content = {'frames': [frame], 'sessions': [{'actual_generator_seed': 42, 'generation_config': config}]}
+            meta = {'seeds': {**{k: 42 for k in ['actual_generator_seed', 'expected_effective_seed', 'manager_seed', 'streamer_seed']}, 'generation_config': config}, 'geometry_checkpoint': {'signature': 'a' * 64, 'range_m': [0, 100], 'step_m': 2}, 'png': 'frame.png', 'run_id': 'session'}
+            cjson.write(source, meta)
+            before = source.read_bytes()
+            row = extract.capture_values(manifest, check, content)[0]
+            self.assertEqual((row['status'], row['signature'], row['source_relpath'], row['source_sha256'], row['seed'], row['generation_config']), ('OBSERVED', 'a' * 64, 'audit/session/frame.json', cjson.sha(source), 42, config))
+            self.assertEqual(source.read_bytes(), before)
+            frame['metadata'] = 'C:/old/root/audit/session/frame.json'
+            self.assertEqual(extract.capture_values(manifest, check, content)[0]['signature'], 'a' * 64)
+            frame['metadata'] = '../frame.json'
+            self.assertEqual(extract.capture_values(manifest, check, content)[0]['status'], 'NOT_COMPARABLE')
+            frame['metadata'] = 'absent.json'
+            row = extract.capture_values(manifest, check, content)[0]
+            self.assertEqual((row['status'], row['signature'], row['source_sha256']), ('NOT_OBSERVED', None, None))
+            frame['metadata'] = 'frame.json'; source.write_text('{broken', encoding='utf-8')
+            row = extract.capture_values(manifest, check, content)[0]
+            self.assertEqual((row['status'], row['signature']), ('NOT_COMPARABLE', None))
+            cjson.write(source, {**meta, 'seeds': {**meta['seeds'], 'actual_generator_seed': 777}})
+            self.assertEqual(extract.capture_values(manifest, check, content)[0]['status'], 'NOT_COMPARABLE')
+
+    def test_microsecond_compatibility_does_not_scale_or_mutate_raw(self):
+        raw = {'user_data_listing': [{'name': 'log', 'bytes': 20, 'mtime_ns': 1791048844364556}]}
+        before = cjson.canonical(raw)
+        view = envinfo.reporting_view(raw)
+        self.assertEqual(view['user_data_listing'][0]['mtime_us'], 1791048844364556)
+        self.assertNotIn('mtime_ns', view['user_data_listing'][0])
+        self.assertEqual(cjson.canonical(raw), before)
+
     def test_real_calibration_metric_formats(self):
         samples = cjson.load(Path(__file__).parent / 'samples/calibration_adapters.json')
         self.assertEqual(len(samples['rows']), 12)

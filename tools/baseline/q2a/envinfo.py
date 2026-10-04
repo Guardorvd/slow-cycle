@@ -23,7 +23,15 @@ def collect(godot, locator):
     out['godot'] = {'path': str(godot), 'sha256': cjson.sha(godot), 'version': (p.stdout + p.stderr).decode('utf-8', 'replace').strip()}
     userdata = Path(os.environ.get('APPDATA', '')) / 'Godot/app_userdata/Slow Cycle'
     try:
-        out['user_data_listing'] = [{'name': p.relative_to(userdata).as_posix(), 'bytes': p.stat().st_size, 'mtime_ns': p.stat().st_mtime_ns // 1000} for p in userdata.rglob('*') if p.is_file()]
+        out['user_data_listing'] = [{'name': p.relative_to(userdata).as_posix(), 'bytes': p.stat().st_size, 'mtime_us': p.stat().st_mtime_ns // 1000} for p in userdata.rglob('*') if p.is_file()]
     except OSError:
         out['user_data_listing'] = 'UNKNOWN'
+    return out
+
+
+def reporting_view(raw):
+    out = {**raw}
+    if isinstance(raw.get('user_data_listing'), list):
+        out['user_data_listing'] = [{('mtime_us' if k == 'mtime_ns' else k): v for k, v in row.items()} for row in raw['user_data_listing']]
+    out['timestamp_compatibility'] = 'A3: historical mtime_ns values were microseconds; renamed mtime_us without scaling; raw env evidence unchanged'
     return out

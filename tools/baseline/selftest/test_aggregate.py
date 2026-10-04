@@ -9,10 +9,92 @@ from unittest.mock import patch
 from pathlib import Path
 import sc_baseline
 from q2a.observer import Observer, Memory
-from q2a import aggregate, cjson, ledger
+from q2a import aggregate, cjson, ledger, extract
 
 
 class Integrity(unittest.TestCase):
+    def session_pair(self, change):
+        steps = [{'label': 'opening', 'signature': 'a' * 64}, {'label': 'selected_arm', 'signature': 'b' * 64}]
+        choices = [{'fork_id': 1, 'choice': 0, 'selected_branch_id': 0, 'selected_seed': 42, 'physics_tick': 18}]
+        other_steps = json.loads(json.dumps(steps)); other_choices = json.loads(json.dumps(choices))
+        change(other_steps, other_choices)
+        refs, obs = [], {}
+        for ordinal, checkpoints, decisions in [(23, steps, choices), (24, other_steps, other_choices)]:
+            attempt = str(ordinal)
+            refs.append({'attempt_ordinal': ordinal, 'attempt_id': attempt, 'suite_id': 'session_diagnostics', 'configuration': {}, 'engine_sha256': 'e'})
+            session = {**extract.session_identity(checkpoints, decisions), 'effective_seed': 42, 'attempt_id': attempt, 'ordinal': ordinal, 'q1_run_id': 'run-' + attempt, 'source_relpath': 'runs/' + attempt + '/diag/manifest.json', 'source_sha256': 'c' * 64}
+            identities = {k: {'sha256': None} for k in extract.IDENTITIES}
+            identities.update({'RI-SESSION': [session], 'RI-OPEN': [], 'RI-CAP': []})
+            obs[attempt] = {'identities': identities, 'seed': {'certified': True}, 'manifests': [{'effective_seed': 42, 'generation_config': {}}]}
+        pairs = aggregate.comparisons(refs, obs)
+        result = next(r for r in pairs if r['identity'] == 'RI-SESSION')
+        return result, aggregate.session_timing(refs, obs, pairs), obs
+
+    def test_session_tick_only_difference_is_match_and_timing_different(self):
+        row, timing, obs = self.session_pair(lambda steps, choices: choices[0].update(physics_tick=99))
+        self.assertEqual((row['eligibility'], row['observation']), ('EQUALITY_ELIGIBLE', 'MATCH'))
+        self.assertEqual(timing['label'], 'REPEATABILITY_OBSERVATION')
+        self.assertFalse(timing['equality_claim'])
+        self.assertEqual((timing['comparisons'][0]['observation'], timing['comparisons'][0]['a_ticks'], timing['comparisons'][0]['b_ticks']), ('DIFFERENT', [[42, [18]]], [[42, [99]]]))
+        self.assertEqual(timing['values'][0]['source_relpath'], 'runs/23/diag/manifest.json')
+        self.assertEqual(set(obs['23']['identities']['RI-SESSION'][0]['decisions'][0]), {'fork_id', 'choice', 'selected_branch_id', 'selected_seed'})
+
+    def test_session_selected_arm_difference_is_mismatch(self):
+        row, timing, obs = self.session_pair(lambda steps, choices: steps[1].update(signature='d' * 64))
+        self.assertEqual(row['observation'], 'MISMATCH')
+        self.assertEqual(timing['comparisons'][0]['observation'], 'IDENTICAL')
+        self.assertNotEqual(obs['23']['identities']['RI-SESSION'][0]['checkpoints'][1], obs['24']['identities']['RI-SESSION'][0]['checkpoints'][1])
+
+    def test_session_deterministic_decision_difference_is_mismatch(self):
+        for field in ['fork_id', 'choice', 'selected_branch_id', 'selected_seed']:
+            with self.subTest(field=field):
+                row, timing, obs = self.session_pair(lambda steps, choices: choices[0].update({field: 999}))
+                self.assertEqual(row['observation'], 'MISMATCH')
+                self.assertEqual(timing['comparisons'][0]['observation'], 'IDENTICAL')
+
+    def test_session_future_incidental_fields_do_not_enter_hash(self):
+        row, timing, obs = self.session_pair(lambda steps, choices: choices[0].update(frame_counter=200, timestamp='tomorrow', scheduler={'queue': 99}))
+        self.assertEqual(row['observation'], 'MATCH')
+        self.assertEqual(obs['23']['identities']['RI-SESSION'][0]['sha256'], obs['24']['identities']['RI-SESSION'][0]['sha256'])
+        self.assertEqual(timing['comparisons'][0]['observation'], 'IDENTICAL')
+
+    def test_wall_values_are_stratified_by_observer_and_workload(self):
+        refs = [{'suite_id': 's', 'configuration': {'mode': 'headless'}, 'observer_mode': mode, 'statistics_role': role, 'attempt_ordinal': i, 'duration_ms': ms} for i, (mode, role, ms) in enumerate([('OFF', 'measured', 10), ('OFF', 'warmup_excluded', 100), ('POLL-250ms', 'memory', 1000), ('OFF', 'measured', 20)], 1)]
+        before = cjson.canonical(refs)
+        groups = aggregate.wall_statistics(refs)
+        actual = {(g['observer_mode'], g['workload_role']): g['statistics'] for g in groups}
+        self.assertEqual(actual[('OFF', 'measured')], {'raw': ['10', '20'], 'n': 2, 'median': '15', 'min': '10', 'max': '20'})
+        self.assertEqual(actual[('OFF', 'warmup_excluded')]['raw'], ['100'])
+        self.assertEqual(actual[('POLL-250ms', 'memory')]['raw'], ['1000'])
+        self.assertEqual(cjson.canonical(refs), before)
+        refs[2].update(phase='P5', statistics_role='baseline')
+        self.assertEqual([g['workload_role'] for g in aggregate.wall_statistics(refs) if g['observer_mode'] == 'POLL-250ms'], ['memory_evidence'])
+
+    def test_compact_all_attempts_external_hash_budget_and_raw_immutability(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            fields = ['attempt_id', 'invocation_id', 'row_id', 'suite_id', 'round', 'phase', 'statistics_role', 'q1_run_id', 'q1_check_relpath', 'q1_result_json_sha256', 'directory_digest', 'evidence_status', 'observer_mode']
+            refs = [{**{k: str(i) for k in fields}, 'attempt_ordinal': i, 'required': i > 22, 'q1_result': 'FAIL' if i == 188 else 'PASS', 'q1_reason_code': 'R', 'q1_reasons': [], 'retry_of': None, 'evidence_problems': [], 'exit_code': 0, 'duration_ms': i, 'seed_config': {'requested': 42}, 'configuration': {'mode': 'headless'}} for i in range(1, 189)]
+            full = {'schema_version': 'slow-cycle.baseline/1', 'representation': 'full-external/1', 'baseline_id': 'b', 'campaign_freeze_revision': 'f', 'attempt_plan': [{'ordinal': i} for i in range(1, 189)], 'run_refs': refs, 'determinism': [], 'road_identity': {}, 'environment': {'pre': {'user_data_listing': []}, 'post': {'user_data_listing': []}}, **{k: [] for k in ['branch', 'streaming', 'cross_suite_opening_observations', 'messages']}}
+            for path in ['ledger.jsonl', 'env/pre.json', 'observer/series.jsonl', 'runs/r/checks/s/result.json']:
+                p = root / path; p.parent.mkdir(parents=True, exist_ok=True); p.write_bytes(b'raw immutable')
+            before = cjson.inventory(root)
+            aggregate.artifact_closure(root, full)
+            compact = aggregate.compact_record(root, full)
+            self.assertEqual([r['attempt_ordinal'] for r in compact['run_refs']], list(range(1, 189)))
+            self.assertEqual(compact['known_failures'][0]['attempt_ordinal'], 188)
+            self.assertEqual(compact['run_refs'][0]['seed_config'], {'requested': 42})
+            self.assertEqual(compact['full_external_report']['sha256'], cjson.sha(root / 'aggregate/baseline.json'))
+            self.assertEqual(compact['full_external_report']['bytes'], (root / 'aggregate/baseline.json').stat().st_size)
+            self.assertLess(aggregate.check_repository_budget(compact, b'index\n', 500), 1000000)
+            with self.assertRaisesRegex(ValueError, 'budget exceeded'):
+                aggregate.check_repository_budget(compact, b'x' * 1000000)
+            for path, size, sha in before:
+                self.assertEqual((root / path).stat().st_size, size); self.assertEqual(cjson.sha(root / path), sha)
+            full['run_refs'] = refs[:-1]; cjson.write(root / 'aggregate/baseline.json', full)
+            with self.assertRaisesRegex(ValueError, 'accountability'):
+                aggregate.compact_record(root, full)
+
     def test_payload_and_closure_hashes_have_no_recursion(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d); (root / 'aggregate').mkdir()
