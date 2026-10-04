@@ -50,3 +50,7 @@ Bit masks 2/4/16 в прежних описаниях не равны поряд
 Нет подтверждённой целиком chain region → routes → FinalSurface → off-road → journey. Старые expected assertions/master PASS не доказательство сегодняшних E3–E7. Radius 18/19 м, широкий fatal fallback, landing +10°, valley jump, ObjectDB/route/performance findings сохранены в [state](docs/CURRENT_PROJECT_STATE.md) и [audit](docs/DOCUMENTATION_AUDIT.md), а не исправлены prose.
 
 Полное прежнее architecture описание, formulas и Sprint/P/B/LOG/C03–C04 детали сохранены в [ARCHITECTURE_PRE_D0](docs/history/ARCHITECTURE_PRE_D0.md). Оно HISTORICAL: MountainProfile-as-biome-owner, Zero-Post, future paired planning и target road-first схемы не являются текущей product authority. [Road geometry reference](ROAD_GENERATION.md), [legacy commands](TEST_PLAN.md), [reports catalogue](docs/history/README.md) сохраняют полезную технику/coverage.
+
+## 5. R0 pure-domain region foundation (as-is)
+
+R0 now provides the isolated pure-domain foundation `world_seed + Vector2i region_coordinate -> RegionIdentity -> RegionBounds -> MacroTerrainPlan(DEFERRED_R1) -> RegionPlan` in [scripts/world/region](scripts/world/region/region_generator.gd). RegionGenerator is the intended producer; RegionPlan directly uses RegionSeedDerivation for canonical identity/signature validation, a benign one-way dependency. There is no runtime/WorldManager integration and no geography yet; MountainMassifField is not a dependency. [R0 completion record](docs/plans/completed/R0.md).
