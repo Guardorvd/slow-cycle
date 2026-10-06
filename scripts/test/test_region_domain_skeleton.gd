@@ -30,13 +30,13 @@ const SEED_GOLDENS := [
 	[I64MIN, I32MAX, I32MIN, 0xde, 6780184215550171328, "slow_cycle.seed/1\npurpose=region_seed\ncount=3\nv0=-9223372036854775808\nv1=2147483647\nv2=-2147483648\n"],
 ]
 const SIGNATURE_GOLDENS := [
-	[184729, 0, 0, "4d870435d130000a382fc2cd128997e6c14d7f6d5c18753aac6ca8171aec63fa"],
-	[184729, -1, -1, "9c5faf24aebd410528daddb07fbc708506b31b968d063e45f360ce4c35b061bf"],
-	[42, 0, 0, "eea36afe1d463925ddd29fee93b35f0925a4fcb6ea135933dfd8b54e6187a667"],
-	[184729, I32MAX, I32MAX, "1113a8289a1fdff7f566185010e836d69b49bd39daaef24d82d969202252b632"],
-	[I64MIN, I32MIN, I32MIN, "3270aaadfae15377dccf282661aebe1cd9c44846af63365b12ad2b1a55a1c65b"],
+	[184729, 0, 0, "1e28fe1846cd0fa96b0c8cc7d153abd83703a14b9eaa1718b21e24cad69f6278"],
+	[184729, -1, -1, "3170d27b86cf95fc704dfc02c3f9706771222cea112ef3ba6dbfa3732570c176"],
+	[42, 0, 0, "5518e1b59b6c0280e1026a9ac8a58b94144b0447b6d1f04e5b29efdb287be964"],
+	[184729, I32MAX, I32MAX, "3f5ea72ccf7a3e995dd79ef8d5a19c6f8f4065edd891b1e656211d340ed21a6f"],
+	[I64MIN, I32MIN, I32MIN, "f8fe99e64b0e82b798770703a335c28d24a48f80733b327a83405b3ca44bcde9"],
 ]
-const P2_TEXT := "slow_cycle.region_plan/1\nlayout.region_size_m=4096\nidentity.world_seed=184729\nidentity.region_coordinate=-1,-1\nidentity.region_seed=5466766008934095593\nbounds.min_x_m=-4096\nbounds.min_z_m=-4096\nbounds.max_x_m=0\nbounds.max_z_m=0\nmacro_terrain.state=DEFERRED_R1\n"
+const P2_TEXT := "slow_cycle.region_plan/2\nlayout.region_size_m=4096\nidentity.world_seed=184729\nidentity.region_coordinate=-1,-1\nidentity.region_seed=5466766008934095593\nbounds.min_x_m=-4096\nbounds.min_z_m=-4096\nbounds.max_x_m=0\nbounds.max_z_m=0\nmacro_terrain.state=GENERATED_R1\nmacro_terrain.signature=4e06d0163258e1f46acbdf0115ec47e348298e8380fac25b3c1fba1014e30c07\n"
 
 var checks: int = 0
 var failures: int = 0
@@ -231,7 +231,7 @@ func _t9() -> void:
 	for script: Script in [Seeds, Identity, Bounds, MacroTerrain, Plan, Generator]:
 		_check(script.get_instance_base_type() == "RefCounted", "T9 pure-domain base " + script.resource_path)
 	var plan := Generator.build(184729, Vector2i(-1, 2))
-	_check(plan.get_macro_terrain().get_state() == "DEFERRED_R1", "T9 macro schema state")
+	_check(plan.get_macro_terrain().get_state() == "GENERATED_R1", "T9 macro schema state")
 	for part: RefCounted in [plan, plan.get_macro_terrain()]:
 		var absent: bool = true
 		for method: String in ["sample_height", "sample_gradient", "sample_normal", "get_height"]:

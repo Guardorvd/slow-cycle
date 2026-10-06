@@ -1,10 +1,10 @@
 TASK: NONE
 STATUS: NO_ACTIVE_PLAN
-LAST_COMPLETED: R0 — Region Domain Skeleton
-RECORD: docs/plans/completed/R0.md
+LAST_COMPLETED: R1 — Macro Geography (Alpha)
+RECORD: docs/plans/completed/R1.md
 
-R0 COMPLETE locally after FINAL VERIFY PASS (E0 PASS; E1 PASS under narrow human A3), fresh independent Review R1 PASS with blocking_findings = none, and human G3 closeout approval. Six isolated pure-domain scripts, one additive direct test and seven approved UID sidecars provide deterministic identity/bounds/schema contracts; no geography or runtime integration. Both final domain runs: 145/145 PASS; Q1 selftests: 49/49 PASS; manifest: 66 suites / 209 rows PASS; H2 isolation PASS. All failure/amendment history, NB1–NB6 and future-R1 risks are retained in the [completed record](docs/plans/completed/R0.md).
+R1 COMPLETE — R1 Alpha accepted by the human on 2026-10-06 after VERIFY #3 PASS and an independent REVIEW PASS with no blocking findings. Ridge-network `MOUNTAIN_RIVER_VALLEY` macro geography with compositional seed variation, a transitional evaluator and an isolated Vulkan preview; R0 contracts unchanged (145/145). The approved ExecPlan v2.0, execution record, verification/review history and the deferred backlog (DEBT/ENHANCEMENT with revisit phases) are in the [completed record](docs/plans/completed/R1.md).
 
-C10 OPEN; C12 OPEN; E2–E7 N/A for R0; whole-game runtime acceptance INCOMPLETE. The exact certificate-store diagnostic remains unresolved and is not globally waived; no TLS/network/environment health is claimed.
+C10 OPEN; C12 OPEN; whole-game runtime acceptance INCOMPLETE.
 
-R1 NOT STARTED. Before R1: R0 completion commit, branch push, independent remote-branch verification, merge to master, independent remote-master verification, and a separately created and approved R1 ExecPlan. Push and merge are not performed in this local closeout; R1 is not approved.
+R2 — Terrain Tile Contract NOT STARTED. It requires its own ExecPlan and explicit human approval.
