@@ -51,6 +51,17 @@ Bit masks 2/4/16 в прежних описаниях не равны поряд
 
 Полное прежнее architecture описание, formulas и Sprint/P/B/LOG/C03–C04 детали сохранены в [ARCHITECTURE_PRE_D0](docs/history/ARCHITECTURE_PRE_D0.md). Оно HISTORICAL: MountainProfile-as-biome-owner, Zero-Post, future paired planning и target road-first схемы не являются текущей product authority. [Road geometry reference](ROAD_GENERATION.md), [legacy commands](TEST_PLAN.md), [reports catalogue](docs/history/README.md) сохраняют полезную технику/coverage.
 
-## 5. R0 pure-domain region foundation (as-is)
+## 5. Region domain foundation R0–R2 (as-is)
 
-R0 now provides the isolated pure-domain foundation `world_seed + Vector2i region_coordinate -> RegionIdentity -> RegionBounds -> MacroTerrainPlan(DEFERRED_R1) -> RegionPlan` in [scripts/world/region](scripts/world/region/region_generator.gd). RegionGenerator is the intended producer; RegionPlan directly uses RegionSeedDerivation for canonical identity/signature validation, a benign one-way dependency. There is no runtime/WorldManager integration and no geography yet; MountainMassifField is not a dependency. [R0 completion record](docs/plans/completed/R0.md).
+Isolated pure-domain chain, no runtime/WorldManager integration (production references = 0), MountainMassifField is not a dependency:
+
+```text
+world_seed + Vector2i region_coordinate
+  -> RegionIdentity -> RegionBounds -> MacroTerrainPlan -> RegionPlan          (R0 identity/bounds; R1 macro geography; RegionGenerator is the producer)
+  -> TerrainField.create(region_plan)                                          (R2: sole public base-terrain query surface — height / gradient / normal / lattice, world metres)
+       internal kernel: MacroTerrainEvaluator (prepared context; stateless math)
+  -> TerrainTileRenderer.tile_arrays / tile_mesh(field, tile_x, tile_z)        (R2: per-tile arrays/ArrayMesh built only through the field)
+  -> region_preview.gd                                                         (presentation only: nodes, material, camera; isolated scene)
+```
+
+Dependency direction `RegionPlan ← TerrainField → MacroTerrainEvaluator → MacroTerrainPlan`; the renderer and preview never touch the evaluator or descriptor data. Neighbouring tiles are seamless by construction (each tile is built independently from the field). Scope: single region, closed domain, same-platform determinism; no hydrology, biomes, routes, FinalSurface, LOD/streaming or cross-region continuity yet; thread safety not claimed. Sources: [scripts/world/region](scripts/world/region/terrain_field.gd). Records: [R0](docs/plans/completed/R0.md), [R1](docs/plans/completed/R1.md), [R2](docs/plans/completed/R2.md).

@@ -1,11 +1,9 @@
 extends Node3D
 
 const Generator = preload("res://scripts/world/region/region_generator.gd")
-const Eval = preload("res://scripts/world/region/macro_terrain_evaluator.gd")
-const TILE_SIZE: int = 512
-const SPACING: int = 16
+const Field = preload("res://scripts/world/region/terrain_field.gd")
+const Renderer = preload("res://scripts/world/region/terrain_tile_renderer.gd")
 const TILE_SIDE: int = 8
-const VERTEX_SIDE: int = 33
 const CONTOUR_SHADER := """
 shader_type spatial;
 varying float height_m;
@@ -84,70 +82,51 @@ func _ready() -> void:
 		return
 	var generation_ms: float = (Time.get_ticks_usec() - generation_start) / 1000.0
 	var build_start: int = Time.get_ticks_usec()
+	var created: Dictionary = Field.create(_plan)
+	if not created.is_valid:
+		_fail("ERR_PREVIEW_FIELD")
+		return
+	var field: RefCounted = created.field
+	var bounds: Dictionary = field.get_bounds_m()
+	# Composition only: every tile is built independently from TerrainField
+	# lattice queries, so shared edges match by construction (no shared grid).
+	var built: Array = []
+	for tz in range(TILE_SIDE):
+		for tx in range(TILE_SIDE):
+			var tile_result: Dictionary = Renderer.tile_mesh(field, bounds.min_x / Renderer.TILE_SIZE_M + tx, bounds.min_z / Renderer.TILE_SIZE_M + tz)
+			if not tile_result.is_valid:
+				_fail("ERR_PREVIEW_SAMPLE")
+				return
+			for h: float in tile_result.heights_m:
+				if not is_finite(h):
+					_fail("ERR_PREVIEW_SAMPLE")
+					return
+			built.append(tile_result)
+	var elevation_sum: float = 0.0
+	_min_elevation = INF
+	_max_elevation = -INF
+	for tile_result: Dictionary in built:
+		for h: float in tile_result.heights_m:
+			_min_elevation = minf(_min_elevation, h)
+			_max_elevation = maxf(_max_elevation, h)
+			elevation_sum += h
 	var shader := Shader.new()
 	shader.code = CONTOUR_SHADER
 	var material := ShaderMaterial.new()
 	material.shader = shader
-	# One shared region grid: shared tile edges read identical samples, and
-	# normals are central differences of that same grid (one-sided at the
-	# region boundary), so neighbouring tiles get identical edge normals.
-	var side: int = TILE_SIDE * (VERTEX_SIDE - 1) + 1
-	var sampled: Dictionary = Eval.sample_grid(_plan.get_macro_terrain(), 0.0, 0.0, SPACING, side, side, true)
-	if not sampled.is_valid:
-		_fail("ERR_PREVIEW_SAMPLE")
-		return
-	var grid: PackedFloat64Array = sampled.elevations_m
-	var elevation_sum: float = 0.0
-	for h: float in grid:
-		if not is_finite(h):
-			_fail("ERR_PREVIEW_SAMPLE")
-			return
-	_min_elevation = INF
-	_max_elevation = -INF
-	for h: float in grid:
-		_min_elevation = minf(_min_elevation, h)
-		_max_elevation = maxf(_max_elevation, h)
 	material.set_shader_parameter("low_m", _min_elevation)
 	material.set_shader_parameter("high_m", _max_elevation)
-	for tz in range(TILE_SIDE):
-		for tx in range(TILE_SIDE):
-			var vertices := PackedVector3Array()
-			var normals := PackedVector3Array()
-			var indices := PackedInt32Array()
-			for iz in range(VERTEX_SIDE):
-				for ix in range(VERTEX_SIDE):
-					var gx: int = tx * (VERTEX_SIDE - 1) + ix
-					var gz: int = tz * (VERTEX_SIDE - 1) + iz
-					var h: float = grid[gz * side + gx]
-					vertices.append(Vector3(ix * SPACING, h, iz * SPACING))
-					elevation_sum += h
-					var x0: int = maxi(0, gx - 1)
-					var x1: int = mini(side - 1, gx + 1)
-					var z0: int = maxi(0, gz - 1)
-					var z1: int = mini(side - 1, gz + 1)
-					var dx: float = (grid[gz * side + x1] - grid[gz * side + x0]) / ((x1 - x0) * SPACING)
-					var dz: float = (grid[z1 * side + gx] - grid[z0 * side + gx]) / ((z1 - z0) * SPACING)
-					normals.append(Vector3(-dx, 1.0, -dz).normalized())
-			for iz in range(VERTEX_SIDE - 1):
-				for ix in range(VERTEX_SIDE - 1):
-					var a: int = iz * VERTEX_SIDE + ix
-					# Clockwise when viewed from +Y (Godot's front-face convention).
-					indices.append_array([a, a + 1, a + VERTEX_SIDE, a + 1, a + VERTEX_SIDE + 1, a + VERTEX_SIDE])
-			var arrays: Array = []
-			arrays.resize(Mesh.ARRAY_MAX)
-			arrays[Mesh.ARRAY_VERTEX] = vertices
-			arrays[Mesh.ARRAY_NORMAL] = normals
-			arrays[Mesh.ARRAY_INDEX] = indices
-			var mesh := ArrayMesh.new()
-			mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-			mesh.surface_set_material(0, material)
-			var tile := MeshInstance3D.new()
-			tile.name = "Tile_%d_%d" % [tx, tz]
-			tile.position = Vector3(tx * TILE_SIZE, 0, tz * TILE_SIZE)
-			tile.mesh = mesh
-			add_child(tile)
-			_tiles.append(tile)
-	_mean_elevation = elevation_sum / (TILE_SIDE * TILE_SIDE * VERTEX_SIDE * VERTEX_SIDE)
+	for index in range(built.size()):
+		var mesh: ArrayMesh = built[index].mesh
+		mesh.surface_set_material(0, material)
+		var tile := MeshInstance3D.new()
+		tile.name = "Tile_%d_%d" % [index % TILE_SIDE, index / TILE_SIDE]
+		# Region-local placement (world origin minus the region minimum).
+		tile.position = Vector3(built[index].origin_x_m - bounds.min_x, 0, built[index].origin_z_m - bounds.min_z)
+		tile.mesh = mesh
+		add_child(tile)
+		_tiles.append(tile)
+	_mean_elevation = elevation_sum / (TILE_SIDE * TILE_SIDE * Renderer.TILE_VERTICES * Renderer.TILE_VERTICES)
 	_metrics = {"generation_ms": generation_ms, "mesh_build_ms": (Time.get_ticks_usec() - build_start) / 1000.0, "tiles": _tiles.size(), "vertices": 69696, "triangles": 131072, "approximate_committed_bytes": 69696 * 24 + 64 * 6144 * 4}
 	set_camera_framing("oblique")
 	print("REGION_PREVIEW_METRICS " + JSON.stringify(_metrics))

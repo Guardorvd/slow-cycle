@@ -1,9 +1,10 @@
 class_name MacroTerrainEvaluator
 extends RefCounted
 
-## Stateless elevation math over a MacroTerrainPlan (transitional R1 macro
-## domain; R2 owns the final TerrainField). Never generates or caches into
-## the plan. Sampling support is the closed square [0, 4096]^2.
+## Stateless elevation math over a MacroTerrainPlan: the private height
+## kernel of TerrainField (R2), which owns the public world-space terrain
+## queries. New consumers use TerrainField, not this script. Never generates
+## or caches into the plan. Sampling support is the closed square [0, 4096]^2.
 ##
 ## structure = valley floor
 ##           + smooth-max(valley rise [walls, benches, uplands],
@@ -390,10 +391,24 @@ static func sample_grid(plan: Macro, origin_x_m: float, origin_z_m: float, step_
 		var reason: String = _check(plan, corner.x, corner.y)
 		if not reason.is_empty():
 			return {"is_valid": false, "elevations_m": PackedFloat64Array(), "reason_code": reason}
-	var context: Context = _context(plan, true)
+	var context: Context = prepare(plan)
 	var result := PackedFloat64Array()
 	result.resize(count_x * count_z)
 	for j in range(count_z):
 		for i in range(count_x):
 			result[j * count_x + i] = _sample(context, origin_x_m + i * step_m, origin_z_m + j * step_m, include_noise)
 	return {"is_valid": true, "elevations_m": result, "reason_code": ""}
+
+
+## Bucketed sampling context for repeated queries over one plan (owned by the
+## caller, read-only afterwards); null for a missing or non-generated plan.
+static func prepare(plan: Macro) -> Context:
+	if plan == null or plan.get_state() != Macro.STATE_GENERATED_R1:
+		return null
+	return _context(plan, true)
+
+
+## Elevation from a prepared context, bit-identical to the point API. The
+## caller guarantees finite region-local coordinates inside [0, 4096]^2.
+static func sample_prepared(context: Context, local_x_m: float, local_z_m: float, include_noise: bool) -> float:
+	return _sample(context, local_x_m, local_z_m, include_noise)
