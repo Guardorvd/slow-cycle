@@ -51,7 +51,7 @@ Bit masks 2/4/16 в прежних описаниях не равны поряд
 
 Полное прежнее architecture описание, formulas и Sprint/P/B/LOG/C03–C04 детали сохранены в [ARCHITECTURE_PRE_D0](docs/history/ARCHITECTURE_PRE_D0.md). Оно HISTORICAL: MountainProfile-as-biome-owner, Zero-Post, future paired planning и target road-first схемы не являются текущей product authority. [Road geometry reference](ROAD_GENERATION.md), [legacy commands](TEST_PLAN.md), [reports catalogue](docs/history/README.md) сохраняют полезную технику/coverage.
 
-## 5. Region domain foundation R0–R2 (as-is)
+## 5. Region domain foundation R0–R3 (as-is)
 
 Isolated pure-domain chain, no runtime/WorldManager integration (production references = 0), MountainMassifField is not a dependency:
 
@@ -60,8 +60,11 @@ world_seed + Vector2i region_coordinate
   -> RegionIdentity -> RegionBounds -> MacroTerrainPlan -> RegionPlan          (R0 identity/bounds; R1 macro geography; RegionGenerator is the producer)
   -> TerrainField.create(region_plan)                                          (R2: sole public base-terrain query surface — height / gradient / normal / lattice, world metres)
        internal kernel: MacroTerrainEvaluator (prepared context; stateless math)
-  -> TerrainTileRenderer.tile_arrays / tile_mesh(field, tile_x, tile_z)        (R2: per-tile arrays/ArrayMesh built only through the field)
-  -> region_preview.gd                                                         (presentation only: nodes, material, camera; isolated scene)
+  -> HydrologyGenerator.build(region_plan, field) -> HydrologyPlan             (R3: single owner of hydrological truth — river, drainage lattice, channels, water bodies)
+  -> HydrologyField.create(plan, field)                                        (R3: derived queries — water / proximity / drainage / deformation)
+  -> HydrologySurface.create(field, hydrology_field)                           (R3, transitional until R7 FinalSurface: base + hydrology deformation, TerrainField API)
+  -> TerrainTileRenderer.tile_arrays / tile_mesh(field or surface, tile_x, tile_z) (R2: per-tile arrays/ArrayMesh built only through the field / surface)
+  -> region_preview.gd                                                         (presentation only: nodes, material, camera; opt-in diagnostic hydrology mode; isolated scene)
 ```
 
-Dependency direction `RegionPlan ← TerrainField → MacroTerrainEvaluator → MacroTerrainPlan`; the renderer and preview never touch the evaluator or descriptor data. Neighbouring tiles are seamless by construction (each tile is built independently from the field). Scope: single region, closed domain, same-platform determinism; no hydrology, biomes, routes, FinalSurface, LOD/streaming or cross-region continuity yet; thread safety not claimed. Sources: [scripts/world/region](scripts/world/region/terrain_field.gd). Records: [R0](docs/plans/completed/R0.md), [R1](docs/plans/completed/R1.md), [R2](docs/plans/completed/R2.md).
+Dependency direction `RegionPlan ← TerrainField → MacroTerrainEvaluator → MacroTerrainPlan`; `HydrologyGenerator → {RegionPlan, TerrainField, DrainageRouting} → HydrologyPlan ← HydrologyField ← HydrologySurface`; hydrology reads base terrain only (no feedback into TerrainField); the renderer and preview never touch the evaluator, descriptor data or hydrology math. Neighbouring tiles are seamless by construction (each tile is built independently from the field). Scope: single region, closed domain, same-platform determinism; no biomes, routes, FinalSurface, LOD/streaming or cross-region continuity yet (region-edge drainage is assumed); thread safety not claimed. Sources: [scripts/world/region](scripts/world/region/terrain_field.gd). Records: [R0](docs/plans/completed/R0.md), [R1](docs/plans/completed/R1.md), [R2](docs/plans/completed/R2.md), [R3](docs/plans/completed/R3.md).

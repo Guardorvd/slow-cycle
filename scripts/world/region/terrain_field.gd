@@ -83,10 +83,17 @@ func _gradient(x: float, z: float) -> Vector2:
 	var x1: float = minf(_max_x, x + GRADIENT_HALF_STEP_M)
 	var z0: float = maxf(_min_z, z - GRADIENT_HALF_STEP_M)
 	var z1: float = minf(_max_z, z + GRADIENT_HALF_STEP_M)
-	return Vector2((_height(x1, z) - _height(x0, z)) / (x1 - x0), (_height(x, z1) - _height(x, z0)) / (z1 - z0))
+	return gradient_from_samples(_height(x0, z), _height(x1, z), x1 - x0, _height(x, z0), _height(x, z1), z1 - z0)
 
 
-static func _normal(gradient: Vector2) -> Vector3:
+## The single gradient stencil definition, shared by the point and lattice
+## paths here and by HydrologySurface (R3): difference quotients over the
+## (possibly one-sided, clamped) +-GRADIENT_HALF_STEP_M spans.
+static func gradient_from_samples(h_x0: float, h_x1: float, span_x: float, h_z0: float, h_z1: float, span_z: float) -> Vector2:
+	return Vector2((h_x1 - h_x0) / span_x, (h_z1 - h_z0) / span_z)
+
+
+static func normal_from_gradient(gradient: Vector2) -> Vector3:
 	return Vector3(-gradient.x, 1.0, -gradient.y).normalized()
 
 
@@ -108,7 +115,7 @@ func sample_normal(x: float, z: float) -> Dictionary:
 	var reason: String = _reason(x, z)
 	if not reason.is_empty():
 		return {"is_valid": false, "normal": Vector3(NAN, NAN, NAN), "reason_code": reason}
-	return {"is_valid": true, "normal": _normal(_gradient(x, z)), "reason_code": ""}
+	return {"is_valid": true, "normal": normal_from_gradient(_gradient(x, z)), "reason_code": ""}
 
 
 ## Lattice block of count_x * count_z points from lattice index (i0, j0),
@@ -149,11 +156,10 @@ func sample_lattice(i0: int, j0: int, count_x: int, count_z: int) -> Dictionary:
 			var i_lo: int = maxi(i - 1, _min_i)
 			var i_hi: int = mini(i + 1, _max_i)
 			var row: int = (j - hj0) * width
-			var gradient := Vector2(
-				(halo[row + i_hi - hi0] - halo[row + i_lo - hi0]) / (float(i_hi * LATTICE_STEP_M) - float(i_lo * LATTICE_STEP_M)),
-				(halo[(j_hi - hj0) * width + i - hi0] - halo[(j_lo - hj0) * width + i - hi0]) / (float(j_hi * LATTICE_STEP_M) - float(j_lo * LATTICE_STEP_M)))
+			var gradient: Vector2 = gradient_from_samples(halo[row + i_lo - hi0], halo[row + i_hi - hi0], float(i_hi * LATTICE_STEP_M) - float(i_lo * LATTICE_STEP_M),
+				halo[(j_lo - hj0) * width + i - hi0], halo[(j_hi - hj0) * width + i - hi0], float(j_hi * LATTICE_STEP_M) - float(j_lo * LATTICE_STEP_M))
 			var k: int = (j - j0) * count_x + (i - i0)
 			heights[k] = halo[row + i - hi0]
 			gradients[k] = gradient
-			normals[k] = _normal(gradient)
+			normals[k] = normal_from_gradient(gradient)
 	return {"is_valid": true, "heights_m": heights, "gradients": gradients, "normals": normals, "reason_code": ""}

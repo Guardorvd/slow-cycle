@@ -3,6 +3,9 @@ extends Node3D
 const Generator = preload("res://scripts/world/region/region_generator.gd")
 const Field = preload("res://scripts/world/region/terrain_field.gd")
 const Renderer = preload("res://scripts/world/region/terrain_tile_renderer.gd")
+const HydroGenerator = preload("res://scripts/world/region/hydrology_generator.gd")
+const HydroField = preload("res://scripts/world/region/hydrology_field.gd")
+const HydroSurface = preload("res://scripts/world/region/hydrology_surface.gd")
 const TILE_SIDE: int = 8
 const CONTOUR_SHADER := """
 shader_type spatial;
@@ -25,7 +28,13 @@ void fragment() {
 
 @export var world_seed: int = 184729
 @export var region_coordinate := Vector2i.ZERO
+## Opt-in R3 hydrology mode (also `--hydrology`): tiles from the transitional
+## HydrologySurface and simple diagnostic water meshes appended after the 64
+## tiles. Off by default: the default preview is unchanged.
+@export var show_hydrology: bool = false
 var _plan: RefCounted
+var _hydrology: RefCounted
+var _focus := Vector3(2048, 0, 2048)
 var _tiles: Array[MeshInstance3D] = []
 var _metrics: Dictionary = {}
 var _mean_elevation: float = 0.0
@@ -75,6 +84,8 @@ func _ready() -> void:
 				_fail("ERR_PREVIEW_CLI_REGION")
 				return
 			region_coordinate = Vector2i(px.value, pz.value)
+		elif argument == "--hydrology":
+			show_hydrology = true
 	var generation_start: int = Time.get_ticks_usec()
 	_plan = Generator.build(world_seed, region_coordinate)
 	if _plan == null or not _plan.validate().is_valid:
@@ -88,12 +99,30 @@ func _ready() -> void:
 		return
 	var field: RefCounted = created.field
 	var bounds: Dictionary = field.get_bounds_m()
+	var source: RefCounted = field
+	var surface: RefCounted = null
+	var hydrology_ms: float = 0.0
+	if show_hydrology:
+		var hydrology_start: int = Time.get_ticks_usec()
+		var hydrology: Dictionary = HydroGenerator.build(_plan, field)
+		if not hydrology.is_valid:
+			_fail("ERR_PREVIEW_HYDROLOGY " + hydrology.reason_code + " " + hydrology.detail)
+			return
+		_hydrology = hydrology.plan
+		var hydro_field: Dictionary = HydroField.create(_hydrology, field)
+		var composed: Dictionary = HydroSurface.create(field, hydro_field.field) if hydro_field.is_valid else {"is_valid": false}
+		if not composed.is_valid:
+			_fail("ERR_PREVIEW_HYDROLOGY surface")
+			return
+		surface = composed.surface
+		source = surface
+		hydrology_ms = (Time.get_ticks_usec() - hydrology_start) / 1000.0
 	# Composition only: every tile is built independently from TerrainField
 	# lattice queries, so shared edges match by construction (no shared grid).
 	var built: Array = []
 	for tz in range(TILE_SIDE):
 		for tx in range(TILE_SIDE):
-			var tile_result: Dictionary = Renderer.tile_mesh(field, bounds.min_x / Renderer.TILE_SIZE_M + tx, bounds.min_z / Renderer.TILE_SIZE_M + tz)
+			var tile_result: Dictionary = Renderer.tile_mesh(source, bounds.min_x / Renderer.TILE_SIZE_M + tx, bounds.min_z / Renderer.TILE_SIZE_M + tz)
 			if not tile_result.is_valid:
 				_fail("ERR_PREVIEW_SAMPLE")
 				return
@@ -128,6 +157,9 @@ func _ready() -> void:
 		_tiles.append(tile)
 	_mean_elevation = elevation_sum / (TILE_SIDE * TILE_SIDE * Renderer.TILE_VERTICES * Renderer.TILE_VERTICES)
 	_metrics = {"generation_ms": generation_ms, "mesh_build_ms": (Time.get_ticks_usec() - build_start) / 1000.0, "tiles": _tiles.size(), "vertices": 69696, "triangles": 131072, "approximate_committed_bytes": 69696 * 24 + 64 * 6144 * 4}
+	if show_hydrology:
+		_add_water(surface, bounds)
+		_metrics.merge({"hydrology_ms": hydrology_ms, "hydrology_signature": _hydrology.signature(), "channels": _hydrology.get_channel_count(), "water_bodies": _hydrology.get_body_count()})
 	set_camera_framing("oblique")
 	print("REGION_PREVIEW_METRICS " + JSON.stringify(_metrics))
 
@@ -145,6 +177,12 @@ func set_camera_framing(framing: String) -> Dictionary:
 	var azimuth_deg: float = 45.0 if framing == "oblique_b" else 225.0
 	var elevation_deg: float = 90.0 if framing == "top_down" else 32.0
 	var distance: float = 5600.0 if framing == "top_down" else 5200.0
+	if framing == "valley_a" or framing == "valley_b":
+		# Closer diagnostic framings on the river midpoint (hydrology mode).
+		target = _focus
+		azimuth_deg = 225.0 if framing == "valley_a" else 45.0
+		elevation_deg = 30.0
+		distance = 1500.0
 	if framing == "top_down":
 		camera.projection = Camera3D.PROJECTION_ORTHOGONAL
 		camera.size = 4096.0
@@ -158,6 +196,71 @@ func set_camera_framing(framing: String) -> Dictionary:
 		camera.position = target + distance * Vector3(cos(elevation) * sin(azimuth), sin(elevation), cos(elevation) * cos(azimuth))
 		camera.look_at(target)
 	return {"framing": framing, "target": [target.x, target.y, target.z], "position": [camera.position.x, camera.position.y, camera.position.z], "projection": camera.projection, "fov": camera.fov, "size": camera.size, "far": camera.far, "azimuth_deg": azimuth_deg, "elevation_deg": elevation_deg, "distance_m": distance}
+
+
+## Diagnostic water: the major river as a ribbon at its true water surface and
+## width; tributaries and creeks as draped overlay ribbons (visual width at
+## least 6 m, 2 m above the composed surface; an overlay, not geometry);
+## bodies as flat lattice-cell quads at their level, clipped by the terrain.
+func _add_water(surface: RefCounted, bounds: Dictionary) -> void:
+	var colours: Array[Color] = [Color(0.10, 0.28, 0.55), Color(0.20, 0.45, 0.85), Color(0.45, 0.70, 0.95)]
+	for index in range(_hydrology.get_channel_count()):
+		var channel: Dictionary = _hydrology.get_channel(index)
+		var major: bool = index == 0
+		var count: int = channel.x_cm.size()
+		var vertices := PackedVector3Array()
+		for k in range(count):
+			var p := Vector2(channel.x_cm[k], channel.z_cm[k]) / 100.0
+			var a := Vector2(channel.x_cm[maxi(k - 1, 0)], channel.z_cm[maxi(k - 1, 0)]) / 100.0
+			var b := Vector2(channel.x_cm[mini(k + 1, count - 1)], channel.z_cm[mini(k + 1, count - 1)]) / 100.0
+			var side: Vector2 = (b - a).normalized().orthogonal()
+			var half: float = channel.width_cm[k] / 200.0 if major else maxf(channel.width_cm[k] / 200.0, 3.0)
+			var y: float = channel.surface_cm[k] / 100.0
+			if not major:
+				y = surface.sample_height(bounds.min_x + p.x, bounds.min_z + p.y).height_m + 2.0
+			vertices.append(Vector3(p.x + side.x * half, y, p.y + side.y * half))
+			vertices.append(Vector3(p.x - side.x * half, y, p.y - side.y * half))
+		var indices := PackedInt32Array()
+		for k in range(count - 1):
+			indices.append_array([2 * k, 2 * k + 1, 2 * k + 2, 2 * k + 1, 2 * k + 3, 2 * k + 2])
+		_add_water_mesh("Water_channel_%d" % index, vertices, indices, colours[channel.class])
+		if major:
+			var middle: int = count / 2
+			_focus = Vector3(channel.x_cm[middle] / 100.0, channel.surface_cm[middle] / 100.0, channel.z_cm[middle] / 100.0)
+	for index in range(_hydrology.get_body_count()):
+		var body: Dictionary = _hydrology.get_body(index)
+		var vertices := PackedVector3Array()
+		var indices := PackedInt32Array()
+		var level: float = body.level_cm / 100.0
+		for cell: int in body.cells:
+			var cx: float = (cell % 129) * 32.0
+			var cz: float = (cell / 129) * 32.0
+			var base: int = vertices.size()
+			vertices.append_array([Vector3(cx - 16, level, cz - 16), Vector3(cx + 16, level, cz - 16), Vector3(cx - 16, level, cz + 16), Vector3(cx + 16, level, cz + 16)])
+			indices.append_array([base, base + 1, base + 2, base + 1, base + 3, base + 2])
+		_add_water_mesh("Water_body_%d" % index, vertices, indices, Color(0.25, 0.60, 0.75) if body.kind == 0 else Color(0.45, 0.35, 0.70))
+
+
+func _add_water_mesh(node_name: String, vertices: PackedVector3Array, indices: PackedInt32Array, colour: Color) -> void:
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	material.albedo_color = colour
+	mesh.surface_set_material(0, material)
+	var instance := MeshInstance3D.new()
+	instance.name = node_name
+	instance.mesh = mesh
+	add_child(instance)
+
+
+func get_hydrology_signature() -> String:
+	return _hydrology.signature() if _hydrology != null else ""
 
 
 func get_plan_signature() -> String:

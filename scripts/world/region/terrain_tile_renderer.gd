@@ -2,7 +2,9 @@ class_name TerrainTileRenderer
 extends RefCounted
 
 ## Builds one terrain tile from TerrainField lattice queries (R2): mesh arrays
-## and an ArrayMesh, nothing else (no nodes, materials or cached state).
+## and an ArrayMesh, nothing else (no nodes, materials or cached state). The
+## transitional HydrologySurface (R3: base + hydrology deformation) exposes
+## the same lattice contract and is accepted as well.
 ##
 ## A tile (tile_x, tile_z) covers the world square [512 tile_x, 512 tile_x +
 ## 512] x [512 tile_z, 512 tile_z + 512] with 33 x 33 lattice points. Every
@@ -12,6 +14,7 @@ extends RefCounted
 ## Vertex positions are tile-local; the tile origin is returned in world metres.
 
 const Field = preload("res://scripts/world/region/terrain_field.gd")
+const Surface = preload("res://scripts/world/region/hydrology_surface.gd")
 const TILE_CELLS: int = 32
 const TILE_VERTICES: int = TILE_CELLS + 1
 const TILE_SIZE_M: int = TILE_CELLS * Field.LATTICE_STEP_M
@@ -19,7 +22,7 @@ const TILE_SIZE_M: int = TILE_CELLS * Field.LATTICE_STEP_M
 
 static func tile_arrays(field: RefCounted, tile_x: int, tile_z: int) -> Dictionary:
 	var failed := {"is_valid": false, "arrays": [], "heights_m": PackedFloat64Array(), "origin_x_m": 0, "origin_z_m": 0, "reason_code": ""}
-	if field == null or not field is Field:
+	if field == null or not (field is Field or field is Surface):
 		failed.reason_code = "ERR_TILE_FIELD_MISSING"
 		return failed
 	# Range check before multiplying, so no int64 overflow can alias a tile
