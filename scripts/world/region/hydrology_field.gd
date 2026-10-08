@@ -62,6 +62,8 @@ var _body_cells: Array = []
 var _area := PackedInt32Array()
 var _catchment := PackedInt32Array()
 var _terminal_of := PackedByteArray()
+var _body_proximity_buckets: Array = []
+var _max_half_width: float = 0.0
 
 
 ## Reasons: ERR_HYDRO_PLAN_MISSING (null plan or terrain), ERR_HYDRO_PLAN_INVALID,
@@ -94,6 +96,7 @@ func _build(data: Dictionary) -> void:
 		_carve_buckets.append(PackedInt32Array())
 	for cell in range(SEARCH_BUCKETS * SEARCH_BUCKETS):
 		_search_buckets.append(PackedInt32Array())
+		_body_proximity_buckets.append(PackedInt32Array())
 	for channel: Dictionary in data.channels:
 		var major: bool = channel.class == Hydro.CLASS_MAJOR_RIVER
 		for k in range(channel.x_cm.size() - 1):
@@ -102,6 +105,7 @@ func _build(data: Dictionary) -> void:
 				channel.surface_cm[k] / 100.0, channel.surface_cm[k + 1] / 100.0, channel.bed_cm[k] / 100.0, channel.bed_cm[k + 1] / 100.0,
 				channel.width_cm[k] / 200.0, channel.width_cm[k + 1] / 200.0, channel.station_cm[k] / 100.0, channel.station_cm[k + 1] / 100.0, channel.id, channel.class])
 			var base: int = s * STRIDE
+			_max_half_width = maxf(_max_half_width, maxf(_segments[base + 8], _segments[base + 9]))
 			var reach: float = maxf(_segments[base + 8], _segments[base + 9]) + (RIVER_REACH_M if major else CREEK_REACH_M)
 			_register(_carve_buckets, BUCKETS, BUCKET_M, s, reach)
 			_register(_search_buckets, SEARCH_BUCKETS, SEARCH_BUCKET_M, s, 0.0)
@@ -114,6 +118,9 @@ func _build(data: Dictionary) -> void:
 		_body_cells.append(body.cells)
 		for cell: int in body.cells:
 			_body_of[cell] = body.id
+			var bi: int = (cell % Hydro.LATTICE_SIZE) * Hydro.LATTICE_STEP_M / int(SEARCH_BUCKET_M)
+			var bj: int = (cell / Hydro.LATTICE_SIZE) * Hydro.LATTICE_STEP_M / int(SEARCH_BUCKET_M)
+			_body_proximity_buckets[bj * SEARCH_BUCKETS + bi].append(cell)
 	_area = data.lattice.area_cells
 	_catchment = data.lattice.catchment
 	# Terminal kind reached from every lattice point (path-compressed walk).
@@ -318,6 +325,50 @@ func sample_proximity(x: float, z: float) -> Dictionary:
 	var major: Dictionary = _nearest(lx, lz, true)
 	var f: Array = Hydro.frame_values(_symmetry, _frame_m, lx, lz)
 	return {"is_valid": true, "distance_to_water_m": nearest.distance, "nearest_kind": nearest.kind, "nearest_id": nearest.id, "distance_to_major_m": major.distance, "in_floodplain": f[0] >= f[3] and f[0] <= f[2], "reason_code": ""}
+
+
+## Capped geometric distance only. A zero distance does not assert water.
+## Per-call segment deduplication leaves immutable shared query state intact.
+func sample_proximity_bounded(x: float, z: float, radius_m: float) -> Dictionary:
+	var reason: String = _reason(x, z)
+	if reason.is_empty() and (not is_finite(radius_m) or radius_m <= 0.0 or radius_m > 256.0):
+		reason = "ERR_HYDRO_PROXIMITY_RADIUS"
+	if not reason.is_empty():
+		return {"is_valid": false, "reason_code": reason}
+	var lx: float = x - _min_x
+	var lz: float = z - _min_z
+	var best: float = radius_m
+	var seen: Dictionary = {}
+	var segment_candidates: int = 0
+	var body_candidates: int = 0
+	var reach: float = radius_m + _max_half_width
+	for j in range(clampi(floori((lz - reach) / SEARCH_BUCKET_M), 0, SEARCH_BUCKETS - 1), clampi(floori((lz + reach) / SEARCH_BUCKET_M), 0, SEARCH_BUCKETS - 1) + 1):
+		for i in range(clampi(floori((lx - reach) / SEARCH_BUCKET_M), 0, SEARCH_BUCKETS - 1), clampi(floori((lx + reach) / SEARCH_BUCKET_M), 0, SEARCH_BUCKETS - 1) + 1):
+			for s: int in _search_buckets[j * SEARCH_BUCKETS + i]:
+				if seen.has(s):
+					continue
+				seen[s] = true
+				segment_candidates += 1
+				var b: int = s * STRIDE
+				var p: Vector3 = _project(s, lx, lz)
+				best = minf(best, maxf(0.0, p.y - lerpf(_segments[b + 8], _segments[b + 9], p.x)))
+	reach = radius_m + 16.0
+	for j in range(clampi(floori((lz - reach) / SEARCH_BUCKET_M), 0, SEARCH_BUCKETS - 1), clampi(floori((lz + reach) / SEARCH_BUCKET_M), 0, SEARCH_BUCKETS - 1) + 1):
+		for i in range(clampi(floori((lx - reach) / SEARCH_BUCKET_M), 0, SEARCH_BUCKETS - 1), clampi(floori((lx + reach) / SEARCH_BUCKET_M), 0, SEARCH_BUCKETS - 1) + 1):
+			for cell: int in _body_proximity_buckets[j * SEARCH_BUCKETS + i]:
+				body_candidates += 1
+				var cx: float = (cell % Hydro.LATTICE_SIZE) * Hydro.LATTICE_STEP_M
+				var cz: float = (cell / Hydro.LATTICE_SIZE) * Hydro.LATTICE_STEP_M
+				best = minf(best, maxf(0.0, Vector2(lx - cx, lz - cz).length() - 16.0))
+	return {"is_valid": true, "reason_code": "", "distance_to_water_m": best, "is_capped": best == radius_m, "segment_candidates": segment_candidates, "body_candidates": body_candidates}
+
+
+## Observational derived-index storage, excluding upstream plans/terrain.
+func get_proximity_metrics() -> Dictionary:
+	var entries: int = 0
+	for bucket: PackedInt32Array in _body_proximity_buckets:
+		entries += bucket.size()
+	return {"segments": _segments.size() / STRIDE, "body_cells": entries, "body_index_packed_bytes": entries * 4, "body_index_buckets": _body_proximity_buckets.size()}
 
 
 func sample_drainage(x: float, z: float) -> Dictionary:

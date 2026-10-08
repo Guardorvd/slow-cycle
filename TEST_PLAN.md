@@ -14,6 +14,26 @@ D0 не меняет команды исполнения, assertions, thresholds
 
 ---
 
+## R4 additive entry points (2026-10-08)
+
+Actual candidate results: new R4 suite29791 checks/0×2; unchanged R0/R1/R2/R3=145/4269/2178/299 checks/0×2, matching accepted R3 output; unchanged Vulkan preview867597/0; retained Q1 gates4/0/0. Twelve development seeds and64 prescribed holdout regions complete. Scope/commands/identities, performance debt and independent reports are in the active R4 ExecPlan. This does not certify R4 gameplay riding or close C10/C12.
+
+Current R4 contracts: `scripts/test/test_environment_fields.gd` exercises the real region → terrain → hydrology → context → biome → rideability chain, controlled production kernels, exact water, bounded/full/independent geometry proximity, point/block parity, identity/precision, continuity and explicit invalid reasons. This is a new approved suite; existing suites/assertions/gates are unchanged. Required results and evidence identities belong to the active R4 ExecPlan, not historical counts below.
+
+In an imported disposable copy:
+
+```text
+godot --headless --path <copy> --script res://scripts/test/test_environment_fields.gd
+godot --headless --path <copy> --script res://scripts/test/capture_environment_map.gd -- --seeds=184729,42,77777,1,2,3,7,11,99,555,2024,10007 --out=<absolute outside-project directory>
+godot --headless --path <copy> --script res://scripts/test/capture_environment_map.gd -- --sweep=64 --out=<directory>
+godot --headless --path <copy> --script res://scripts/test/capture_environment_map.gd -- --benchmark --seeds=184729,3 --out=<directory>
+godot --path <copy> --rendering-method forward_plus --rendering-driver vulkan --script res://scripts/test/capture_environment_preview.gd -- --seed=10007 --environment=biome --out=<directory>
+```
+
+Map PNGs are headless diagnostics (16 m full-region queries; 4 m point closeups; 1/4 m transects), not E5. Holdout is exactly 64 fixed seeds, alternating four regions, at 64 m spacing plus local transects. Vulkan captures are saved/reloaded top-down/oblique/valley/pocket views. Optional `--provenance=<absolute JSON file>` binds external Git/source/diff identity alongside all script/scene/config hashes. Performance uses one warm-up and three measured repetitions and ten build/query/release cycles; targets are observational. No R4 main-game or physical ride acceptance is claimed. The legacy seed-diversity, monotony, real-physics rider and Vulkan gates remain mandatory.
+
+---
+
 # Slow Cycle — Verification & Testing Protocol
 
 > **Актуализация 01.10.2026:** [текущий статус](docs/CURRENT_PROJECT_STATE.md), [сводка изменений дня](docs/TODAY_CHANGES_2026_10_01.md) и [активный план](docs/plans/history/IMPLEMENTATION_PLAN_PRE_D0_ed7d132.md). WORLD-00A/00B, C01–C04 и минимальные LOG/replay выполнены в описанном scope; общая чистая приёмка INCOMPLETE. C03–C04 выполнен по согласованному плану; пороги сохранены. Следующий отдельный план — WORLD-01/C05, цельная местность и граница долины вместе с полем. Исторические результаты/«следующие шаги» ниже сохраняются как история и не заменяют этот порядок.

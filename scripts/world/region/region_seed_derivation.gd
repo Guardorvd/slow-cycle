@@ -7,6 +7,15 @@ const PURPOSE_REGION_SEED := "region_seed"
 const PURPOSE_MACRO_STRUCTURE := "macro_structure"
 const PURPOSE_MACRO_NOISE := "macro_noise"
 const PURPOSE_HYDROLOGY := "hydrology"
+const PURPOSE_BIOME := "biome"
+
+
+static func biome_seed_preimage(region_seed_value: int) -> String:
+	return _preimage(PURPOSE_BIOME, PackedInt64Array([region_seed_value]))
+
+
+static func biome_seed(region_seed_value: int) -> int:
+	return _seed_from_preimage(biome_seed_preimage(region_seed_value))
 
 
 static func macro_structure_seed_preimage(region_seed_value: int) -> String:

@@ -6,6 +6,9 @@ const Renderer = preload("res://scripts/world/region/terrain_tile_renderer.gd")
 const HydroGenerator = preload("res://scripts/world/region/hydrology_generator.gd")
 const HydroField = preload("res://scripts/world/region/hydrology_field.gd")
 const HydroSurface = preload("res://scripts/world/region/hydrology_surface.gd")
+const EnvContext = preload("res://scripts/world/region/environment_context.gd")
+const Biome = preload("res://scripts/world/region/biome_field.gd")
+const Ride = preload("res://scripts/world/region/rideability_field.gd")
 const TILE_SIDE: int = 8
 const CONTOUR_SHADER := """
 shader_type spatial;
@@ -32,6 +35,11 @@ void fragment() {
 ## HydrologySurface and simple diagnostic water meshes appended after the 64
 ## tiles. Off by default: the default preview is unchanged.
 @export var show_hydrology: bool = false
+## R4 diagnostics only. Off preserves the original material and composition.
+@export var environment_mode: String = ""
+var _environment: RefCounted
+var _biome: RefCounted
+var _rideability: RefCounted
 var _plan: RefCounted
 var _hydrology: RefCounted
 var _focus := Vector3(2048, 0, 2048)
@@ -86,6 +94,13 @@ func _ready() -> void:
 			region_coordinate = Vector2i(px.value, pz.value)
 		elif argument == "--hydrology":
 			show_hydrology = true
+		elif argument.begins_with("--environment="):
+			environment_mode = argument.substr(14)
+			if environment_mode not in ["biome", "rideability"]:
+				_fail("ERR_PREVIEW_CLI_ENVIRONMENT")
+				return
+	if not environment_mode.is_empty():
+		show_hydrology = true
 	var generation_start: int = Time.get_ticks_usec()
 	_plan = Generator.build(world_seed, region_coordinate)
 	if _plan == null or not _plan.validate().is_valid:
@@ -145,6 +160,50 @@ func _ready() -> void:
 	material.shader = shader
 	material.set_shader_parameter("low_m", _min_elevation)
 	material.set_shader_parameter("high_m", _max_elevation)
+	var environmental_ms: float = 0.0
+	if not environment_mode.is_empty():
+		var environment_start: int = Time.get_ticks_usec()
+		var context_result: Dictionary = EnvContext.create(_plan, field, _hydrology)
+		if not context_result.is_valid:
+			_fail(context_result.reason_code)
+			return
+		_environment = context_result.context
+		_biome = Biome.create(_environment).field
+		_rideability = Ride.create(_environment, _biome).field
+		var result: Dictionary = _rideability.sample_combined_lattice(bounds.min_x / 16, bounds.min_z / 16, 257, 257)
+		if not result.is_valid:
+			_fail(result.reason_code)
+			return
+		var image := Image.create(257, 257, false, Image.FORMAT_RGB8)
+		for k in range(257 * 257):
+			var colour: Color
+			if environment_mode == "biome":
+				colour = Biome.blend_color({"is_water": bool(result.biome.is_water[k]), "weights": result.biome.weights.slice(k * 4, k * 4 + 4)})
+			else:
+				colour = Color(0.20, 0.70, 0.35).lerp(Color(0.92, 0.40, 0.15), clampf((result.rideability.cost[k] - 1.0) / 8.0, 0.0, 1.0)) if not result.rideability.blocked[k] else Color(0.65, 0.08, 0.18)
+			image.set_pixel(k % 257, k / 257, colour)
+		var environmental_shader := Shader.new()
+		environmental_shader.code = """
+shader_type spatial;
+uniform sampler2D environment_map : source_color, filter_linear, repeat_disable;
+varying vec2 region_uv;
+varying float height_m;
+void vertex() {
+    vec3 p = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+    region_uv = (p.xz / 4096.0 * 256.0 + 0.5) / 257.0;
+    height_m = p.y;
+}
+void fragment() {
+    vec3 tint = texture(environment_map, region_uv).rgb;
+    float d = abs(fract(height_m / 100.0 + 0.5) - 0.5);
+    float line = 1.0 - smoothstep(0.0, fwidth(height_m / 100.0), d);
+    ALBEDO = tint * (1.0 - 0.15 * line);
+    ROUGHNESS = 1.0;
+}
+"""
+		material.shader = environmental_shader
+		material.set_shader_parameter("environment_map", ImageTexture.create_from_image(image))
+		environmental_ms = (Time.get_ticks_usec() - environment_start) / 1000.0
 	for index in range(built.size()):
 		var mesh: ArrayMesh = built[index].mesh
 		mesh.surface_set_material(0, material)
@@ -160,6 +219,15 @@ func _ready() -> void:
 	if show_hydrology:
 		_add_water(surface, bounds)
 		_metrics.merge({"hydrology_ms": hydrology_ms, "hydrology_signature": _hydrology.signature(), "channels": _hydrology.get_channel_count(), "water_bodies": _hydrology.get_body_count()})
+	if not environment_mode.is_empty():
+		_metrics.merge({"environment_mode": environment_mode, "environment_ms": environmental_ms, "environment_signature": _environment.signature(), "biome_signature": _biome.signature(), "rideability_signature": _rideability.signature(), "basis": EnvContext.SURFACE_BASIS, "sample_spacing_m": 16, "biome_descriptor": _biome.get_descriptor()})
+		var legend := Label.new()
+		legend.text = "R4 %s | seed %d | region %s | 4096 m; samples 16 m\n%s\nNatural barriers allow future crossing/engineering reasoning. Water ribbons show narrow geometry." % [environment_mode, world_seed, str(region_coordinate), "Conifer green / Meadow yellow / Riparian teal / Autumn orange / Water blue" if environment_mode == "biome" else "Cost: green low / orange difficult / red natural barrier (deep water or steep slope)"]
+		legend.position = Vector2(15, 15)
+		legend.add_theme_color_override("font_shadow_color", Color.BLACK)
+		legend.add_theme_constant_override("shadow_offset_x", 2)
+		legend.add_theme_constant_override("shadow_offset_y", 2)
+		add_child(legend)
 	set_camera_framing("oblique")
 	print("REGION_PREVIEW_METRICS " + JSON.stringify(_metrics))
 
@@ -183,6 +251,14 @@ func set_camera_framing(framing: String) -> Dictionary:
 		azimuth_deg = 225.0 if framing == "valley_a" else 45.0
 		elevation_deg = 30.0
 		distance = 1500.0
+	if framing == "pocket" and _biome != null:
+		var pocket: Dictionary = _biome.get_descriptor().pocket
+		if pocket.is_present:
+			var macro = preload("res://scripts/world/region/macro_terrain_plan.gd")
+			var local: Vector2 = macro.frame_to_local(_environment.get_frame_symmetry(), pocket.u_m, pocket.v_m)
+			target = Vector3(local.x, _mean_elevation, local.y)
+			elevation_deg = 70.0
+			distance = 1600.0
 	if framing == "top_down":
 		camera.projection = Camera3D.PROJECTION_ORTHOGONAL
 		camera.size = 4096.0
@@ -277,3 +353,4 @@ func get_tile_arrays(index: int) -> Array:
 
 func get_metrics() -> Dictionary:
 	return _metrics.duplicate(true)
+
