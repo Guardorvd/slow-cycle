@@ -1,8 +1,8 @@
 TASK: NONE
 STATUS: NO_ACTIVE_PLAN
-LAST_COMPLETED: R4 — Biome + Rideability Fields (Alpha)
-RECORD: docs/plans/completed/R4.md
+LAST_COMPLETED: R5 — Region Route Planning (Alpha)
+RECORD: docs/plans/completed/R5.md
 
-R5 — Region Route Planning NOT STARTED
+R6 — Road Synthesis Adapter NOT STARTED
 
-[Completed R4 record](docs/plans/completed/R4.md)
+[Completed R5 record](docs/plans/completed/R5.md)

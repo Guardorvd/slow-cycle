@@ -14,6 +14,27 @@ D0 не меняет команды исполнения, assertions, thresholds
 
 ---
 
+## R5 additive entry points (2026-10-09, Alpha accepted)
+
+Status: R5 COMPLETE — Alpha accepted by the Game Director 2026-10-09 (freeze 3, code manifest `547de46c8a66f915f609523419d267cb9e91244429928a2932c7a1142b40d391`) after independent VERIFY PASS and fresh independent REVIEW PASS ([completed record](docs/plans/completed/R5.md)); E7 human ride not done; C10/C12 open. DEBT-3: independent barrier/corridor certification coverage (natural-BLOCKED corridor re-sampling, builder-certification mutant) needs attention when R6 consumes the corridors; no R5 test was added at closeout. Actual freeze-3 results: new R5 suite `test_route_network.gd` 2,235 checks/0 ×2 (8 regions), stdout and graph signatures identical across both processes; development maps 16/16 valid; holdout 32/32 valid (0 DEGRADED_NO_LOOP; full Blueprint §31 mix 19/32); crossing mutant killed (barrier/separation mutants killed on freeze 2, search code unchanged since). Reused from freeze 2 because the freeze 2 → 3 diff (route corridor builder, route anchor finder, R5 suite) does not reach them: unchanged R0/R1/R2/R3/R4 = 145/4,269/2,178/299/29,791 checks/0 ×2; Vulkan preview 867,597/0; default 9/9, hydrology 10/10, environment 8/8 byte-identical parity; retained Q1 gates 4/0/0. Identities, evidence paths and freeze history (holdout defects found on freezes 1 and 2 and fixed at their cause) are in the active R5 ExecPlan §21.
+
+Current R5 contracts: `scripts/test/test_route_network.gd` (V1–V10) exercises the real region → terrain → hydrology → R4 → planning raster → anchors → planner → graph chain, controlled search-kernel arrays, independent segment-crossing geometry, raster/point parity, anchor rules (topographic passes; gateway banks: a rejected bank has no eligible valley-floor node), crafted validator negatives, determinism, network invariants on real seeds, seed variation and CLI negatives. Three disclosed holdout regions are kept as regression rows (3628391 @ (3,−2), 3942578 @ (−1,−1), 6037158 @ (−1,−1)). This is a new approved suite; existing suites/assertions/gates are unchanged.
+
+In an imported disposable copy:
+
+```text
+godot --headless --path <copy> --script res://scripts/test/test_route_network.gd
+godot --headless --path <copy> --script res://scripts/test/capture_route_map.gd -- --seeds=184729,42,77777,1,2,3 --out=<absolute outside-project directory>
+godot --headless --path <copy> --script res://scripts/test/capture_route_map.gd -- --seeds=184729,42 --region=-1,-1 --out=<directory>
+godot --headless --path <copy> --script res://scripts/test/capture_route_map.gd -- --holdout-batch=0 --out=<directory>   # batches 0..3
+godot --headless --path <copy> --script res://scripts/test/capture_route_map.gd -- --benchmark --seeds=184729,3 --out=<directory>
+godot --path <copy> --rendering-method forward_plus --rendering-driver vulkan --script res://scripts/test/capture_route_preview.gd -- --seed=10007 --region=3,-2 --environment=biome --out=<directory>
+```
+
+Map PNG/SVG/JSON outputs are headless diagnostics, not E5. The holdout is 32 fixed seeds `3000017 + 104729·k`, alternating (0,0), (−1,−1), (3,−2), (1,2); any invalid graph or planner failure is FAIL. It was used to find and repair defects on freezes 1 and 2 and is therefore a fixed regression set, not a blind one. Vulkan route captures (top-down/oblique) are saved and re-read through the opt-in `region_preview --routes` mode. The benchmark runs alone: one warm-up, three measured repetitions, ten build/plan/release cycles; targets are observational (freeze 3: raster ~17 s on seed 184729 against the ≤15 s target, recorded as DEBT; planner 43–45 s isolated against ≤60 s). No gameplay, collision or ride integration is claimed (E3/E4/E7 N/A). The legacy seed-diversity, monotony, real-physics rider and Vulkan gates remain mandatory.
+
+---
+
 ## R4 additive entry points (2026-10-08)
 
 Actual candidate results: new R4 suite29791 checks/0×2; unchanged R0/R1/R2/R3=145/4269/2178/299 checks/0×2, matching accepted R3 output; unchanged Vulkan preview867597/0; retained Q1 gates4/0/0. Twelve development seeds and64 prescribed holdout regions complete. Scope/commands/identities, performance debt and independent reports are in the active R4 ExecPlan. This does not certify R4 gameplay riding or close C10/C12.

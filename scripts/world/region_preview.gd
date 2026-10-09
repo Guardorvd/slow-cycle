@@ -9,6 +9,9 @@ const HydroSurface = preload("res://scripts/world/region/hydrology_surface.gd")
 const EnvContext = preload("res://scripts/world/region/environment_context.gd")
 const Biome = preload("res://scripts/world/region/biome_field.gd")
 const Ride = preload("res://scripts/world/region/rideability_field.gd")
+const Routing = preload("res://scripts/world/region/route_planner.gd")
+const RouteGraph = preload("res://scripts/world/region/region_route_graph.gd")
+const ROUTE_COLOURS: Array[Color] = [Color(1.0, 0.92, 0.35), Color(1.0, 0.55, 0.10), Color(0.90, 0.20, 0.75), Color(0.85, 0.05, 0.05)]
 const TILE_SIDE: int = 8
 const CONTOUR_SHADER := """
 shader_type spatial;
@@ -37,6 +40,11 @@ void fragment() {
 @export var show_hydrology: bool = false
 ## R4 diagnostics only. Off preserves the original material and composition.
 @export var environment_mode: String = ""
+## R5 diagnostics only (`--routes`, implies hydrology): corridor bands and
+## reference lines drawn from RegionRouteGraph public accessors, lifted above
+## the natural surface. Presentation only; the planner owns every decision.
+@export var show_routes: bool = false
+var _routes: RefCounted
 var _environment: RefCounted
 var _biome: RefCounted
 var _rideability: RefCounted
@@ -94,12 +102,14 @@ func _ready() -> void:
 			region_coordinate = Vector2i(px.value, pz.value)
 		elif argument == "--hydrology":
 			show_hydrology = true
+		elif argument == "--routes":
+			show_routes = true
 		elif argument.begins_with("--environment="):
 			environment_mode = argument.substr(14)
 			if environment_mode not in ["biome", "rideability"]:
 				_fail("ERR_PREVIEW_CLI_ENVIRONMENT")
 				return
-	if not environment_mode.is_empty():
+	if not environment_mode.is_empty() or show_routes:
 		show_hydrology = true
 	var generation_start: int = Time.get_ticks_usec()
 	_plan = Generator.build(world_seed, region_coordinate)
@@ -228,6 +238,25 @@ void fragment() {
 		legend.add_theme_constant_override("shadow_offset_x", 2)
 		legend.add_theme_constant_override("shadow_offset_y", 2)
 		add_child(legend)
+	if show_routes:
+		var routes_start: int = Time.get_ticks_usec()
+		var planned: Dictionary = Routing.plan(_plan, field, _hydrology)
+		if not planned.is_valid:
+			_fail("ERR_PREVIEW_ROUTES " + planned.reason_code + " " + planned.detail)
+			return
+		_routes = planned.graph
+		_add_routes(surface, bounds)
+		var counts: Dictionary = planned.diagnostics.composition
+		_metrics.merge({"routes_ms": (Time.get_ticks_usec() - routes_start) / 1000.0, "route_signature": _routes.signature(), "route_composition": counts, "degrade_codes": planned.diagnostics.degrade_codes})
+		var route_legend := Label.new()
+		route_legend.text = "R5 routes | seed %d | region %s
+Backbone yellow / Secondary orange / Singletrack magenta / Technical red; translucent bands = corridors (R6 freedom, not roads)
+Posts: white junction, cyan anchor used, grey anchor unused | %s" % [world_seed, str(region_coordinate), JSON.stringify(counts)]
+		route_legend.position = Vector2(15, 60 if not environment_mode.is_empty() else 15)
+		route_legend.add_theme_color_override("font_shadow_color", Color.BLACK)
+		route_legend.add_theme_constant_override("shadow_offset_x", 2)
+		route_legend.add_theme_constant_override("shadow_offset_y", 2)
+		add_child(route_legend)
 	set_camera_framing("oblique")
 	print("REGION_PREVIEW_METRICS " + JSON.stringify(_metrics))
 
@@ -317,6 +346,51 @@ func _add_water(surface: RefCounted, bounds: Dictionary) -> void:
 		_add_water_mesh("Water_body_%d" % index, vertices, indices, Color(0.25, 0.60, 0.75) if body.kind == 0 else Color(0.45, 0.35, 0.70))
 
 
+## Corridor bands (translucent, draped at their edges) and reference-line
+## ribbons per edge; posts for junctions and anchors. Region-local placement.
+func _add_routes(surface: RefCounted, bounds: Dictionary) -> void:
+	for e in range(_routes.get_edge_count()):
+		var corridor: Dictionary = _routes.get_corridor(e)
+		var count: int = corridor.station_count
+		var band := PackedVector3Array()
+		var line := PackedVector3Array()
+		var half_line: float = 7.0 if corridor.class == RouteGraph.RouteClass.BACKBONE else 4.0
+		# Region-local coordinates first (float64 subtraction; Vector2 is float32).
+		var local := PackedVector2Array()
+		for k in range(count):
+			local.append(Vector2(corridor.x_m[k] - bounds.min_x, corridor.z_m[k] - bounds.min_z))
+		for k in range(count):
+			var p: Vector2 = local[k]
+			var side: Vector2 = (local[mini(k + 1, count - 1)] - local[maxi(k - 1, 0)]).normalized().orthogonal()
+			var left: Vector2 = (p + side * corridor.half_left_m[k]).clamp(Vector2.ZERO, Vector2(4096, 4096))
+			var right: Vector2 = (p - side * corridor.half_right_m[k]).clamp(Vector2.ZERO, Vector2(4096, 4096))
+			band.append(Vector3(left.x, surface.sample_height(bounds.min_x + left.x, bounds.min_z + left.y).height_m + 1.5, left.y))
+			band.append(Vector3(right.x, surface.sample_height(bounds.min_x + right.x, bounds.min_z + right.y).height_m + 1.5, right.y))
+			var y: float = corridor.elevation_m[k] + 2.5
+			line.append(Vector3(p.x + side.x * half_line, y, p.y + side.y * half_line))
+			line.append(Vector3(p.x - side.x * half_line, y, p.y - side.y * half_line))
+		var indices := PackedInt32Array()
+		for k in range(count - 1):
+			indices.append_array([2 * k, 2 * k + 1, 2 * k + 2, 2 * k + 1, 2 * k + 3, 2 * k + 2])
+		var colour: Color = ROUTE_COLOURS[corridor.class]
+		_add_water_mesh("Route_band_%d" % e, band, indices, Color(colour.r, colour.g, colour.b, 0.22))
+		_add_water_mesh("Route_line_%d" % e, line, indices, colour)
+	var post_colours: Array = []
+	for n in range(_routes.get_route_node_count()):
+		var node: Dictionary = _routes.get_route_node(n)
+		post_colours.append([Vector3(node.x_cm / 100.0, node.elevation_cm / 100.0, node.z_cm / 100.0), Color(1, 1, 1), 70.0])
+	for a in range(_routes.get_anchor_count()):
+		var anchor: Dictionary = _routes.get_anchor(a)
+		if anchor.status == RouteGraph.AnchorStatus.REJECTED:
+			continue
+		post_colours.append([Vector3(anchor.x_cm / 100.0, anchor.elevation_cm / 100.0, anchor.z_cm / 100.0), Color(0.2, 0.95, 1.0) if anchor.status == RouteGraph.AnchorStatus.USED else Color(0.6, 0.6, 0.6), 45.0])
+	for entry: Array in post_colours:
+		var base: Vector3 = entry[0]
+		var vertices := PackedVector3Array([base + Vector3(-5, 0, 0), base + Vector3(5, 0, 0), base + Vector3(-5, entry[2], 0), base + Vector3(5, entry[2], 0),
+			base + Vector3(0, 0, -5), base + Vector3(0, 0, 5), base + Vector3(0, entry[2], -5), base + Vector3(0, entry[2], 5)])
+		_add_water_mesh("Route_post", vertices, PackedInt32Array([0, 1, 2, 1, 3, 2, 4, 5, 6, 5, 7, 6]), entry[1])
+
+
 func _add_water_mesh(node_name: String, vertices: PackedVector3Array, indices: PackedInt32Array, colour: Color) -> void:
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
@@ -328,6 +402,8 @@ func _add_water_mesh(node_name: String, vertices: PackedVector3Array, indices: P
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	material.albedo_color = colour
+	if colour.a < 1.0:
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mesh.surface_set_material(0, material)
 	var instance := MeshInstance3D.new()
 	instance.name = node_name
@@ -337,6 +413,10 @@ func _add_water_mesh(node_name: String, vertices: PackedVector3Array, indices: P
 
 func get_hydrology_signature() -> String:
 	return _hydrology.signature() if _hydrology != null else ""
+
+
+func get_route_signature() -> String:
+	return _routes.signature() if _routes != null else ""
 
 
 func get_plan_signature() -> String:

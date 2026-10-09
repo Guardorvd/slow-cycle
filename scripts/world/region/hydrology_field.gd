@@ -363,6 +363,68 @@ func sample_proximity_bounded(x: float, z: float, radius_m: float) -> Dictionary
 	return {"is_valid": true, "reason_code": "", "distance_to_water_m": best, "is_capped": best == radius_m, "segment_candidates": segment_candidates, "body_candidates": body_candidates}
 
 
+## Additive R5 query: where a straight world-space segment crosses recorded
+## channel centrelines, and which water bodies' lattice cells it passes. Each
+## crossing carries the parameter t along the segment, world point, channel
+## id/class/perennial/order, water width (m), surface and bed (m) and the
+## crossing angle in degrees (90 = perpendicular). Exactly collinear overlaps
+## are not crossings. Bodies: lattice cells nearest to samples every 8 m.
+## Derived only; existing queries, schema and numerics are unchanged.
+const MAX_CROSSING_SEGMENT_M: float = 256.0
+
+
+func sample_segment_crossings(x0: float, z0: float, x1: float, z1: float) -> Dictionary:
+	var reason: String = _reason(x0, z0)
+	if reason.is_empty():
+		reason = _reason(x1, z1)
+	if reason.is_empty() and Vector2(x1 - x0, z1 - z0).length() > MAX_CROSSING_SEGMENT_M:
+		reason = "ERR_HYDRO_SEGMENT_LENGTH"
+	if not reason.is_empty():
+		return {"is_valid": false, "reason_code": reason, "crossings": [], "body_ids": PackedInt32Array()}
+	var a := Vector2(x0 - _min_x, z0 - _min_z)
+	var b := Vector2(x1 - _min_x, z1 - _min_z)
+	var r: Vector2 = b - a
+	var crossings: Array = []
+	var seen: Dictionary = {}
+	for j in range(clampi(floori(minf(a.y, b.y) / SEARCH_BUCKET_M), 0, SEARCH_BUCKETS - 1), clampi(floori(maxf(a.y, b.y) / SEARCH_BUCKET_M), 0, SEARCH_BUCKETS - 1) + 1):
+		for i in range(clampi(floori(minf(a.x, b.x) / SEARCH_BUCKET_M), 0, SEARCH_BUCKETS - 1), clampi(floori(maxf(a.x, b.x) / SEARCH_BUCKET_M), 0, SEARCH_BUCKETS - 1) + 1):
+			for s: int in _search_buckets[j * SEARCH_BUCKETS + i]:
+				if seen.has(s):
+					continue
+				seen[s] = true
+				var base: int = s * STRIDE
+				var p := Vector2(_segments[base], _segments[base + 1])
+				var q: Vector2 = Vector2(_segments[base + 2], _segments[base + 3]) - p
+				var denominator: float = r.cross(q)
+				if denominator == 0.0:
+					continue
+				var t: float = (p - a).cross(q) / denominator
+				var u: float = (p - a).cross(r) / denominator
+				if t < 0.0 or t > 1.0 or u < 0.0 or u > 1.0:
+					continue
+				var surface: float = lerpf(_segments[base + 4], _segments[base + 5], u)
+				var bed: float = lerpf(_segments[base + 6], _segments[base + 7], u)
+				var cosine: float = absf(r.normalized().dot(q.normalized())) if r.length() > 0.0 else 1.0
+				crossings.append({"t": t, "x": _min_x + a.x + t * r.x, "z": _min_z + a.y + t * r.y, "channel_id": int(_segments[base + 12]), "class": int(_segments[base + 13]),
+					"width_m": 2.0 * lerpf(_segments[base + 8], _segments[base + 9], u), "surface_m": surface, "bed_m": bed, "angle_deg": rad_to_deg(acos(clampf(cosine, 0.0, 1.0))), "segment": s})
+	crossings.sort_custom(func(m: Dictionary, n: Dictionary) -> bool: return m.t < n.t or (m.t == n.t and (m.channel_id < n.channel_id or (m.channel_id == n.channel_id and m.segment < n.segment))))
+	# A hit exactly on a shared channel vertex is one crossing, not two.
+	var unique: Array = []
+	for crossing: Dictionary in crossings:
+		if not unique.is_empty() and unique[-1].channel_id == crossing.channel_id and absf(unique[-1].t - crossing.t) <= 1e-9:
+			continue
+		unique.append(crossing)
+	var bodies := PackedInt32Array()
+	var steps: int = maxi(1, ceili(r.length() / 8.0))
+	for k in range(steps + 1):
+		var point: Vector2 = a + r * (float(k) / steps)
+		var body: int = _body_of[_lattice_index(point.x, point.y)]
+		if body >= 0 and not body in bodies:
+			bodies.append(body)
+	bodies.sort()
+	return {"is_valid": true, "reason_code": "", "crossings": unique, "body_ids": bodies}
+
+
 ## Observational derived-index storage, excluding upstream plans/terrain.
 func get_proximity_metrics() -> Dictionary:
 	var entries: int = 0

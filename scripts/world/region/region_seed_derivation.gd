@@ -8,6 +8,15 @@ const PURPOSE_MACRO_STRUCTURE := "macro_structure"
 const PURPOSE_MACRO_NOISE := "macro_noise"
 const PURPOSE_HYDROLOGY := "hydrology"
 const PURPOSE_BIOME := "biome"
+const PURPOSE_ROUTE := "route"
+
+
+static func route_seed_preimage(region_seed_value: int) -> String:
+	return _preimage(PURPOSE_ROUTE, PackedInt64Array([region_seed_value]))
+
+
+static func route_seed(region_seed_value: int) -> int:
+	return _seed_from_preimage(route_seed_preimage(region_seed_value))
 
 
 static func biome_seed_preimage(region_seed_value: int) -> String:
