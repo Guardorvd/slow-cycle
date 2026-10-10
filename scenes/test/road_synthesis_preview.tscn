@@ -1,0 +1,35 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/test/road_synthesis_preview.gd" id="1_preview"]
+
+[sub_resource type="ProceduralSkyMaterial" id="SkyMaterial"]
+sky_top_color = Color(0.45, 0.52, 0.62, 1)
+sky_horizon_color = Color(0.72, 0.74, 0.76, 1)
+ground_bottom_color = Color(0.3, 0.3, 0.3, 1)
+ground_horizon_color = Color(0.72, 0.74, 0.76, 1)
+
+[sub_resource type="Sky" id="Sky"]
+sky_material = SubResource("SkyMaterial")
+
+[sub_resource type="Environment" id="Environment"]
+background_mode = 2
+sky = SubResource("Sky")
+ambient_light_source = 3
+ambient_light_color = Color(0.65, 0.65, 0.65, 1)
+ambient_light_energy = 0.75
+fog_enabled = false
+
+[node name="RoadSynthesisPreview" type="Node3D"]
+script = ExtResource("1_preview")
+
+[node name="Camera3D" type="Camera3D" parent="."]
+current = true
+far = 20000.0
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-42, -35, 0)
+light_energy = 1.0
+shadow_enabled = false
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment")

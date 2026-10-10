@@ -35,7 +35,7 @@ Player → world query contracts / collision
 | Hydrology layer | HydrologyPlan | River/tributary/drainage влияет на terrain/moisture/routes, не просто decoration spline | R3 |
 | Biome/Rideability layers | BiomeField/RideabilityField | Geography-driven placement/cost; не biome из одного road arc-distance | R4 |
 | RoutePlanner | RouteNetworkPlan, RegionRouteGraph, RouteCorridor | Network/corridors по terrain/water/cost/классу пути; не mesh builder | R5 |
-| RoadSynthesizer | RouteCorridor → RoadPathData | Локальная непрерывная геометрия и события; не macro geography | R6 |
+| RoadSynthesizer | RegionRouteGraph + TerrainField/HydrologyPlan/R4 → RoadSynthesisPlan (RoadPathData-совместимые виды, roadbed intent) | R6 LIMITED ALPHA ACCEPTED 2026-10-10 (certified R7/R8 handoff route only; full regional network NOT READY; [record](plans/completed/R6.md)); isolated, `scripts/world/region/road_*.gd`, no runtime consumer: REWRITE регионального композитора, не RoadGrammar FSM; terrain-aware alignment designer (lattice DP + fairing + G2 quintic + exact vertical profile), shared junction patches, exact crossing pins (C2 envelope), bounded roadbed intent for R7; грунтовая геометрия без airborne; PARTIAL/REPLAN_REQUIRED выходы честны. R7 владеет deformation/surface/collision | R6 |
 | FinalSurface | BaseTerrain + hydrology/road/landmark deformation | Единственная итоговая высота для всех consumers | R7 |
 | WorldStreamer | WorldCellData/runtime lifecycle | Пространственные terrain/collision/road/vegetation/prop/water cells | R10 |
 | Vegetation planning/adapter | Ecology fields → VegetationCell/transforms | World-space placement, road/view exclusions; не меняет terrain | R11 |

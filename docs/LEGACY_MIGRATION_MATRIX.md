@@ -13,8 +13,8 @@ KEEP сохраняет правильную responsibility; EXTEND добавл
 |---|---|---|
 | BicycleController, VisualsRoot, камера, controls, аудио, HUD/recovery | KEEP; world layer потребляет public API/коллизии | Любая player-правка — отдельный measured defect и approval |
 | RoadPathData, RoadMath, геометрические/airborne contracts | KEEP/ADAPT как формат и локальная математика; расхождения явно открыты | R6, без молчаливой смены limits |
-| RoadLogic | ADAPT к RouteCorridor/RoadSynthesizer; macro direction больше не его власть | R6; сохранять полезную геометрию |
-| RoadGrammar | ADAPT в local ride vocabulary | R6/R16/R17; не top-level world planner |
+| RoadLogic | ADAPT к RouteCorridor/RoadSynthesizer; macro direction больше не его власть | R6 LIMITED ALPHA ACCEPTED (certified handoff only; full network NOT READY): legacy RoadLogic/RoadGrammar НЕ обёрнуты (A1: REWRITE регионального композитора); legacy-код и тесты не тронуты, используется только математика/формат (RoadPathData, RoadKinematicModel). Наблюдательный legacy audit (150 chunks × 3 seeds × 3 styles): 0 rejections/repairs/fallbacks, 57–65 % длины \|k\|<1/1000 |
+| RoadGrammar | ADAPT в local ride vocabulary | R6 не использует FSM; feature intents R6 (SWEEP, LINKED_TURNS, SWITCHBACK, CLIMB, DESCENT, CREST, COMPRESSION, CALM) — геометрические, R16/R17 vocabulary остаётся |
 | RoadGraph | REPLACE для региональной topology; старый runtime сохраняется до безопасного перехода | RegionRouteGraph R5; gameplay integration R13 |
 | TerrainCarver | REPLACE как owner поверхности; извлечь CUT/FILL/SHELF в будущий RoadTerrainDeformer | R7; retire production role только после parity |
 | MountainProfile | ADAPT/DEFER для локального intent/reference, не абсолютный terrain/biome owner | Точная полезность оценивается R6; не обязателен только из-за реализации |
