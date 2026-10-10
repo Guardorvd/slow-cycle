@@ -316,6 +316,8 @@ visual capture if applicable
 performance data if applicable
 ```
 
+D2: эти действия выполняются в L2 campaign и аудируются verifier по authentic raw evidence; verifier сам повторяет критичные результаты ([Test Strategy §7](TEST_STRATEGY.md)).
+
 Результат:
 
 ```text
