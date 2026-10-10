@@ -54,6 +54,9 @@ const MAX_LATERAL_M: float = 130.0
 ## the cross-slope earthwork cost (a longer line must still be buildable).
 const LONGEST_PROFILE := {"name": "LONGEST", "len": 0.0, "grade": 0.3, "cross": 1.0, "ride": 0.0, "curv": 1.0}
 const DEVELOP_ROUNDS: int = 8
+## Reward per metre of the feasibility probe: large against the curvature and
+## cross-slope costs so that the probe returns the longest buildable line.
+const LONGEST_REWARD: float = 60.0
 ## Bounds of the fit escalation (stiffness as a multiple of the base, point
 ## weight): a repair that needs more is a diagnosed failure, never a degenerate
 ## straightened line.
@@ -65,6 +68,12 @@ const FIT_WEIGHT_CAP: float = 1e4
 ## the transition.
 const PORT_RAMP_SHARE: float = 0.8
 const SLOPE_BLOCK: float = 0.9
+## Margin below the exact roadbed limit of a cross slope.
+const CROSS_LIMIT_SHARE: float = 0.97
+## Search cost per metre (before the profile weight) of a step across ground the
+## class roadbed cannot be built on: the lattice still returns a line, the
+## roadbed condition below sends that stretch to the heading-aware search.
+const UNBUILDABLE_COST: float = 300.0
 const PROFILE_DS: float = 2.0
 const LATTICE_RESERVE_M: float = 1.0
 ## Fixed ladder of search settings [lattice curvature cut-off (x hard curvature),
@@ -73,6 +82,10 @@ const LATTICE_RESERVE_M: float = 1.0
 const SEARCH_ATTEMPTS: Array = [[1.2, 0.0], [1.6, 0.0], [1.2, 3.0], [1.6, 3.0], [1.6, 7.0]]
 const RETRY_REASONS: Array[String] = ["ERR_R6_CORRIDOR_CLEARANCE", "ERR_R6_CURVATURE", "ERR_R6_CROSSING_APPROACH", "ERR_R6_GRADE_TRANSITION", "ERR_R6_EARTHWORK"]
 const PLAN_RESERVE_M: float = 0.3
+## Share of the class cut + fill capacity the necessary grade condition may count
+## on; tightened step by step when the exact profile (whose roadbed bounds depend
+## on the local cross slopes) still fails a stretch the first condition passed.
+const SLACK_LADDER: Array[float] = [1.0, 0.6, 0.35]
 ## Vertical profile. A bounded number of cyclic projections (least-movement
 ## repair of the smoothed natural profile against the bounds) prepares the
 ## tracking reference; the exact reachability solve then decides feasibility
@@ -96,6 +109,16 @@ var fit_budget: int = Policy.MAX_FIT_EVALUATIONS
 var dp_transitions: int = 0
 var lattice_extra_reserve: float = 0.0
 var curvature_cutoff: float = 1.2
+var hybrid_remaining: int = 0
+var slack_share: float = 1.0
+## Diagnostic scales of the heading-aware search limits (1 = the class policy):
+## turn radius, grade, cross/natural slope, and extra band room. Used only by
+## probes that ask which limit blocks a stretch; production leaves them at 1 / 0.
+var relax_radius: float = 1.0
+var relax_grade: float = 1.0
+var relax_slope: float = 1.0
+var relax_band_m: float = 0.0
+var hy_zone_limit: int = HY_MAX_EXPANSIONS
 
 
 static func create(natural_: Geo.Natural, fit_budget_: int) -> RoadAlignmentDesigner:
@@ -121,6 +144,7 @@ static func _fail(reason: String, detail: Dictionary = {}) -> Dictionary:
 ## selected, features (intents), crossings (actual), metrics}.
 func design(request: Dictionary) -> Dictionary:
 	lattice_extra_reserve = 0.0
+	hybrid_remaining = HY_EDGE_EXPANSIONS
 	curvature_cutoff = SEARCH_ATTEMPTS[0][0]
 	var result: Dictionary = _design_once(request)
 	var attempt: int = 0
@@ -141,9 +165,34 @@ func design(request: Dictionary) -> Dictionary:
 			break
 	lattice_extra_reserve = 0.0
 	curvature_cutoff = SEARCH_ATTEMPTS[0][0]
+	# A line that passed the necessary grade condition and still failed the exact
+	# profile on grade (a marginal shortage) is developed against less cut/fill
+	# capacity, step by step down the fixed ladder.
+	var tried: int = 1
+	while not result.is_valid and tried < SLACK_LADDER.size() and _profile_grade_shortage(result):
+		slack_share = SLACK_LADDER[tried]
+		tried += 1
+		var tighter: Dictionary = _design_once(request)
+		tighter["slack_share"] = slack_share
+		if tighter.is_valid or not _profile_grade_shortage(tighter):
+			result = tighter
+			break
+		result = tighter
+	slack_share = 1.0
 	if result.is_valid:
 		result["search_attempt"] = attempt
 	return result
+
+
+## True when the failed design was a shortage found by the exact profile (a
+## candidate rejected on grade with a measured profile bound conflict).
+static func _profile_grade_shortage(result: Dictionary) -> bool:
+	if result.get("reason_code", "") != "ERR_R6_GRADE":
+		return false
+	for c: Dictionary in result.get("candidates", []):
+		if c.get("reason_code", "") == "ERR_R6_GRADE" and c.get("detail", {}).has("high_from_s"):
+			return true
+	return false
 
 
 func _design_once(request: Dictionary) -> Dictionary:
@@ -165,34 +214,61 @@ func _design_once(request: Dictionary) -> Dictionary:
 			results.append(null)
 			continue
 		var line: Dictionary = _dynamic_program(lattice, PROFILES[p], route_class)
+		var line_lattice: Dictionary = lattice
+		var from_hybrid: bool = false
 		if not line.is_valid:
-			summaries.append({"profile": PROFILES[p].name, "status": "REJECTED", "reason_code": line.reason_code, "detail": line.get("detail", {})})
-			results.append(null)
-			continue
-		var reach: Dictionary = _grade_reach(line, route_class)
+			# No monotone lattice line (a stretch the roadbed limits close to every
+			# station-by-station step): the heading-aware search may still find one.
+			var whole: Dictionary = _hybrid_edge(request, lattice, PROFILES[p])
+			if not whole.is_valid:
+				var failed_detail: Dictionary = line.get("detail", {}).duplicate()
+				failed_detail["hybrid"] = whole.detail
+				summaries.append({"profile": PROFILES[p].name, "status": "REJECTED", "reason_code": line.reason_code, "detail": failed_detail})
+				results.append(null)
+				continue
+			line = whole.line
+			line_lattice = whole.lattice
+			from_hybrid = true
+		var reach: Dictionary = _necessary(line, route_class)
 		# Development stage: where the necessary grade condition fails, the
 		# length of the failing stretch is rewarded (bounded rounds, escalating
 		# per stretch) until the line is long enough, or the longest line the
 		# lattice offers there is shown to be too short.
 		if not reach.is_valid:
-			var developed: Dictionary = _develop(lattice, PROFILES[p], route_class, line, reach)
-			line = developed.line
-			reach = developed.reach
-			if developed.lattice_limit:
-				lattice_limited = true
+			if not from_hybrid and reach.reason == "ERR_R6_GRADE":
+				var developed: Dictionary = _develop(lattice, PROFILES[p], route_class, line, reach)
+				line = developed.line
+				reach = developed.reach
+				if reach.is_valid:
+					reach = _necessary(line, route_class)
+				else:
+					reach["reason"] = "ERR_R6_GRADE"
+			if not reach.is_valid:
+				# The monotone lattice could not lengthen the stretch enough: let
+				# the road turn and double back inside the band.
+				var hybrid: Dictionary = _develop_hybrid(request, line_lattice, PROFILES[p], line, reach)
+				if hybrid.is_valid:
+					line = hybrid.line
+					line_lattice = hybrid.lattice
+					reach = {"is_valid": true}
+				else:
+					reach.detail["hybrid"] = hybrid.detail
+					if hybrid.get("exhausted", false):
+						lattice_limited = true
 		if not reach.is_valid:
-			_reach_context(lattice, reach.detail)
-			summaries.append({"profile": PROFILES[p].name, "status": "REJECTED", "reason_code": "ERR_R6_GRADE", "detail": reach.detail, "dp_cost": line.cost})
+			if reach.reason == "ERR_R6_GRADE":
+				_reach_context(lattice, reach.detail)
+			summaries.append({"profile": PROFILES[p].name, "status": "REJECTED", "reason_code": reach.reason, "detail": reach.detail, "dp_cost": line.cost})
 			results.append(null)
 			continue
-		var key: String = str(line.j)
+		var key: String = line.get("key", str(line.get("j", "")))
 		if seen_lines.has(key):
 			# Identical node sequence: one fit, recorded once per profile.
 			summaries.append({"profile": PROFILES[p].name, "status": "DUPLICATE", "same_as": seen_lines[key], "reason_code": ""})
 			results.append(null)
 			continue
 		seen_lines[key] = PROFILES[p].name
-		var candidate: Dictionary = _evaluate(request, lattice, line, p)
+		var candidate: Dictionary = _evaluate(request, line_lattice, line, p)
 		results.append(candidate)
 		summaries.append(candidate.summary)
 	# Hard constraints first, then score; stable tie-break by profile order.
@@ -233,7 +309,7 @@ func _develop(lattice: Dictionary, profile: Dictionary, route_class: int, line: 
 			var probe := PackedFloat64Array()
 			probe.resize(n)
 			for i in range(a, b):
-				probe[i] = -3.0
+				probe[i] = -LONGEST_REWARD
 			var longest: Dictionary = _dynamic_program(lattice, LONGEST_PROFILE, route_class, probe)
 			var longest_len: float = 0.0
 			if longest.is_valid:
@@ -286,6 +362,455 @@ func _reach_context(lattice: Dictionary, detail: Dictionary) -> void:
 	detail["lateral_room_mean_m"] = room_sum / maxf(stations, 1)
 	detail["crossing_window_in_zone"] = window
 	detail["required_length_ratio"] = detail.required_length_m / maxf(detail.line_length_m, 1.0)
+
+
+# =====================================================================
+# 1b. Heading-aware development of a failing stretch
+# =====================================================================
+
+## The lattice advances one station per step along a smoothed axis, so it can
+## not express switchbacks that run back along that axis. For a stretch that
+## still fails the necessary grade condition, a bounded heading-aware search
+## (hybrid A*) between the stretch's end nodes lets the road turn within the
+## class radius, double back inside the band and keep every step under the
+## class grade limit measured on exact natural heights. A node line it returns
+## replaces the stretch and is fitted and certified like any other candidate.
+const HY_CELL_M: float = 4.0
+const HY_HEADING_BINS: int = 24
+## Turn per step as a share of the largest turn the class radius allows.
+const HY_TURNS: Array[float] = [0.0, -0.5, 0.5, -1.0, 1.0]
+const HY_MAX_EXPANSIONS: int = 250000
+## Total heading-aware expansions of one design call (all stretches, profiles and
+## search attempts): bounded work like every other search of this designer.
+const HY_EDGE_EXPANSIONS: int = 600000
+const HY_RADIUS_SHARE: float = 1.12
+## Share of the class cut + fill capacity the search may use up in the running
+## grade excess (the necessary condition of _grade_reach, tracked incrementally),
+## and the steepest single step it will consider at all (x class grade limit).
+const HY_SLACK_SHARE: float = 0.85
+const HY_STEP_GRADE_FACTOR: float = 2.5
+const HY_EXCESS_BINS: int = 3
+## Weight of the straight-line distance in the search priority (> 1 trades
+## optimality for speed; the line is fitted and certified afterwards).
+const HY_HEURISTIC_WEIGHT: float = 1.5
+## Stretch margins in stations; -1 = walk outward to the first gentle ground.
+const HY_ZONE_MARGINS: Array[int] = [-1, 12, 28, 60]
+const HY_GENTLE_SHARE: float = 0.6
+const HY_GENTLE_PAD: int = 3
+const HY_ROUNDS: int = 6
+const HY_MIN_SPAN: int = 8
+## The search may rejoin the lattice line at any of this many stations beyond the
+## stretch end (nodes of the unchanged, gentle line), not only at the end node.
+const HY_REACH_AHEAD: int = 10
+const HY_END_HEADING_TOL: float = 0.7
+const HY_HINT_WINDOW: int = 14
+
+
+class MinHeap extends RefCounted:
+	var keys := PackedFloat64Array()
+	var items := PackedInt32Array()
+
+	func size() -> int:
+		return keys.size()
+
+	func push(key: float, item: int) -> void:
+		keys.append(key)
+		items.append(item)
+		var i: int = keys.size() - 1
+		while i > 0:
+			var parent: int = (i - 1) / 2
+			if keys[parent] <= keys[i]:
+				break
+			_swap(i, parent)
+			i = parent
+
+	func pop() -> int:
+		var top: int = items[0]
+		var last: int = keys.size() - 1
+		keys[0] = keys[last]
+		items[0] = items[last]
+		keys.resize(last)
+		items.resize(last)
+		var i: int = 0
+		while true:
+			var left: int = 2 * i + 1
+			var right: int = left + 1
+			var smallest: int = i
+			if left < last and keys[left] < keys[smallest]:
+				smallest = left
+			if right < last and keys[right] < keys[smallest]:
+				smallest = right
+			if smallest == i:
+				break
+			_swap(i, smallest)
+			i = smallest
+		return top
+
+	func _swap(a: int, b: int) -> void:
+		var k: float = keys[a]
+		keys[a] = keys[b]
+		keys[b] = k
+		var it: int = items[a]
+		items[a] = items[b]
+		items[b] = it
+
+
+## Replaces failing stretches of a lattice line by heading-aware developments
+## (at most HY_ROUNDS) until the necessary grade condition holds. Returns
+## {is_valid, line, lattice} (the lattice view carries the new station count and
+## shifted crossing windows) or {is_valid: false, detail}.
+func _develop_hybrid(request: Dictionary, lattice: Dictionary, profile: Dictionary, line: Dictionary, reach: Dictionary) -> Dictionary:
+	var route_class: int = request.route_class
+	var current: Dictionary = line
+	var windows: Array = []
+	for w: Dictionary in lattice.windows:
+		windows.append(w.duplicate())
+	var failing: Dictionary = reach
+	var rounds: int = 0
+	var log: Array = []
+	for round_index in range(HY_ROUNDS):
+		rounds += 1
+		var count: int = current.x.size()
+		# The failing stretch is widened until the search can start and end on
+		# ground the class grade allows (the lattice line itself may be too steep
+		# right at the stretch).
+		var a: int = 0
+		var b: int = 0
+		var found: Dictionary = {"is_valid": false}
+		var exhausted: bool = true
+		var windowed: bool = false
+		for margin: int in HY_ZONE_MARGINS:
+			var from_i: int = clampi(int(failing.detail.i0) - margin, 0, count - 2)
+			var to_i: int = clampi(int(failing.detail.i1) + margin, from_i + 1, count - 1)
+			if margin < 0:
+				var ends: Vector2i = _gentle_ends(current, int(failing.detail.i0), int(failing.detail.i1), route_class)
+				from_i = ends.x
+				to_i = ends.y
+			# A crossing window keeps its station-lattice geometry: the road is
+			# developed on the window-free parts of the stretch (any added length
+			# between the stretch's ends counts against its grade shortage).
+			var spans: Array = _window_free_spans(windows, from_i, to_i)
+			windowed = windowed or spans.size() != 1 or spans[0][0] != from_i or spans[0][1] != to_i
+			for span: Array in spans:
+				a = span[0]
+				b = span[1]
+				found = _hybrid_zone(request, lattice, profile, current, a, b, _reach_ahead(windows, b, count))
+				log.append({"i0": a, "i1": b, "expansions": found.get("expansions", 0), "found": found.is_valid, "note": found.get("note", "")})
+				if found.is_valid:
+					break
+				exhausted = exhausted and found.get("exhausted", false)
+			if found.is_valid:
+				break
+			if spans.is_empty():
+				exhausted = false
+		if not found.is_valid:
+			var why: String = found.get("note", "")
+			if why.is_empty():
+				why = "a crossing window lies in the failing stretch"
+			# Exhaustion proves the shortage only when no window part was left out.
+			return {"is_valid": false, "exhausted": exhausted and not windowed, "detail": {"note": why, "rounds": rounds, "stretches": log}}
+		var interior: int = found.x.size()
+		var xs := PackedFloat64Array()
+		var zs := PackedFloat64Array()
+		for i in range(a + 1):
+			xs.append(current.x[i])
+			zs.append(current.z[i])
+		xs.append_array(found.x)
+		zs.append_array(found.z)
+		var end: int = found.end
+		for i in range(end, count):
+			xs.append(current.x[i])
+			zs.append(current.z[i])
+		var shift: int = interior - (end - a - 1)
+		for w: Dictionary in windows:
+			if w.station > end:
+				w["station"] = w.station + shift
+		current = {"is_valid": true, "x": xs, "z": zs, "cost": current.cost, "key": str(hash(xs)) + str(hash(zs))}
+		failing = _necessary(current, route_class)
+		if failing.is_valid:
+			var view: Dictionary = lattice.duplicate()
+			view["n"] = xs.size()
+			view["windows"] = windows
+			return {"is_valid": true, "line": current, "lattice": view, "rounds": rounds}
+	return {"is_valid": false, "detail": {"note": "development rounds exhausted", "rounds": rounds, "stretches": log, "remaining": failing.get("detail", {})}}
+
+
+## Heading-aware search over the whole edge when the lattice offers no line (no
+## crossing windows: those stay with the station lattice).
+func _hybrid_edge(request: Dictionary, lattice: Dictionary, profile: Dictionary) -> Dictionary:
+	if not lattice.windows.is_empty():
+		return {"is_valid": false, "detail": {"note": "crossing windows keep the edge on the station lattice"}}
+	var count: int = lattice.n
+	var axis_line := {"x": lattice.axis.x, "z": lattice.axis.z}
+	var found: Dictionary = _hybrid_zone(request, lattice, profile, axis_line, 0, count - 1)
+	if not found.is_valid:
+		return {"is_valid": false, "exhausted": found.get("exhausted", false), "detail": {"note": found.get("note", ""), "expansions": found.get("expansions", 0)}}
+	var xs := PackedFloat64Array([lattice.axis.x[0]])
+	var zs := PackedFloat64Array([lattice.axis.z[0]])
+	xs.append_array(found.x)
+	zs.append_array(found.z)
+	xs.append(lattice.axis.x[count - 1])
+	zs.append(lattice.axis.z[count - 1])
+	var view: Dictionary = lattice.duplicate()
+	view["n"] = xs.size()
+	return {"is_valid": true, "line": {"is_valid": true, "x": xs, "z": zs, "cost": 0.0, "key": str(hash(xs)) + str(hash(zs))}, "lattice": view}
+
+
+## First stations outside [i0, i1] (walking outward) where the line's own natural
+## grade over a few stations is gentle: the heading-aware search starts and ends
+## there instead of inside the steep stretch it has to relieve.
+func _gentle_ends(line: Dictionary, i0: int, i1: int, route_class: int) -> Vector2i:
+	var count: int = line.x.size()
+	var g_gentle: float = HY_GENTLE_SHARE * Policy.grade_hard(route_class)
+	var a: int = clampi(mini(i0, i1), 0, count - 2)
+	var b: int = clampi(maxi(i0, i1), a + 1, count - 1)
+	while a > 0 and _line_grade(line, a) > g_gentle:
+		a -= 1
+	while b < count - 1 and _line_grade(line, b) > g_gentle:
+		b += 1
+	return Vector2i(clampi(a - HY_GENTLE_PAD, 0, count - 2), clampi(b + HY_GENTLE_PAD, 1, count - 1))
+
+
+## Natural grade of a line over the five stations around i.
+func _line_grade(line: Dictionary, i: int) -> float:
+	var count: int = line.x.size()
+	var lo: int = maxi(0, i - 2)
+	var hi: int = mini(count - 1, i + 2)
+	var length: float = 0.0
+	for k in range(lo, hi):
+		length += Vector2(line.x[k + 1] - line.x[k], line.z[k + 1] - line.z[k]).length()
+	var h0: float = natural.height_search(line.x[lo], line.z[lo])
+	var h1: float = natural.height_search(line.x[hi], line.z[hi])
+	return absf(h1 - h0) / maxf(length, 1.0)
+
+
+## Stations beyond b the search may rejoin the line at: up to HY_REACH_AHEAD, never
+## into or past the next crossing window's reach.
+static func _reach_ahead(windows: Array, b: int, count: int) -> int:
+	var ahead: int = mini(HY_REACH_AHEAD, count - 1 - b)
+	for w: Dictionary in windows:
+		var lo: int = w.station - w.reach - 2
+		if lo > b:
+			ahead = mini(ahead, lo - b - 1)
+	return maxi(ahead, 0)
+
+
+## Window-free spans (station ranges, longest first) of [from_i, to_i]: the
+## ranges outside every crossing window's reach, at least HY_MIN_SPAN stations.
+static func _window_free_spans(windows: Array, from_i: int, to_i: int) -> Array:
+	var blocked: Array = []
+	for w: Dictionary in windows:
+		var lo: int = w.station - w.reach - 2
+		var hi: int = w.station + w.reach + 2
+		if hi >= from_i and lo <= to_i:
+			blocked.append([lo, hi])
+	blocked.sort_custom(func(p: Array, q: Array) -> bool: return p[0] < q[0])
+	var spans: Array = []
+	var cursor: int = from_i
+	for block: Array in blocked:
+		if block[0] - cursor >= HY_MIN_SPAN:
+			spans.append([cursor, block[0]])
+		cursor = maxi(cursor, block[1])
+	if to_i - cursor >= HY_MIN_SPAN:
+		spans.append([cursor, to_i])
+	spans.sort_custom(func(p: Array, q: Array) -> bool: return p[1] - p[0] > q[1] - q[0])
+	return spans
+
+
+## One heading-aware search from node a to node b of a line: returns the
+## interior points (resampled at the lattice step) or the reason none exists.
+func _hybrid_zone(request: Dictionary, lattice: Dictionary, profile: Dictionary, line: Dictionary, a: int, b: int, ahead: int = 0) -> Dictionary:
+	var route_class: int = request.route_class
+	var cls: Dictionary = Policy.CLASSES[route_class]
+	var band: Geo.Band = request.band
+	var count: int = line.x.size()
+	var ell: float = lattice.du
+	var k_hard: float = Policy.curvature_hard(route_class)
+	var k_pref: float = 1.0 / cls.radius_pref_m
+	var r_step: float = relax_radius * HY_RADIUS_SHARE / k_hard
+	var d_theta: float = 2.0 * asin(minf(ell / (2.0 * r_step), 0.99))
+	var k_step: float = 2.0 * sin(0.5 * d_theta) / ell
+	var turn_penalty: float = 6.0 * profile.curv * ell * _curvature_penalty(k_step, k_pref, k_hard, curvature_cutoff)
+	var g_hard: float = relax_grade * Policy.grade_hard(route_class)
+	var g_cap: float = HY_STEP_GRADE_FACTOR * g_hard
+	var slack: float = slack_share * HY_SLACK_SHARE * (cls.cut_max_m + cls.fill_max_m)
+	var g_pref: float = cls.grade_pref
+	var hf: float = Policy.half_footprint(route_class)
+	var bench_cap: float = minf(cls.cut_max_m, cls.cut_max_m + cls.fill_max_m * 0.5)
+	var cross_limit: float = relax_slope * _cross_limit(route_class)
+	var slope_limit: float = relax_slope * _slope_limit(route_class)
+	var need: float = hf + LATTICE_RESERVE_M + lattice_extra_reserve + 1.0 - relax_band_m
+	var start: Dictionary = request.start
+	var finish: Dictionary = request.end
+	var avoid: Array = request.get("avoid", [])
+	var x0: float = line.x[a]
+	var z0: float = line.z[a]
+	var t0: float = atan2(start.tz, start.tx) if a == 0 else atan2(line.z[a] - line.z[maxi(a - 2, 0)], line.x[a] - line.x[maxi(a - 2, 0)])
+	var x1: float = line.x[b]
+	var z1: float = line.z[b]
+	# Rejoin nodes: station b and the next `ahead` stations of the line, each with
+	# the line's own heading there.
+	var goal_x := PackedFloat64Array()
+	var goal_z := PackedFloat64Array()
+	var goal_t := PackedFloat64Array()
+	for k in range(mini(ahead, count - 1 - b) + 1):
+		var s: int = b + k
+		goal_x.append(line.x[s])
+		goal_z.append(line.z[s])
+		goal_t.append(atan2(finish.tz, finish.tx) if s == count - 1 else atan2(line.z[mini(s + 2, count - 1)] - line.z[s], line.x[mini(s + 2, count - 1)] - line.x[s]))
+	var cache: Dictionary = {}
+	var best: Dictionary = {}
+	var sx := PackedFloat64Array([x0])
+	var sz := PackedFloat64Array([z0])
+	var sth := PackedFloat64Array([t0])
+	var sh := PackedFloat64Array([natural.height_search(x0, z0)])
+	var sg := PackedFloat64Array([0.0])
+	var su := PackedFloat64Array([0.0])
+	var sd := PackedFloat64Array([0.0])
+	var sp := PackedInt32Array([-1])
+	var shint := PackedInt32Array([int(band.clearance(x0, z0, -1, 10)[1])])
+	var heap := MinHeap.new()
+	var goal_h: float = natural.height_search(x1, z1)
+	heap.push(profile.len * maxf(Vector2(x1 - x0, z1 - z0).length(), (absf(goal_h - sh[0]) - slack) / g_hard), 0)
+	var expansions: int = 0
+	var goal_state: int = -1
+	var goal_k: int = 0
+	var closest: float = INF
+	var rejects := {"domain": 0, "cell": 0, "height": 0, "step_grade": 0, "excess": 0, "cross": 0, "dominated": 0}
+	var bin_width: float = TAU / HY_HEADING_BINS
+	var limit: int = mini(hy_zone_limit, hybrid_remaining)
+	while heap.size() > 0 and expansions < limit:
+		var cur: int = heap.pop()
+		expansions += 1
+		var cx: float = sx[cur]
+		var cz: float = sz[cur]
+		var cth: float = sth[cur]
+		var to_goal: float = Vector2(x1 - cx, z1 - cz).length()
+		closest = minf(closest, to_goal)
+		if to_goal <= ell + ahead * ell:
+			for k in range(goal_x.size()):
+				if Vector2(goal_x[k] - cx, goal_z[k] - cz).length() <= ell and absf(RMath.wrap_angle(cth - goal_t[k])) <= HY_END_HEADING_TOL:
+					goal_state = cur
+					goal_k = k
+					break
+			if goal_state >= 0:
+				break
+		for turn: float in HY_TURNS:
+			var chord_dir: float = cth + 0.5 * turn * d_theta
+			var nx: float = cx + ell * cos(chord_dir)
+			var nz: float = cz + ell * sin(chord_dir)
+			var nth: float = cth + turn * d_theta
+			if not Geo.Natural.in_domain(nx, nz):
+				rejects.domain += 1
+				continue
+			var cell_x: int = int(floorf(nx / HY_CELL_M))
+			var cell_z: int = int(floorf(nz / HY_CELL_M))
+			var cell_key: int = cell_x * 4096 + cell_z
+			var info: Array
+			if cache.has(cell_key):
+				info = cache[cell_key]
+			else:
+				info = _hybrid_cell(band, (cell_x + 0.5) * HY_CELL_M, (cell_z + 0.5) * HY_CELL_M, shint[cur], need, slope_limit, avoid)
+				cache[cell_key] = info
+			if info[0] == 0:
+				rejects.cell += 1
+				continue
+			var nh: float = natural.height_search(nx, nz)
+			if not is_finite(nh):
+				rejects.height += 1
+				continue
+			var grade: float = absf(nh - sh[cur]) / ell
+			if grade > g_cap:
+				rejects.step_grade += 1
+				continue
+			# Running excess of the natural rise (up / down) over the class grade
+			# along the path: the pairwise necessary condition, tracked step by step.
+			var rise: float = nh - sh[cur]
+			var up: float = maxf(0.0, su[cur] + rise - g_hard * ell)
+			var down: float = maxf(0.0, sd[cur] - rise - g_hard * ell)
+			if up > slack or down > slack:
+				rejects.excess += 1
+				continue
+			var nxn: float = -sin(chord_dir)
+			var nzn: float = cos(chord_dir)
+			var cross: float = absf(info[1] * nxn + info[2] * nzn)
+			if cross > cross_limit:
+				rejects.cross += 1
+				continue
+			var step_cost: float = ell * (profile.len + profile.grade * _grade_term(grade, g_pref, g_hard) + profile.cross * _cross_term(cross, hf, bench_cap) + profile.ride * maxf(0.0, info[3] - 1.0))
+			if turn != 0.0:
+				step_cost += turn_penalty * absf(turn)
+			var total: float = sg[cur] + step_cost
+			var heading_bin: int = int(floorf(fposmod(nth, TAU) / bin_width)) % HY_HEADING_BINS
+			var excess_bin: int = mini(HY_EXCESS_BINS - 1, int(maxf(up, down) / slack * HY_EXCESS_BINS))
+			var key: int = (cell_key * 64 + heading_bin) * HY_EXCESS_BINS + excess_bin
+			if best.has(key) and best[key] <= total + 1e-9:
+				rejects.dominated += 1
+				continue
+			best[key] = total
+			sx.append(nx)
+			sz.append(nz)
+			sth.append(nth)
+			sh.append(nh)
+			sg.append(total)
+			su.append(up)
+			sd.append(down)
+			sp.append(cur)
+			shint.append(info[4])
+			# Remaining length is at least the distance and at least the climb still to
+			# make at the class grade (less the cut/fill capacity).
+			heap.push(total + HY_HEURISTIC_WEIGHT * profile.len * maxf(Vector2(x1 - nx, z1 - nz).length(), (absf(goal_h - nh) - slack) / g_hard), sx.size() - 1)
+	hybrid_remaining -= expansions
+	if goal_state < 0:
+		var exhausted: bool = heap.size() == 0
+		return {"is_valid": false, "exhausted": exhausted, "expansions": expansions, "closest_m": closest, "rejects": rejects, "note": "no heading-aware line under the class grade and radius limits inside the band" if exhausted else "heading-aware search budget exhausted"}
+	var path_x := PackedFloat64Array([goal_x[goal_k]])
+	var path_z := PackedFloat64Array([goal_z[goal_k]])
+	var walk: int = goal_state
+	while walk >= 0:
+		path_x.append(sx[walk])
+		path_z.append(sz[walk])
+		walk = sp[walk]
+	path_x.reverse()
+	path_z.reverse()
+	var arc := PackedFloat64Array([0.0])
+	for i in range(1, path_x.size()):
+		arc.append(arc[i - 1] + Vector2(path_x[i] - path_x[i - 1], path_z[i] - path_z[i - 1]).length())
+	var total_len: float = arc[arc.size() - 1]
+	var pieces: int = maxi(1, roundi(total_len / ell))
+	var out_x := PackedFloat64Array()
+	var out_z := PackedFloat64Array()
+	var seg: int = 0
+	for m in range(1, pieces):
+		var target: float = total_len * m / pieces
+		while seg < arc.size() - 2 and arc[seg + 1] < target:
+			seg += 1
+		var t: float = (target - arc[seg]) / maxf(arc[seg + 1] - arc[seg], 1e-9)
+		out_x.append(path_x[seg] + t * (path_x[seg + 1] - path_x[seg]))
+		out_z.append(path_z[seg] + t * (path_z[seg + 1] - path_z[seg]))
+	return {"is_valid": true, "x": out_x, "z": out_z, "end": b + goal_k, "expansions": expansions, "length_m": total_len}
+
+
+## Admissibility of a search cell (evaluated at its centre): [ok, gradient x,
+## gradient z, R4 cost, band hint]. Same rules as the lattice nodes.
+func _hybrid_cell(band: Geo.Band, x: float, z: float, hint: int, need: float, slope_limit: float, avoid: Array) -> Array:
+	var blocked: Array = [0, 0.0, 0.0, 1.0, hint]
+	if not Geo.Natural.in_domain(x, z):
+		return blocked
+	var cl: PackedFloat64Array = band.clearance(x, z, hint, HY_HINT_WINDOW)
+	if cl[0] < need:
+		return blocked
+	var g: Vector2 = natural.gradient_search(x, z)
+	var h: float = natural.height_search(x, z)
+	if not is_finite(h) or g.length() >= slope_limit:
+		return blocked
+	var water: PackedFloat64Array = natural.water_search(x, z, 14.0)
+	if water[7] >= 0.0 or (water[0] >= 0.0 and water[2] <= water[3] + 4.0):
+		return blocked
+	for o: PackedFloat64Array in avoid:
+		if Vector2(o[0] - x, o[1] - z).length() < o[2]:
+			return blocked
+	return [1, g.x, g.y, natural.ride_cost_search(x, z), int(cl[1])]
 
 
 static func _dominant_reason(summaries: Array) -> String:
@@ -408,6 +933,7 @@ func _lattice(request: Dictionary) -> Dictionary:
 	var offsets: Array = []
 	var hint: int = -1
 	var avoid: Array = request.get("avoid", [])
+	var slope_limit: float = _slope_limit(route_class)
 	for i in range(n):
 		var ax: float = axis.x[i]
 		var az: float = axis.z[i]
@@ -452,7 +978,7 @@ func _lattice(request: Dictionary) -> Dictionary:
 				h = natural.height_search(px, pz)
 				g = natural.gradient_search(px, pz)
 				ride = natural.ride_cost_search(px, pz)
-				if not is_finite(h) or g.length() >= SLOPE_BLOCK:
+				if not is_finite(h) or g.length() >= slope_limit:
 					ok = false
 					why = 4
 			if ok:
@@ -526,6 +1052,14 @@ func _lattice(request: Dictionary) -> Dictionary:
 			any = any or node_ok[first[i] + k] == 1
 		if not any:
 			var reason: String = "ERR_R6_CROSSING_APPROACH" if window_at.has(i) else "ERR_R6_CORRIDOR_CLEARANCE"
+			var steep: int = 0
+			for k in range(jcount[i]):
+				steep += 1 if node_why[first[i] + k] == 4 else 0
+			# A station every slot of which is closed mostly by ground steeper than the
+			# class roadbed can be built on (a wall across the corridor, below the R4
+			# natural barrier) is an earthwork failure, not a clearance one.
+			if not window_at.has(i) and steep * 2 >= jcount[i]:
+				reason = "ERR_R6_EARTHWORK"
 			var histogram: Dictionary = {}
 			var names: Array[String] = ["", "outside_region", "axis_bend_fold", "band_clearance", "natural_slope_or_height", "deep_water", "water_not_crossable", "outside_crossing_window", "wrong_side_of_channel", "other_road"]
 			for k in range(jcount[i]):
@@ -557,6 +1091,52 @@ static func _step_offsets(m: int) -> PackedInt32Array:
 	return offs
 
 
+## Search cost of a natural grade g along a step: cheap below the class
+## preference, rising to the soft limit, steep beyond it.
+static func _grade_term(g: float, g_pref: float, g_hard: float) -> float:
+	var g_soft: float = 0.9 * g_hard
+	if g <= g_pref:
+		return 0.1 * (g / g_pref) * (g / g_pref)
+	if g <= g_soft:
+		var q: float = (g - g_pref) / maxf(g_soft - g_pref, 1e-6)
+		return 0.1 + q * q
+	# Sustained grade above the class limit cannot be absorbed by bounded
+	# earthwork: length (development) must be cheaper.
+	var e: float = (g - g_soft) / (0.1 * g_hard)
+	return 1.1 + 30.0 * e * e
+
+
+## Steepest natural cross slope on which the class roadbed can be built at all:
+## the edge heights 2 hf sx apart must fit inside the class cut bound and inside
+## the cut the class tie-in reach can daylight (cut slope 1:1), see _profile.
+static func _cross_limit(route_class: int) -> float:
+	var cls: Dictionary = Policy.CLASSES[route_class]
+	var hf: float = Policy.half_footprint(route_class)
+	return CROSS_LIMIT_SHARE * minf(cls.cut_max_m / (2.0 * hf), cls.tie_max_m / (cls.tie_max_m + 2.0 * hf))
+
+
+## Steepest natural slope the class roadbed can be built on in any direction: a
+## road at grade g across a slope s has cross slope sqrt(s^2 - g^2), so s^2 can
+## not exceed the class grade limit squared plus the cross-slope limit squared.
+static func _slope_limit(route_class: int) -> float:
+	var g: float = Policy.grade_hard(route_class)
+	var c: float = _cross_limit(route_class)
+	return minf(SLOPE_BLOCK, sqrt(g * g + c * c))
+
+
+## Search cost of a natural cross slope sx under a section of half footprint hf.
+static func _cross_term(sx: float, hf: float, bench_cap: float) -> float:
+	# Balanced section below ~0.4 cross slope; steeper ground needs a full
+	# bench (no downhill fill can daylight): uphill cut 2 hf sx.
+	var depth: float = sx * hf if sx < 0.4 else 2.0 * sx * hf
+	var fx: float = (depth / bench_cap) * (depth / bench_cap)
+	if depth > bench_cap:
+		fx += 25.0 * (depth / bench_cap - 1.0)
+	if sx >= 0.85:
+		fx += 50.0
+	return fx
+
+
 ## Profile-independent transition terms per (station, node, step).
 func _transitions(lattice: Dictionary, route_class: int) -> void:
 	var cls: Dictionary = Policy.CLASSES[route_class]
@@ -564,6 +1144,7 @@ func _transitions(lattice: Dictionary, route_class: int) -> void:
 	var g_hard: float = Policy.grade_hard(route_class)
 	var hf: float = Policy.half_footprint(route_class)
 	var bench_cap: float = minf(cls.cut_max_m, cls.cut_max_m + cls.fill_max_m * 0.5)
+	var cross_limit: float = _cross_limit(route_class)
 	var n: int = lattice.n
 	var t_len: Array = []
 	var t_theta: Array = []
@@ -621,34 +1202,14 @@ func _transitions(lattice: Dictionary, route_class: int) -> void:
 					if water[0] >= 0.0 and water[2] <= water[3] + 3.0:
 						continue
 				var g: float = absf(node_h[c] - node_h[a]) / length
-				var fg: float
-				var g_soft: float = 0.9 * g_hard
-				if g <= g_pref:
-					fg = 0.1 * (g / g_pref) * (g / g_pref)
-				elif g <= g_soft:
-					var q: float = (g - g_pref) / maxf(g_soft - g_pref, 1e-6)
-					fg = 0.1 + q * q
-				else:
-					# Sustained grade above the class limit cannot be absorbed by
-					# bounded earthwork: length (development) must be cheaper.
-					var q: float = (g - g_soft) / (0.1 * g_hard)
-					fg = 1.1 + 30.0 * q * q
 				var px: float = -ez / length
 				var pz: float = ex / length
 				var sx: float = absf(0.5 * ((node_gx[a] + node_gx[c]) * px + (node_gz[a] + node_gz[c]) * pz))
-				# Balanced section below ~0.4 cross slope; steeper ground needs a
-				# full bench (no downhill fill can daylight): uphill cut 2 hf sx.
-				var depth: float = sx * hf if sx < 0.4 else 2.0 * sx * hf
-				var fx: float = (depth / bench_cap) * (depth / bench_cap)
-				if depth > bench_cap:
-					fx += 25.0 * (depth / bench_cap - 1.0)
-				if sx >= 0.85:
-					fx += 50.0
 				var idx: int = k * width + b
 				lens[idx] = length
 				thetas[idx] = atan2(ez, ex)
-				grades[idx] = fg
-				crosses[idx] = fx
+				grades[idx] = _grade_term(g, g_pref, g_hard)
+				crosses[idx] = _cross_term(sx, hf, bench_cap) + (UNBUILDABLE_COST if sx > cross_limit else 0.0)
 				rides[idx] = maxf(0.0, 0.5 * (node_ride[a] + node_ride[c]) - 1.0)
 		t_len.append(lens)
 		t_theta.append(thetas)
@@ -830,7 +1391,7 @@ func _dynamic_program(lattice: Dictionary, profile: Dictionary, route_class: int
 func _grade_reach(line: Dictionary, route_class: int) -> Dictionary:
 	var cls: Dictionary = Policy.CLASSES[route_class]
 	var g: float = Policy.grade_hard(route_class)
-	var slack: float = cls.cut_max_m + cls.fill_max_m
+	var slack: float = slack_share * (cls.cut_max_m + cls.fill_max_m)
 	var xs: PackedFloat64Array = line.x
 	var zs: PackedFloat64Array = line.z
 	var n: int = xs.size()
@@ -865,6 +1426,48 @@ func _grade_reach(line: Dictionary, route_class: int) -> Dictionary:
 	var length: float = arc[b] - arc[a]
 	return {"is_valid": false, "detail": {"note": "natural rise exceeds the class grade times this line's length plus earthwork capacity: more development room needed than the band allowed this candidate",
 		"s0": arc[a], "s1": arc[b], "i0": a, "i1": b, "rise_m": absf(h[b] - h[a]), "line_length_m": length, "required_length_m": absf(h[b] - h[a]) / g, "excess_m": best, "x": xs[b], "z": zs[b]}}
+
+
+## Necessary roadbed condition on a line: no stretch crosses natural ground
+## steeper than the class roadbed can be built on (_cross_limit). Returns the
+## first failing stretch in the shape of _grade_reach.
+func _bench_reach(line: Dictionary, route_class: int) -> Dictionary:
+	var limit: float = _cross_limit(route_class)
+	var xs: PackedFloat64Array = line.x
+	var zs: PackedFloat64Array = line.z
+	var first: int = -1
+	var last: int = -1
+	var worst: float = 0.0
+	for i in range(xs.size() - 1):
+		var dx: float = xs[i + 1] - xs[i]
+		var dz: float = zs[i + 1] - zs[i]
+		var length: float = sqrt(dx * dx + dz * dz)
+		if length < 0.5:
+			continue
+		var g: Vector2 = natural.gradient_search(0.5 * (xs[i] + xs[i + 1]), 0.5 * (zs[i] + zs[i + 1]))
+		var sx: float = absf(g.x * -dz / length + g.y * dx / length)
+		if sx > limit:
+			if first < 0:
+				first = i
+			last = i + 1
+			worst = maxf(worst, sx)
+		elif first >= 0:
+			break
+	if first < 0:
+		return {"is_valid": true}
+	return {"is_valid": false, "detail": {"note": "the line crosses natural ground steeper than the class roadbed can be built on", "i0": first, "i1": last, "cross_slope": worst, "cross_limit": limit, "x": xs[first], "z": zs[first]}}
+
+
+## Both necessary conditions; the first failing one names the stretch and kind.
+func _necessary(line: Dictionary, route_class: int) -> Dictionary:
+	var grade: Dictionary = _grade_reach(line, route_class)
+	if not grade.is_valid:
+		grade["reason"] = "ERR_R6_GRADE"
+		return grade
+	var bench: Dictionary = _bench_reach(line, route_class)
+	if not bench.is_valid:
+		bench["reason"] = "ERR_R6_EARTHWORK"
+	return bench
 
 
 # =====================================================================

@@ -27,6 +27,13 @@ const Graph = preload("res://scripts/world/region/region_route_graph.gd")
 const RoadMath = preload("res://scripts/world/road_math.gd")
 
 const CONNECTOR_LENGTH_FACTORS: Array[float] = [0.9, 1.0, 1.15, 1.3, 1.5]
+## Analytic corner connector: share of the retained curvature-change limit used
+## by its clothoids, candidate radii between the class preference and limit,
+## integration step and knot spacing (m).
+const CORNER_DK_SHARE: float = 0.9
+const CORNER_RADIUS_STEPS: int = 6
+const CORNER_STEP_M: float = 0.25
+const CORNER_KNOT_M: float = 5.0
 
 var natural: Geo.Natural
 var fit_evaluations: int = 0
@@ -398,9 +405,9 @@ func _connector(record: Dictionary, fit: Dictionary, pa: Dictionary, pb: Diction
 	var chord: float = Vector2(pb.x - pa.x, pb.z - pa.z).length()
 	var turn_deg: float = rad_to_deg(absf(RMath.wrap_angle(atan2(pb.tz, pb.tx) - atan2(-pa.tz, -pa.tx))))
 	movement["turn_deg"] = turn_deg
-	var best_spline: RMath.PlanSpline = null
-	var best_k: float = INF
-	var best_dk: float = INF
+	# Candidates: the 2-knot quintic at a few lengths, and the analytic corner
+	# (straight leads, clothoid - arc - clothoid) where it fits inside the ports.
+	var candidates: Array = []
 	for factor: float in CONNECTOR_LENGTH_FACTORS:
 		fit_evaluations += 1
 		var spline := RMath.PlanSpline.new()
@@ -411,55 +418,49 @@ func _connector(record: Dictionary, fit: Dictionary, pa: Dictionary, pb: Diction
 		spline.kk = PackedFloat64Array([0.0, 0.0])
 		spline.span_param = PackedFloat64Array([chord * factor])
 		spline.build()
-		var max_k: float = 0.0
-		var max_dk: float = 0.0
-		var steps: int = maxi(8, ceili(spline.total_length / 0.5))
-		var ok: bool = true
-		for q in range(steps + 1):
-			var e: PackedFloat64Array = spline.eval(0, float(q) / steps)
-			if not is_finite(e[4]):
-				ok = false
-				break
-			max_k = maxf(max_k, absf(e[4]))
-			max_dk = maxf(max_dk, absf(e[5]))
-		if not ok:
-			continue
-		var score: float = max_k + (1.0 if max_dk > Policy.MAX_CURVATURE_CHANGE_PER_M2 else 0.0)
-		if score < best_k + (1.0 if best_dk > Policy.MAX_CURVATURE_CHANGE_PER_M2 else 0.0):
-			best_k = max_k
-			best_dk = max_dk
-			best_spline = spline
-	movement.max_curvature = best_k
-	movement["max_dk_ds"] = best_dk
-	if best_spline == null:
+		var stats: Dictionary = _spline_stats(spline)
+		if stats.is_valid:
+			candidates.append({"spline": spline, "k": stats.k, "dk": stats.dk})
+	var corner: RMath.PlanSpline = _corner_spline(pa, pb, record.x, record.z, stricter)
+	if corner != null:
+		var corner_stats: Dictionary = _spline_stats(corner)
+		if corner_stats.is_valid:
+			candidates.append({"spline": corner, "k": corner_stats.k, "dk": corner_stats.dk})
+	if candidates.is_empty():
 		movement.reasons.append("ERR_R6_FRAME")
 		return movement
-	movement["length_m"] = best_spline.total_length
-	if best_k > k_hard + 1e-9:
-		movement.reasons.append("ERR_R6_JUNCTION_MOVEMENT")
-		movement["detail"] = {"min_radius_m": 1.0 / maxf(best_k, 1e-9), "required_radius_m": 1.0 / k_hard, "turn_deg": turn_deg}
-	if best_dk > Policy.MAX_CURVATURE_CHANGE_PER_M2:
-		movement.reasons.append("ERR_R6_JUNCTION_MOVEMENT")
-		movement["detail_dk"] = best_dk
-	# Inside the union of incident bands with footprint clearance.
+	candidates.sort_custom(func(p: Dictionary, q: Dictionary) -> bool:
+		return p.k + (1.0 if p.dk > Policy.MAX_CURVATURE_CHANGE_PER_M2 else 0.0) < q.k + (1.0 if q.dk > Policy.MAX_CURVATURE_CHANGE_PER_M2 else 0.0))
+	# First candidate that satisfies curvature and band clearance; otherwise the
+	# lowest-curvature one reports its reasons.
 	var hf: float = maxf(Policy.half_footprint(a.class), Policy.half_footprint(b.class))
-	var steps2: int = maxi(8, ceili(best_spline.total_length / 1.0))
-	var worst: float = INF
-	for q in range(1, steps2):
-		var e: PackedFloat64Array = best_spline.eval(0, float(q) / steps2)
-		var c: float = -INF
-		for inc: Dictionary in incident:
-			c = maxf(c, inc.band.clearance(e[0], e[1], -1)[0])
-		worst = minf(worst, c)
-	movement["min_clearance_m"] = worst
-	if worst < hf:
-		movement.reasons.append("ERR_R6_CORRIDOR_CLEARANCE")
+	var chosen: Dictionary = candidates[0]
+	var chosen_check: Dictionary = {}
+	for candidate: Dictionary in candidates:
+		var check: Dictionary = _connector_check(candidate, k_hard, hf, incident)
+		if chosen_check.is_empty():
+			chosen = candidate
+			chosen_check = check
+		if check.reasons.is_empty():
+			chosen = candidate
+			chosen_check = check
+			break
+	var best_spline: RMath.PlanSpline = chosen.spline
+	movement.max_curvature = chosen.k
+	movement["max_dk_ds"] = chosen.dk
+	movement["length_m"] = best_spline.total_length
+	if chosen.k > k_hard + 1e-9:
+		movement["detail"] = {"min_radius_m": 1.0 / maxf(chosen.k, 1e-9), "required_radius_m": 1.0 / k_hard, "turn_deg": turn_deg}
+	if chosen.dk > Policy.MAX_CURVATURE_CHANGE_PER_M2:
+		movement["detail_dk"] = chosen.dk
+	movement.reasons.append_array(chosen_check.reasons)
+	movement["min_clearance_m"] = chosen_check.worst
 	# No water under the connector ribbon (centre and edges, exact).
 	if movement.reasons.is_empty():
 		var wet: int = 0
 		var steps3: int = maxi(4, ceili(best_spline.total_length / 2.0))
 		for q in range(steps3 + 1):
-			var e: PackedFloat64Array = best_spline.eval(0, float(q) / steps3)
+			var e: PackedFloat64Array = best_spline.eval_s(best_spline.total_length * q / steps3)
 			for o: float in [0.0, hf, -hf]:
 				var w: Dictionary = natural.water_exact(e[0] - e[3] * o, e[1] + e[2] * o)
 				if w.is_valid and w.is_water:
@@ -471,6 +472,127 @@ func _connector(record: Dictionary, fit: Dictionary, pa: Dictionary, pb: Diction
 		movement.status = Policy.MOVEMENT_READY
 		movement.design = _connector_design(record, fit, best_spline, pa, pb, a, b)
 	return movement
+
+
+## Peak curvature and curvature change of a connector spline sampled at 0.5 m.
+func _spline_stats(spline: RMath.PlanSpline) -> Dictionary:
+	var max_k: float = 0.0
+	var max_dk: float = 0.0
+	var steps: int = maxi(8, ceili(spline.total_length / 0.5))
+	for q in range(steps + 1):
+		var e: PackedFloat64Array = spline.eval_s(spline.total_length * q / steps)
+		if not is_finite(e[4]):
+			return {"is_valid": false}
+		max_k = maxf(max_k, absf(e[4]))
+		max_dk = maxf(max_dk, absf(e[5]))
+	return {"is_valid": true, "k": max_k, "dk": max_dk}
+
+
+## Curvature, curvature-change and band-clearance reasons of a connector candidate.
+func _connector_check(candidate: Dictionary, k_hard: float, hf: float, incident: Array) -> Dictionary:
+	var reasons: Array = []
+	if candidate.k > k_hard + 1e-9 or candidate.dk > Policy.MAX_CURVATURE_CHANGE_PER_M2:
+		reasons.append("ERR_R6_JUNCTION_MOVEMENT")
+	var spline: RMath.PlanSpline = candidate.spline
+	var steps: int = maxi(8, ceili(spline.total_length / 1.0))
+	var worst: float = INF
+	for q in range(1, steps):
+		var e: PackedFloat64Array = spline.eval_s(spline.total_length * q / steps)
+		var c: float = -INF
+		for inc: Dictionary in incident:
+			c = maxf(c, inc.band.clearance(e[0], e[1], -1)[0])
+		worst = minf(worst, c)
+	if worst < hf:
+		reasons.append("ERR_R6_CORRIDOR_CLEARANCE")
+	return {"reasons": reasons, "worst": worst}
+
+
+## Analytic corner through the node: a straight lead on each port line, then a
+## clothoid - circular arc - clothoid of the corner's deflection with the
+## largest radius (from the stricter class's preference down to its limit) whose
+## tangent length fits inside the shorter port radius. Curvature rises and falls
+## at CORNER_DK_SHARE of the retained curvature-change limit and is zero at both
+## ports. Returns a G2 spline or null when no radius fits.
+func _corner_spline(pa: Dictionary, pb: Dictionary, cx: float, cz: float, stricter: int) -> RMath.PlanSpline:
+	var dax: float = -pa.tx
+	var daz: float = -pa.tz
+	var dbx: float = pb.tx
+	var dbz: float = pb.tz
+	var theta_a: float = atan2(daz, dax)
+	var signed: float = RMath.wrap_angle(atan2(dbz, dbx) - theta_a)
+	var delta: float = absf(signed)
+	if delta < deg_to_rad(2.0) or delta > deg_to_rad(172.0):
+		return null
+	var sgn: float = 1.0 if signed > 0.0 else -1.0
+	var ra: float = Vector2(pa.x - cx, pa.z - cz).length()
+	var rb: float = Vector2(pb.x - cx, pb.z - cz).length()
+	var available: float = minf(ra, rb) - 0.5
+	var cls: Dictionary = Policy.CLASSES[stricter]
+	var dk_limit: float = CORNER_DK_SHARE * Policy.MAX_CURVATURE_CHANGE_PER_M2
+	for step in range(CORNER_RADIUS_STEPS):
+		var radius: float = lerpf(cls.radius_pref_m, cls.radius_hard_m * 1.03, step / (CORNER_RADIUS_STEPS - 1.0))
+		var kp: float = minf(1.0 / radius, sqrt(dk_limit * delta))
+		var ramp: float = kp / dk_limit
+		var arc: float = delta / kp - ramp
+		var total: float = 2.0 * ramp + arc
+		var count: int = maxi(8, ceili(total / CORNER_STEP_M))
+		var ds: float = total / count
+		# Local frame: start at the tangent point heading along +X, turning to +Y.
+		var xs := PackedFloat64Array([0.0])
+		var ys := PackedFloat64Array([0.0])
+		var phis := PackedFloat64Array([0.0])
+		var kappas := PackedFloat64Array([0.0])
+		for i in range(1, count + 1):
+			var s: float = ds * i
+			var kappa: float = kp * minf(1.0, minf(s / ramp, (total - s) / ramp))
+			var kappa_mid: float = kp * minf(1.0, minf((s - 0.5 * ds) / ramp, (total - s + 0.5 * ds) / ramp))
+			var phi_mid: float = phis[i - 1] + 0.5 * kappa_mid * ds
+			xs.append(xs[i - 1] + ds * cos(phi_mid))
+			ys.append(ys[i - 1] + ds * sin(phi_mid))
+			phis.append(phis[i - 1] + kappa_mid * ds)
+			kappas.append(kappa)
+		var phi_end: float = phis[count]
+		var tangent_length: float = xs[count] - ys[count] / tan(phi_end)
+		if tangent_length > available or tangent_length <= 0.0:
+			continue
+		# World knots: lead A, the corner every CORNER_KNOT_M, lead B.
+		var spline := RMath.PlanSpline.new()
+		var tx1: float = cx - dax * tangent_length
+		var tz1: float = cz - daz * tangent_length
+		var left_x: float = -daz
+		var left_z: float = dax
+		var lead_a: float = ra - tangent_length
+		var lead_b: float = rb - tangent_length
+		var knots: Array = []
+		var pieces_a: int = maxi(1, ceili(lead_a / 12.0))
+		for m in range(pieces_a):
+			knots.append([pa.x + dax * lead_a * m / pieces_a, pa.z + daz * lead_a * m / pieces_a, dax, daz, 0.0])
+		var index_step: int = maxi(1, roundi(CORNER_KNOT_M / ds))
+		var i: int = 0
+		while i <= count:
+			var heading: float = theta_a + sgn * phis[i]
+			knots.append([tx1 + dax * xs[i] + left_x * sgn * ys[i], tz1 + daz * xs[i] + left_z * sgn * ys[i], cos(heading), sin(heading), sgn * kappas[i]])
+			if i == count:
+				break
+			i = mini(count, i + index_step)
+		var pieces_b: int = maxi(1, ceili(lead_b / 12.0))
+		for m in range(1, pieces_b + 1):
+			var t2x: float = cx + dbx * tangent_length
+			var t2z: float = cz + dbz * tangent_length
+			knots.append([t2x + dbx * lead_b * m / pieces_b, t2z + dbz * lead_b * m / pieces_b, dbx, dbz, 0.0])
+		for n in range(knots.size()):
+			var knot: Array = knots[n]
+			spline.kx.append(knot[0])
+			spline.kz.append(knot[1])
+			spline.ktx.append(knot[2])
+			spline.ktz.append(knot[3])
+			spline.kk.append(knot[4])
+			if n > 0:
+				var previous: Array = knots[n - 1]
+				spline.span_param.append(maxf(Vector2(knot[0] - previous[0], knot[1] - previous[1]).length(), 1e-6))
+		spline.build()
+		return spline
+	return null
 
 
 ## Export-density connector arrays (same keys as edge designs).
