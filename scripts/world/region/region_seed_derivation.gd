@@ -9,6 +9,17 @@ const PURPOSE_MACRO_NOISE := "macro_noise"
 const PURPOSE_HYDROLOGY := "hydrology"
 const PURPOSE_BIOME := "biome"
 const PURPOSE_ROUTE := "route"
+const PURPOSE_ROAD_SYNTHESIS := "road_synthesis"
+
+
+## R6 (additive): seed for road-synthesis tie keys. Existing purposes and
+## their preimages are unchanged.
+static func road_synthesis_seed_preimage(region_seed_value: int) -> String:
+	return _preimage(PURPOSE_ROAD_SYNTHESIS, PackedInt64Array([region_seed_value]))
+
+
+static func road_synthesis_seed(region_seed_value: int) -> int:
+	return _seed_from_preimage(road_synthesis_seed_preimage(region_seed_value))
 
 
 static func route_seed_preimage(region_seed_value: int) -> String:
