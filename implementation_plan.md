@@ -7,6 +7,7 @@ BASELINE: at approval: unstaged implementation_plan.md (this plan) only; staged 
 APPROVAL: Game Director 2026-10-09 — APPROVED WITH CONDITIONS, A1–A5; approved v1.0 SHA-256 76bb517c…291df (snapshot kept externally)
 RESULT IDENTITY: record source/diff digests externally at each freeze, not in this content
 NEXT: Director decision on the technical-category amendment and on the deferred verification sprint; commit/push only on the user command; no R7 or R8
+D2 INTEGRATION: 2026-10-10 — D2 (published origin/master ee94d667423fee0fd70626b4e261748297d78ec4) merged locally into this branch; D2 is NOT adopted for R6 until the Game Director approves R6-VA1 (section 18, DRAFT). Until then this plan's own verification text (sections 12, 15, 17) governs. Local WIP checkpoint e6cb304 (not acceptance, not pushed).
 
 ---
 

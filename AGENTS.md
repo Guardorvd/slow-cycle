@@ -24,17 +24,17 @@ STATUS: CURRENT
 
 ## Integrity and evidence
 
-- Existing tests, assertions, thresholds, coverage and mandatory gates remain protected. Test mutation/reclassification needs explicit human approval of the specific change; general feature approval is insufficient. D1 assigns no suite categories; Q0 is a separate task.
+- Existing tests, assertions, thresholds, coverage and mandatory gates remain protected. Test mutation/reclassification needs explicit human approval of the specific change; general feature approval is insufficient.
 - Tests cannot silently redefine the approved product architecture. Preserve current regression protection while escalating a precise legacy-test/target conflict with owner, requirement and evidence; do not change tests, ignore failures or revert the target by inference.
 - Read the frozen [test-integrity rule](.antigravity/rules/test-integrity.md) for test-related work/conflicts. Its anti-gaming and escalation protections remain; universal test-as-product-authority wording is limited by the accepted D0 authority distinction. No silent skips, suppression, fake PASS, test-specific production behavior or weakened assertions.
 - [World instructions](scripts/world/AGENTS.md) retain the existing legacy geometry limits, Watchdog/Vulkan generation gates and local foliage culling. Simplifying root instructions does not relax them.
-- Report actual coverage, assertions, completion, seeds, revision/source/diff identity, errors/leaks and artifact evidence. Exit 0, expected budgets and old reports are insufficient. Missing required evidence blocks completion. Evidence levels belong to Test Strategy; E7 requires a human ride.
+- Select checks by L0–L3 and impact ([Test Strategy §7](docs/TEST_STRATEGY.md)); reuse needs closure proof. Report actual coverage, assertions, completion, seeds, source/diff identity, errors/leaks and artifacts. Exit 0, budgets or stale reports never suffice; missing evidence blocks completion. E7 requires a human ride.
 
 ## Workflow and documentation
 
 - Worldgen design/implementation uses `slow-cycle-worldgen`; result verification uses `slow-cycle-verify`; independent criticism uses `slow-cycle-review`. Load the relevant body when that workflow starts, only as needed.
 - Invoke required verify/review explicitly by name or natural language (for example, “Use the slow-cycle-verify skill”). `$skill-name` is a convenience, not the sole activation or acceptance mechanism. Implicit matching alone does not prove a gate ran.
-- Verification is read-only for implementation/tests and returns PASS / FAIL / INCOMPLETE with reason/evidence. Review consumes approved plan + diff + verification report in a fresh independent context and returns PASS / REJECT. Green tests do not guarantee review PASS; author self-review is not independent.
-- Fixes return to the implementation owner inside approved scope, followed by fresh verification/review for the changed diff. Completion requires both VERIFY PASS and independent REVIEW PASS.
+- Verification is read-only for implementation/tests and returns PASS / FAIL / INCOMPLETE with reason/evidence. Review reads approved plan + diff + verification report in a fresh independent context, reruns no campaign and returns PASS / REJECT. Green tests do not guarantee review PASS; author self-review is not independent.
+- Fixes return to the implementation owner inside approved scope, followed by fresh verification/review of the changed impact set. Completion requires both VERIFY PASS and independent REVIEW PASS.
 - Update owned current documentation and the task record within the whitelist; distinguish implemented, planned, not-run and known failures. Keep one active plan; archive successful tasks in `docs/plans/completed/<TASK-ID>.md`, then clear the root slot to NO_ACTIVE_PLAN. Never start the next phase automatically.
 - Scoped instructions, skills and an ExecPlan specialize these rules; they may not silently weaken approval, stable-system or integrity boundaries. Record unresolved conflicts and stop the affected work for a human decision.
