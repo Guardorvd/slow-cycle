@@ -52,12 +52,31 @@ func run() -> void:
 	report["deformer_ms"]=deformer_ms
 	report["cache_dependency_key"]=source.key
 	report["route_payload_sha256"]=Route.sha(source.route.to_bytes())
+	# PR1 D10/T2.3: fixture mode has no live R5/R6, so handoff is declared not run.
+	var groups_run: Array=[]
+	var groups_not_run: Array=[]
+	if group in ["all","contracts"]:
+		groups_run.append("contracts")
+	if group in ["all","handoff"]:
+		if mode=="fixture":
+			groups_not_run.append("handoff")
+			report["groups_not_run_reason"]="FIXTURE_NO_LIVE_R5_R6"
+		else:
+			groups_run.append("handoff")
+	if not group in ["contracts","handoff"]:
+		groups_run.append("surface")
+	if group in ["all","collision"]:
+		groups_run.append("collision")
+	report["groups_run"]=groups_run
+	report["groups_not_run"]=groups_not_run
+	if mode=="fixture":
+		report["fixture_sha256"]=source.fixture_sha256
 	if mode=="live":
 		check(source.fixture_equal,"authenticated fixture equals actual live extract")
 	if group in ["all","contracts"]:
 		_contracts(source,surface)
 		_index_parity(source,surface)
-	if group in ["all","handoff"]:
+	if group in ["all","handoff"] and mode!="fixture":
 		_handoff(source)
 	if group in ["contracts","handoff"]:
 		finish()

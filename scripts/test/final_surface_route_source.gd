@@ -8,6 +8,7 @@ const HField = preload("res://scripts/world/region/hydrology_field.gd")
 const Natural = preload("res://scripts/world/region/hydrology_surface.gd")
 const Planner = preload("res://scripts/world/region/route_planner.gd")
 const Synth = preload("res://scripts/world/region/road_synthesizer.gd")
+const FIXTURE_PATH = "res://scripts/test/fixtures/r7_certified_route_184729_v1.bin"
 
 static func build(source: String = "cache", path: String = "user://r7/route_184729_0_0.bin") -> Dictionary:
 	var t0 := Time.get_ticks_usec()
@@ -17,8 +18,14 @@ static func build(source: String = "cache", path: String = "user://r7/route_1847
 	var field: RefCounted = HField.create(hydro.plan, terrain).field
 	var natural: RefCounted = Natural.create(terrain, field).surface
 	var stages: Dictionary={"base_hydrology_ms":(Time.get_ticks_usec()-t0)/1000.0,"planner_ms":0.0,"synth_ms":0.0}
-	var key := Route.dependency_digest()
 	var spec := {"seed": 184729, "region": Vector2i.ZERO, "settings": "default", "region_signature": region.signature(), "hydrology_signature": hydro.plan.signature()}
+	if source == "fixture":
+		# PR1 D10/T2.2: committed v1 route bytes; R0-R3 stay live, R5/R6 are not called.
+		var fixture: Dictionary = read_fixture(FIXTURE_PATH, spec)
+		if not fixture.is_valid:
+			return fixture
+		return {"is_valid": true, "reason_code": "", "region":region,"route": fixture.route, "terrain": terrain, "hydrology": hydro.plan, "field": field, "natural": natural, "graph": null, "plan": null, "fixture_equal": false, "fixture_sha256": fixture.sha256, "upstream_ms": (Time.get_ticks_usec() - t0) / 1000.0,"upstream_stages_ms":stages,"key": "fixture:" + fixture.sha256}
+	var key := Route.dependency_digest()
 	var cached: Dictionary = read_cache(path, key, spec)
 	var route: RefCounted
 	var live_bytes_equal := false
@@ -52,6 +59,23 @@ static func build(source: String = "cache", path: String = "user://r7/route_1847
 		file.store_buffer(var_to_bytes({"key": key, "spec": spec, "sha": Route.sha(payload), "payload": payload}))
 		file.close()
 	return {"is_valid": true, "reason_code": "", "region":region,"route": route, "terrain": terrain, "hydrology": hydro.plan, "field": field, "natural": natural, "graph": graph, "plan": plan, "fixture_equal": live_bytes_equal, "upstream_ms": (Time.get_ticks_usec() - t0) / 1000.0,"upstream_stages_ms":stages,"key": key}
+
+## Authenticated fixture: byte SHA-256 equals the committed provenance record,
+## the existing route authentication passes and the spec matches live R0-R3.
+static func read_fixture(path: String, spec: Dictionary) -> Dictionary:
+	if not FileAccess.file_exists(path) or not FileAccess.file_exists(path.get_basename() + ".json"):
+		return Route.failure("ERR_R7_CACHE_STALE")
+	var bytes: PackedByteArray = FileAccess.get_file_as_bytes(path)
+	var provenance: Variant = JSON.parse_string(FileAccess.get_file_as_string(path.get_basename() + ".json"))
+	if not provenance is Dictionary or Route.sha(bytes) != provenance.get("sha256", ""):
+		return Route.failure("ERR_R7_CACHE_STALE")
+	var result: Dictionary = Route.from_bytes(bytes)
+	if not result.is_valid:
+		return result
+	if result.route.get_data().spec != spec:
+		return Route.failure("ERR_R7_CACHE_STALE")
+	result["sha256"] = Route.sha(bytes)
+	return result
 
 static func read_cache(path: String, key: String, spec: Dictionary) -> Dictionary:
 	if not FileAccess.file_exists(path):

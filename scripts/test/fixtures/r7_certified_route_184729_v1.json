@@ -1,0 +1,21 @@
+{
+	"schema": "slow_cycle.r7_route_fixture/1",
+	"purpose": "PR1 D10/T2.1: authenticated v1 CertifiedRoadRoute bytes for test_final_surface --source=fixture (REGRESSION_GUARD of R7 machinery on HEAD)",
+	"payload": "r7_certified_route_184729_v1.bin",
+	"sha256": "70b2738e03f6022c2cded3769be283f01ad85efc696b3f906cbb4bbdfa613957",
+	"bytes": 184372,
+	"route_digest": "835422e71237d20b3e8e8975d1f52000cabb5e9df98a9c33979a4a715cfd875f",
+	"plan_signature": "e9c11c398edced6d0a35a8632f2a71e68d771469b4eb2b48afc393fc97f8a8b4",
+	"seed": 184729,
+	"region": [0, 0],
+	"region_signature": "1e28fe1846cd0fa96b0c8cc7d153abd83703a14b9eaa1718b21e24cad69f6278",
+	"hydrology_signature": "5d7463f840dbed216c0fd7627ddbcb3b1ef61da3c05bd04ffdcf31f5561a97ff",
+	"source_commit": "52a9c342e508567b49f38863ca2519c68c861090 (tag pr1-baseline)",
+	"source_command": "test_final_surface.gd --source=live on a disposable pr1-baseline copy (426044 assertions, 0 failures, fixture_equal=true); payload = CertifiedRoadRoute.to_bytes() of the authenticated live extract",
+	"baseline_reference": {
+		"surface_signature": "e1523d47b895891f7dfad673d1c427c9304ac806d5faf3951dc4dfd388198afc",
+		"mesh_signatures": ["87ab68614f7c3105498044c0f443139db8d8d3f8e983ab80f0876da1b1bc5b86", "a05030811b77fad93d2a5a514a0ea8ef9b143cc06cbcaed17d971318d33d96f8", "2cdb9357ea285e54ff67c73253b9e04225617ea2b8ac7fe4d1925b3d20ad4004"]
+	},
+	"engine": "Godot 4.7.2-stable (official) ed1daf0bf001b61586d9930840f2f1394092c079",
+	"captured_utc": "2026-10-11T10:33:45Z"
+}
