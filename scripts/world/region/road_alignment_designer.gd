@@ -1949,6 +1949,28 @@ func _wet_extent(spline: RMath.PlanSpline, s_cross: float, hf: float, total: flo
 	return result
 
 
+## Centre-height band [low, high] of a ford riding plane at station s: for
+## every wet sample across the footprint (+-hf, 0.25 m) at lateral L (left,
+## +N, positive) on a section banked tan_bank (edge at y - L tan_bank):
+## surface - 0.34 <= y - L tan_bank <= min(bed + 0.08, surface - 0.035), the
+## FinalSurface ford cross-section rule. [-INF, INF] where dry.
+func _ford_band(spline: RMath.PlanSpline, s: float, hf: float, tan_bank: float) -> PackedFloat64Array:
+	var low: float = -INF
+	var high: float = INF
+	var e: PackedFloat64Array = spline.eval_s(clampf(s, 0.0, spline.total_length))
+	var count: int = ceili(2.0 * hf / 0.25)
+	for t in range(count + 1):
+		var lateral: float = -hf + 2.0 * hf * t / count
+		var wet: Dictionary = natural.water_exact(clampf(e[0] - e[3] * lateral, 0.0, Geo.DOMAIN_M), clampf(e[1] + e[2] * lateral, 0.0, Geo.DOMAIN_M))
+		if not wet.is_valid or not wet.is_water:
+			continue
+		var surface: float = wet.water_surface_m
+		var bed: float = surface - wet.depth_m
+		low = maxf(low, surface - 0.34 + lateral * tan_bank)
+		high = minf(high, minf(bed + 0.08, surface - 0.035) + lateral * tan_bank)
+	return PackedFloat64Array([low, high])
+
+
 func _wet_at(spline: RMath.PlanSpline, s: float, hf: float) -> bool:
 	var e: PackedFloat64Array = spline.eval_s(s)
 	var nx: float = -e[3]
@@ -1981,6 +2003,12 @@ func _crossing_record(pin: Dictionary, f: Dictionary, request: Dictionary) -> Di
 ## (every window then holds it), else within the pointwise pitch / descent
 ## grades with the climb windows and pitch lengths left to the validator's
 ## `_climb` stage. Grades are canonical (a -> b): rise <= up, drop <= down.
+## Sections within this distance of a ford's wet span take its band (PR1).
+const FORD_BAND_REACH_M: float = 4.0
+## Interpolation margin inside the ford band (shrunk to a fifth of a narrow band).
+const FORD_BAND_MARGIN_M: float = 0.02
+
+
 func _profile(request: Dictionary, spline: RMath.PlanSpline, section: Dictionary, crossing: Dictionary) -> Dictionary:
 	var limits: Dictionary = climb_limits(request)
 	var passes: Array = [[limits.dev_up, limits.dev_down]]
@@ -2048,6 +2076,31 @@ func _profile_pass(request: Dictionary, spline: RMath.PlanSpline, section: Dicti
 				lo[i] = hc[i] - 0.05
 				hi[i] = hc[i] + 0.10
 				kind[i] = Policy.Support.FORD
+		if r.support != Policy.Support.FORD:
+			continue
+		# PR1: the ford band FinalSurface realizes, wherever water lies under the
+		# footprint (riding width and shoulders, every 0.25 m) of a section near
+		# the crossing - an oblique channel wets the edges where the centre line
+		# is dry. Unreachable band -> ERR_R6_CROSSING_APPROACH (small bridge retry).
+		for i in range(n + 1):
+			if s[i] < r.wet_s0 - FORD_BAND_REACH_M or s[i] > r.wet_s1 + FORD_BAND_REACH_M:
+				continue
+			# FinalSurface checks the band every 0.5 m and can only lower the road;
+			# the profile interpolates between sections, so a wet point anywhere in
+			# the intervals on either side binds this section (both neighbours of
+			# every wet point hold its band).
+			var band := PackedFloat64Array([-INF, INF])
+			for q in range(9):
+				var sub_s: float = s[i] + (q - 4) * 0.25 * ds
+				var part: PackedFloat64Array = _ford_band(spline, sub_s, hf, tan(deg_to_rad(bank[i])))
+				band[0] = maxf(band[0], part[0])
+				band[1] = minf(band[1], part[1])
+			if band[0] == -INF:
+				continue
+			var m_f: float = minf(FORD_BAND_MARGIN_M, 0.2 * maxf(band[1] - band[0], 0.0))
+			lo[i] = maxf(lo[i], band[0] + m_f)
+			hi[i] = minf(hi[i], band[1] - m_f)
+			kind[i] = Policy.Support.FORD
 	var start: Dictionary = request.start
 	var finish: Dictionary = request.end
 	var pinned := PackedByteArray()

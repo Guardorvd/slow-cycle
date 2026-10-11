@@ -18,6 +18,8 @@ const Geo = preload("res://scripts/world/region/road_corridor_geometry.gd")
 ## 16 m fine cells per region side: a piece reaching a region-edge gateway
 ## refines only cells inside the region domain (PR1 network).
 const DOMAIN_CELLS: int = int(Geo.DOMAIN_M / 16.0)
+## Ford windows never lower the road this close to a piece end (PR1).
+const FORD_END_GUARD_M: float = 1.0
 var _segments: Array[Dictionary] = []
 var _index: Dictionary = {}
 var _query_index: Dictionary = {}
@@ -448,6 +450,10 @@ func _ford_profile(d: Dictionary, intent: Dictionary) -> Dictionary:
 		for ref: Dictionary in decks:
 			if s>=ref.s0 and s<=ref.s1:
 				in_window=false
+		# Nor next to a piece end: the seam with the next piece stays the
+		# designed one (PR1 network; the last control spacing is irregular).
+		if s<FORD_END_GUARD_M or s>d.s[-1]-FORD_END_GUARD_M:
+			in_window=false
 		var lo: float = y-0.35 if in_window else y
 		var hi: float = y
 		if in_window:
