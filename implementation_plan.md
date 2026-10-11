@@ -1,6 +1,6 @@
 TASK: PR1 — Architectural Recovery & Playable Region (Mountain River Valley)
 DATE: 2026-10-11
-STATUS: IMPLEMENTING — ExecPlan v1.1 (D1–D13, T0–T5) + Director execution conditions 1–3 (2026-10-11); M0 done, M1 in progress
+STATUS: IMPLEMENTING — ExecPlan v1.1 (D1–D13, T0–T5) + Director conditions 1–3; M0+M1 done (e12a641, 21a9264); M2–M4 code WIP checkpoint, NOT verified
 BRANCH/BASE/HEAD: pr1-playable-region / master 52a9c34 (= origin/master) / 52a9c34; local tag pr1-baseline = 52a9c34
 BASELINE: clean before this plan record (0 staged / 0 unstaged / 0 untracked); only implementation_plan.md modified
 APPROVAL: Game Director in chat 2026-10-11 — v1.0 audit + architecture B accepted with conditions 1–6 + DEGRADE rule; v1.1 approved via plan approval
@@ -763,3 +763,30 @@ Descent: modulated brake holds 8 m/s within 0.46 m/s up to 15 deg; full-brake me
 Derived policy v2 (fixed rules in `derive_policy`): v_climb 2.0 m/s (knee of the pedal-hold curve: 6.0→6.5 deg halves the speed); climb_sustained BACKBONE 5.0 (A2) / SECONDARY 6.0 / SINGLETRACK 5.5 / TECHNICAL 5.5 deg; climb_pitch = A2 5/8/10/12 deg with the measured pitch-length table per surface; descent_max = caps 5/8/10/15 deg; junction lateral 2.4 m/s², approach braking 2.0 m/s², low-speed radius 8.0 m, movement floor 3.0 m/s.
 
 First ride on the new world (`m1_ride_r7_dev3`): authenticated v1 route slice, real scene, Input bot, both directions 1115 m finished, 0 stalls, max lateral 0.083 / 0.040 m, 100 % road collider, 0 ungrounded frames (109 single-ray frames in reverse), physics frame p99 1.4 ms headless. Vulkan (`m1_capture_r7_dev1`): 4 captures saved/reloaded (first/third person). Integration risks: trimesh contact none; spawn/settle fine; recovery query implemented (exercised in M4 runtime tests).
+
+## M2–M4 — WORK IN PROGRESS (checkpoint 2026-10-11, not verified, not accepted)
+
+Checkpoint commit "PR1 WIP checkpoint" on `pr1-playable-region`. Nothing below is verified at L2; protected suites have NOT been rerun on this code.
+
+**Implemented (code present):**
+- Policy v2 `regional_road/2` (`road_synthesis_policy.gd`): climb_sustained 5/6/5.5/5.5°, climb_pitch 5/8/10/12°, descent 5/8/10/15°, TECHNICAL grade_hard 15° + earthwork 3/2/8, measured pitch-length table, SUSTAINED_WINDOW_M 100, V_CLIMB 2.0, junction kinematics (lateral 2.4, brake 2.0, R_low 8 m, floor 3 m/s), PORT_RADII to 96 m, shared `cross_limit` / `buildable_slope` / `traverse_slope`, `movement_speed` / `movement_radius`; grade_pref lowered below sustained (ST/TECH keep v1 values as `descent_pref`).
+- `regional_road_math.solve_profile`: additive `gd_down` (asymmetric bound; default call unchanged).
+- Designer: `climb_limits(request)` (canonical up/down development, pointwise and preference grades; `recommended` 0/±1); lattice development zones, transition grade terms, hybrid A* running excess and `_grade_reach` use them; two-pass profile (sustained first, then pitch/descent) with asymmetric Lipschitz envelopes; `_cross_limit`/`_slope_limit` delegate to the policy.
+- Validator: separate `_climb` stage (ERR_R6_SUSTAINED_GRADE / ERR_R6_PITCH_LENGTH) in the required directions; optional connector curvature limit in `_geometry`.
+- Junctions (D3): `movement_limit` (speed per direction from braking room, radius max(R_low, v²/a_lat) ≤ stricter hard radius), corner radii down to it, ports to 96 m outside other junction zones, crossing cap to 106 m.
+- Synthesizer: per-piece isolation (`Natural.begin_piece`, per-piece fit budget), descent-preferred retry for ST/TECH on climb failures (`recommended` on edge record and piece), `failure_xz` on failures, edges designed in parallel (`synthesize(..., threads)`; prepare → independent (any thread) → finish in (class,id) order with conflict retry).
+- R5: profiles from policy (static var), per-move development feasibility (serpentine room or contour traverse; v1.1 §4a), per-move cross-slope buildability (CROSS_MARGIN 1.1; root-cause fix for "walls", interpretation of v1.1 §4a — record for review), `settings.hints` (CLOSE / PENALTY per class), raster reuse between rounds (`result.raster`), hints in diagnostics. The first attempt (node closure by buildable slope) was reverted: it contradicted "no new natural-slope ban" and stranded slope anchors.
+- New: `realized_road_network.gd` (fixed-point exclusions: component, junction groups, dead ends, descent-preferred needs easier path; metrics N1–N7; get_data in deformer shape), `region_network_builder.gd` (≤ 2 replans, hints from failures, best round by score), `bridge_deck_builder.gd`, `region_bake.gd` (tiles, layers, patches, coarse LOD, water, spawn, manifest; threaded tiles), `region_bake_cache.gd`, `region_streamer.gd`, runtime `region_world.gd` (session seed, cache/bake thread, overlay, spawn, recovery, deep-water recovery, descent markers), `assets/shaders/region_road.gdshader`, mode_select entry 5 "Mountain River Valley".
+- Deformer: dangling-end caps (generalises first/last piece), declared bridge-deck spans not deformed (undeclared deck station still ERR_R7_BRIDGE_UNSUPPORTED), `owner_at`; FinalSurface `road_owner`.
+
+**Measured so far (L1 probes, candidate copy; evidence `outputs/evidence/m2_*`):**
+- 184729@(0,0), current code (`m2_net_dev2_184729`): best round 1: backbone continuous, 9.43 km, 3 cycles, 0 blocked, 0 dead ends, classes B7+S5 — **no SINGLETRACK/TECHNICAL** (ST edge fails on walls near region edge; R5 yields no technical: NO_ATTACH / NO_SECOND_ATTACH). D3: almost all movements READY (v1: 24 BLOCKED in battery).
+- 3628391@(3,-2) (older closure code, `m2_net_dev1_3628391`): round 0 B8+S1+ST1 7.45 km; round 2 B8+S5 10.4 km; R6 233–387 s/round → builder 1133 s (too slow).
+- R6 parallel: 8 threads R6 22.5 s vs 44 s single. **Determinism finding:** 8-thread vs main-thread single differ at ~1e-13 (signature differs); 1-thread run inside a WorkerThreadPool task == 8-thread run exactly (`m2_synthdiff_3`); main-thread vs main-thread identical (`m2_synthdiff_2`). Cause: main-thread floating-point environment differs from worker threads. **Fix to apply:** run all edge designs (and ideally the whole bake) on worker threads in every mode.
+
+**Open problems / next steps (in order):**
+1. Determinism fix (always worker threads), recheck 1 vs 8 equality.
+2. Rerun on HEAD: `test_final_surface --source=fixture` (deformer changed: hashes must equal M0), R6 contracts, R5 suite. Expect an **S3 conflict**: `road_synthesis_oracle.gd` hardcodes v1 limits (grade 5/8/10/12°, radius 35/25/19/19, connector radius = stricter hard) — D3 connectors (R ≥ 8 m) and TECH 15° descents fail it in `test_road_synthesis --group=regions`. Record precisely and escalate; do not edit the test.
+3. N4: get SINGLETRACK/TECHNICAL realized (R5 candidate generation / feedback); N2 ≥ 8 km together with N4; scoring must not pick < 8 km.
+4. First bake of 184729 (`work/tools/bake_probe.gd`), cache save/load, then runtime scene run + bot ride + Vulkan captures → deliver playable build + ride instruction (Director condition 1) even before N4 is solved.
+5. Bake time (R6 dominates), D5 character, M5 vegetation, M6 L2.

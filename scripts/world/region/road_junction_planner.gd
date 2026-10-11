@@ -10,8 +10,14 @@ extends RefCounted
 ##     inside its band; edge interiors start / end exactly at the port with the
 ##     plane's height, directional grade and crossfall, curvature 0;
 ##   * one canonical connector per unordered pair of incident edges, lying on
-##     the shared plane, G2 with zero curvature at both ports; geometric limits
-##     from the stricter class of the two edges.
+##     the shared plane, G2 with zero curvature at both ports. Policy v2 (D3):
+##     its minimum radius follows the movement design speed - the slower of
+##     the two class design speeds and the speed reachable by comfortable
+##     braking on each approach (both travel directions), through the measured
+##     lateral load and low-speed radius - never above the stricter class's
+##     hard radius; grade, crossfall and earthwork stay those of the stricter
+##     class. Ports beyond PORT_RADIUS_PLAIN_M also keep clear of every other
+##     junction zone.
 ## Every movement is READY or UNAVAILABLE with its measured reason. Essential
 ## movements (route continuity: consecutive edges of one R5 route, and for any
 ## other edge at least one movement to a class it may rely on) decide the
@@ -31,9 +37,11 @@ const CONNECTOR_LENGTH_FACTORS: Array[float] = [0.9, 1.0, 1.15, 1.3, 1.5]
 ## by its clothoids, candidate radii between the class preference and limit,
 ## integration step and knot spacing (m).
 const CORNER_DK_SHARE: float = 0.9
-const CORNER_RADIUS_STEPS: int = 6
+const CORNER_RADIUS_STEPS: int = 8
 const CORNER_STEP_M: float = 0.25
 const CORNER_KNOT_M: float = 5.0
+## Braking room counted on an incident edge before its port (m).
+const APPROACH_CAP_M: float = 40.0
 
 var natural: Geo.Natural
 var fit_evaluations: int = 0
@@ -47,9 +55,11 @@ static func create(natural_: Geo.Natural) -> RoadJunctionPlanner:
 
 ## node: R5 node record; incident: [{edge_id, class, band (Geo.Band), at_start
 ## (node is the edge's a end), route_id}], sorted by edge id; routes: R5 route
-## records. Returns the junction record (ports, patch, movements, connector
-## designs) with status READY / USABLE / BLOCKED.
-func plan_junction(node: Dictionary, incident: Array, routes: Array) -> Dictionary:
+## records; others: centres [x, z] of the other junction nodes (ports beyond
+## PORT_RADIUS_PLAIN_M stay outside their zones). Returns the junction record
+## (ports, patch, movements, connector designs) with status READY / USABLE /
+## BLOCKED.
+func plan_junction(node: Dictionary, incident: Array, routes: Array, others: Array = []) -> Dictionary:
 	var cx: float = node.x_cm / 100.0
 	var cz: float = node.z_cm / 100.0
 	var record := {"node_id": node.id, "x": cx, "z": cz, "status": Policy.JUNCTION_BLOCKED, "reasons": [], "ports": [], "movements": [], "patch": {}}
@@ -71,7 +81,7 @@ func plan_junction(node: Dictionary, incident: Array, routes: Array) -> Dictiona
 	var radii: Dictionary = {}
 	var caps: Dictionary = {}
 	for inc: Dictionary in incident:
-		var cap: float = inc.get("radius_cap", INF)
+		var cap: float = minf(inc.get("radius_cap", INF), _zone_cap(cx, cz, inc, others))
 		caps[inc.edge_id] = cap
 		radii[inc.edge_id] = -1.0
 		for r: float in Policy.PORT_RADII_M:
@@ -143,6 +153,36 @@ func plan_junction(node: Dictionary, incident: Array, routes: Array) -> Dictiona
 	if not all_ready:
 		record.reasons.append("ERR_R6_JUNCTION_MOVEMENT")
 	return record
+
+
+## Largest port radius on an incident reference beyond PORT_RADIUS_PLAIN_M whose
+## port stays outside every other junction's zone (D3 no-conflict condition).
+static func _zone_cap(cx: float, cz: float, inc: Dictionary, others: Array) -> float:
+	var band: Geo.Band = inc.band
+	var cap: float = INF
+	for r: float in Policy.PORT_RADII_M:
+		if r <= Policy.PORT_RADIUS_PLAIN_M:
+			continue
+		var p: PackedFloat64Array = band.at_u(r if inc.at_start else band.length() - r)
+		for o: Array in others:
+			if Vector2(p[0] - o[0], p[1] - o[1]).length() < Policy.JUNCTION_ZONE_M:
+				return minf(cap, r - 1.0)
+	return cap
+
+
+## D3 movement limit for a connector serving both travel directions: design
+## speed per direction (Policy.movement_speed with the braking room on the
+## entering edge), radius from the faster one, never stricter than the class
+## hard radius of the stricter class.
+static func movement_limit(a: Dictionary, b: Dictionary, pa: Dictionary, pb: Dictionary) -> Dictionary:
+	var stricter: int = mini(a.class, b.class)
+	var band_a: Geo.Band = a.band
+	var band_b: Geo.Band = b.band
+	var approach_a: float = clampf(band_a.length() - pa.radius_m, 0.0, APPROACH_CAP_M)
+	var approach_b: float = clampf(band_b.length() - pb.radius_m, 0.0, APPROACH_CAP_M)
+	var speed: float = maxf(Policy.movement_speed(a.class, b.class, approach_a), Policy.movement_speed(b.class, a.class, approach_b))
+	var radius: float = minf(Policy.movement_radius(speed), Policy.CLASSES[stricter].radius_hard_m)
+	return {"speed_ms": speed, "radius_m": radius, "curvature": 1.0 / radius, "approach_m": [approach_a, approach_b]}
 
 
 ## Least-squares plane through natural heights on three rings (10/20/30 m)
@@ -399,9 +439,10 @@ static func bank_on_plane(fit: Dictionary, tx: float, tz: float) -> float:
 func _connector(record: Dictionary, fit: Dictionary, pa: Dictionary, pb: Dictionary, a: Dictionary, b: Dictionary, incident: Array) -> Dictionary:
 	var key: String = _pair_key(a.edge_id, b.edge_id)
 	var stricter: int = mini(a.class, b.class)
-	var k_hard: float = Policy.curvature_hard(stricter)
+	var limit: Dictionary = movement_limit(a, b, pa, pb)
+	var k_hard: float = limit.curvature
 	var movement := {"key": key, "piece_id": movement_piece_id(record.node_id, a.edge_id, b.edge_id), "edges": [a.edge_id, b.edge_id], "status": Policy.MOVEMENT_UNAVAILABLE,
-		"reasons": [], "limit_class": stricter, "max_curvature": INF, "design": {}}
+		"reasons": [], "limit_class": stricter, "max_curvature": INF, "design": {}, "speed_ms": limit.speed_ms, "radius_min_m": limit.radius_m, "curvature_limit": k_hard}
 	var chord: float = Vector2(pb.x - pa.x, pb.z - pa.z).length()
 	var turn_deg: float = rad_to_deg(absf(RMath.wrap_angle(atan2(pb.tz, pb.tx) - atan2(-pa.tz, -pa.tx))))
 	movement["turn_deg"] = turn_deg
@@ -421,7 +462,7 @@ func _connector(record: Dictionary, fit: Dictionary, pa: Dictionary, pb: Diction
 		var stats: Dictionary = _spline_stats(spline)
 		if stats.is_valid:
 			candidates.append({"spline": spline, "k": stats.k, "dk": stats.dk})
-	var corner: RMath.PlanSpline = _corner_spline(pa, pb, record.x, record.z, stricter)
+	var corner: RMath.PlanSpline = _corner_spline(pa, pb, record.x, record.z, stricter, limit.radius_m)
 	if corner != null:
 		var corner_stats: Dictionary = _spline_stats(corner)
 		if corner_stats.is_valid:
@@ -509,11 +550,12 @@ func _connector_check(candidate: Dictionary, k_hard: float, hf: float, incident:
 
 ## Analytic corner through the node: a straight lead on each port line, then a
 ## clothoid - circular arc - clothoid of the corner's deflection with the
-## largest radius (from the stricter class's preference down to its limit) whose
-## tangent length fits inside the shorter port radius. Curvature rises and falls
+## largest radius (from the stricter class's preference down to the movement
+## minimum radius `r_min`, default its hard radius) whose tangent length fits
+## inside the shorter port radius. Curvature rises and falls
 ## at CORNER_DK_SHARE of the retained curvature-change limit and is zero at both
 ## ports. Returns a G2 spline or null when no radius fits.
-func _corner_spline(pa: Dictionary, pb: Dictionary, cx: float, cz: float, stricter: int) -> RMath.PlanSpline:
+func _corner_spline(pa: Dictionary, pb: Dictionary, cx: float, cz: float, stricter: int, r_min: float = -1.0) -> RMath.PlanSpline:
 	var dax: float = -pa.tx
 	var daz: float = -pa.tz
 	var dbx: float = pb.tx
@@ -530,7 +572,7 @@ func _corner_spline(pa: Dictionary, pb: Dictionary, cx: float, cz: float, strict
 	var cls: Dictionary = Policy.CLASSES[stricter]
 	var dk_limit: float = CORNER_DK_SHARE * Policy.MAX_CURVATURE_CHANGE_PER_M2
 	for step in range(CORNER_RADIUS_STEPS):
-		var radius: float = lerpf(cls.radius_pref_m, cls.radius_hard_m * 1.03, step / (CORNER_RADIUS_STEPS - 1.0))
+		var radius: float = lerpf(cls.radius_pref_m, (cls.radius_hard_m if r_min <= 0.0 else r_min) * 1.03, step / (CORNER_RADIUS_STEPS - 1.0))
 		var kp: float = minf(1.0 / radius, sqrt(dk_limit * delta))
 		var ramp: float = kp / dk_limit
 		var arc: float = delta / kp - ramp

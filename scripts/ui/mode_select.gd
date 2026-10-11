@@ -2,19 +2,20 @@ class_name ModeSelect
 extends Control
 
 ## Slow Cycle — Main Mode Selection Screen
-## Supports Keyboard (1-4, Enter, Space, Up/Down), Gamepad (A, D-pad, Left Stick), and Mouse.
+## Supports Keyboard (1-5, Enter, Space, Up/Down), Gamepad (A, D-pad, Left Stick), and Mouse.
 
 @onready var btn_infinite: Button = $CenterContainer/VBoxContainer/BtnInfinite
 @onready var btn_sandbox: Button = $CenterContainer/VBoxContainer/BtnSandbox
 @onready var btn_lab: Button = $CenterContainer/VBoxContainer/BtnLab
 @onready var btn_training: Button = $CenterContainer/VBoxContainer/BtnTraining
+@onready var btn_region: Button = $CenterContainer/VBoxContainer/BtnRegion
 
 var is_changing_scene: bool = false
 var _buttons: Array[Button] = []
 var _last_stick_dir: int = 0
 
 func _ready() -> void:
-	_buttons = [btn_infinite, btn_sandbox, btn_lab, btn_training]
+	_buttons = [btn_infinite, btn_sandbox, btn_lab, btn_training, btn_region]
 
 	if btn_infinite:
 		btn_infinite.pressed.connect(_on_infinite_selected)
@@ -25,6 +26,8 @@ func _ready() -> void:
 		btn_lab.pressed.connect(_on_lab_selected)
 	if btn_training:
 		btn_training.pressed.connect(_on_training_selected)
+	if btn_region:
+		btn_region.pressed.connect(_on_region_selected)
 
 func _unhandled_input(event: InputEvent) -> void:
 	# 1. Keyboard digits 1-4
@@ -43,6 +46,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		elif event.keycode == KEY_4 or event.keycode == KEY_KP_4:
 			_on_training_selected()
+			get_viewport().set_input_as_handled()
+			return
+		elif event.keycode == KEY_5 or event.keycode == KEY_KP_5:
+			_on_region_selected()
 			get_viewport().set_input_as_handled()
 			return
 
@@ -98,6 +105,8 @@ func _activate_focused_or_default() -> void:
 		_on_lab_selected()
 	elif focus_owner == btn_training:
 		_on_training_selected()
+	elif focus_owner == btn_region:
+		_on_region_selected()
 	else:
 		_on_infinite_selected()
 
@@ -121,3 +130,6 @@ func _on_lab_selected() -> void:
 
 func _on_training_selected() -> void:
 	_change_mode_scene("res://scenes/test/gravel_training_loop.tscn")
+
+func _on_region_selected() -> void:
+	_change_mode_scene("res://scenes/region/region_world.tscn")

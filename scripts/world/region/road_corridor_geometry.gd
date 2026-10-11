@@ -287,6 +287,20 @@ class Natural extends RefCounted:
 	func exhausted() -> bool:
 		return queries > budget
 
+	## Queries of finished pieces (diagnostics; `queries` is per piece).
+	var finished_queries: int = 0
+
+	## PR1 per-piece isolation: a fresh query budget and cold search caches, so
+	## a piece's outcome never depends on which pieces were designed before it.
+	func begin_piece() -> void:
+		finished_queries += queries
+		queries = 0
+		_grid.fill(NAN)
+		_ride_cost.fill(NAN)
+
+	func total_queries() -> int:
+		return finished_queries + queries
+
 	static func in_domain(lx: float, lz: float) -> bool:
 		return is_finite(lx) and is_finite(lz) and lx >= 0.0 and lz >= 0.0 and lx <= DOMAIN_M and lz <= DOMAIN_M
 

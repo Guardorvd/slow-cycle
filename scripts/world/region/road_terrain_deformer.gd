@@ -2,6 +2,12 @@ class_name RoadTerrainDeformer
 extends RefCounted
 ## Pure, immutable station-quads, explicit stable ownership. Each owner
 ## constructs ONE height from natural ground; overlaps blend those heights.
+## PR1: any consumable route data (CertifiedRoadRoute or RealizedRoadNetwork,
+## same get_data() shape). Radial end caps and cap refinement at every piece
+## end that meets no other piece end; spans of declared bridge decks (crossing
+## records with support BRIDGE_DECK) are not deformed - natural ground stays
+## under the deck, abutments get radial caps - while an undeclared BRIDGE_DECK
+## station is rejected (ERR_R7_BRIDGE_UNSUPPORTED).
 const Policy = preload("res://scripts/world/region/road_synthesis_policy.gd")
 var _segments: Array[Dictionary] = []
 var _index: Dictionary = {}
@@ -25,6 +31,14 @@ static func create(route: RefCounted, hydrology_field: RefCounted) -> Dictionary
 		return {"is_valid":false,"reason_code":"ERR_R7_SIGNATURE_MISMATCH","deformer":null}
 	out._origin_x = data.header.origin_x_m
 	out._origin_z = data.header.origin_z_m
+	var decks: Dictionary = {}
+	for c: Dictionary in data.get("crossings", []):
+		if c.get("status", "") == "RESOLVED" and c.get("support", "") == "BRIDGE_DECK" and c.has("deck_span_m"):
+			var key: String = "edge:%d" % c.edge_id
+			if not decks.has(key):
+				decks[key] = []
+			decks[key].append(c.deck_span_m)
+	var gap_ends: Array = []
 	for p: Dictionary in data.pieces:
 		var d: Dictionary = p.design
 		var limits: Dictionary = p.intent.limits
@@ -50,13 +64,34 @@ static func create(route: RefCounted, hydrology_field: RefCounted) -> Dictionary
 			for record: Dictionary in data.patches:
 				if record.owner.node_id == node:
 					patch = record.patch
-		for k in range(d.s.size() - 1):
+		# Deck stations must lie in a declared deck span; a segment is left to
+		# the deck builder only when both of its stations are such deck stations.
+		var on_deck := PackedByteArray()
+		on_deck.resize(d.s.size())
+		for k in range(d.s.size()):
 			if d.support[k] == Policy.Support.BRIDGE_DECK:
-				return {"is_valid": false, "reason_code": "ERR_R7_BRIDGE_UNSUPPORTED", "deformer": null}
+				for span: Array in decks.get(p.id, []):
+					if d.s[k] >= span[0] - 0.001 and d.s[k] <= span[1] + 0.001:
+						on_deck[k] = 1
+				if on_deck[k] == 0:
+					return {"is_valid": false, "reason_code": "ERR_R7_BRIDGE_UNSUPPORTED", "deformer": null}
+		var deck := PackedByteArray()
+		deck.resize(d.s.size() - 1)
+		for k in range(d.s.size() - 1):
+			deck[k] = 1 if on_deck[k] == 1 and on_deck[k + 1] == 1 else 0
+		for k in range(d.s.size() - 1):
+			if deck[k] == 1:
+				continue
 			var a := Vector2(d.x[k], d.z[k])
 			var b := Vector2(d.x[k + 1], d.z[k + 1])
 			var reach: float = maxf(d.width[k], d.width[k + 1]) / 2.0 + shoulder + limits.tie_max_m + 1.0
-			var seg := {"id": p.id, "k": k, "d": d, "profile":profile,"a": a, "b": b, "n0": Vector2(-d.tz[k], d.tx[k]), "n1": Vector2(-d.tz[k + 1], d.tx[k + 1]), "shoulder": shoulder, "limits": limits, "patch": patch, "reach": reach, "first": k == 0, "last": k == d.s.size() - 2}
+			var abut_in: bool = k > 0 and deck[k - 1] == 1
+			var abut_out: bool = k < d.s.size() - 2 and deck[k + 1] == 1
+			if abut_in:
+				gap_ends.append([p.id, k])
+			if abut_out:
+				gap_ends.append([p.id, k + 1])
+			var seg := {"id": p.id, "k": k, "d": d, "profile":profile,"a": a, "b": b, "n0": Vector2(-d.tz[k], d.tx[k]), "n1": Vector2(-d.tz[k + 1], d.tx[k + 1]), "shoulder": shoulder, "limits": limits, "patch": patch, "reach": reach, "first": k == 0 or abut_in, "last": k == d.s.size() - 2 or abut_out}
 			var index: int = out._segments.size()
 			out._segments.append(seg)
 			var query_bounds: Rect2=_quad_bounds(a,b,seg.n0,seg.n1,reach,seg.first or seg.last)
@@ -93,9 +128,9 @@ static func create(route: RefCounted, hydrology_field: RefCounted) -> Dictionary
 			for j in range(int(floor(fine_bounds.position.y/16)),int(floor(fine_bounds.end.y/16))+1):
 				for i in range(int(floor(fine_bounds.position.x/16)),int(floor(fine_bounds.end.x/16))+1):
 					out._fine[Vector2i(i,j)]=true
-	for piece_index: int in [0,data.pieces.size()-1]:
-		var d: Dictionary=data.pieces[piece_index].design
-		var k: int=0 if piece_index==0 else d.s.size()-1
+	for end: Array in _dangling_ends(data, gap_ends):
+		var d: Dictionary=data.pieces[end[0]].design
+		var k: int=end[1]
 		var half: float=d.width[k]/2.0+0.75
 		for j in range(int(floor(d.z[k]-half-1)),int(floor(d.z[k]+half+1))+1):
 			for i in range(int(floor(d.x[k]-half-1)),int(floor(d.x[k]+half+1))+1):
@@ -106,6 +141,32 @@ static func create(route: RefCounted, hydrology_field: RefCounted) -> Dictionary
 
 func fine_cells() -> Dictionary:
 	return _fine.duplicate()
+
+## Piece ends (piece index, station) meeting no other piece end within 1 mm,
+## plus abutment stations of declared bridge decks, in stable piece order.
+static func _dangling_ends(data: Dictionary, gap_ends: Array) -> Array:
+	var ends: Array = []
+	for i in range(data.pieces.size()):
+		var d: Dictionary = data.pieces[i].design
+		var last: int = d.s.size() - 1
+		ends.append([i, 0, d.x[0], d.z[0]])
+		ends.append([i, last, d.x[last], d.z[last]])
+	var out: Array = []
+	for end: Array in ends:
+		var joined: bool = false
+		for other: Array in ends:
+			var dx: float = other[2] - end[2]
+			var dz: float = other[3] - end[3]
+			if other[0] != end[0] and sqrt(dx * dx + dz * dz) <= 0.001:
+				joined = true
+				break
+		if not joined:
+			out.append([end[0], end[1]])
+	for gap: Array in gap_ends:
+		for i in range(data.pieces.size()):
+			if data.pieces[i].id == gap[0]:
+				out.append([i, gap[1]])
+	return out
 
 static func _quad_bounds(a: Vector2,b: Vector2,n0: Vector2,n1: Vector2,reach: float,caps: bool) -> Rect2:
 	if caps:
@@ -132,6 +193,24 @@ func _owns_road_point(lx: float,lz: float) -> bool:
 		if candidate.get("plane",false):
 			return true
 	return false
+
+## Owning piece id of a point's riding plane ("" outside every plane): the
+## same plane test as _owns_road_point, with evaluate()'s authority order
+## (connectors over edges, then the lowest id).
+func owner_at(lx: float, lz: float) -> String:
+	var cell := Vector2i(int(floor(lx/4)),int(floor(lz/4)))
+	var candidates: Variant=_plane_index.get(cell)
+	if candidates==null: return ""
+	var point := Vector2(lx,lz)
+	var best := ""
+	for index: int in candidates:
+		var seg: Dictionary = _segments[index]
+		if _candidate(seg,point,0.0,true).get("plane",false):
+			var id: String = seg.id
+			var move: bool = id.begins_with("move:")
+			if best.is_empty() or (move and not best.begins_with("move:")) or (move == best.begins_with("move:") and id < best):
+				best = id
+	return best
 
 static func _error(reason: String) -> Dictionary:
 	return {"is_valid": false, "reason_code": reason, "height_m": NAN, "kind": "INVALID", "owner": "", "lateral": INF, "half_width": 0.0}

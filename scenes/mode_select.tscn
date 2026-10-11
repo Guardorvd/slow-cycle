@@ -83,7 +83,7 @@ layout_mode = 2
 
 [node name="BtnInfinite" type="Button" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
-focus_neighbor_top = NodePath("../BtnTraining")
+focus_neighbor_top = NodePath("../BtnRegion")
 focus_neighbor_bottom = NodePath("../BtnSandbox")
 theme_override_font_sizes/font_size = 20
 theme_override_styles/normal = SubResource("StyleBox_BtnNormal")
@@ -114,12 +114,22 @@ text = "3. Полигон 4K — Техническая Лаборатория (
 [node name="BtnTraining" type="Button" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
 focus_neighbor_top = NodePath("../BtnLab")
-focus_neighbor_bottom = NodePath("../BtnInfinite")
+focus_neighbor_bottom = NodePath("../BtnRegion")
 theme_override_font_sizes/font_size = 20
 theme_override_styles/normal = SubResource("StyleBox_BtnNormal")
 theme_override_styles/hover = SubResource("StyleBox_BtnFocus")
 theme_override_styles/focus = SubResource("StyleBox_BtnFocus")
 text = "4. Полигон 4L — Гравийный Дзен-Круг (1220 м)"
+
+[node name="BtnRegion" type="Button" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+focus_neighbor_top = NodePath("../BtnTraining")
+focus_neighbor_bottom = NodePath("../BtnInfinite")
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("StyleBox_BtnNormal")
+theme_override_styles/hover = SubResource("StyleBox_BtnFocus")
+theme_override_styles/focus = SubResource("StyleBox_BtnFocus")
+text = "5. Mountain River Valley — процедурный регион (PR1)"
 
 [node name="Spacer2" type="Control" parent="CenterContainer/VBoxContainer"]
 custom_minimum_size = Vector2(0, 15)
@@ -129,7 +139,7 @@ layout_mode = 2
 layout_mode = 2
 theme_override_colors/font_color = Color(0.5, 0.6, 0.55, 1)
 theme_override_font_sizes/font_size = 14
-text = "[A / Enter] Выбрать | [D-Pad / Стик] Навигация | [1-4] Быстрый выбор | F3 HUD | V Камера | R Рекавери"
+text = "[A / Enter] Выбрать | [D-Pad / Стик] Навигация | [1-5] Быстрый выбор | F3 HUD | V Камера | R Рекавери"
 horizontal_alignment = 1
 
 

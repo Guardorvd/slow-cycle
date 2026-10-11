@@ -16,20 +16,106 @@ extends RefCounted
 ##   V        backbone valley-road affinity
 ##   S        separation from the existing network (per search, >= 1)
 ##   X        recorded water crossing cost (hint/width/angle); bodies forbidden
+##   P        optional per-class feedback penalty (R6 -> R5 hints, >= 1)
 ## Every multiplier is >= 1 and X >= 0, so Euclidean distance is an admissible
-## and consistent A* heuristic.
+## and consistent A* heuristic. Policy v2 (PR1 D2, v1.1 §4a): grades come
+## from the shared road policy; no new natural-slope ban. A move steeper than
+## the class development grade pays the development length and is allowed
+## only where it can be laid out at least one way - a serpentine (no barrier,
+## water or region edge within R_min + half footprint of its nodes) or a contour
+## traverse (natural slope within the class traverse slope at that grade);
+## otherwise it is forbidden for that class only. Likewise a move whose own
+## cross slope exceeds the class roadbed cross limit (R6 bench condition, with
+## CROSS_MARGIN for the 32 m raster) cannot host that class's roadbed and is
+## forbidden for that class only (PR1 M2 root cause: walls).
 
 const Graph = preload("res://scripts/world/region/region_route_graph.gd")
 const Raster = preload("res://scripts/world/region/route_planning_raster.gd")
-const MODEL := "search/1;profiles=.06:.10:1.3:3:.6,.09:.15:1:2:0,.14:.22:.8:1:0,.22:.38:.5:.5:0;develop=all:1.1;hint=60,200,500;width=4;oblique=60"
+const Policy = preload("res://scripts/world/region/road_synthesis_policy.gd")
+const MODEL := "search/2;policy=regional_road/2;ground=1.3:1:.8:.5;cut_fill=3:2:1:.5;valley=.6:0:0:0;half=40:50:45:40;develop=all:1.1;layout=serpentine|traverse;hint=60,200,500;width=4;oblique=60;feedback=penalty,closed"
 const DIRECTIONS: int = 16
-## Alpha starting values (ExecPlan §7 table), indexed by RouteClass.
-const PROFILES: Array[Dictionary] = [
-	{"g_pref": 0.06, "g_max": 0.10, "develop": true, "ground": 1.3, "cut_fill": 3.0, "valley": 0.6, "half_width_m": 40.0},
-	{"g_pref": 0.09, "g_max": 0.15, "develop": true, "ground": 1.0, "cut_fill": 2.0, "valley": 0.0, "half_width_m": 50.0},
-	{"g_pref": 0.14, "g_max": 0.22, "develop": true, "ground": 0.8, "cut_fill": 1.0, "valley": 0.0, "half_width_m": 35.0},
-	{"g_pref": 0.22, "g_max": 0.38, "develop": true, "ground": 0.5, "cut_fill": 0.5, "valley": 0.0, "half_width_m": 25.0},
-]
+## Per-class profiles, indexed by RouteClass. Grades and buildable slope from
+## the road policy v2 (one source with R6): bidirectional classes climb at most
+## their sustained grade before development; descent-capable classes may run
+## up to descent_max (R6 designs such pieces descent-preferred). The other
+## factors are R5 Alpha values; SINGLETRACK / TECHNICAL bands are wider
+## (R6 §19: technical needs ~15 m more room per side).
+static var PROFILES: Array[Dictionary] = _profiles()
+
+
+static func _profiles() -> Array[Dictionary]:
+	var ground: Array[float] = [1.3, 1.0, 0.8, 0.5]
+	var cut_fill: Array[float] = [3.0, 2.0, 1.0, 0.5]
+	var valley: Array[float] = [0.6, 0.0, 0.0, 0.0]
+	var half: Array[float] = [40.0, 50.0, 45.0, 40.0]
+	var out: Array[Dictionary] = []
+	for c in range(4):
+		var cls: Dictionary = Policy.CLASSES[c]
+		var steep: bool = cls.descent_preferred
+		var g_max: float = Policy.descent_max(c) if steep else Policy.climb_sustained(c)
+		out.append({"g_pref": cls.descent_pref if steep else cls.grade_pref, "g_max": g_max, "develop": true,
+			"ground": ground[c], "cut_fill": cut_fill[c], "valley": valley[c], "half_width_m": half[c],
+			"traverse_slope": Policy.traverse_slope(c, g_max), "serpentine_room_m": cls.radius_hard_m + Policy.half_footprint(c),
+			"cross_limit": CROSS_MARGIN * Policy.cross_limit(c)})
+	return out
+
+
+## Per node: 1 where a development of the class can be laid out (serpentine
+## room or a buildable contour traverse), see the header.
+static func development_mask(g: Dictionary, route_class: int) -> PackedByteArray:
+	var profile: Dictionary = PROFILES[route_class]
+	var n: int = g.n
+	var room: PackedFloat64Array = _barrier_distance(g)
+	var limit_sq: float = profile.traverse_slope * profile.traverse_slope
+	var grad_x: PackedFloat64Array = g.grad_x
+	var grad_z: PackedFloat64Array = g.grad_z
+	var mask := PackedByteArray()
+	mask.resize(n * n)
+	for k in range(n * n):
+		var traverse: bool = grad_x[k] * grad_x[k] + grad_z[k] * grad_z[k] <= limit_sq
+		mask[k] = 1 if traverse or room[k] >= profile.serpentine_room_m else 0
+	return mask
+
+
+## Chamfer distance (m) to the nearest blocked / water / body node or the grid
+## edge, on a grid of any size.
+static func _barrier_distance(g: Dictionary) -> PackedFloat64Array:
+	var n: int = g.n
+	var s: float = g.spacing
+	var d := PackedFloat64Array()
+	d.resize(n * n)
+	var body: PackedInt32Array = g.get("body", PackedInt32Array())
+	for k in range(n * n):
+		var i: int = k % n
+		var j: int = k / n
+		var edge: float = s * mini(mini(i, j), mini(n - 1 - i, n - 1 - j))
+		var barrier: bool = g.blocked[k] == 1 or g.water[k] == 1 or (not body.is_empty() and body[k] >= 0)
+		d[k] = 0.0 if barrier else edge + s
+	var diagonal: float = s * sqrt(2.0)
+	for sweep in range(2):
+		var range_j: Array = range(n) if sweep == 0 else range(n - 1, -1, -1)
+		var range_i: Array = range(n) if sweep == 0 else range(n - 1, -1, -1)
+		var step: int = -1 if sweep == 0 else 1
+		for j: int in range_j:
+			for i: int in range_i:
+				var k: int = j * n + i
+				var v: float = d[k]
+				var pi: int = i + step
+				var pj: int = j + step
+				if pi >= 0 and pi < n:
+					v = minf(v, d[j * n + pi] + s)
+				if pj >= 0 and pj < n:
+					v = minf(v, d[pj * n + i] + s)
+					if pi >= 0 and pi < n:
+						v = minf(v, d[pj * n + pi] + diagonal)
+					var qi: int = i - step
+					if qi >= 0 and qi < n:
+						v = minf(v, d[pj * n + qi] + diagonal)
+				d[k] = v
+	return d
+## Raster allowance on the class roadbed cross limit (32 m nodes, +-16 m
+## gradient stencil smooth local relief).
+const CROSS_MARGIN: float = 1.1
 ## Slightly cheaper than node-level zig-zagging, so steep corridors stay direct
 ## and carry DEVELOPMENT_REQUIRED for R6 instead of fake 32 m switchbacks.
 const DEVELOPMENT_OVERHEAD: float = 1.1
@@ -99,8 +185,19 @@ static func base_cost(g: Dictionary, profile: Dictionary, a: int, b: int, helper
 
 ## Static per-class move tables: `base` (NODES*16, INF = forbidden) and the
 ## additive crossing cost `extra`. `passable` marks standing nodes for the run.
-static func build_tables(g: Dictionary, route_class: int, passable: PackedByteArray) -> Dictionary:
+## Nodes steeper than the class buildable slope are closed for the class.
+## `hints` (optional, PR1 D4 feedback): `closed` (per node, 1 = closed for the
+## class) and `penalty` (per node multiplier >= 1, mean of a move's ends).
+static func build_tables(g: Dictionary, route_class: int, passable: PackedByteArray, hints: Dictionary = {}) -> Dictionary:
 	var profile: Dictionary = PROFILES[route_class]
+	var closed: PackedByteArray = hints.get("closed", PackedByteArray())
+	if closed.is_empty():
+		closed.resize(g.n * g.n)
+	var penalty: PackedFloat64Array = hints.get("penalty", PackedFloat64Array())
+	var developable: PackedByteArray = development_mask(g, route_class)
+	var heights: PackedFloat64Array = g.height
+	var grad_x: PackedFloat64Array = g.grad_x
+	var grad_z: PackedFloat64Array = g.grad_z
 	var n: int = g.n
 	var count: int = n * n
 	var base := PackedFloat64Array()
@@ -113,7 +210,7 @@ static func build_tables(g: Dictionary, route_class: int, passable: PackedByteAr
 	var crossings: Dictionary = g.move_crossings
 	var off: Dictionary = offsets(n)
 	for k in range(count):
-		if passable[k] == 0:
+		if passable[k] == 0 or closed[k] == 1:
 			continue
 		var i: int = k % n
 		var j: int = k / n
@@ -124,7 +221,7 @@ static func build_tables(g: Dictionary, route_class: int, passable: PackedByteAr
 			if ti < 0 or tj < 0 or ti >= n or tj >= n:
 				continue
 			var t: int = tj * n + ti
-			if passable[t] == 0:
+			if passable[t] == 0 or closed[t] == 1:
 				continue
 			var helpers := PackedInt32Array()
 			if d >= 4:
@@ -135,6 +232,15 @@ static func build_tables(g: Dictionary, route_class: int, passable: PackedByteAr
 			var cost: float = base_cost(g, profile, k, t, helpers)
 			if cost == INF:
 				continue
+			# A development move needs a layout at both of its nodes; any move needs
+			# a cross slope the class roadbed can be built on.
+			if absf(heights[t] - heights[k]) > profile.g_max * step.length() * g.spacing and (developable[k] == 0 or developable[t] == 0):
+				continue
+			var direction: Vector2 = Vector2(step).normalized()
+			if absf(0.5 * (grad_x[k] + grad_x[t]) * direction.y - 0.5 * (grad_z[k] + grad_z[t]) * direction.x) > profile.cross_limit:
+				continue
+			if not penalty.is_empty():
+				cost *= 0.5 * (penalty[k] + penalty[t])
 			var key: int = Raster.pair_key(k, t)
 			if crossings.has(key):
 				var x: float = crossing_cost(crossings[key], route_class)
@@ -142,7 +248,7 @@ static func build_tables(g: Dictionary, route_class: int, passable: PackedByteAr
 					continue
 				extra[k * DIRECTIONS + d] = x
 			base[k * DIRECTIONS + d] = cost
-	return {"base": base, "extra": extra, "class": route_class}
+	return {"base": base, "extra": extra, "class": route_class, "closed": closed}
 
 
 ## Cost of a recorded water jump (no separation), INF if not allowed.
@@ -262,6 +368,7 @@ static func search(g: Dictionary, tables: Dictionary, sep: PackedFloat64Array, s
 	var base: PackedFloat64Array = tables.base
 	var extra: PackedFloat64Array = tables.extra
 	var jumps: Dictionary = g.jumps
+	var class_closed: PackedByteArray = tables.get("closed", PackedByteArray())
 	var off: Dictionary = offsets(n)
 	var step_off: PackedInt32Array = off.step
 	var swept_a: PackedInt32Array = off.swept_a
@@ -322,7 +429,7 @@ static func search(g: Dictionary, tables: Dictionary, sep: PackedFloat64Array, s
 				heap.push(nd + h, t)
 		if jumps.has(k):
 			for t: int in jumps[k]:
-				if closed[t] == 1:
+				if closed[t] == 1 or (not class_closed.is_empty() and class_closed[t] == 1):
 					continue
 				var is_target: bool = (goal >= 0 and t == goal) or (goal < 0 and targets[t] == 1)
 				if closed_extra[t] == 1 and not is_target:

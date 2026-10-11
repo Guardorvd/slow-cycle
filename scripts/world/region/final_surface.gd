@@ -61,6 +61,11 @@ func _road_cell(i: int,j: int) -> bool:
 func _road_leaf(x2: int,z2: int) -> bool:
 	return _road_leaves.has(Vector2i(int(floor(x2/2.0))-_bounds.min_x,int(floor(z2/2.0))-_bounds.min_z))
 
+## Owning road piece id at a world point ("" off road): the layer test of
+## _collision_layer, naming the owner (PR1: road / rough-road layers by class).
+func road_owner(x: float, z: float) -> String:
+	return _deformer.owner_at(x-_bounds.min_x,z-_bounds.min_z) if _deformer!=null else ""
+
 func _collision_layer(x: float,z: float) -> int:
 	return 2 if _deformer!=null and _deformer._owns_road_point(x-_bounds.min_x,z-_bounds.min_z) else 4
 

@@ -31,7 +31,7 @@ const Context = preload("res://scripts/world/region/environment_context.gd")
 const Biome = preload("res://scripts/world/region/biome_field.gd")
 const Ride = preload("res://scripts/world/region/rideability_field.gd")
 const Seeds = preload("res://scripts/world/region/region_seed_derivation.gd")
-const MODEL := "planner/1;separation=160:5;attach_spacing=200;loop_attach=800;second_ratio=2.5;cap=34000;bridges=4;spurs=2:1500;max_route=6000,5000,2000;tie=.03,.05;gateway_passable=128;floors=1.2,1,.7,.7;spur_scale=.7;connector=12000:1000:24:.6"
+const MODEL := "planner/2;hints=close,penalty;raster_reuse;separation=160:5;attach_spacing=200;loop_attach=800;second_ratio=2.5;cap=34000;bridges=4;spurs=2:1500;max_route=6000,5000,2000;tie=.03,.05;gateway_passable=128;floors=1.2,1,.7,.7;spur_scale=.7;connector=12000:1000:24:.6"
 const SEPARATION_M: float = 160.0
 const SEPARATION_K: float = 5.0
 const ATTACH_SPACING_M: float = 200.0
@@ -96,6 +96,9 @@ var _spurs: int = 0
 var _metrics := {"searches": 0, "expanded": 0, "regenerations": 0, "replans": 0, "candidates": 0, "trial_rejects": 0}
 var _rounds_log: Array = []
 var _backbone_options: Array = []
+## PR1 D4 feedback hints (validated settings.hints) and their per-class masks.
+var _hints: Array = []
+var _hint_masks: Dictionary = {}
 var _explanations: Array = []
 ## Built, certified corridor pieces keyed "route:i0:i1" (the final edges).
 var _pieces: Dictionary = {}
@@ -105,9 +108,17 @@ static func _failure(reason: String, detail: String = "") -> Dictionary:
 	return {"is_valid": false, "graph": null, "reason_code": reason, "detail": detail, "diagnostics": {}}
 
 
-static func plan(region_plan: RefCounted, terrain_field: RefCounted, hydrology_plan: RefCounted) -> Dictionary:
+## settings (additive, PR1 D4): {"hints": [{kind: "CLOSE" | "PENALTY", class:
+## RouteClass (-1 = every class but BACKBONE), x_m, z_m (region-local), radius_m,
+## factor (PENALTY, >= 1)}], "raster": a RoutePlanningRaster built for exactly
+## these inputs (reused between feedback rounds)}. Unknown keys / invalid
+## hints -> ERR_ROUTE_SETTINGS. Empty settings = the unchanged R5 behaviour.
+static func plan(region_plan: RefCounted, terrain_field: RefCounted, hydrology_plan: RefCounted, settings: Dictionary = {}) -> Dictionary:
 	if region_plan == null or terrain_field == null or hydrology_plan == null:
 		return _failure("ERR_ROUTE_INPUT_MISSING")
+	var checked: Dictionary = _check_settings(settings)
+	if not checked.is_valid:
+		return _failure("ERR_ROUTE_SETTINGS", checked.detail)
 	if not region_plan is Region or not terrain_field is Terrain or not hydrology_plan is Hydro or not region_plan.validate().is_valid:
 		return _failure("ERR_ROUTE_INPUT_INVALID")
 	if terrain_field.get_region_signature() != region_plan.signature() or hydrology_plan.get_region_signature() != region_plan.signature():
@@ -137,7 +148,13 @@ static func plan(region_plan: RefCounted, terrain_field: RefCounted, hydrology_p
 	planner._symmetry = macro.frame_symmetry
 	planner._relief_m = macro.relief_cm / 100.0
 	planner._route_seed = Seeds.route_seed(region_plan.get_identity().get_region_seed())
-	planner._raster = Raster.create(ride.field, surface.surface, hydro.field, hydrology_plan)
+	planner._hints = checked.hints
+	var reused: Variant = settings.get("raster")
+	if reused is Raster and reused.origin_x == region_plan.get_bounds().get_min_x_m() and reused.origin_z == region_plan.get_bounds().get_min_z_m() and reused.metrics.get("region_signature", "") == region_plan.signature():
+		planner._raster = reused
+	else:
+		planner._raster = Raster.create(ride.field, surface.surface, hydro.field, hydrology_plan)
+		planner._raster.metrics["region_signature"] = region_plan.signature()
 	planner._grid = planner._raster.grid()
 	planner._builder = Builder.create(planner._raster, ride.field, surface.surface, hydro.field)
 	planner._anchors = Anchors.find(planner._raster, macro, hydrology_plan, biome.field.get_descriptor())
@@ -158,8 +175,60 @@ static func tie_value(seed_value: int, round_index: int, key: String) -> int:
 
 func _tables_for(route_class: int) -> Dictionary:
 	if not _tables.has(route_class):
-		_tables[route_class] = Search.build_tables(_grid, route_class, _passable)
+		_tables[route_class] = Search.build_tables(_grid, route_class, _passable, _class_hints(route_class))
 	return _tables[route_class]
+
+
+static func _check_settings(settings: Dictionary) -> Dictionary:
+	for key: Variant in settings:
+		if not key in ["hints", "raster"]:
+			return {"is_valid": false, "detail": "unknown key %s" % str(key)}
+	var hints: Array = []
+	var raw: Variant = settings.get("hints", [])
+	if not raw is Array:
+		return {"is_valid": false, "detail": "hints must be an array"}
+	for h: Variant in raw:
+		if not h is Dictionary or not h.get("kind", "") in ["CLOSE", "PENALTY"] or not h.get("class", -9) in [-1, 0, 1, 2, 3]:
+			return {"is_valid": false, "detail": "invalid hint %s" % str(h)}
+		for field: String in ["x_m", "z_m", "radius_m"]:
+			if not (h.get(field) is float or h.get(field) is int) or not is_finite(float(h[field])):
+				return {"is_valid": false, "detail": "invalid hint field %s" % field}
+		var factor: float = float(h.get("factor", 1.0))
+		if not is_finite(factor) or factor < 1.0 or float(h.radius_m) <= 0.0:
+			return {"is_valid": false, "detail": "invalid hint factor/radius"}
+		hints.append({"kind": h.kind, "class": int(h["class"]), "x_m": float(h.x_m), "z_m": float(h.z_m), "radius_m": float(h.radius_m), "factor": factor})
+	return {"is_valid": true, "hints": hints, "detail": ""}
+
+
+## Per-class feedback masks from the hints (nodes within each hint radius).
+func _class_hints(route_class: int) -> Dictionary:
+	if _hints.is_empty():
+		return {}
+	if _hint_masks.has(route_class):
+		return _hint_masks[route_class]
+	var closed := PackedByteArray()
+	closed.resize(Raster.NODES)
+	var penalty := PackedFloat64Array()
+	penalty.resize(Raster.NODES)
+	penalty.fill(1.0)
+	for h: Dictionary in _hints:
+		if not (h["class"] == route_class or (h["class"] == -1 and route_class != Graph.RouteClass.BACKBONE)):
+			continue
+		var r: int = ceili(h.radius_m / Raster.SPACING_M)
+		var ci: int = roundi(h.x_m / Raster.SPACING_M)
+		var cj: int = roundi(h.z_m / Raster.SPACING_M)
+		for j in range(maxi(0, cj - r), mini(Raster.N, cj + r + 1)):
+			for i in range(maxi(0, ci - r), mini(Raster.N, ci + r + 1)):
+				if Vector2(i * Raster.SPACING_M - h.x_m, j * Raster.SPACING_M - h.z_m).length() > h.radius_m:
+					continue
+				var k: int = j * Raster.N + i
+				if h.kind == "CLOSE":
+					closed[k] = 1
+				else:
+					penalty[k] = maxf(penalty[k], h.factor)
+	_hint_masks[route_class] = {"closed": closed, "penalty": penalty}
+	return _hint_masks[route_class]
+
 
 
 ## Standing nodes: dry, no natural barrier, no water body, inside the region
@@ -1077,7 +1146,7 @@ func _assemble() -> Dictionary:
 	var composition: Dictionary = _composition(routes, loops, anchors)
 	var diagnostics := {"degrade_codes": composition.degrade_codes, "composition": composition.counts, "rounds": _rounds_log, "rejected": _rejected, "backbone_options": _backbone_options,
 		"explanations": _explain(), "metrics": _metrics.merged({"raster": _raster.metrics, "raster_storage_bytes": _raster.storage_bytes(), "certify_samples": _builder.certify_samples,
-		"network_length_m": _total_length, "bridges": _bridges, "final_defects": defects, "missing_pieces": missing_pieces})}
+		"network_length_m": _total_length, "bridges": _bridges, "final_defects": defects, "missing_pieces": missing_pieces}), "feedback_hints": _hints}
 	var graph := Graph.new(data, diagnostics)
 	var validation: Dictionary = graph.validate()
 	if not validation.is_valid:
@@ -1090,7 +1159,7 @@ func _assemble() -> Dictionary:
 		var failed_audit: Dictionary = _failure("ERR_ROUTE_GRAPH_INVALID", ",".join(audit) + ("" if defects == 0 else "ERR_ROUTE_UNCERTIFIED_BARRIER:%d" % defects) + ("" if missing_pieces == 0 else "ERR_ROUTE_MISSING_PIECE:%d" % missing_pieces))
 		failed_audit.diagnostics = diagnostics
 		return failed_audit
-	return {"is_valid": true, "graph": graph, "reason_code": "", "detail": "", "diagnostics": diagnostics}
+	return {"is_valid": true, "graph": graph, "reason_code": "", "detail": "", "diagnostics": diagnostics, "raster": _raster}
 
 
 func _edge_path_between(edges: Array, nodes: Array, excluded: Dictionary, a: int, b: int) -> PackedInt32Array:

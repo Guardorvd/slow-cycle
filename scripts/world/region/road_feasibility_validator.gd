@@ -49,9 +49,13 @@ func validate_piece(design: Dictionary, context: Dictionary) -> Dictionary:
 	_add(reasons, structure.reasons)
 	if not structure.reasons.is_empty():
 		return {"is_valid": false, "reasons": reasons, "measured": measured}
-	var geometry: Dictionary = _geometry(design, context.route_class, context.get("is_connector", false))
+	var geometry: Dictionary = _geometry(design, context.route_class, context.get("is_connector", false), context.get("curvature_limit", -1.0))
 	measured["geometry"] = geometry.measured
 	_add(reasons, geometry.reasons)
+	if not context.get("is_connector", false):
+		var climb: Dictionary = _climb(design, context.route_class, context.get("recommended", 0))
+		measured["climb"] = climb.measured
+		_add(reasons, climb.reasons)
 	var frame: Dictionary = _frame(design)
 	measured["frame"] = frame.measured
 	_add(reasons, frame.reasons)
@@ -105,11 +109,13 @@ func _structure(d: Dictionary) -> Dictionary:
 	return {"reasons": reasons, "measured": {"samples": n, "max_step_m": max_step, "min_step_m": min_step, "max_sagitta_m": max_sagitta, "length_m": d.s[n - 1]}}
 
 
-func _geometry(d: Dictionary, route_class: int, connector: bool) -> Dictionary:
+## `k_limit` (> 0) replaces the class hard curvature for a junction movement
+## designed by its approach speed (policy v2 D3, RoadJunctionPlanner).
+func _geometry(d: Dictionary, route_class: int, connector: bool, k_limit: float = -1.0) -> Dictionary:
 	var reasons: Array = []
 	var n: int = d.s.size()
 	var g_hard: float = Policy.grade_hard(route_class) if not connector else Policy.PATCH_GRADE_MAX + 1e-9
-	var k_hard: float = Policy.curvature_hard(route_class)
+	var k_hard: float = Policy.curvature_hard(route_class) if k_limit <= 0.0 else k_limit
 	var max_grade: float = 0.0
 	var max_dgrade: float = 0.0
 	var max_k: float = 0.0
@@ -158,6 +164,72 @@ func _geometry(d: Dictionary, route_class: int, connector: bool) -> Dictionary:
 		reasons.append("ERR_R6_FRAME")
 	return {"reasons": reasons, "measured": {"max_grade": max_grade, "grade_limit": g_hard, "max_dgrade_deg_per_m": max_dgrade, "max_curvature": max_k, "curvature_limit": k_hard,
 		"max_dk_ds": max_dk, "max_bank_deg": max_bank, "max_dbank_deg_per_m": max_dbank, "tangent_error_deg": tangent_error, "grade_error": grade_error, "curvature_error": curvature_error}}
+
+
+## Climb limits of policy v2 in every direction the piece must be ridden:
+## both for a bidirectional piece (recommended == 0), only the recommended one
+## for a descent-preferred piece (+1 = canonical a -> b, -1 = b -> a). Separate
+## from _geometry so its reason lists are unchanged.
+##   ERR_R6_SUSTAINED_GRADE  rise over any SUSTAINED_WINDOW_M of travel exceeds
+##                           the class sustained grade;
+##   ERR_R6_PITCH_LENGTH     a climb steeper than the class pitch grade, or a
+##                           run above the sustained grade longer than the
+##                           measured pitch length of its steepest grade.
+static func _climb(d: Dictionary, route_class: int, recommended: int) -> Dictionary:
+	var reasons: Array = []
+	var n: int = d.s.size()
+	var g_sus: float = Policy.climb_sustained(route_class)
+	var g_pitch: float = Policy.climb_pitch(route_class)
+	var window: float = Policy.SUSTAINED_WINDOW_M
+	var worst_window: float = 0.0
+	var worst_window_s: float = -1.0
+	var worst_pitch: Dictionary = {}
+	var directions: Array = [1, -1] if recommended == 0 else [recommended]
+	for direction: int in directions:
+		# Travel-ordered copies: distance from the travel start, height, grade.
+		var ts := PackedFloat64Array()
+		var ty := PackedFloat64Array()
+		var tg := PackedFloat64Array()
+		for q in range(n):
+			var k: int = q if direction > 0 else n - 1 - q
+			ts.append(absf(d.s[k] - d.s[0 if direction > 0 else n - 1]))
+			ty.append(d.y[k])
+			tg.append(d.grade[k] * direction)
+		# Sustained windows (two pointers).
+		var j: int = 0
+		for i in range(n):
+			while j < n and ts[j] - ts[i] < window:
+				j += 1
+			if j >= n:
+				break
+			var rise: float = (ty[j] - ty[i]) / (ts[j] - ts[i])
+			if rise > worst_window:
+				worst_window = rise
+				worst_window_s = ts[i] if direction > 0 else d.s[n - 1] - ts[i]
+		# Pitch runs: contiguous travel grade above the sustained grade.
+		var start: int = -1
+		var steepest: float = 0.0
+		for q in range(n + 1):
+			var g: float = tg[q] if q < n else -INF
+			if g > g_sus + 1e-9:
+				if start < 0:
+					start = q
+					steepest = 0.0
+				steepest = maxf(steepest, g)
+			elif start >= 0:
+				var length: float = ts[q - 1] - ts[start]
+				var steepest_deg: float = rad_to_deg(atan(steepest))
+				var limit: float = Policy.pitch_length_limit(route_class, steepest_deg) if steepest <= g_pitch + 1e-6 else 0.0
+				if length > limit + 1e-6 and (worst_pitch.is_empty() or length - limit > worst_pitch.excess_m):
+					worst_pitch = {"travel_s0": ts[start], "travel_s1": ts[q - 1], "length_m": length, "limit_m": limit, "steepest_deg": steepest_deg,
+						"direction": direction, "excess_m": length - limit}
+				start = -1
+	if worst_window > g_sus + 1e-6:
+		reasons.append("ERR_R6_SUSTAINED_GRADE")
+	if not worst_pitch.is_empty():
+		reasons.append("ERR_R6_PITCH_LENGTH")
+	return {"reasons": reasons, "measured": {"worst_window_grade": worst_window, "worst_window_s": worst_window_s, "sustained_limit": g_sus, "pitch_limit": g_pitch,
+		"recommended": recommended, "worst_pitch": worst_pitch}}
 
 
 func _frame(d: Dictionary) -> Dictionary:

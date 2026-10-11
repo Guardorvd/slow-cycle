@@ -67,9 +67,6 @@ const FIT_WEIGHT_CAP: float = 1e4
 ## the lattice search is charged for more, so the fitted curve keeps room for
 ## the transition.
 const PORT_RAMP_SHARE: float = 0.8
-const SLOPE_BLOCK: float = 0.9
-## Margin below the exact roadbed limit of a cross slope.
-const CROSS_LIMIT_SHARE: float = 0.97
 ## Search cost per metre (before the profile weight) of a step across ground the
 ## class roadbed cannot be built on: the lattice still returns a line, the
 ## roadbed condition below sends that stretch to the heading-aware search.
@@ -119,6 +116,9 @@ var relax_grade: float = 1.0
 var relax_slope: float = 1.0
 var relax_band_m: float = 0.0
 var hy_zone_limit: int = HY_MAX_EXPANSIONS
+## Policy v2 limits of the design in progress (climb_limits(request)); empty
+## outside design(), where helpers fall back to the bidirectional class limits.
+var _limits: Dictionary = {}
 
 
 static func create(natural_: Geo.Natural, fit_budget_: int) -> RoadAlignmentDesigner:
@@ -132,6 +132,27 @@ static func _fail(reason: String, detail: Dictionary = {}) -> Dictionary:
 	return {"is_valid": false, "reason_code": reason, "detail": detail}
 
 
+## Policy v2 grade limits of a request in canonical (a -> b) terms. request
+## `recommended`: 0 bidirectional, +1 descent-preferred travelling a -> b,
+## -1 travelling b -> a. dev_*: sustained / development grade of a canonical
+## rise (up) or drop (down); pt_*: pointwise grade; pref_*: search preference.
+static func climb_limits(request: Dictionary) -> Dictionary:
+	var c: int = request.route_class
+	var cls: Dictionary = Policy.CLASSES[c]
+	var r: int = int(request.get("recommended", 0))
+	var climb := {"dev": Policy.climb_sustained(c), "pt": Policy.climb_pitch(c), "pref": cls.grade_pref}
+	if r == 0:
+		return {"recommended": 0, "dev_up": climb.dev, "dev_down": climb.dev, "pt_up": climb.pt, "pt_down": climb.pt, "pref_up": climb.pref, "pref_down": climb.pref}
+	var fall := {"dev": Policy.descent_max(c), "pt": Policy.descent_max(c), "pref": cls.descent_pref}
+	var up: Dictionary = climb if r > 0 else fall
+	var down: Dictionary = fall if r > 0 else climb
+	return {"recommended": r, "dev_up": up.dev, "dev_down": down.dev, "pt_up": up.pt, "pt_down": down.pt, "pref_up": up.pref, "pref_down": down.pref}
+
+
+func _current_limits(route_class: int) -> Dictionary:
+	return _limits if not _limits.is_empty() else climb_limits({"route_class": route_class})
+
+
 # =====================================================================
 # Public entry point
 # =====================================================================
@@ -143,6 +164,7 @@ static func _fail(reason: String, detail: Dictionary = {}) -> Dictionary:
 ## Returns {is_valid, reason_code, design (arrays), candidates (summaries),
 ## selected, features (intents), crossings (actual), metrics}.
 func design(request: Dictionary) -> Dictionary:
+	_limits = climb_limits(request)
 	lattice_extra_reserve = 0.0
 	hybrid_remaining = HY_EDGE_EXPANSIONS
 	curvature_cutoff = SEARCH_ATTEMPTS[0][0]
@@ -179,6 +201,7 @@ func design(request: Dictionary) -> Dictionary:
 			break
 		result = tighter
 	slack_share = 1.0
+	_limits = {}
 	if result.is_valid:
 		result["search_attempt"] = attempt
 	return result
@@ -561,7 +584,8 @@ func _hybrid_edge(request: Dictionary, lattice: Dictionary, profile: Dictionary)
 ## there instead of inside the steep stretch it has to relieve.
 func _gentle_ends(line: Dictionary, i0: int, i1: int, route_class: int) -> Vector2i:
 	var count: int = line.x.size()
-	var g_gentle: float = HY_GENTLE_SHARE * Policy.grade_hard(route_class)
+	var limits: Dictionary = _current_limits(route_class)
+	var g_gentle: float = HY_GENTLE_SHARE * minf(limits.dev_up, limits.dev_down)
 	var a: int = clampi(mini(i0, i1), 0, count - 2)
 	var b: int = clampi(maxi(i0, i1), a + 1, count - 1)
 	while a > 0 and _line_grade(line, a) > g_gentle:
@@ -631,10 +655,12 @@ func _hybrid_zone(request: Dictionary, lattice: Dictionary, profile: Dictionary,
 	var d_theta: float = 2.0 * asin(minf(ell / (2.0 * r_step), 0.99))
 	var k_step: float = 2.0 * sin(0.5 * d_theta) / ell
 	var turn_penalty: float = 6.0 * profile.curv * ell * _curvature_penalty(k_step, k_pref, k_hard, curvature_cutoff)
-	var g_hard: float = relax_grade * Policy.grade_hard(route_class)
-	var g_cap: float = HY_STEP_GRADE_FACTOR * g_hard
+	var limits: Dictionary = _current_limits(route_class)
+	var g_up: float = relax_grade * limits.dev_up
+	var g_down: float = relax_grade * limits.dev_down
+	var g_hard: float = maxf(g_up, g_down)
+	var g_cap: float = HY_STEP_GRADE_FACTOR * relax_grade * maxf(limits.pt_up, limits.pt_down)
 	var slack: float = slack_share * HY_SLACK_SHARE * (cls.cut_max_m + cls.fill_max_m)
-	var g_pref: float = cls.grade_pref
 	var hf: float = Policy.half_footprint(route_class)
 	var bench_cap: float = minf(cls.cut_max_m, cls.cut_max_m + cls.fill_max_m * 0.5)
 	var cross_limit: float = relax_slope * _cross_limit(route_class)
@@ -726,8 +752,8 @@ func _hybrid_zone(request: Dictionary, lattice: Dictionary, profile: Dictionary,
 			# Running excess of the natural rise (up / down) over the class grade
 			# along the path: the pairwise necessary condition, tracked step by step.
 			var rise: float = nh - sh[cur]
-			var up: float = maxf(0.0, su[cur] + rise - g_hard * ell)
-			var down: float = maxf(0.0, sd[cur] - rise - g_hard * ell)
+			var up: float = maxf(0.0, su[cur] + rise - g_up * ell)
+			var down: float = maxf(0.0, sd[cur] - rise - g_down * ell)
 			if up > slack or down > slack:
 				rejects.excess += 1
 				continue
@@ -737,7 +763,8 @@ func _hybrid_zone(request: Dictionary, lattice: Dictionary, profile: Dictionary,
 			if cross > cross_limit:
 				rejects.cross += 1
 				continue
-			var step_cost: float = ell * (profile.len + profile.grade * _grade_term(grade, g_pref, g_hard) + profile.cross * _cross_term(cross, hf, bench_cap) + profile.ride * maxf(0.0, info[3] - 1.0))
+			var g_term: float = _grade_term(grade, limits.pref_up, g_up) if rise >= 0.0 else _grade_term(grade, limits.pref_down, g_down)
+			var step_cost: float = ell * (profile.len + profile.grade * g_term + profile.cross * _cross_term(cross, hf, bench_cap) + profile.ride * maxf(0.0, info[3] - 1.0))
 			if turn != 0.0:
 				step_cost += turn_penalty * absf(turn)
 			var total: float = sg[cur] + step_cost
@@ -860,7 +887,7 @@ func _lattice(request: Dictionary) -> Dictionary:
 	var n: int = axis.x.size()
 	var du: float = axis.length / (n - 1)
 	var dd: float = scale.dd
-	var grade_hard: float = Policy.grade_hard(route_class)
+	var limits: Dictionary = climb_limits(request)
 	# Natural reference grade along the axis -> development zones.
 	var axis_h := PackedFloat64Array()
 	for i in range(n):
@@ -871,8 +898,8 @@ func _lattice(request: Dictionary) -> Dictionary:
 	for i in range(n):
 		var a: int = maxi(0, i - 3)
 		var b: int = mini(n - 1, i + 3)
-		var g: float = absf(axis_h[b] - axis_h[a]) / maxf((b - a) * du, 1.0)
-		if g > 0.7 * grade_hard:
+		var g: float = (axis_h[b] - axis_h[a]) / maxf((b - a) * du, 1.0)
+		if g > 0.7 * limits.dev_up or -g > 0.7 * limits.dev_down:
 			develop[i] = 1
 			develop_count += 1
 	# Crossing windows: the station nearest each pin (in pin order, monotone),
@@ -1045,7 +1072,7 @@ func _lattice(request: Dictionary) -> Dictionary:
 	var lattice := {"is_valid": true, "n": n, "du": du, "dd": dd, "axis": axis, "axis_length": axis.length, "develop": develop, "develop_count": develop_count,
 		"windows": windows, "window_at": window_at, "node_x": node_x, "node_z": node_z, "node_h": node_h, "node_gx": node_gx, "node_gz": node_gz, "node_ride": node_ride,
 		"node_ok": node_ok, "node_near": node_near, "node_window": node_window, "first": first, "jlo": jlo, "jcount": jcount, "offsets": offsets,
-		"start_heading": atan2(start.tz, start.tx), "end_heading": atan2(finish.tz, finish.tx)}
+		"start_heading": atan2(start.tz, start.tx), "end_heading": atan2(finish.tz, finish.tx), "limits": limits}
 	for i in range(1, n - 1):
 		var any: bool = false
 		for k in range(jcount[i]):
@@ -1106,22 +1133,16 @@ static func _grade_term(g: float, g_pref: float, g_hard: float) -> float:
 	return 1.1 + 30.0 * e * e
 
 
-## Steepest natural cross slope on which the class roadbed can be built at all:
-## the edge heights 2 hf sx apart must fit inside the class cut bound and inside
-## the cut the class tie-in reach can daylight (cut slope 1:1), see _profile.
+## Steepest natural cross slope on which the class roadbed can be built at all
+## (policy v2: one definition shared with R5's node closure), see _profile.
 static func _cross_limit(route_class: int) -> float:
-	var cls: Dictionary = Policy.CLASSES[route_class]
-	var hf: float = Policy.half_footprint(route_class)
-	return CROSS_LIMIT_SHARE * minf(cls.cut_max_m / (2.0 * hf), cls.tie_max_m / (cls.tie_max_m + 2.0 * hf))
+	return Policy.cross_limit(route_class)
 
 
-## Steepest natural slope the class roadbed can be built on in any direction: a
-## road at grade g across a slope s has cross slope sqrt(s^2 - g^2), so s^2 can
-## not exceed the class grade limit squared plus the cross-slope limit squared.
+## Steepest natural slope the class roadbed can be built on in any direction
+## (policy v2 buildable slope, shared with R5).
 static func _slope_limit(route_class: int) -> float:
-	var g: float = Policy.grade_hard(route_class)
-	var c: float = _cross_limit(route_class)
-	return minf(SLOPE_BLOCK, sqrt(g * g + c * c))
+	return Policy.buildable_slope(route_class)
 
 
 ## Search cost of a natural cross slope sx under a section of half footprint hf.
@@ -1140,8 +1161,7 @@ static func _cross_term(sx: float, hf: float, bench_cap: float) -> float:
 ## Profile-independent transition terms per (station, node, step).
 func _transitions(lattice: Dictionary, route_class: int) -> void:
 	var cls: Dictionary = Policy.CLASSES[route_class]
-	var g_pref: float = cls.grade_pref
-	var g_hard: float = Policy.grade_hard(route_class)
+	var limits: Dictionary = lattice.get("limits", climb_limits({"route_class": route_class}))
 	var hf: float = Policy.half_footprint(route_class)
 	var bench_cap: float = minf(cls.cut_max_m, cls.cut_max_m + cls.fill_max_m * 0.5)
 	var cross_limit: float = _cross_limit(route_class)
@@ -1201,14 +1221,14 @@ func _transitions(lattice: Dictionary, route_class: int) -> void:
 					var water: PackedFloat64Array = natural.water_search(0.5 * (node_x[a] + node_x[c]), 0.5 * (node_z[a] + node_z[c]), 3.0)
 					if water[0] >= 0.0 and water[2] <= water[3] + 3.0:
 						continue
-				var g: float = absf(node_h[c] - node_h[a]) / length
+				var g: float = (node_h[c] - node_h[a]) / length
 				var px: float = -ez / length
 				var pz: float = ex / length
 				var sx: float = absf(0.5 * ((node_gx[a] + node_gx[c]) * px + (node_gz[a] + node_gz[c]) * pz))
 				var idx: int = k * width + b
 				lens[idx] = length
 				thetas[idx] = atan2(ez, ex)
-				grades[idx] = _grade_term(g, g_pref, g_hard)
+				grades[idx] = _grade_term(g, limits.pref_up, limits.dev_up) if g >= 0.0 else _grade_term(-g, limits.pref_down, limits.dev_down)
 				crosses[idx] = _cross_term(sx, hf, bench_cap) + (UNBUILDABLE_COST if sx > cross_limit else 0.0)
 				rides[idx] = maxf(0.0, 0.5 * (node_ride[a] + node_ride[c]) - 1.0)
 		t_len.append(lens)
@@ -1384,13 +1404,18 @@ func _dynamic_program(lattice: Dictionary, profile: Dictionary, route_class: int
 
 
 ## Necessary grade condition on a lattice line (exact natural heights): between any
-## two nodes the natural rise may exceed g_hard x path length by no more than
-## the class cut + fill capacity. A line failing it cannot be profiled within
-## bounds whatever the fit: the corridor needs more development room than this
-## candidate found (diagnosed, with the worst stretch).
+## two nodes the natural rise (drop) along a -> b may exceed the development
+## grade of a rise (drop) x path length by no more than the class cut + fill
+## capacity. Policy v2: the sustained climb grade in every direction the piece
+## must be climbed, descent_max for the descent of a descent-preferred piece.
+## A line failing it cannot be profiled within bounds whatever the fit: the
+## corridor needs more development room than this candidate found (diagnosed,
+## with the worst stretch).
 func _grade_reach(line: Dictionary, route_class: int) -> Dictionary:
 	var cls: Dictionary = Policy.CLASSES[route_class]
-	var g: float = Policy.grade_hard(route_class)
+	var limits: Dictionary = _current_limits(route_class)
+	var g_up: float = limits.dev_up
+	var g_down: float = limits.dev_down
 	var slack: float = slack_share * (cls.cut_max_m + cls.fill_max_m)
 	var xs: PackedFloat64Array = line.x
 	var zs: PackedFloat64Array = line.z
@@ -1400,32 +1425,37 @@ func _grade_reach(line: Dictionary, route_class: int) -> Dictionary:
 	for i in range(1, n):
 		arc.append(arc[i - 1] + sqrt((xs[i] - xs[i - 1]) ** 2 + (zs[i] - zs[i - 1]) ** 2))
 		h.append(natural.height(clampf(xs[i], 0.0, Geo.DOMAIN_M), clampf(zs[i], 0.0, Geo.DOMAIN_M)))
-	# max over i<j of |h_j - h_i| - g (arc_j - arc_i): track running extrema of
-	# h_i -/+ g arc_i.
+	# max over i<j of (h_j - h_i) - g_up (arc_j - arc_i) and of (h_i - h_j) -
+	# g_down (arc_j - arc_i): track running extrema of h_i - g_up arc_i and
+	# h_i + g_down arc_i.
 	var best: float = -INF
 	var best_pair := Vector2i.ZERO
+	var best_rise: bool = true
 	var low_i: int = 0
 	var high_i: int = 0
 	for j in range(1, n):
-		if h[j - 1] - g * arc[j - 1] < h[low_i] - g * arc[low_i]:
+		if h[j - 1] - g_up * arc[j - 1] < h[low_i] - g_up * arc[low_i]:
 			low_i = j - 1
-		if h[j - 1] + g * arc[j - 1] > h[high_i] + g * arc[high_i]:
+		if h[j - 1] + g_down * arc[j - 1] > h[high_i] + g_down * arc[high_i]:
 			high_i = j - 1
-		var up: float = (h[j] - g * arc[j]) - (h[low_i] - g * arc[low_i])
-		var down: float = (h[high_i] + g * arc[high_i]) - (h[j] + g * arc[j])
+		var up: float = (h[j] - g_up * arc[j]) - (h[low_i] - g_up * arc[low_i])
+		var down: float = (h[high_i] + g_down * arc[high_i]) - (h[j] + g_down * arc[j])
 		if up > best:
 			best = up
 			best_pair = Vector2i(low_i, j)
+			best_rise = true
 		if down > best:
 			best = down
 			best_pair = Vector2i(high_i, j)
+			best_rise = false
 	if best <= slack:
 		return {"is_valid": true}
 	var a: int = best_pair.x
 	var b: int = best_pair.y
 	var length: float = arc[b] - arc[a]
 	return {"is_valid": false, "detail": {"note": "natural rise exceeds the class grade times this line's length plus earthwork capacity: more development room needed than the band allowed this candidate",
-		"s0": arc[a], "s1": arc[b], "i0": a, "i1": b, "rise_m": absf(h[b] - h[a]), "line_length_m": length, "required_length_m": absf(h[b] - h[a]) / g, "excess_m": best, "x": xs[b], "z": zs[b]}}
+		"s0": arc[a], "s1": arc[b], "i0": a, "i1": b, "rise_m": absf(h[b] - h[a]), "line_length_m": length, "required_length_m": absf(h[b] - h[a]) / (g_up if best_rise else g_down), "excess_m": best,
+		"x": xs[b], "z": zs[b], "rise": best_rise, "grade_limit": g_up if best_rise else g_down}}
 
 
 ## Necessary roadbed condition on a line: no stretch crosses natural ground
@@ -1947,13 +1977,33 @@ func _crossing_record(pin: Dictionary, f: Dictionary, request: Dictionary) -> Di
 ## the smoothed natural surface, and bounded cyclic slab projections enforcing
 ## bounds, grade and vertical curvature (comfort limit first, then the hard
 ## limit). Non-convergence is a diagnosed failure, never a clamp.
+## Policy v2 vertical profile: first within the sustained climb grade everywhere
+## (every window then holds it), else within the pointwise pitch / descent
+## grades with the climb windows and pitch lengths left to the validator's
+## `_climb` stage. Grades are canonical (a -> b): rise <= up, drop <= down.
 func _profile(request: Dictionary, spline: RMath.PlanSpline, section: Dictionary, crossing: Dictionary) -> Dictionary:
+	var limits: Dictionary = climb_limits(request)
+	var passes: Array = [[limits.dev_up, limits.dev_down]]
+	if limits.pt_up > limits.dev_up + 1e-9 or limits.pt_down > limits.dev_down + 1e-9:
+		passes.append([limits.pt_up, limits.pt_down])
+	var result: Dictionary = {}
+	for k in range(passes.size()):
+		result = _profile_pass(request, spline, section, crossing, passes[k][0], passes[k][1])
+		if result.is_valid:
+			result["grade_pass"] = k
+			return result
+	return result
+
+
+func _profile_pass(request: Dictionary, spline: RMath.PlanSpline, section: Dictionary, crossing: Dictionary, up_limit: float, down_limit: float) -> Dictionary:
 	var route_class: int = request.route_class
 	var cls: Dictionary = Policy.CLASSES[route_class]
 	var scale: Dictionary = SCALES[route_class]
 	var n: int = section.n
 	var ds: float = section.ds
-	var g: float = Policy.grade_hard(route_class) * PROFILE_GRADE_SHARE
+	var g_up: float = up_limit * PROFILE_GRADE_SHARE
+	var g_down: float = down_limit * PROFILE_GRADE_SHARE
+	var g: float = maxf(g_up, g_down)
 	var hf: float = Policy.half_footprint(route_class)
 	var hc: PackedFloat64Array = section.hc
 	var hl: PackedFloat64Array = section.hl
@@ -2012,14 +2062,14 @@ func _profile(request: Dictionary, spline: RMath.PlanSpline, section: Dictionary
 		lo[n] = finish.y
 		hi[n] = finish.y
 		pinned[n] = 1
-	var big_lo: PackedFloat64Array = RMath.lipschitz_lower(lo, g, ds)
-	var big_hi: PackedFloat64Array = RMath.lipschitz_upper(hi, g, ds)
+	var big_lo: PackedFloat64Array = _lip_lower(lo, g_up, g_down, ds)
+	var big_hi: PackedFloat64Array = _lip_upper(hi, g_up, g_down, ds)
 	for i in range(n + 1):
 		if big_lo[i] > big_hi[i] + 1e-6:
 			return _profile_failure(i, lo, hi, g, ds, section, kind)
 	var target: PackedFloat64Array = RMath.gaussian(hc, 3.0)
-	var upper: PackedFloat64Array = RMath.lipschitz_upper(target, g, ds)
-	var lower: PackedFloat64Array = RMath.lipschitz_lower(target, g, ds)
+	var upper: PackedFloat64Array = _lip_upper(target, g_up, g_down, ds)
+	var lower: PackedFloat64Array = _lip_lower(target, g_up, g_down, ds)
 	var y := PackedFloat64Array()
 	y.resize(n + 1)
 	for i in range(n + 1):
@@ -2031,8 +2081,8 @@ func _profile(request: Dictionary, spline: RMath.PlanSpline, section: Dictionary
 	# the retained 1.2 deg/m so the quintic interpolant stays inside).
 	var hard_c: float = 0.8 * deg_to_rad(Policy.MAX_GRADE_CHANGE_DEG_PER_M)
 	var comfort_c: float = minf(hard_c, scale.v_comfort)
-	var grade_start: Array = [-g * ds, g * ds]
-	var grade_end: Array = [-g * ds, g * ds]
+	var grade_start: Array = [-g_down * ds, g_up * ds]
+	var grade_end: Array = [-g_down * ds, g_up * ds]
 	if start.grade_pinned:
 		grade_start = [start.grade * ds, start.grade * ds]
 	if finish.grade_pinned:
@@ -2050,13 +2100,14 @@ func _profile(request: Dictionary, spline: RMath.PlanSpline, section: Dictionary
 	var start_y: PackedFloat64Array = y
 	while attempt < ladder.size():
 		var c_lim: float = ladder[attempt][0]
-		var g_lim: float = g * ladder[attempt][1]
+		var g_lim: float = g_up * ladder[attempt][1]
+		var g_lim_down: float = g_down * ladder[attempt][1]
 		attempt += 1
 		fit_evaluations += 1
-		var gs: Array = [maxf(grade_start[0], -g_lim * ds), minf(grade_start[1], g_lim * ds)] if not start.grade_pinned else grade_start
-		var ge: Array = [maxf(grade_end[0], -g_lim * ds), minf(grade_end[1], g_lim * ds)] if not finish.grade_pinned else grade_end
-		var prepared: Dictionary = _project_profile(start_y, big_lo, big_hi, pinned, g_lim * ds, c_lim * ds * ds)
-		var solved: Dictionary = RMath.solve_profile(big_lo, big_hi, gs, ge, g_lim * ds, c_lim * ds * ds, prepared.y, PROFILE_TRACK_GRADE, PROFILE_TRACK_JERK)
+		var gs: Array = [maxf(grade_start[0], -g_lim_down * ds), minf(grade_start[1], g_lim * ds)] if not start.grade_pinned else grade_start
+		var ge: Array = [maxf(grade_end[0], -g_lim_down * ds), minf(grade_end[1], g_lim * ds)] if not finish.grade_pinned else grade_end
+		var prepared: Dictionary = _project_profile(start_y, big_lo, big_hi, pinned, g_lim * ds, c_lim * ds * ds, g_lim_down * ds)
+		var solved: Dictionary = RMath.solve_profile(big_lo, big_hi, gs, ge, g_lim * ds, c_lim * ds * ds, prepared.y, PROFILE_TRACK_GRADE, PROFILE_TRACK_JERK, g_lim_down * ds)
 		if not solved.feasible:
 			var detail: Dictionary = solved.fail_detail.duplicate()
 			detail["s"] = s[solved.fail_index]
@@ -2073,7 +2124,7 @@ func _profile(request: Dictionary, spline: RMath.PlanSpline, section: Dictionary
 				solved.y[i] = lo[i]
 		y_final = solved.y
 		profile = _profile_spline_states(solved, s, ds)
-		var worst: Dictionary = _certify_profile(profile, s[n], Policy.grade_hard(route_class))
+		var worst: Dictionary = _certify_profile(profile, s[n], up_limit, down_limit)
 		if worst.is_empty():
 			last_failure = {}
 			break
@@ -2084,12 +2135,14 @@ func _profile(request: Dictionary, spline: RMath.PlanSpline, section: Dictionary
 	return {"is_valid": true, "spline": profile, "y": y_final, "kind": kind, "lo": big_lo, "hi": big_hi, "bank": bank, "attempts": attempt}
 
 
-## Fine (0.5 m) check of the profile interpolant: grade and grade change.
-static func _certify_profile(profile: RMath.ProfileSpline, total: float, g_hard: float) -> Dictionary:
+## Fine (0.5 m) check of the profile interpolant: grade (canonical rise <=
+## g_hard, drop <= g_down; g_down < 0 = symmetric) and grade change.
+static func _certify_profile(profile: RMath.ProfileSpline, total: float, g_hard: float, g_down: float = -1.0) -> Dictionary:
 	var steps: int = maxi(4, ceili(total / 0.5))
+	var drop: float = g_hard if g_down < 0.0 else g_down
 	for q in range(steps + 1):
 		var p: PackedFloat64Array = profile.eval(total * q / steps)
-		if absf(p[1]) > g_hard:
+		if p[1] > g_hard or -p[1] > drop:
 			return {"reason": "ERR_R6_GRADE", "s": total * q / steps, "value": absf(p[1])}
 		var dgrade: float = rad_to_deg(absf(p[2]) / (1.0 + p[1] * p[1]))
 		if dgrade > Policy.MAX_GRADE_CHANGE_DEG_PER_M:
@@ -2126,7 +2179,8 @@ static func _profile_spline_states(solved: Dictionary, s: PackedFloat64Array, ds
 ## curvature-change slabs (third differences <= cd / JERK_SAMPLES); pinned
 ## samples never move. At most PROFILE_PREP_SWEEPS sweeps: the result is a
 ## near-feasible tracking reference, not a certificate.
-static func _project_profile(start: PackedFloat64Array, lo: PackedFloat64Array, hi: PackedFloat64Array, pinned: PackedByteArray, gd: float, cd: float) -> Dictionary:
+static func _project_profile(start: PackedFloat64Array, lo: PackedFloat64Array, hi: PackedFloat64Array, pinned: PackedByteArray, gd: float, cd: float, gd_down: float = -1.0) -> Dictionary:
+	var g_drop: float = gd if gd_down < 0.0 else gd_down
 	var jd: float = cd / JERK_SAMPLES
 	var y: PackedFloat64Array = start.duplicate()
 	var n: int = y.size()
@@ -2162,8 +2216,8 @@ static func _project_profile(start: PackedFloat64Array, lo: PackedFloat64Array, 
 					y[i + 2] -= f * w3
 		for i in range(n - 1):
 			var d: float = y[i + 1] - y[i]
-			if absf(d) > gd:
-				var excess: float = d - signf(d) * gd
+			if d > gd or -d > g_drop:
+				var excess: float = d - (gd if d > 0.0 else -g_drop)
 				var a: float = 0.0 if pinned[i] == 1 else 1.0
 				var b: float = 0.0 if pinned[i + 1] == 1 else 1.0
 				if a + b > 0.0:
@@ -2177,7 +2231,7 @@ static func _project_profile(start: PackedFloat64Array, lo: PackedFloat64Array, 
 			for i in range(n):
 				var v: float = maxf(lo[i] - y[i], y[i] - hi[i])
 				if i < n - 1:
-					v = maxf(v, absf(y[i + 1] - y[i]) - gd)
+					v = maxf(v, maxf(y[i + 1] - y[i] - gd, y[i] - y[i + 1] - g_drop))
 				if i > 0 and i < n - 1:
 					v = maxf(v, absf(y[i - 1] - 2.0 * y[i] + y[i + 1]) - cd)
 				violation = maxf(violation, v)
@@ -2508,6 +2562,29 @@ static func _tie(delta: float, slope: float) -> float:
 		var rate: float = Policy.FILL_SIDE_SLOPE + slope
 		return INF if rate <= 0.0 else delta / rate
 	return 0.0
+
+
+## Asymmetric Lipschitz envelopes of a sampled profile (canonical a -> b): rise
+## per sample <= up * ds, drop <= down * ds; equal limits reproduce
+## RMath.lipschitz_upper / lipschitz_lower exactly.
+static func _lip_upper(values: PackedFloat64Array, up: float, down: float, ds: float) -> PackedFloat64Array:
+	var n: int = values.size()
+	var r: PackedFloat64Array = values.duplicate()
+	for i in range(1, n):
+		r[i] = minf(r[i], r[i - 1] + up * ds)
+	for i in range(n - 2, -1, -1):
+		r[i] = minf(r[i], r[i + 1] + down * ds)
+	return r
+
+
+static func _lip_lower(values: PackedFloat64Array, up: float, down: float, ds: float) -> PackedFloat64Array:
+	var n: int = values.size()
+	var r: PackedFloat64Array = values.duplicate()
+	for i in range(1, n):
+		r[i] = maxf(r[i], r[i - 1] - down * ds)
+	for i in range(n - 2, -1, -1):
+		r[i] = maxf(r[i], r[i + 1] - up * ds)
+	return r
 
 
 static func _smoothstep(t: float) -> float:

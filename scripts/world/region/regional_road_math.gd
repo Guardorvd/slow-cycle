@@ -420,17 +420,21 @@ static func _poly_nearest(xs: PackedFloat64Array, ps: PackedFloat64Array, tx: fl
 ##   gd, cd            grade limit p and curvature limit q per sample (metres)
 ##   target            desired heights (the tracking reference)
 ##   w_grade, w_jerk   tracking weight of the grade state / of curvature changes
+##   gd_down           optional descent limit per sample (metres, >= 0) in the
+##                     canonical direction: p in [-gd_down, gd]; negative (the
+##                     default) keeps the symmetric bound [-gd, gd]
 ## Returns {feasible, y, p, q, fail_index, fail_detail}; q has n entries (one
 ## per interval), p is grade * ds.
 static func solve_profile(lo: PackedFloat64Array, hi: PackedFloat64Array, grade_start: Array, grade_end: Array, gd: float, cd: float,
-		target: PackedFloat64Array, w_grade: float, w_jerk: float) -> Dictionary:
+		target: PackedFloat64Array, w_grade: float, w_jerk: float, gd_down: float = -1.0) -> Dictionary:
+	var g_lo: float = -gd if gd_down < 0.0 else -gd_down
 	var count: int = lo.size()
 	var ref: float = 0.5 * (lo[0] + hi[0])
 	var eps_y: float = 2e-5
 	var eps_p: float = 2e-6
 	var polys_x: Array = []
 	var polys_p: Array = []
-	var p_lo: float = maxf(-gd, grade_start[0] - eps_p)
+	var p_lo: float = maxf(g_lo, grade_start[0] - eps_p)
 	var p_hi: float = minf(gd, grade_start[1] + eps_p)
 	var cur: Array = _poly_box(PackedFloat64Array([lo[0] - ref - eps_y, hi[0] - ref + eps_y, hi[0] - ref + eps_y, lo[0] - ref - eps_y]),
 		PackedFloat64Array([p_lo, p_lo, p_hi, p_hi]), lo[0] - ref - eps_y, hi[0] - ref + eps_y, p_lo, p_hi)
@@ -444,10 +448,10 @@ static func solve_profile(lo: PackedFloat64Array, hi: PackedFloat64Array, grade_
 		for k in range(xs.size()):
 			xs[k] += ps[k]
 		var sum: Array = _poly_sum_segment(xs, ps, 0.5 * cd, cd)
-		var pl: float = -gd
+		var pl: float = g_lo
 		var ph: float = gd
 		if i == count - 1:
-			pl = maxf(-gd, grade_end[0] - eps_p)
+			pl = maxf(g_lo, grade_end[0] - eps_p)
 			ph = minf(gd, grade_end[1] + eps_p)
 		cur = _poly_box(sum[0], sum[1], lo[i] - ref - eps_y, hi[i] - ref + eps_y, pl, ph)
 		if cur[0].is_empty():

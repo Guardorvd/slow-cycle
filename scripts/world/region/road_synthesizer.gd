@@ -52,13 +52,22 @@ var _validator: Validator
 var _settings: Dictionary
 var _bands: Array = []
 var _timings: Dictionary = {}
+var _fit_total: int = 0
+var _surface: RefCounted
+var _hfield: RefCounted
+var _threads: int = 1
+## Failures a descent-preferred design may relieve (policy v2 climb limits).
+const CLIMB_REASONS: Array[String] = ["ERR_R6_GRADE", "ERR_R6_SUSTAINED_GRADE", "ERR_R6_PITCH_LENGTH"]
 
 
 static func _result(status: int, plan: RefCounted, reason: String, diagnostics: Dictionary) -> Dictionary:
 	return {"schema": Policy.RESULT_SCHEMA, "status": Policy.STATUS_NAMES[status], "is_valid": status == Policy.Status.READY, "plan": plan, "reason_code": reason, "diagnostics": diagnostics}
 
 
-static func synthesize(region_plan: RefCounted, terrain_field: RefCounted, hydrology_plan: RefCounted, graph: RefCounted, settings: Variant = {}) -> Dictionary:
+## `threads` (PR1, additive): edge interiors are designed on that many
+## WorkerThreadPool threads; outcomes do not depend on it (every piece is
+## designed in isolation; conflicts are resolved afterwards in stable order).
+static func synthesize(region_plan: RefCounted, terrain_field: RefCounted, hydrology_plan: RefCounted, graph: RefCounted, settings: Variant = {}, threads: int = 1) -> Dictionary:
 	if region_plan == null or terrain_field == null or hydrology_plan == null or graph == null:
 		return _result(Policy.Status.REJECT, null, "ERR_R6_INPUT_MISSING", {})
 	if not region_plan is Region or not terrain_field is Terrain or not hydrology_plan is Hydro or not graph is Graph:
@@ -94,6 +103,9 @@ static func synthesize(region_plan: RefCounted, terrain_field: RefCounted, hydro
 	var ox: float = graph.get_origin_x_m()
 	var oz: float = graph.get_origin_z_m()
 	synthesizer._natural = Geo.Natural.create(surface.surface, ride.field, hydro.field, hydrology_plan, ox, oz, resolved.settings.max_natural_queries)
+	synthesizer._surface = surface.surface
+	synthesizer._hfield = hydro.field
+	synthesizer._threads = maxi(1, threads)
 	synthesizer._designer = Designer.create(synthesizer._natural, resolved.settings.max_fit_evaluations)
 	synthesizer._junctions = Junctions.create(synthesizer._natural)
 	synthesizer._validator = Validator.create(synthesizer._natural)
@@ -126,6 +138,10 @@ func _run() -> Dictionary:
 	# --- 3. Junctions ---
 	var junctions: Dictionary = {}
 	var ports: Dictionary = {}
+	var junction_centres: Array = []
+	for node: Dictionary in nodes:
+		if node.kind == Graph.NodeKind.JUNCTION:
+			junction_centres.append([node.id, node.x_cm / 100.0, node.z_cm / 100.0])
 	for node: Dictionary in nodes:
 		if node.kind != Graph.NodeKind.JUNCTION:
 			continue
@@ -137,11 +153,16 @@ func _run() -> Dictionary:
 			for crossing: Dictionary in graph.get_corridor(e).crossings:
 				var u: float = band.project_u(crossing.x_cm / 100.0, crossing.z_cm / 100.0)
 				var from_node: float = u if at_start else band.length() - u
-				if from_node < 60.0:
+				# No R5 crossing inside the port zone (D3; ports up to 96 m).
+				if from_node < Policy.JUNCTION_ZONE_M + 10.0:
 					cap = minf(cap, from_node - 10.0)
 			incident.append({"edge_id": e, "class": edges[e].class, "band": band, "at_start": at_start, "route_id": edges[e].route_id, "radius_cap": cap})
 		incident.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.edge_id < b.edge_id)
-		var record: Dictionary = _junctions.plan_junction(node, incident, routes)
+		var others: Array = []
+		for centre: Array in junction_centres:
+			if centre[0] != node.id:
+				others.append([centre[1], centre[2]])
+		var record: Dictionary = _junctions.plan_junction(node, incident, routes, others)
 		junctions[node.id] = record
 		for port: Dictionary in record.ports:
 			ports[Vector2i(node.id, port.edge_id)] = port
@@ -153,8 +174,22 @@ func _run() -> Dictionary:
 	var pieces: Dictionary = {}
 	var crossing_records: Array = []
 	var accepted: Array = []
+	var slots: Array = []
 	for e: int in order:
-		var outcome: Dictionary = _edge(e, edges, nodes, junctions, ports, accepted)
+		slots.append({"e": e, "prep": _prepare_edge(e, edges, nodes, ports)})
+	var job := func(i: int) -> void:
+		slots[i]["independent"] = _independent(slots[i].prep, _tools())
+	if _threads > 1 and slots.size() > 1:
+		var group: int = WorkerThreadPool.add_group_task(job, slots.size(), _threads, false, "r6_edges")
+		WorkerThreadPool.wait_for_group_task_completion(group)
+	else:
+		for i in range(slots.size()):
+			job.call(i)
+	for slot: Dictionary in slots:
+		var e: int = slot.e
+		_fit_total += slot.independent.fit_evaluations
+		_natural.finished_queries += slot.independent.natural_queries
+		var outcome: Dictionary = _finish_edge(slot.prep, slot.independent, accepted)
 		edge_records[e] = outcome.record
 		crossing_records.append_array(outcome.crossings)
 		if outcome.has("piece"):
@@ -175,7 +210,8 @@ func _run() -> Dictionary:
 			if movement.status != Policy.MOVEMENT_READY:
 				movement.erase("design")
 				continue
-			var check: Dictionary = _validator.validate_piece(movement.design, {"route_class": movement.limit_class, "band_request": {"union_bands": incident_bands}, "is_connector": true})
+			var check: Dictionary = _validator.validate_piece(movement.design, {"route_class": movement.limit_class, "band_request": {"union_bands": incident_bands}, "is_connector": true,
+				"curvature_limit": movement.curvature_limit})
 			movement["certification"] = check.measured
 			if not check.is_valid:
 				movement.status = Policy.MOVEMENT_UNAVAILABLE
@@ -280,7 +316,7 @@ func _run() -> Dictionary:
 		"settings": _settings, "status": Policy.STATUS_NAMES[status], "reason_codes": reasons, "edges": edge_list, "junctions": junction_records, "crossings": crossing_records,
 		"pieces": pieces, "intents": intents, "network": network, "overlaps": overlap}
 	var diagnostics := {"timings_s": _timings, "natural_queries": _natural.queries, "ride_queries": _natural.ride_queries, "validator_ride_samples": _validator.ride_samples,
-		"fit_evaluations": _designer.fit_evaluations + _junctions.fit_evaluations, "dp_transitions": _designer.dp_transitions, "budgets": _settings}
+		"fit_evaluations": _fit_total + _junctions.fit_evaluations, "dp_transitions": _designer.dp_transitions, "budgets": _settings, "natural_queries_total": _natural.total_queries()}
 	# Diagnostic records may hold unbounded measures (e.g. no sight station
 	# checked, no feasible connector). Canonical encoding refuses non-finite
 	# numbers, so they become null and are counted. Design arrays are never
@@ -351,7 +387,15 @@ static func _junction_status(record: Dictionary) -> void:
 
 
 ## One edge interior: request, design, conflict retry, certification.
-func _edge(e: int, edges: Array, nodes: Array, junctions: Dictionary, ports: Dictionary, accepted: Array) -> Dictionary:
+## Per-edge isolated tools: own natural sampler (caches, budget), designer and
+## validator; nothing mutable is shared between edges.
+func _tools() -> Dictionary:
+	var natural: Geo.Natural = Geo.Natural.create(_surface, _ride, _hfield, _hydrology_plan, _graph.get_origin_x_m(), _graph.get_origin_z_m(), _settings.max_natural_queries)
+	return {"natural": natural, "designer": Designer.create(natural, _settings.max_fit_evaluations), "validator": Validator.create(natural)}
+
+
+## Edge record, crossing entries, zones, pins and the design request.
+func _prepare_edge(e: int, edges: Array, nodes: Array, ports: Dictionary) -> Dictionary:
 	var graph: RefCounted = _graph
 	var edge: Dictionary = edges[e]
 	var corridor: Dictionary = graph.get_corridor(e)
@@ -409,38 +453,64 @@ func _edge(e: int, edges: Array, nodes: Array, junctions: Dictionary, ports: Dic
 	var gateway: bool = nodes[edge.a].kind == Graph.NodeKind.GATEWAY or nodes[edge.b].kind == Graph.NodeKind.GATEWAY
 	var request := {"edge_id": e, "route_class": route_class, "band": band, "start": ends[0], "end": ends[1], "pins": pins, "zones": zones,
 		"allowed_hints": Graph.ALLOWED_HINTS[route_class], "gateway_ends": gateway, "avoid": []}
-	var designed: Dictionary = _designer.design(request)
-	var conflicts: Array = []
-	if designed.is_valid:
-		conflicts = _conflicts(designed.design, zones, route_class, accepted)
-		if not conflicts.is_empty():
-			# One bounded retry keeping clear of the conflicting roads.
-			var avoid: Array = []
-			for c: Dictionary in conflicts:
-				var other: Dictionary = c.other
-				for i in range(0, other.design.s.size(), 2):
-					avoid.append(PackedFloat64Array([other.design.x[i], other.design.z[i], 0.5 * other.design.width[i] + Policy.half_footprint(route_class) + 2.0]))
-			request.avoid = avoid
-			var retry: Dictionary = _designer.design(request)
-			if retry.is_valid and _conflicts(retry.design, zones, route_class, accepted).is_empty():
-				designed = retry
-				conflicts = []
-				record.detail["conflict_retry"] = "resolved by avoidance"
-			else:
-				record.detail["conflict_retry"] = "unresolved"
+	return {"e": e, "edge": edge, "record": record, "crossings": crossings, "zones": zones, "pins": pins, "request": request, "ends": ends, "route_class": route_class}
+
+
+## The order-independent part of an edge (run on any thread): isolated design
+## and certification, and for SINGLETRACK / TECHNICAL a descent-preferred
+## design towards the lower end when the piece cannot be climbed both ways
+## (policy v2; the network keeps it only beside an easier connection).
+func _independent(prep: Dictionary, tools: Dictionary) -> Dictionary:
+	var request: Dictionary = prep.request.duplicate()
+	var attempt: Dictionary = _attempt_core(request, prep.pins, tools)
+	var out := {"attempt": attempt, "recommended": 0, "detail": {}}
+	if not attempt.ok and Policy.CLASSES[prep.route_class].descent_preferred and attempt.reason in CLIMB_REASONS:
+		var recommended: int = 1 if prep.ends[0].y >= prep.ends[1].y else -1
+		out.detail["bidirectional_attempt"] = {"reason": attempt.reason, "failure_xz": attempt.failure_xz}
+		request["recommended"] = recommended
+		var descent: Dictionary = _attempt_core(request, prep.pins, tools)
+		if descent.ok:
+			out.attempt = descent
+			out.recommended = recommended
+		else:
+			out.detail["descent_attempt"] = {"reason": descent.reason, "failure_xz": descent.failure_xz, "recommended": recommended}
+	out["fit_evaluations"] = tools.designer.fit_evaluations
+	out["natural_queries"] = tools.natural.total_queries()
+	return out
+
+
+## Sequential completion in (class, id) order: conflicts with the accepted
+## pieces (one bounded avoidance retry), then the edge record and crossings.
+func _finish_edge(prep: Dictionary, independent: Dictionary, accepted: Array) -> Dictionary:
+	var e: int = prep.e
+	var edge: Dictionary = prep.edge
+	var record: Dictionary = prep.record
+	var crossings: Array = prep.crossings
+	var zones: Array = prep.zones
+	var pins: Array = prep.pins
+	var route_class: int = prep.route_class
+	var request: Dictionary = prep.request.duplicate()
+	request["recommended"] = independent.recommended
+	record.detail.merge(independent.detail, true)
+	var attempt: Dictionary = _resolve_conflicts(independent.attempt, request, zones, route_class, accepted, pins)
+	var designed: Dictionary = attempt.designed
+	var conflicts: Array = attempt.conflicts
+	record["recommended"] = int(request.get("recommended", 0))
 	record.candidates = designed.get("candidates", [])
 	record.detail["lattice"] = designed.get("lattice", {})
+	if attempt.has("conflict_retry"):
+		record.detail["conflict_retry"] = attempt.conflict_retry
 	if not designed.is_valid or not conflicts.is_empty():
 		var reason: String = designed.reason_code if not designed.is_valid else "ERR_R6_UNPLANNED_INTERSECTION"
 		record.reasons.append(reason)
 		record.detail["failure"] = designed.get("detail", {}) if not designed.is_valid else {"conflicts": conflicts.map(func(c: Dictionary) -> Dictionary: return {"with": c.other.piece_id, "s": c.s, "x": c.x, "z": c.z})}
+		record["failure_xz"] = attempt.failure_xz
 		for entry: Dictionary in crossings:
 			if entry.reasons.is_empty():
 				entry.reasons.append("ERR_R6_EDGE_UNAVAILABLE")
 		return {"record": record, "crossings": crossings, "zones": zones}
 	var design: Dictionary = designed.design
-	var context := {"route_class": route_class, "band_request": request, "pins": pins, "crossings": designed.crossings}
-	var check: Dictionary = _validator.validate_piece(design, context)
+	var check: Dictionary = attempt.check
 	record.metrics = designed.metrics
 	record.metrics["profile"] = designed.profile
 	record["certification"] = check.measured
@@ -482,6 +552,7 @@ func _edge(e: int, edges: Array, nodes: Array, junctions: Dictionary, ports: Dic
 	if not check.is_valid:
 		record.reasons.append_array(check.reasons)
 		record.detail["failure"] = {"certification": check.measured}
+		record["failure_xz"] = attempt.failure_xz
 		for entry: Dictionary in crossings:
 			entry.status = "UNRESOLVED" if entry.status == "RESOLVED" else entry.status
 			entry.erase("design")
@@ -498,7 +569,98 @@ func _edge(e: int, edges: Array, nodes: Array, junctions: Dictionary, ports: Dic
 	for z: Dictionary in zones:
 		zone_centres.append([z.x, z.z])
 	return {"record": record, "crossings": crossings, "zones": zone_centres,
-		"piece": {"piece_id": piece_id, "kind": "EDGE", "owner": {"edge_id": e, "route_id": edge.route_id}, "route_class": route_class, "design": design}}
+		"piece": {"piece_id": piece_id, "kind": "EDGE", "owner": {"edge_id": e, "route_id": edge.route_id}, "route_class": route_class, "design": design, "recommended": record.recommended}}
+
+
+## One isolated design attempt of an edge interior (PR1 per-piece isolation:
+## fresh natural-query budget and caches, fit budget per piece): design and
+## certification with the given tools. failure_xz is the region-local point
+## the diagnosis names (feedback to R5), else the band middle.
+func _attempt_core(request: Dictionary, pins: Array, tools: Dictionary) -> Dictionary:
+	var natural: Geo.Natural = tools.natural
+	var designer: Designer = tools.designer
+	natural.begin_piece()
+	var designed: Dictionary = designer.design(request)
+	var out := {"ok": false, "reason": "", "designed": designed, "conflicts": [], "check": {}, "failure_xz": []}
+	var band: Geo.Band = request.band
+	var middle: PackedFloat64Array = band.at_u(0.5 * band.length())
+	if not designed.is_valid:
+		out.reason = designed.reason_code
+		out.failure_xz = _point_of(designed.get("detail", {}), middle)
+		return out
+	var context := {"route_class": request.route_class, "band_request": request, "pins": pins, "crossings": designed.crossings, "recommended": int(request.get("recommended", 0))}
+	var check: Dictionary = tools.validator.validate_piece(designed.design, context)
+	out.check = check
+	if not check.is_valid:
+		out.reason = check.reasons[0]
+		out.failure_xz = _certification_point(designed.design, check.measured, middle)
+		return out
+	out.ok = true
+	return out
+
+
+## Conflicts of a designed piece with the accepted ones: one bounded retry
+## keeping clear of the conflicting roads (sequential tools), re-certified.
+func _resolve_conflicts(attempt: Dictionary, request: Dictionary, zones: Array, route_class: int, accepted: Array, pins: Array) -> Dictionary:
+	var designed: Dictionary = attempt.designed
+	if not designed.is_valid:
+		return attempt
+	var conflicts: Array = _conflicts(designed.design, zones, route_class, accepted)
+	if conflicts.is_empty():
+		return attempt
+	var avoid: Array = []
+	for c: Dictionary in conflicts:
+		var other: Dictionary = c.other
+		for i in range(0, other.design.s.size(), 2):
+			avoid.append(PackedFloat64Array([other.design.x[i], other.design.z[i], 0.5 * other.design.width[i] + Policy.half_footprint(route_class) + 2.0]))
+	var retry_request: Dictionary = request.duplicate()
+	retry_request.avoid = avoid
+	_designer.fit_evaluations = 0
+	var retry: Dictionary = _attempt_core(retry_request, pins, {"natural": _natural, "designer": _designer, "validator": _validator})
+	_fit_total += _designer.fit_evaluations
+	if retry.designed.is_valid and _conflicts(retry.designed.design, zones, route_class, accepted).is_empty():
+		retry["conflict_retry"] = "resolved by avoidance"
+		return retry
+	var out: Dictionary = attempt.duplicate()
+	out.conflicts = conflicts
+	out.ok = false
+	out.reason = "ERR_R6_UNPLANNED_INTERSECTION"
+	out.failure_xz = [conflicts[0].x, conflicts[0].z]
+	out["conflict_retry"] = "unresolved"
+	return out
+
+
+## First (x, z) pair found depth-first in a diagnostic record.
+static func _point_of(detail: Variant, fallback: PackedFloat64Array) -> Array:
+	if detail is Dictionary:
+		if detail.has("x") and detail.has("z") and (detail.x is float or detail.x is int) and (detail.z is float or detail.z is int):
+			return [float(detail.x), float(detail.z)]
+		for key: Variant in detail:
+			var found: Array = _point_of(detail[key], PackedFloat64Array())
+			if not found.is_empty():
+				return found
+	elif detail is Array:
+		for item: Variant in detail:
+			var found: Array = _point_of(item, PackedFloat64Array())
+			if not found.is_empty():
+				return found
+	return [] if fallback.is_empty() else [fallback[0], fallback[1]]
+
+
+## Certification failure location: the worst climb window / pitch station when
+## the climb stage failed, else the first located diagnostic.
+static func _certification_point(design: Dictionary, measured: Dictionary, fallback: PackedFloat64Array) -> Array:
+	var climb: Dictionary = measured.get("climb", {})
+	var s: float = -1.0
+	if not climb.get("worst_pitch", {}).is_empty():
+		var pitch: Dictionary = climb.worst_pitch
+		s = pitch.travel_s0 if pitch.direction > 0 else design.s[design.s.size() - 1] - pitch.travel_s0
+	elif climb.get("worst_window_grade", 0.0) > climb.get("sustained_limit", INF):
+		s = climb.worst_window_s
+	if s >= 0.0:
+		var k: int = clampi(design.s.bsearch(s), 0, design.s.size() - 1)
+		return [design.x[k], design.z[k]]
+	return _point_of(measured, fallback)
 
 
 ## Signed curvature of the selected candidate's faired plan line (the intent
