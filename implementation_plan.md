@@ -744,3 +744,22 @@ Disposable copy `work/baseline` = `git archive pr1-baseline` (52a9c34), fresh E0
 | R7 live, cache repopulated | m0_base_r7_live2 (253 s) | 426044/0 complete, fixture_equal=true; surface `e1523d47…`, meshes `87ab6861…`/`a0503081…`/`2cdb9357…`, R5 55.7 s, R6 60.3 s, deformer 7.5 s, mesh build 63.2 s (parallel load) |
 
 T2.1: fixture `scripts/test/fixtures/r7_certified_route_184729_v1.bin` (+ `.json`), SHA `70b2738e…`, route digest `835422e7…`, plan `e9c11c39…`, extracted from the authenticated baseline cache (`m0_fixture_extract`). T2.2/T2.3 implemented. HEAD `test_final_surface --source=fixture` (m0_head_r7_fixture, 113.7 s): 424259/0 complete, groups_run contracts/surface/collision, groups_not_run [handoff] (FIXTURE_NO_LIVE_R5_R6), surface and all three mesh signatures equal to the baseline (difference 1785 = handoff + live-equality assertions).
+
+## M1 — first ride and measured envelope (DONE)
+
+New: `scenes/region/region_world.tscn` + `scripts/world/region_world.gd` (runtime composition root v0: forest environment, sun, existing `bicycle.tscn`, HUD, fader; content attach, spawn at ground +0.45 m, duck-typed `request_bike_recovery` = nearest riding-path point stepped back 20 m), `scripts/test/region_ride_bot.gd` (Input-only pure pursuit + curvature/braking speed plan), `test_ride_envelope.gd`, `test_region_ride.gd`, `capture_region_world.gd`. No player/camera/input/project-setting change.
+
+Envelope (`m1_envelope_all_final`, 407.6 s, 204/0, controller sha recorded in the report), real BicycleController on registered trimesh ramps, Input only:
+
+| Measure | Gravel (layer 2) | Rough (2\|16) | Grass (4) |
+|---|---|---|---|
+| Pedal-hold steady speed 0/2/4/5/5.5/6/6.5/7 deg (m/s) | 7.05/5.84/4.26/3.29/2.72/2.04/1.13/stall | 7.05/5.76/4.01/2.87/2.15/1.18/stall | 4.25/3.20/1.68/stall(5) |
+| Sustained grade at v_climb 2.0 m/s | 6.02 deg | 5.58 deg | 3.58 deg |
+| Pitch length above 2 m/s, cruise entry, 1 tap/2 s: 8/9/10/12/15 deg | ≥320/42.6/30.9/23.0/18.3 m | 61.4/37.4/29.8/22.6/18.7 m | — |
+| One tap per second | 15 deg held at 5.4 m/s (sprint boost saturates) | | |
+
+Descent: modulated brake holds 8 m/s within 0.46 m/s up to 15 deg; full-brake mean deceleration ≥ 5.47 m/s². Turning: half-lock radius 7.5/8.5/9.7/11.2/13.3/17.1/22.1 m at 2.3/3.3/4.3/5.3/6.2/7.3/8.2 m/s; median steady lateral load 2.45 m/s²; full lock beyond ~5 m/s² bleeds speed (scrub); flat sprint top speed ≈10.6 m/s. Mesh tolerance: steps up to 10 cm (up/down) and abrupt 10 deg sags/crests at 8.8 m/s keep contact (no airborne frame); 0.5 m vs 8 m trimesh triangles, flat and 5 deg cross slope: identical speed, zero vertical jitter (trimesh edge contact is not a risk).
+
+Derived policy v2 (fixed rules in `derive_policy`): v_climb 2.0 m/s (knee of the pedal-hold curve: 6.0→6.5 deg halves the speed); climb_sustained BACKBONE 5.0 (A2) / SECONDARY 6.0 / SINGLETRACK 5.5 / TECHNICAL 5.5 deg; climb_pitch = A2 5/8/10/12 deg with the measured pitch-length table per surface; descent_max = caps 5/8/10/15 deg; junction lateral 2.4 m/s², approach braking 2.0 m/s², low-speed radius 8.0 m, movement floor 3.0 m/s.
+
+First ride on the new world (`m1_ride_r7_dev3`): authenticated v1 route slice, real scene, Input bot, both directions 1115 m finished, 0 stalls, max lateral 0.083 / 0.040 m, 100 % road collider, 0 ungrounded frames (109 single-ray frames in reverse), physics frame p99 1.4 ms headless. Vulkan (`m1_capture_r7_dev1`): 4 captures saved/reloaded (first/third person). Integration risks: trimesh contact none; spawn/settle fine; recovery query implemented (exercised in M4 runtime tests).
