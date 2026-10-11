@@ -843,3 +843,44 @@ Isolation (M3): pieces FinalSurface cannot construct are excluded with DEGRADE `
 - Next method (per the rules: method change, not coefficients): per-node fine buildability in the R5 raster, from the same natural surface and R6's gradient definition, as the per-class admissibility of moves. Then check N2–N4 on 184729, 2024 and 3628391.
 
 **Next:** N4 method change; R6 ford profile band (edge 8); rerun the overview capture; 10-minute ride and off-road cases (M4 L1); D5; M5; M6.
+
+## Launch fix (2026-10-11, commit 00bf10d) — user report: the game did not start
+
+**Reproduced from the working tree** (`m5_user_repro_1`):
+- `Identifier not found: RealizedRoadNetwork` (`realized_road_network.gd:245`);
+- cascade compile failures in region_network_builder, region_bake and region_world;
+- `from_bytes` nonexistent;
+- `is_valid` on an empty Dictionary.
+
+**Root cause.** A launch without an editor import uses `.godot/global_script_class_cache.cfg`. In the working tree it was last written at M1 (16:00) and lacks the PR1 classes. `realized_road_network.gd` made instances through its own `class_name`. The branch is correct and there is one worktree.
+
+**Fix.** Instances are made from the script path; no PR1 code depends on the global class cache. With the user's stale cache, all 169 scripts compile (`m5_userstate_parse2`).
+
+**Further defects found by the user-path checks, fixed:**
+- the menu handler called `set_input_as_handled()` after `change_scene_to_file` (Godot 4.7 removes the scene immediately: null viewport error on keys 1–5 / Enter);
+- leaving the scene or quitting during a bake freed a running bake: 174 script errors, crash (`m5_fail_ui_probe`).
+
+The bake is now a self-contained job owned by a drain node under the root, with cooperative cancel between stages:
+- Esc during a bake: menu in 0.03 s, thread joined 29 s later (`m5_exit_esc_probe`);
+- quit during a bake: clean exit after about 40 s (`m5_exit_quit_probe`).
+
+Generation failures are presented, not cascaded: on-screen seed and reason, diagnostics JSON under `user://regions/failures/`, Enter for another random region (`m5_fail_ui_probe`).
+
+**Checks (all with empty stderr unless noted):**
+
+| Check | Evidence | Result |
+|---|---|---|
+| User's repo, stale class cache, `region_world.tscn --seed=184729` | `m5_repo_direct_184729_final` | cache, READY in 1.37 s |
+| Stale-cache copy, direct scene, bake | `m5_userstate_direct_184729` | READY after 355 s (concurrent bake); bike moved under pedal |
+| Menu → key 5 / Enter on item 5, seed 184729 | `m5_userstate_menu_key5_184729`, `_enter_` | READY from cache |
+| Final code, menu → 5, seed 184729 | `m5_userstate_menu_184729_final` | bake 319 s alone, same network 7860 m |
+| Clean import (no `.godot`, `--editor --import` 0 errors), menu → 5 random | `m5_clean_menu_random_1` | seed 4627278186771687215: READY, 718 s (concurrent), 6.9 km, 1 cycle, B9+S1, edge 9 isolated (R7 ford) |
+| Clean import of commit 00bf10d, menu → 5 random | `m5_head00bf_menu_random_1` | seed 3855061512140275683: ERR_REGION_NO_NETWORK after 472 s, presented, diagnostics saved |
+
+The last row: the chosen round had 7.85 km, B6+S4, 1 cycle. R7 excluded edges 2 and 10 (ford outside the R7 band), and the N6 dead-end fixed point then emptied the network.
+
+**Network consequences, next:**
+1. R6 must design fords inside the R7 ford band (edge-8 class; it also causes no-network seeds).
+2. The bake should consider R7 feasibility in the choice of round instead of collapsing the chosen one.
+
+The playtest instruction now covers random seeds through the menu.
