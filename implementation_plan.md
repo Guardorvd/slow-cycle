@@ -1,6 +1,6 @@
 TASK: PR1 — Architectural Recovery & Playable Region (Mountain River Valley)
 DATE: 2026-10-11
-STATUS: IMPLEMENTING — ExecPlan v1.1 (D1–D13, T0–T5) + Director conditions 1–3; M0+M1 done (e12a641, 21a9264); M2–M4 code WIP checkpoint, NOT verified
+STATUS: IMPLEMENTING — ExecPlan v1.1 (D1–D13, T0–T5) + Director conditions 1–3; M0+M1 done (e12a641, 21a9264); M2–M4 in progress (37e584d, 705b3b6); early playable build delivered (condition 1, not PASS); S3 escalated (R6 oracle v1 connector radius)
 BRANCH/BASE/HEAD: pr1-playable-region / master 52a9c34 (= origin/master) / 52a9c34; local tag pr1-baseline = 52a9c34
 BASELINE: clean before this plan record (0 staged / 0 unstaged / 0 untracked); only implementation_plan.md modified
 APPROVAL: Game Director in chat 2026-10-11 — v1.0 audit + architecture B accepted with conditions 1–6 + DEGRADE rule; v1.1 approved via plan approval
@@ -790,3 +790,56 @@ Checkpoint commit "PR1 WIP checkpoint" on `pr1-playable-region`. Nothing below i
 3. N4: get SINGLETRACK/TECHNICAL realized (R5 candidate generation / feedback); N2 ≥ 8 km together with N4; scoring must not pick < 8 km.
 4. First bake of 184729 (`work/tools/bake_probe.gd`), cache save/load, then runtime scene run + bot ride + Vulkan captures → deliver playable build + ride instruction (Director condition 1) even before N4 is solved.
 5. Bake time (R6 dominates), D5 character, M5 vegetation, M6 L2.
+
+## M2–M4 — progress 2 (2026-10-11, commits 37e584d, 705b3b6; not accepted)
+
+**Determinism (done, 37e584d).** RCA: the old note's "main-thread FP environment" hypothesis is not supported. MXCSR rounding and denormal handling are equal on all threads (`m2_fpenv_1`). The measured cause is the C runtime: `exp` and `pow` return different last bits on the main thread than on any other thread. Thread and WorkerThreadPool agree bit for bit (`m2_mathfn_1`: exp 3362/20000, pow 16755/20000 differ). Terrain heights inherit the difference, about 3e-13 m (`m2_heightthread_1`). Fix: `RoadSynthesizer.off_main_thread`. `synthesize`, `RegionNetworkBuilder.build` and `RegionBake.bake` never run on the main thread. The runtime bakes on a Thread. R6 at 1 vs 8 threads gives an equal plan signature `b7feaf44…` in two processes (`m2_synthdiff_det1/2`).
+
+**Protected suites on a disposable copy (`git archive`).**
+
+| Suite | 37e584d | 705b3b6 | Class |
+|---|---|---|---|
+| E0 import | 0 errors (`m2_head_e0`) | 0 errors (`m4_head_e0`) | — |
+| R7 `test_final_surface --source=fixture` | 424259/0, surface and 3 mesh hashes = M0 (`m2_head_r7_fixture`) | 424259/0, = M0 (`m4_head_r7_fixture`) | REGRESSION_GUARD, PASS |
+| R6 `--group=contracts` | 72/0 (`m2_head_r6_contracts`) | 72/0 (`m4_head_r6_contracts`) | PASS |
+| R5 `test_route_network` | 2230/0, completed, 8 rows (`m2_head_r5`; baseline 2235/0, count follows the graphs) | R5 files unchanged since | PASS |
+| R6 `--group=regions` 184729 | 362 checks, 11 failures (`m2_head_r6_regions_184729`) | 362 checks, 10 failures (`m4_head_r6_regions_184729`) | 10 × S3; 1 × (a) fixed |
+
+- **(a) regression, fixed in scope:** `neg_search_budget`. The per-piece budget had dropped the R6 §5 *per-region* work limit. Restored: designs stay isolated, and the region totals (natural queries, fit evaluations) are accounted in the fixed (class, id) completion order. `max_natural_queries=10000` now gives PARTIAL with ERR_R6_SEARCH_BUDGET; the default plan signature is unchanged (`m2_budget_probe_2`).
+- **S3 — escalated to the Director:** 10 × `oracle_path_move:<node>:<a>-<b>` failures = ["curvature"]. Source: `scripts/test/road_synthesis_oracle.gd:27-28` (`GRADE_HARD_DEG [5,8,10,12]`, `RADIUS_HARD_M [35,25,19,19]`), `:103` `k_limit = 1/RADIUS_HARD_M[route_class]` (connectors use the stricter class), `:118` curvature failure; caller `test_road_synthesis.gd:576-577`. Measured connector max curvature 0.0306–0.0519 1/m (R 19.3–32.7 m), against the BACKBONE limit 1/35 m. These are the D3 movement radii approved by v1.1 §4b (R_m = max(8 m, v²/a_lat) ≤ stricter hard radius). The TECH 15° descent conflict is not observed on 184729 (no TECHNICAL realized). Test not changed; work it does not cover continues. Decision needed: the oracle limits follow policy v2 / D3, or another resolution.
+
+**Network surface and bake (M3).** First bakes of 184729 surfaced R7 defects that appear only on a network. All are fixed; the fixture path is unchanged (hashes = M0 after each change):
+- the ford window was applied to bridge decks;
+- the ford grade bound was fixed at the BACKBONE 5°; the class hard grade is used now;
+- a piece-end control spacing artefact;
+- fine cells beyond the region edge at gateways (ERR_TERRAIN_OUT_OF_DOMAIN);
+- earthwork filling channels at bridge abutments.
+
+Isolation (M3): pieces FinalSurface cannot construct are excluded with DEGRADE `R7_<reason>`, and the network is realized again.
+
+- Bake `m3_bake_184729_t8g`: 327.6 s at 8 threads. Network 196 s, deformer 39 s, tiles 90 s.
+- Network: 7.86 km, backbone continuous, 2 cycles, B7 + S3 edges, 7 bridges, 0 blocked nodes, 0 dead ends.
+- Size: 1.17 M vertices. Cache save 1.1 s, load 0.7 s.
+- Excluded: `edge:8` (SECONDARY, about 0.5 km), `ERR_R7_FORD_CHANNEL`. A steep, oblique stream: the water surface under the road falls 0.47 m over about 5 m (depth ≤ 0.30 everywhere). The R7 ford plane must follow the bed within 12 cm, which is not reachable with ≤ 0.35 m drop and 1.2°/m. Root fix belongs to R6: the ford profile should be designed in that band. Open.
+- A footprint-depth support rule for R6 is prepared but deferred (`work/edits/deferred_ford_footprint_depth.patch`): it did not change 184729 and is unverified.
+
+**Runtime and ride (M4, condition 1).**
+- `region_world.tscn --seed=184729` from cache: REGION_READY in 1.36 s.
+- A runtime bake on the scene's thread also works: 341 s, same network.
+- Input bot tour (`m4_ride_region_184729_3`): 2943 m over 6 edges, finished, 0 stalls, max lateral 0.043 m, 100 % road collider, 0 ungrounded frames, 0 deep-water recoveries, physics p99 1.54 ms.
+- One frame of 118 ms is not yet localized (D7 gate ≤ 100 ms after load is open).
+- Fixed on the way:
+  - deep-water recovery falsely triggered on legal fords; it now applies only off the road;
+  - recovery stepped back along design order instead of against travel;
+  - bridge meshes produced tangent errors.
+- Vulkan (`m4_capture_region_184729_1`): 6/6 captures saved and reloaded. The overview was washed out by the scene fog; the overview camera now gets a fog-free environment copy (rerun pending). Ride frames show roads, junctions and a cut on a hillside.
+- Human ride instruction: `docs/PLAYTEST_MOUNTAIN_RIVER_VALLEY.md`. No PASS is declared.
+
+**N4 RCA (in progress, two cycles).**
+- 184729 R5 (HEAD) yields 1 SINGLETRACK route and 0 TECHNICAL (baseline: 1 TECH).
+- The ST edge (2938 m, 366 → 518 → 336 m) fails R6 at lattice construction: no admissible lateral slot, 29/45 slots blocked by natural slope ≥ buildable slope (`m4_n4probe_184729`).
+- Ablations in a disposable copy: without the cross-slope rule, without the development rule, or with v1 g_max, nothing changes. Serpentine also requiring buildable legs changes nothing. Closing nodes at raster slope ≥ buildable slope removes ST entirely (`m4_abl_*`, `m4_abl2_*`).
+- Diagnosis: R5 judges buildability on the 32 m raster (±16 m stencil), R6 on the 8 m search grid (±4 m). Fine-scale slopes exceed the class buildable slope (ST 0.63, TECH 0.82) where the coarse slope does not.
+- Next method (per the rules: method change, not coefficients): per-node fine buildability in the R5 raster, from the same natural surface and R6's gradient definition, as the per-class admissibility of moves. Then check N2–N4 on 184729, 2024 and 3628391.
+
+**Next:** N4 method change; R6 ford profile band (edge 8); rerun the overview capture; 10-minute ride and off-road cases (M4 L1); D5; M5; M6.
