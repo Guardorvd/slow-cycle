@@ -905,3 +905,85 @@ The playtest instruction now covers random seeds through the menu.
   - (a) R5 candidate generation for ST/TECH on buildable terrain (valley sides, benches, descent lines) instead of only from the current anchor kinds;
   - (b) if the dev regions also have no buildable ST/TECH terrain, an S1 report to the Director: the approved earthwork policy vs. the generated geography.
 - Do not tune coefficients.
+
+## Progress 4 (2026-10-11, commit 3842a3f; S1 raised for N4)
+
+**N4 — RCA cycle 3, S1 escalated to the Director.** Full report with evidence and options: evidence root `S1_N4_REPORT.md`. No N4 experiment is in the repository; ablation patches are in `work/edits/ablation_{fine,nodev,bench,dir,r8}.py`.
+- Terrain statistics (`m8_terrain_*`) refute the cycle-2 conclusion. At the R6 scale, only 18 % (184729) and 10 % (2024) of standing nodes are closed for SINGLETRACK, and 5 % / 2 % for TECHNICAL. Almost every anchor is buildable.
+- R5 on 184729 (`m8_cand_*`):
+  - the whole network is on the valley floor, while the ST/TECH anchors are 400–570 m higher;
+  - loops climb and return on one slope (`REJECT_DUPLICATE`), spurs exceed 1500 m;
+  - technical candidates fail with `NO_SECOND_ATTACH`.
+- R6 does not lay out steep ST/TECH corridors. Across all ablations: `ERR_R6_GRADE` (development room) about 19 pieces, `CORRIDOR_CLEARANCE` 7, `EARTHWORK` 3, `CURVATURE` 2. Only gentle ST pieces were built, and no TECHNICAL piece.
+- Methods tried in a disposable copy, each with the full builder over 3 feedback rounds:
+  - (a1) fine buildability;
+  - (a2) no R5 development for ST/TECH;
+  - (a3) terrace (BENCH-rule) loops;
+  - (a4) the §4a direction rule (climb branch ≤ `climb_sustained`).
+
+  Results:
+
+  | Region | HEAD | Method |
+  |---|---|---|
+  | 184729 | 9.39 km, B+S | 9.51 km, B+S, no ST |
+  | 2024 | 9.14 km, 2 cycles | 7.78 km, 1 cycle (worse) |
+  | 3628391 | 9.05 km, B+S | 14.10 km, B7+S5+ST5 |
+  | TECHNICAL | 0/3 | 0/3 |
+
+  The measured low-speed radius (8 m) for ST/TECH changes nothing.
+- Not adopted: the method gives no net gain and regresses N2/N3 on 2024. N4 and the M6 acceptance wait for the Director's decision. Options: earthwork / band for ST/TECH, an R6 switchback capability task, DEGRADE, or other dev regions.
+
+**Bake round choice with R7 (done).**
+- `RegionNetworkBuilder` returns every OK round as a candidate.
+- `RegionBake` isolates R7-unconstructible pieces per candidate, in score order, and keeps the best network after isolation.
+- A further round is tried only while its pre-isolation score exceeds the best post-isolation score.
+- The manifest records `chosen_round`, `network_best_round` and `r7_rounds`.
+
+**Fresh bake of 184729 (current code).**
+- `m9_bake_184729` and `m9_bake2_184729`:
+  - 9.39 km, backbone continuous, 3 cycles, B7+S5, 13 bridges, 0 R7 exclusions;
+  - edge 8 is back: N2 ≥ 8 km holds on the playtest region.
+- 383 s at 8 threads: network 210 s, tiles 94 s, vegetation 64 s, deformer 12 s.
+- Cache save 1.5 s, load 0.94 s.
+- Two processes give equal `tiles_digest` (`c94451cf…`) and `network_digest` (`183eef0c…`).
+
+**M5 vegetation (done, D9).**
+- `region_vegetation_planner.gd` (pure, per tile, stateless hash of the additive `vegetation` seed):
+  - trees by R4 woody cover and biome weights (pine / birch / autumn birch);
+  - riparian shrubs within 12 m of water, meadow grass, rocks by slope;
+  - road clearance 3.5 / 1.5 / 0.6 / 2.5 m, no water, region margin.
+- `region_flora_meshes.gd`: procedural low-poly meshes.
+- Streamer:
+  - one MultiMesh per tile × kind with a visibility range (spatial cell × type partition);
+  - trunk / rock cylinders on layer 1 inside the active collision patches.
+- 184729: 160 216 instances. Planner deterministic (equal bytes in two planners, `m9_veg_probe_1`).
+- `region_seed_derivation.gd` additive purpose `vegetation`: R0 145/0 on a copy of 3842a3f (`m9_head_r0`; baseline 145/0), existing preimages unchanged.
+
+**D7 frame spike (measured, fixed).**
+- Ride `m9_ride_184729`: max frame 154 ms = one patch commit. The first commit in a tile counting-sorted the whole tile on the main thread.
+- The sort now runs in the bake (threaded, cached as `patch_order` / `patch_offsets`).
+- Ride `m9_ride2_184729`, 10.66 km tour over 10 edges, Input bot:
+  - finished, 0 stalls, 0 ungrounded frames, 100 % road, max lateral 0.063 m;
+  - frame p50 1.04 ms, p99 2.28 ms, max 78.6 ms (headless, ≤ 100 ms);
+  - 43 267 flora colliders built over the ride.
+
+**Vulkan.**
+- `m9_capture2_184729`: 6/6 frames saved, with forest, autumn pockets, junction and slopes.
+- The overview is no longer washed out.
+- Known visual defect: lake water cells render as a pale flat patch from above (pre-existing, seen at M4 too).
+
+**Protected suites on a copy of 3842a3f** (E0 import 0 errors, `m9_head_e0`):
+
+| Suite | Evidence | Result |
+|---|---|---|
+| R0 | `m9_head_r0` | 145/0 |
+| R6 contracts | `m9_head_r6_contracts` | 72/0 |
+| R7 `--source=fixture` | `m9_head_r7_fixture` | 424259/0, complete; surface `e1523d47…` and meshes `87ab6861…` / `a0503081…` / `2cdb9357…` = M0 |
+
+R5 and R6 files are unchanged since 41f6c29 (R5 2230/0 and R6 regions as recorded in Progress 3; the 10 S3 failures stay escalated).
+
+**User path.** `m9_userstate_menu_184729` (stale class cache): menu → 5 → READY from cache in 1.87 s, bike moves, empty stderr.
+
+**Not done / next:**
+- D5: R6 already has DIRECT / TERRAIN / FLOW candidate profiles; no further change; N7 recorded in the manifest.
+- M6 (L2 + slow-cycle-verify + independent slow-cycle-review) waits for the S1 decision on N4, because verify would return FAIL on N4.
