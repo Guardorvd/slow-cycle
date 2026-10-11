@@ -10,6 +10,7 @@ extends RefCounted
 ##              layer (Road 2, RoughRoad 2|16 for SINGLETRACK / TECHNICAL,
 ##              Terrain 4) and 64 m collision-patch id, plus a coarse 16 m LOD;
 ##   bridges    BridgeDeckBuilder decks; water ribbons / lake cells;
+##   vegetation RegionVegetationPlanner per tile (M5, D9; on FinalSurface);
 ##   spawn      a backbone point near the region centre, facing along it.
 ## Output is region-local (x - min_x, z - min_z) so runtime float32 stays
 ## precise anywhere in the int64 world. Tiles may be built on WorkerThreadPool
@@ -33,6 +34,7 @@ const Renderer = preload("res://scripts/world/region/final_surface_tile_renderer
 const Bridges = preload("res://scripts/world/region/bridge_deck_builder.gd")
 const Graph = preload("res://scripts/world/region/region_route_graph.gd")
 const Synth = preload("res://scripts/world/region/road_synthesizer.gd")
+const Vegetation = preload("res://scripts/world/region/region_vegetation_planner.gd")
 const SCHEMA := "slow_cycle.region_bake/1"
 const TILE_M: int = 512
 const TILES: int = 8
@@ -40,6 +42,8 @@ const PATCH_M: float = 64.0
 const LAYER_ROAD: int = 2
 const LAYER_ROUGH: int = 2 | 16
 const LAYER_TERRAIN: int = 4
+## Bucket order of triangles inside a collision patch (runtime patch bodies).
+const PATCH_LAYERS: Array[int] = [LAYER_TERRAIN, LAYER_ROAD, LAYER_ROUGH]
 ## Bound on surface isolation passes (each excludes at least one piece).
 const MAX_ISOLATION_PASSES: int = 24
 
@@ -69,60 +73,47 @@ static func _bake(seed_value: int, region: Vector2i, options: Dictionary, progre
 	timings["network_s"] = _lap(t)
 	if not built.is_valid:
 		return {"is_valid": false, "reason_code": built.reason_code, "rounds": built.get("rounds", [])}
-	var network: RefCounted = built.network
 	var bounds: Dictionary = terrain.get_bounds_m()
 	var threads: int = int(options.get("threads", 1))
-	# Pieces FinalSurface cannot construct are isolated (M3): construction checks
-	# of the deformer, then failed tile samples naming their owning pieces. The
-	# network is realized again without them (DEGRADE "R7_<reason>"), in a fixed
-	# order, until the surface and every tile build.
-	var checks: Dictionary = {}
-	var excluded: Dictionary = {}
-	var surface: RefCounted = null
-	var slots: Array = []
 	timings["deformer_s"] = 0.0
 	timings["tiles_s"] = 0.0
-	for attempt in range(MAX_ISOLATION_PASSES):
-		if cancelled.is_valid() and cancelled.call():
+	# The round is chosen with R7 constructibility: candidates in network score
+	# order; each is isolated (below) and scored again. A further candidate is
+	# tried only while its score before isolation exceeds the best score after
+	# isolation (isolation only removes pieces), so a round R7 would collapse
+	# does not hide a round that constructs.
+	var candidates: Array = built.get("candidates", [])
+	var chosen: Dictionary = {}
+	var first_failure: Dictionary = {}
+	var tried: Array = []
+	for candidate: Dictionary in candidates:
+		if not chosen.is_empty() and not candidate.score > chosen.score:
+			break
+		var made: Dictionary = _isolated(candidate, terrain, field, bounds, threads, progress, cancelled, timings)
+		if made.get("reason_code", "") == "ERR_BAKE_CANCELLED":
 			return stopped
-		t = Time.get_ticks_usec()
-		_report(progress, "surface", 0.45)
-		var blamed: Dictionary = {}
-		var deformer: Dictionary = Deformer.create(network, field, {"collect_failures": true, "check_cache": checks})
-		timings.deformer_s += _lap(t)
-		if not deformer.is_valid:
-			if deformer.reason_code != "ERR_R7_PIECE_FAILURES":
-				return {"is_valid": false, "reason_code": deformer.reason_code, "detail": deformer.get("detail", {}), "rounds": built.rounds}
-			for failure: Dictionary in deformer.failures:
-				blamed[failure.piece_id] = failure.reason_code
-		else:
-			surface = Surface.create(terrain, field, deformer.deformer).surface
-			t = Time.get_ticks_usec()
-			slots = _tiles(surface, bounds, network.get_data(), threads, progress, cancelled)
-			timings.tiles_s += _lap(t)
-			if cancelled.is_valid() and cancelled.call():
-				return stopped
-			var failed: Dictionary = {}
-			for slot: Dictionary in slots:
-				if not slot.get("is_valid", false):
-					failed = slot
-					for id: String in slot.get("owners", []):
-						blamed[id] = slot.get("reason_code", "ERR_BAKE_TILE")
-			if failed.is_empty():
-				break
-			if blamed.is_empty():
-				return {"is_valid": false, "reason_code": failed.get("reason_code", "ERR_BAKE_TILE"), "tile": [failed.tx, failed.tz], "rounds": built.rounds}
-		var ids: Array = blamed.keys()
-		ids.sort()
-		for id: String in ids:
-			excluded[id] = blamed[id]
-		var again: Dictionary = Network.from_plan(built.plan, built.graph, built.network.get_data().spec, excluded)
-		if not again.is_valid:
-			return {"is_valid": false, "reason_code": again.reason_code, "rounds": built.rounds}
-		network = again.network
-		surface = null
-	if surface == null:
-		return {"is_valid": false, "reason_code": "ERR_BAKE_ISOLATION", "detail": excluded, "rounds": built.rounds}
+		var entry := {"round": candidate.round, "score_before": candidate.score, "is_valid": made.is_valid, "reason_code": made.reason_code, "r7_excluded": made.get("excluded", {})}
+		if made.is_valid:
+			made["score"] = Builder.score_of(made.network.get_metrics())
+			made["round"] = candidate.round
+			made["plan"] = candidate.plan
+			made["graph"] = candidate.graph
+			entry["score_after"] = made.score
+			if chosen.is_empty() or made.score > chosen.score:
+				chosen = made
+		elif first_failure.is_empty():
+			first_failure = made
+		tried.append(entry)
+	if chosen.is_empty():
+		var failure: Dictionary = {"is_valid": false, "reason_code": first_failure.get("reason_code", "ERR_BAKE_ISOLATION"), "rounds": built.rounds, "r7_rounds": tried}
+		for key: String in ["detail", "tile"]:
+			if first_failure.has(key):
+				failure[key] = first_failure[key]
+		return failure
+	var network: RefCounted = chosen.network
+	var surface: RefCounted = chosen.surface
+	var slots: Array = chosen.slots
+	var excluded: Dictionary = chosen.excluded
 	var data: Dictionary = network.get_data()
 	t = Time.get_ticks_usec()
 	_report(progress, "bridges_water", 0.92)
@@ -132,11 +123,20 @@ static func _bake(seed_value: int, region: Vector2i, options: Dictionary, progre
 	var bridges: Dictionary = Bridges.build(data, ground)
 	var water: Dictionary = _water(hydro.plan)
 	timings["bridges_water_s"] = _lap(t)
+	if cancelled.is_valid() and cancelled.call():
+		return stopped
+	t = Time.get_ticks_usec()
+	_report(progress, "vegetation", 0.94)
+	var flora: Dictionary = Vegetation.create(plan, terrain, hydro.plan, surface)
+	if not flora.is_valid:
+		return {"is_valid": false, "reason_code": flora.reason_code, "rounds": built.rounds}
+	var vegetation: Array = _vegetation(flora.planner, slots, threads)
+	timings["vegetation_s"] = _lap(t)
 	var spawn: Dictionary = _spawn(data)
 	var manifest: Dictionary = {"schema": SCHEMA, "seed": seed_value, "region": [region.x, region.y], "origin": [bounds.min_x, bounds.min_z],
-		"region_signature": plan.signature(), "hydrology_signature": hydro.plan.signature(), "network_digest": network.digest(), "graph_signature": built.graph.signature(),
-		"plan_signature": built.plan.signature(), "chosen_round": built.round, "rounds": _round_summaries(built.rounds), "metrics": data.metrics, "tiles": [], "timings_s": timings,
-		"r7_excluded": excluded,
+		"region_signature": plan.signature(), "hydrology_signature": hydro.plan.signature(), "network_digest": network.digest(), "graph_signature": chosen.graph.signature(),
+		"plan_signature": chosen.plan.signature(), "chosen_round": chosen.round, "network_best_round": built.round, "rounds": _round_summaries(built.rounds), "metrics": data.metrics,
+		"tiles": [], "timings_s": timings, "r7_excluded": excluded, "r7_rounds": _r7_summaries(tried),
 		"bridges": bridges.decks.size(), "threads": threads}
 	var vertices: int = 0
 	var triangles: int = 0
@@ -147,9 +147,70 @@ static func _bake(seed_value: int, region: Vector2i, options: Dictionary, progre
 	manifest["vertices"] = vertices
 	manifest["triangles"] = triangles
 	manifest["tiles_digest"] = _tiles_digest(slots)
+	manifest["vegetation"] = _vegetation_summary(vegetation)
 	_report(progress, "done", 1.0)
-	return {"is_valid": true, "reason_code": "", "manifest": manifest, "network": network, "tiles": slots, "bridges": bridges, "water": water, "spawn": spawn,
+	return {"is_valid": true, "reason_code": "", "manifest": manifest, "network": network, "tiles": slots, "bridges": bridges, "water": water, "spawn": spawn, "vegetation": vegetation,
 		"surface": surface, "terrain": terrain, "hydrology": hydro.plan, "field": field, "plan": plan}
+
+
+## Pieces FinalSurface cannot construct are isolated (M3): construction checks
+## of the deformer, then failed tile samples naming their owning pieces. The
+## candidate's network is realized again without them (DEGRADE "R7_<reason>"),
+## in a fixed order, until the surface and every tile build. Returns {is_valid,
+## reason_code, network, surface, slots, excluded} (detail / tile on failure).
+static func _isolated(candidate: Dictionary, terrain: RefCounted, field: RefCounted, bounds: Dictionary, threads: int, progress: Callable, cancelled: Callable, timings: Dictionary) -> Dictionary:
+	var network: RefCounted = candidate.network
+	var checks: Dictionary = {}
+	var excluded: Dictionary = {}
+	for attempt in range(MAX_ISOLATION_PASSES):
+		if cancelled.is_valid() and cancelled.call():
+			return {"is_valid": false, "reason_code": "ERR_BAKE_CANCELLED"}
+		var t: int = Time.get_ticks_usec()
+		_report(progress, "surface (round %d)" % candidate.round, 0.45)
+		var blamed: Dictionary = {}
+		var deformer: Dictionary = Deformer.create(network, field, {"collect_failures": true, "check_cache": checks})
+		timings.deformer_s += _lap(t)
+		if not deformer.is_valid:
+			if deformer.reason_code != "ERR_R7_PIECE_FAILURES":
+				return {"is_valid": false, "reason_code": deformer.reason_code, "detail": deformer.get("detail", {}), "excluded": excluded}
+			for failure: Dictionary in deformer.failures:
+				blamed[failure.piece_id] = failure.reason_code
+		else:
+			var surface: RefCounted = Surface.create(terrain, field, deformer.deformer).surface
+			t = Time.get_ticks_usec()
+			var slots: Array = _tiles(surface, bounds, network.get_data(), threads, progress, cancelled)
+			timings.tiles_s += _lap(t)
+			if cancelled.is_valid() and cancelled.call():
+				return {"is_valid": false, "reason_code": "ERR_BAKE_CANCELLED"}
+			var failed: Dictionary = {}
+			for slot: Dictionary in slots:
+				if not slot.get("is_valid", false):
+					failed = slot
+					for id: String in slot.get("owners", []):
+						blamed[id] = slot.get("reason_code", "ERR_BAKE_TILE")
+			if failed.is_empty():
+				return {"is_valid": true, "reason_code": "", "network": network, "surface": surface, "slots": slots, "excluded": excluded}
+			if blamed.is_empty():
+				return {"is_valid": false, "reason_code": failed.get("reason_code", "ERR_BAKE_TILE"), "tile": [failed.tx, failed.tz], "excluded": excluded}
+		var ids: Array = blamed.keys()
+		ids.sort()
+		for id: String in ids:
+			excluded[id] = blamed[id]
+		var again: Dictionary = Network.from_plan(candidate.plan, candidate.graph, candidate.network.get_data().spec, excluded)
+		if not again.is_valid:
+			return {"is_valid": false, "reason_code": again.reason_code, "excluded": excluded}
+		network = again.network
+	return {"is_valid": false, "reason_code": "ERR_BAKE_ISOLATION", "detail": excluded, "excluded": excluded}
+
+
+static func _r7_summaries(tried: Array) -> Array:
+	var out: Array = []
+	for entry: Dictionary in tried:
+		var ids: Array = entry.r7_excluded.keys()
+		ids.sort()
+		out.append({"round": entry.round, "is_valid": entry.is_valid, "reason_code": entry.reason_code, "score_before": entry.score_before,
+			"score_after": entry.get("score_after", []), "r7_excluded": ids})
+	return out
 
 
 ## Every tile of the region (optionally threaded; each result lands in its own
@@ -178,6 +239,36 @@ static func _tiles(surface: RefCounted, bounds: Dictionary, data: Dictionary, th
 			job.call(k)
 			_report(progress, "tiles", 0.5 + 0.4 * float(k + 1) / slots.size())
 	return slots
+
+
+## Vegetation of every tile, in tile order (each job writes its own slot).
+static func _vegetation(planner: RefCounted, slots: Array, threads: int) -> Array:
+	var out: Array = []
+	out.resize(slots.size())
+	var job := func(k: int) -> void:
+		out[k] = planner.tile(slots[k].tx, slots[k].tz)
+	if threads > 1:
+		var group: int = WorkerThreadPool.add_group_task(job, slots.size(), threads, true, "region_bake_vegetation")
+		WorkerThreadPool.wait_for_group_task_completion(group)
+	else:
+		for k in range(slots.size()):
+			job.call(k)
+	return out
+
+
+## Instance counts per kind and a content digest (order: tiles, kinds).
+static func _vegetation_summary(vegetation: Array) -> Dictionary:
+	var counts: Dictionary = {}
+	var ctx := HashingContext.new()
+	ctx.start(HashingContext.HASH_SHA256)
+	for tile: Dictionary in vegetation:
+		for kind: String in Vegetation.KINDS:
+			var values: PackedFloat32Array = tile[kind]
+			counts[kind] = counts.get(kind, 0) + values.size() / 5
+			ctx.update(("%s:%d;" % [kind, values.size()]).to_utf8_buffer())
+			if not values.is_empty():
+				ctx.update(values.to_byte_array())
+	return {"model": Vegetation.MODEL, "counts": counts, "digest": ctx.finish().hex_encode()}
 
 
 static func _lap(t0: int) -> float:
@@ -224,6 +315,7 @@ static func _tile(surface: RefCounted, bounds: Dictionary, piece_class: Dictiona
 	slot["arrays"] = arrays
 	slot["layers"] = layers
 	slot["patches"] = patches
+	_patch_order(slot)
 	slot["origin"] = [tile.origin_x_m - bounds.min_x, tile.origin_z_m - bounds.min_z]
 	slot["vertex_count"] = tile.vertex_count
 	slot["triangle_count"] = tile.triangle_count
@@ -234,6 +326,34 @@ static func _tile(surface: RefCounted, bounds: Dictionary, piece_class: Dictiona
 	bytes.append_array(layers)
 	slot["sha256"] = _sha(bytes)
 	slot["is_valid"] = true
+
+
+## Triangles counting-sorted by (patch, PATCH_LAYERS index): patch_order lists
+## triangle indices, patch_offsets[b] .. patch_offsets[b + 1] is bucket b
+## (b = patch * PATCH_LAYERS.size() + layer index). Writes into `slot` only.
+static func _patch_order(slot: Dictionary) -> void:
+	var layers: PackedByteArray = slot.layers
+	var patches: PackedByteArray = slot.patches
+	var count: int = layers.size()
+	var lanes: int = PATCH_LAYERS.size()
+	var offsets := PackedInt32Array()
+	offsets.resize(64 * lanes + 1)
+	var bucket_of := PackedInt32Array()
+	bucket_of.resize(count)
+	for q in range(count):
+		var b: int = patches[q] * lanes + PATCH_LAYERS.find(layers[q])
+		bucket_of[q] = b
+		offsets[b + 1] += 1
+	for b in range(1, offsets.size()):
+		offsets[b] += offsets[b - 1]
+	var cursor: PackedInt32Array = offsets.duplicate()
+	var order := PackedInt32Array()
+	order.resize(count)
+	for q in range(count):
+		order[cursor[bucket_of[q]]] = q
+		cursor[bucket_of[q]] += 1
+	slot["patch_order"] = order
+	slot["patch_offsets"] = offsets
 
 
 static func _sha(bytes: PackedByteArray) -> String:

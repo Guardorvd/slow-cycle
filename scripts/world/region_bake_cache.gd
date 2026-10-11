@@ -8,7 +8,8 @@ extends RefCounted
 ## as ERR_BAKE_STALE and the caller rebakes. Files: manifest.json, network.bin,
 ## tile_<i>.bin (one per tile), extras.bin (bridges, water, spawn); binary
 ## files are zstd-compressed var_to_bytes, each SHA-256 recorded in the
-## manifest. The domain bake never touches files.
+## manifest. The domain bake never touches files. extras.bin also carries the
+## vegetation (M5).
 
 const Bake = preload("res://scripts/world/region/region_bake.gd")
 const Network = preload("res://scripts/world/region/realized_road_network.gd")
@@ -60,12 +61,13 @@ static func save(cache_key: String, baked: Dictionary) -> Dictionary:
 	for k in range(baked.tiles.size()):
 		var slot: Dictionary = baked.tiles[k]
 		var payload := {"tx": slot.tx, "tz": slot.tz, "arrays": slot.arrays, "layers": slot.layers, "patches": slot.patches, "origin": slot.origin, "coarse": slot.coarse,
+			"patch_order": slot.patch_order, "patch_offsets": slot.patch_offsets,
 			"sha256": slot.sha256, "vertex_count": slot.vertex_count, "triangle_count": slot.triangle_count}
 		written = _write(dir.path_join("tile_%d.bin" % k), var_to_bytes(payload))
 		if not written.ok:
 			return {"is_valid": false, "reason_code": "ERR_BAKE_WRITE"}
 		files["tile_%d.bin" % k] = written.sha256
-	written = _write(dir.path_join("extras.bin"), var_to_bytes({"bridges": baked.bridges, "water": baked.water, "spawn": baked.spawn}))
+	written = _write(dir.path_join("extras.bin"), var_to_bytes({"bridges": baked.bridges, "water": baked.water, "spawn": baked.spawn, "vegetation": baked.get("vegetation", [])}))
 	if not written.ok:
 		return {"is_valid": false, "reason_code": "ERR_BAKE_WRITE"}
 	files["extras.bin"] = written.sha256
@@ -109,7 +111,8 @@ static func _sha(bytes: PackedByteArray) -> String:
 	return ctx.finish().hex_encode()
 
 
-## Returns the bake products ({manifest, network, tiles, bridges, water, spawn})
+## Returns the bake products ({manifest, network, tiles, bridges, water, spawn,
+## vegetation})
 ## or {is_valid: false, reason_code: ERR_BAKE_STALE}.
 static func load_products(cache_key: String) -> Dictionary:
 	var stale := {"is_valid": false, "reason_code": "ERR_BAKE_STALE"}
@@ -134,10 +137,11 @@ static func load_products(cache_key: String) -> Dictionary:
 	var tiles: Array = []
 	for k in range(Bake.TILES * Bake.TILES):
 		var tile: Variant = _read(dir.path_join("tile_%d.bin" % k), files.get("tile_%d.bin" % k, ""))
-		if not tile is Dictionary:
+		if not tile is Dictionary or not tile.has("patch_order"):
 			return stale
 		tiles.append(tile)
 	var extras: Variant = _read(dir.path_join("extras.bin"), files.get("extras.bin", ""))
-	if not extras is Dictionary:
+	if not extras is Dictionary or not extras.get("vegetation") is Array:
 		return stale
-	return {"is_valid": true, "reason_code": "", "manifest": manifest, "network": network.network, "tiles": tiles, "bridges": extras.bridges, "water": extras.water, "spawn": extras.spawn}
+	return {"is_valid": true, "reason_code": "", "manifest": manifest, "network": network.network, "tiles": tiles, "bridges": extras.bridges, "water": extras.water, "spawn": extras.spawn,
+		"vegetation": extras.vegetation}

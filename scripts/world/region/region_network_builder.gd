@@ -10,8 +10,10 @@ extends RefCounted
 ##             same planning raster, R6 synthesizes again (<= MAX_REPLANS);
 ##   result    the round with the best network score (N1 backbone, N5 no split
 ##             junction, N4 class mix, N3 loops, N2 component length), with all
-##             rounds' metrics, hints and DEGRADE records. The R5 graph schema is
-##             never changed; R6 never edits the graph.
+##             rounds' metrics, hints and DEGRADE records, plus every OK round as
+##             a candidate in score order (the bake may prefer another round
+##             when FinalSurface cannot construct pieces of the best one). The
+##             R5 graph schema is never changed; R6 never edits the graph.
 ## Deterministic: fixed round order, stable hint order, no time-based choice;
 ## R5 and R6 never run on the main thread (RoadSynthesizer.off_main_thread).
 
@@ -24,7 +26,9 @@ const MODEL := "network_builder/1;replans=2;wall=close:64,penalty:6:96;crossing=
 const WALL_REASONS: Array[String] = ["ERR_R6_EARTHWORK", "ERR_R6_NATURAL_BARRIER", "ERR_R6_CORRIDOR_CLEARANCE"]
 
 
-## Returns {is_valid, reason_code, network, graph, plan, round, rounds}.
+## Returns {is_valid, reason_code, network, graph, plan, round, rounds,
+## candidates: [{score, network, graph, plan, round}] best first (ties: earlier
+## round)}.
 ## options.progress (optional Callable(stage: String, fraction: float in 0..1))
 ## is called from the building thread at every R5 / R6 step; options.cancelled
 ## (optional Callable() -> bool) is polled there and stops the build with
@@ -40,6 +44,7 @@ static func _build(region_plan: RefCounted, terrain_field: RefCounted, hydrology
 	var raster: Variant = null
 	var rounds: Array = []
 	var best: Dictionary = {}
+	var candidates: Array = []
 	var max_replans: int = int(options.get("max_replans", MAX_REPLANS))
 	var progress: Callable = options.get("progress", Callable())
 	var cancelled: Callable = options.get("cancelled", Callable())
@@ -86,8 +91,10 @@ static func _build(region_plan: RefCounted, terrain_field: RefCounted, hydrology
 		rounds.append({"round": round_index, "status": "OK", "hints": hints.size(), "score": score, "metrics": metrics, "graph_signature": routes.graph.signature(),
 			"plan_signature": synth.plan.signature(), "r6_status": synth.status, "edges": routes.graph.get_edge_count(), "edges_ready": edges_ready,
 			"seconds": {"r5": (t1 - t0) / 1e6, "r6": (t2 - t1) / 1e6, "network": (t3 - t2) / 1e6}, "r6_timings": synth.diagnostics.get("timings_s", {})})
+		var candidate := {"score": score, "network": realized.network, "graph": routes.graph, "plan": synth.plan, "round": round_index}
+		candidates.append(candidate)
 		if best.is_empty() or score > best.score:
-			best = {"score": score, "network": realized.network, "graph": routes.graph, "plan": synth.plan, "round": round_index}
+			best = candidate
 		if complete(metrics) or round_index == max_replans:
 			break
 		var fresh: Array = hints_from(realized.analysis, routes.graph)
@@ -101,7 +108,9 @@ static func _build(region_plan: RefCounted, terrain_field: RefCounted, hydrology
 			added += 1
 		if added == 0:
 			break
-	return {"is_valid": true, "reason_code": "", "network": best.network, "graph": best.graph, "plan": best.plan, "round": best.round, "rounds": rounds, "hints": hints}
+	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.score > b.score or (a.score == b.score and a.round < b.round))
+	return {"is_valid": true, "reason_code": "", "network": best.network, "graph": best.graph, "plan": best.plan, "round": best.round, "rounds": rounds, "hints": hints,
+		"candidates": candidates}
 
 
 ## Lexicographic network score (higher is better).
