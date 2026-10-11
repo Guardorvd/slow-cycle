@@ -884,3 +884,24 @@ The last row: the chosen round had 7.85 km, B6+S4, 1 cycle. R7 excluded edges 2 
 2. The bake should consider R7 feasibility in the choice of round instead of collapsing the chosen one.
 
 The playtest instruction now covers random seeds through the menu.
+
+## Progress 3 (2026-10-11, commit 41f6c29; stopped by the user for a new chat)
+
+**Fords — done (41f6c29).**
+- R6 now designs every ford inside the band FinalSurface realizes. Wherever water lies under the footprint (riding width and shoulders, every 0.25 m) of a section within 4 m of the wet span, the band is checked every 0.5 m over both neighbouring intervals. An unreachable band gives ERR_R6_CROSSING_APPROACH, and the existing small-bridge retry applies.
+- R7: no ford lowering within 1 m of a piece end.
+- 184729: 31/31 pieces constructible (`m6_fordband3_184729`; edge 8 restored).
+- Seed 3855061512140275683: 22/22 (`m6_fordband3_3855`; the no-network failure class is removed for this seed).
+- R7 fixture 424259/0, hashes = M0 (`m6_diag_r7_fixture`).
+- On a copy of 41f6c29: R6 contracts 72/0; R6 regions 184729: 365 checks, 10 failures, all the escalated S3 `oracle_path_move:*` curvature (`m6_head_r6_*`).
+- A fresh bake of 184729 on 41f6c29 has not been run yet. The network should exceed 7.86 km with edge 8 back.
+
+**N4 — RCA cycle 2 result (ablation, disposable copy, `work/edits/ablation_fine.py`).**
+- R5 node admissibility at the R6 scale: a node is closed for a class when every 8 m lattice point within ±16 m has |grad| ≥ `Policy.buildable_slope(class)` (R6 lattice slot rule).
+- With this rule, 184729 yields 0 SINGLETRACK and 0 TECHNICAL candidates, for ST/TECH only and for all classes alike (`m7_abl_finest_184729`, `m7_abl_fineall_184729`): singletrack NO_ATTACH 8 / DUPLICATE 9 / UNJUSTIFIED_SPUR 5; technical NO_SECOND_ATTACH 12.
+- So once R5 and R6 agree, the terrain around the ST/TECH anchors of 184729 is steeper at 8 m than the approved policy allows: ST cut 1.5 m / tie 6 m → buildable about 0.63 (32°); TECH 3/2/8 m → 0.82.
+- Not yet done: the same measurement on 2024@(−1,−1) and 3628391@(3,−2) (3628391 realized a ST in an earlier round). Also not done: terrain statistics, i.e. the share of nodes closed per class and the anchor positions.
+- Next options, decided by evidence:
+  - (a) R5 candidate generation for ST/TECH on buildable terrain (valley sides, benches, descent lines) instead of only from the current anchor kinds;
+  - (b) if the dev regions also have no buildable ST/TECH terrain, an S1 report to the Director: the approved earthwork policy vs. the generated geography.
+- Do not tune coefficients.
