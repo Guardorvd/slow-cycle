@@ -1,6 +1,6 @@
 # Slow Cycle — current runtime architecture
 
-STATUS: CURRENT
+STATUS: CURRENT - R7 isolated certified-route surface technically verified; legacy runtime unchanged; Director acceptance pending ([record](docs/plans/completed/R7.md))
 
 Scope: **as-is legacy runtime**, read-only observations до D0 на `ed7d132`; D0 не меняет код. Целевая архитектура отдельно в [TARGET_ARCHITECTURE](docs/TARGET_ARCHITECTURE.md), первоисточники — [Blueprint](docs/TARGET_GAME_BLUEPRINT.md) и [Master](docs/MASTER_IMPLEMENTATION_PLAN.md). [Index](docs/README.md), [migration](docs/LEGACY_MIGRATION_MATRIX.md), [current state](docs/CURRENT_PROJECT_STATE.md).
 
