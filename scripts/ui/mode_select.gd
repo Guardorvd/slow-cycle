@@ -33,36 +33,37 @@ func _unhandled_input(event: InputEvent) -> void:
 	# 1. Keyboard digits 1-4
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_1 or event.keycode == KEY_KP_1:
-			_on_infinite_selected()
 			get_viewport().set_input_as_handled()
+			_on_infinite_selected()
 			return
 		elif event.keycode == KEY_2 or event.keycode == KEY_KP_2:
-			_on_sandbox_selected()
 			get_viewport().set_input_as_handled()
+			_on_sandbox_selected()
 			return
 		elif event.keycode == KEY_3 or event.keycode == KEY_KP_3:
-			_on_lab_selected()
 			get_viewport().set_input_as_handled()
+			_on_lab_selected()
 			return
 		elif event.keycode == KEY_4 or event.keycode == KEY_KP_4:
-			_on_training_selected()
 			get_viewport().set_input_as_handled()
+			_on_training_selected()
 			return
 		elif event.keycode == KEY_5 or event.keycode == KEY_KP_5:
-			_on_region_selected()
 			get_viewport().set_input_as_handled()
+			_on_region_selected()
 			return
 
-	# 2. Gamepad Button A or ui_accept action
+	# 2. Gamepad Button A or ui_accept action. A selection changes the scene,
+	# which leaves the tree at once (Godot 4.7): mark the input handled first.
 	if event.is_action_pressed("ui_accept"):
-		_activate_focused_or_default()
 		get_viewport().set_input_as_handled()
+		_activate_focused_or_default()
 		return
 
 	if event is InputEventJoypadButton and event.pressed:
 		if event.button_index == JOY_BUTTON_A:
-			_activate_focused_or_default()
 			get_viewport().set_input_as_handled()
+			_activate_focused_or_default()
 			return
 		elif event.button_index == JOY_BUTTON_DPAD_UP:
 			_navigate_vertical(-1)

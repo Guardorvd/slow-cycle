@@ -25,6 +25,10 @@ const WALL_REASONS: Array[String] = ["ERR_R6_EARTHWORK", "ERR_R6_NATURAL_BARRIER
 
 
 ## Returns {is_valid, reason_code, network, graph, plan, round, rounds}.
+## options.progress (optional Callable(stage: String, fraction: float in 0..1))
+## is called from the building thread at every R5 / R6 step; options.cancelled
+## (optional Callable() -> bool) is polled there and stops the build with
+## ERR_BAKE_CANCELLED (never a network).
 static func build(region_plan: RefCounted, terrain_field: RefCounted, hydrology_plan: RefCounted, options: Dictionary = {}) -> Dictionary:
 	return Synth.off_main_thread(func() -> Dictionary: return _build(region_plan, terrain_field, hydrology_plan, options))
 
@@ -37,8 +41,14 @@ static func _build(region_plan: RefCounted, terrain_field: RefCounted, hydrology
 	var rounds: Array = []
 	var best: Dictionary = {}
 	var max_replans: int = int(options.get("max_replans", MAX_REPLANS))
+	var progress: Callable = options.get("progress", Callable())
+	var cancelled: Callable = options.get("cancelled", Callable())
 	for round_index in range(max_replans + 1):
+		if cancelled.is_valid() and cancelled.call():
+			return {"is_valid": false, "reason_code": "ERR_BAKE_CANCELLED", "network": null, "rounds": rounds}
 		var t0: int = Time.get_ticks_usec()
+		if progress.is_valid():
+			progress.call("network: routes (round %d of up to %d)" % [round_index + 1, max_replans + 1], float(round_index) / (max_replans + 1))
 		var settings: Dictionary = {"hints": hints.duplicate(true)}
 		if raster != null:
 			settings["raster"] = raster
@@ -50,6 +60,10 @@ static func _build(region_plan: RefCounted, terrain_field: RefCounted, hydrology
 				return {"is_valid": false, "reason_code": routes.reason_code, "network": null, "rounds": rounds}
 			break
 		raster = routes.get("raster")
+		if cancelled.is_valid() and cancelled.call():
+			return {"is_valid": false, "reason_code": "ERR_BAKE_CANCELLED", "network": null, "rounds": rounds}
+		if progress.is_valid():
+			progress.call("network: roads (round %d of up to %d)" % [round_index + 1, max_replans + 1], (round_index + 0.3) / (max_replans + 1))
 		var synth: Dictionary = Synth.synthesize(region_plan, terrain_field, hydrology_plan, routes.graph, {}, int(options.get("threads", 1)))
 		var t2: int = Time.get_ticks_usec()
 		if synth.plan == null:

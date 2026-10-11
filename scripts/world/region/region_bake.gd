@@ -18,7 +18,8 @@ extends RefCounted
 ## thread (RoadSynthesizer.off_main_thread: main-thread `exp`/`pow` differ in
 ## the last bits), so a probe, a test and the runtime loader bake identically.
 ## `progress` (optional Callable(stage: String, fraction: float)) is called
-## from the baking thread.
+## from the baking thread; options.cancelled (optional Callable() -> bool) is
+## polled between stages and ends the bake with ERR_BAKE_CANCELLED.
 
 const Gen = preload("res://scripts/world/region/region_generator.gd")
 const Terrain = preload("res://scripts/world/region/terrain_field.gd")
@@ -56,10 +57,15 @@ static func _bake(seed_value: int, region: Vector2i, options: Dictionary, progre
 	var hydro: Dictionary = HGen.build(plan, terrain)
 	var field: RefCounted = HField.create(hydro.plan, terrain).field
 	timings["upstream_s"] = _lap(t)
+	var cancelled: Callable = options.get("cancelled", Callable())
+	var stopped := {"is_valid": false, "reason_code": "ERR_BAKE_CANCELLED"}
+	if cancelled.is_valid() and cancelled.call():
+		return stopped
 	t = Time.get_ticks_usec()
 	_report(progress, "network", 0.03)
+	var network_progress := func(stage: String, fraction: float) -> void: _report(progress, stage, 0.03 + 0.42 * fraction)
 	var built: Dictionary = Builder.build(plan, terrain, hydro.plan, {"seed": seed_value, "region": region, "max_replans": options.get("max_replans", Builder.MAX_REPLANS),
-		"threads": int(options.get("threads", 1))})
+		"threads": int(options.get("threads", 1)), "progress": network_progress, "cancelled": cancelled})
 	timings["network_s"] = _lap(t)
 	if not built.is_valid:
 		return {"is_valid": false, "reason_code": built.reason_code, "rounds": built.get("rounds", [])}
@@ -77,6 +83,8 @@ static func _bake(seed_value: int, region: Vector2i, options: Dictionary, progre
 	timings["deformer_s"] = 0.0
 	timings["tiles_s"] = 0.0
 	for attempt in range(MAX_ISOLATION_PASSES):
+		if cancelled.is_valid() and cancelled.call():
+			return stopped
 		t = Time.get_ticks_usec()
 		_report(progress, "surface", 0.45)
 		var blamed: Dictionary = {}
@@ -90,8 +98,10 @@ static func _bake(seed_value: int, region: Vector2i, options: Dictionary, progre
 		else:
 			surface = Surface.create(terrain, field, deformer.deformer).surface
 			t = Time.get_ticks_usec()
-			slots = _tiles(surface, bounds, network.get_data(), threads, progress)
+			slots = _tiles(surface, bounds, network.get_data(), threads, progress, cancelled)
 			timings.tiles_s += _lap(t)
+			if cancelled.is_valid() and cancelled.call():
+				return stopped
 			var failed: Dictionary = {}
 			for slot: Dictionary in slots:
 				if not slot.get("is_valid", false):
@@ -144,7 +154,7 @@ static func _bake(seed_value: int, region: Vector2i, options: Dictionary, progre
 
 ## Every tile of the region (optionally threaded; each result lands in its own
 ## slot dictionary, so order and thread count do not matter).
-static func _tiles(surface: RefCounted, bounds: Dictionary, data: Dictionary, threads: int, progress: Callable) -> Array:
+static func _tiles(surface: RefCounted, bounds: Dictionary, data: Dictionary, threads: int, progress: Callable, cancelled: Callable = Callable()) -> Array:
 	var piece_class: Dictionary = {}
 	for piece: Dictionary in data.pieces:
 		piece_class[piece.id] = piece.info.route_class
@@ -154,6 +164,10 @@ static func _tiles(surface: RefCounted, bounds: Dictionary, data: Dictionary, th
 	for k in range(TILES * TILES):
 		slots.append({"tx": tile_x0 + k % TILES, "tz": tile_z0 + k / TILES})
 	var job := func(k: int) -> void:
+		if cancelled.is_valid() and cancelled.call():
+			slots[k]["is_valid"] = false
+			slots[k]["reason_code"] = "ERR_BAKE_CANCELLED"
+			return
 		_tile(surface, bounds, piece_class, slots[k])
 	if threads > 1:
 		_report(progress, "tiles", 0.5)

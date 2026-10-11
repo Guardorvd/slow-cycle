@@ -14,6 +14,10 @@ extends Node3D
 ## transform the controller itself requests.
 ##   --seed=N (int64; default: random, logged)   --region=X,Z (default 0,0)
 ##   --bake-threads=N (default 8)
+## A region that cannot be generated (bake failure, crashed bake, empty
+## network) is a recorded result, not a script failure: the screen names the
+## seed and reason, the diagnostics are saved under user://regions/failures/
+## and Enter tries another random region (Esc: menu, via the HUD).
 
 const Bake = preload("res://scripts/world/region/region_bake.gd")
 const Cache = preload("res://scripts/world/region_bake_cache.gd")
@@ -36,8 +40,7 @@ var _recovery_paths: Array = []
 var _recovery_recommended: Array = []
 var _content: Node3D
 var _thread: Thread
-var _mutex := Mutex.new()
-var _progress := {"stage": "", "fraction": 0.0}
+var _job: BakeJob
 var _overlay: CanvasLayer
 var _label: Label
 var _t0: int = 0
@@ -46,6 +49,11 @@ var _water_grid: Dictionary = {}
 var _ready_to_ride: bool = false
 var _water_cooldown_ms: int = 0
 var water_recoveries: int = 0
+var failed: bool = false
+var failure: Dictionary = {}
+## Set before reloading the scene for "another random region": the next load
+## ignores --seed once.
+static var force_random_next: bool = false
 
 
 func get_bike() -> BicycleController:
@@ -68,7 +76,7 @@ func _ready() -> void:
 	session_seed = 0
 	var seeded: bool = false
 	for arg: String in OS.get_cmdline_user_args():
-		if arg.begins_with("--seed="):
+		if arg.begins_with("--seed=") and not force_random_next:
 			session_seed = arg.substr(7).to_int()
 			seeded = true
 		elif arg.begins_with("--region="):
@@ -77,11 +85,12 @@ func _ready() -> void:
 				region = Vector2i(parts[0].to_int(), parts[1].to_int())
 		elif arg.begins_with("--bake-threads="):
 			threads = maxi(1, arg.substr(15).to_int())
+	force_random_next = false
 	if not seeded:
 		var rng := RandomNumberGenerator.new()
 		rng.randomize()
 		session_seed = (int(rng.randi()) << 31) ^ int(rng.randi())
-	print("REGION_SESSION seed=%d region=%d,%d" % [session_seed, region.x, region.y])
+	print("REGION_SESSION seed=%d region=%d,%d mode=%s" % [session_seed, region.x, region.y, "given" if seeded else "random"])
 	_build_overlay()
 	_t0 = Time.get_ticks_usec()
 	var key: String = Cache.key(session_seed, region, {})
@@ -91,51 +100,54 @@ func _ready() -> void:
 		_finish_load(cached)
 		return
 	source = "bake"
-	_set_progress("bake", 0.0)
+	_job = BakeJob.new()
+	_job.seed_value = session_seed
+	_job.region = region
+	_job.key = key
+	_job.threads = threads
 	_thread = Thread.new()
-	_thread.start(_bake_job.bind(key, threads))
+	# The thread belongs to a drain node under the root, so leaving the scene
+	# during a bake (Esc to the menu, window close) never frees a running bake.
+	var drain := BakeDrain.new()
+	drain.name = "RegionBakeDrain"
+	drain.adopt(_thread, _job)
+	get_tree().root.add_child.call_deferred(drain)
+	_thread.start(_job.run)
 
 
-func _bake_job(key: String, threads: int) -> void:
-	var baked: Dictionary = Bake.bake(session_seed, region, {"threads": threads}, _set_progress)
-	if baked.is_valid:
-		_set_progress("cache_write", 0.99)
-		Cache.save(key, baked)
-	_mutex.lock()
-	_progress["result"] = baked
-	_mutex.unlock()
-
-
-func _set_progress(stage: String, fraction: float) -> void:
-	_mutex.lock()
-	_progress.stage = stage
-	_progress.fraction = fraction
-	_mutex.unlock()
+func _exit_tree() -> void:
+	if _job != null:
+		_job.cancel()
 
 
 func _process(_delta: float) -> void:
 	if _thread == null:
 		return
-	_mutex.lock()
-	var stage: String = _progress.stage
-	var fraction: float = _progress.fraction
-	var result: Variant = _progress.get("result")
-	_mutex.unlock()
+	var snapshot: Array = _job.snapshot()
+	var stage: String = snapshot[0]
+	var fraction: float = snapshot[1]
+	var result: Variant = snapshot[2]
 	if _label != null:
-		_label.text = "Mountain River Valley\nseed %d  region %d,%d\n%s  %d%%  (%.0f s)" % [session_seed, region.x, region.y, stage, int(fraction * 100.0), (Time.get_ticks_usec() - _t0) / 1e6]
+		_label.text = "Mountain River Valley\nseed %d  region %d,%d\n%s  %d%%  (%.0f s)\n\nПервый запуск региона строит его (около 5–6 минут), повторный открывается из кэша." % [session_seed, region.x, region.y, stage, int(fraction * 100.0), (Time.get_ticks_usec() - _t0) / 1e6]
 	if result == null:
+		if not _thread.is_alive():
+			# The bake ended without a result (a script error inside it).
+			_thread = null
+			_job = null
+			_fail("ERR_BAKE_CRASHED", {"stage": stage, "fraction": fraction})
 		return
-	_thread.wait_to_finish()
 	_thread = null
+	_job = null
 	if not result.is_valid:
-		push_error("REGION_BAKE_FAILED %s" % result.reason_code)
-		if _label != null:
-			_label.text = "Region bake failed: %s" % result.reason_code
+		_fail(result.reason_code, result)
 		return
 	_finish_load(result)
 
 
 func _finish_load(baked: Dictionary) -> void:
+	if baked.spawn.is_empty() or baked.network.get_data().pieces.is_empty():
+		_fail("ERR_REGION_NO_NETWORK", {"metrics": baked.network.get_metrics(), "manifest": baked.manifest})
+		return
 	products = baked
 	var materials: Dictionary = _materials()
 	streamer = Streamer.new()
@@ -154,11 +166,159 @@ func _finish_load(baked: Dictionary) -> void:
 		bike.visible = true
 		bike.process_mode = Node.PROCESS_MODE_INHERIT
 	load_seconds = (Time.get_ticks_usec() - _t0) / 1e6
-	print("REGION_READY source=%s seconds=%.3f seed=%d network_m=%.0f" % [source, load_seconds, session_seed, baked.network.get_metrics().component_length_m])
+	var metrics: Dictionary = baked.network.get_metrics()
+	print("REGION_READY source=%s seconds=%.3f seed=%d network_m=%.0f cycles=%d classes=%s excluded=%s" % [source, load_seconds, session_seed, metrics.component_length_m,
+		metrics.cycles, JSON.stringify(metrics.classes), JSON.stringify(baked.manifest.get("r7_excluded", {}))])
 	if _overlay != null:
 		_overlay.queue_free()
 		_overlay = null
+	_show_summary(metrics)
 	_ready_to_ride = true
+
+
+## A few seconds of region facts on screen (seed to note down).
+func _show_summary(metrics: Dictionary) -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 19
+	var label := Label.new()
+	label.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	label.position.y = 24.0
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 20)
+	label.add_theme_color_override("font_outline_color", Color.BLACK)
+	label.add_theme_constant_override("outline_size", 6)
+	label.text = "Mountain River Valley · seed %d · сеть %.1f км · петли %d · %s · загрузка %.0f с (%s)" % [session_seed, metrics.component_length_m / 1000.0, metrics.cycles,
+		", ".join(metrics.classes.keys()), load_seconds, "кэш" if source == "cache" else "генерация"]
+	layer.add_child(label)
+	add_child(layer)
+	get_tree().create_timer(8.0).timeout.connect(layer.queue_free)
+
+
+## Generation failure: on screen, in the log and as a diagnostics file.
+func _fail(reason: String, detail: Variant) -> void:
+	failed = true
+	var record := {"seed": session_seed, "region": [region.x, region.y], "source": source, "reason_code": reason, "elapsed_s": (Time.get_ticks_usec() - _t0) / 1e6,
+		"engine": Engine.get_version_info(), "cache_key": Cache.key(session_seed, region, {}), "created_utc": Time.get_datetime_string_from_system(true),
+		"detail": _plain(detail)}
+	var directory: String = "user://regions/failures"
+	DirAccess.make_dir_recursive_absolute(directory)
+	var path: String = directory.path_join("seed_%d_%d_%d.json" % [session_seed, region.x, region.y])
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file != null:
+		file.store_string(JSON.stringify(record, "\t"))
+		file.close()
+	failure = record
+	failure["diagnostics_path"] = ProjectSettings.globalize_path(path)
+	print("REGION_GENERATION_FAILED seed=%d region=%d,%d reason=%s seconds=%.1f diagnostics=%s" % [session_seed, region.x, region.y, reason, record.elapsed_s, failure.diagnostics_path])
+	push_warning("Region generation failed: seed %d, %s (diagnostics: %s)" % [session_seed, reason, failure.diagnostics_path])
+	if _overlay == null:
+		_build_overlay()
+	_label.text = "Регион не сгенерировался\nseed %d · регион %d,%d · %.0f с\nпричина: %s\n\nДиагностика сохранена:\n%s\n\nEnter — другой случайный регион    Esc — меню" % [session_seed, region.x, region.y,
+		record.elapsed_s, reason, failure.diagnostics_path]
+
+
+## JSON-safe copy of diagnostics (no objects or packed arrays, bounded size).
+static func _plain(value: Variant, depth: int = 0) -> Variant:
+	if depth > 6:
+		return "..."
+	if value is Dictionary:
+		var out: Dictionary = {}
+		for key: Variant in value:
+			if value[key] is Object:
+				continue
+			out[str(key)] = _plain(value[key], depth + 1)
+		return out
+	if value is Array:
+		var out: Array = []
+		for item: Variant in value.slice(0, 64):
+			out.append(_plain(item, depth + 1))
+		return out
+	if typeof(value) >= TYPE_PACKED_BYTE_ARRAY:
+		return "<packed %d>" % value.size()
+	if value is Object:
+		return "<object>"
+	return value
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if failed and event.is_action_pressed("ui_accept"):
+		get_viewport().set_input_as_handled()
+		force_random_next = true
+		get_tree().reload_current_scene()
+
+
+## One background bake. Owns its progress, result and cancel flag and never
+## touches the scene: its thread may outlive the scene that started it.
+class BakeJob extends RefCounted:
+	const JobBake = preload("res://scripts/world/region/region_bake.gd")
+	const JobCache = preload("res://scripts/world/region_bake_cache.gd")
+	var seed_value: int = 0
+	var region := Vector2i.ZERO
+	var key: String = ""
+	var threads: int = 8
+	var _mutex := Mutex.new()
+	var _stage: String = "bake"
+	var _fraction: float = 0.0
+	var _result: Variant = null
+	var _cancel: bool = false
+
+	func run() -> void:
+		var baked: Dictionary = JobBake.bake(seed_value, region, {"threads": threads, "cancelled": is_cancelled}, set_progress)
+		if baked.is_valid:
+			set_progress("cache_write", 0.99)
+			JobCache.save(key, baked)
+		_mutex.lock()
+		_result = baked
+		_mutex.unlock()
+
+	func set_progress(stage: String, fraction: float) -> void:
+		_mutex.lock()
+		_stage = stage
+		_fraction = fraction
+		_mutex.unlock()
+
+	func cancel() -> void:
+		_mutex.lock()
+		_cancel = true
+		_mutex.unlock()
+
+	func is_cancelled() -> bool:
+		_mutex.lock()
+		var value: bool = _cancel
+		_mutex.unlock()
+		return value
+
+	## [stage, fraction, result or null]
+	func snapshot() -> Array:
+		_mutex.lock()
+		var out: Array = [_stage, _fraction, _result]
+		_mutex.unlock()
+		return out
+
+
+## Holds bake threads past their scene: joins each when it ends and frees
+## itself; at exit it cancels and waits (the bake stops at its next stage).
+class BakeDrain extends Node:
+	var _entries: Array = []
+
+	func adopt(thread: Thread, job: RefCounted) -> void:
+		_entries.append([thread, job])
+
+	func _process(_delta: float) -> void:
+		for entry: Array in _entries.duplicate():
+			if not entry[0].is_alive() and entry[0].is_started():
+				entry[0].wait_to_finish()
+				_entries.erase(entry)
+		if _entries.is_empty():
+			queue_free()
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_PREDELETE:
+			for entry: Array in _entries:
+				entry[1].cancel()
+				if entry[0].is_started():
+					entry[0].wait_to_finish()
+			_entries.clear()
 
 
 func _materials() -> Dictionary:

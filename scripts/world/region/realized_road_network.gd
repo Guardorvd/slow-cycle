@@ -24,6 +24,10 @@ const Graph = preload("res://scripts/world/region/region_route_graph.gd")
 const Policy = preload("res://scripts/world/region/road_synthesis_policy.gd")
 const Intent = preload("res://scripts/world/region/roadbed_intent.gd")
 const SCHEMA := "slow_cycle.realized_road_network/1"
+## This script's own path: instances are made from it, never through the
+## global class_name (registered only by an editor import; a launch from a
+## stale .godot class cache must still compile - PR1 launch fix).
+const SELF_PATH := "res://scripts/world/region/realized_road_network.gd"
 ## N7 diagnostics: curvature below this counts as near-straight (R > 500 m).
 const NEAR_STRAIGHT_K: float = 0.002
 
@@ -242,7 +246,7 @@ static func from_plan(plan: RefCounted, graph: RefCounted, spec: Dictionary, exc
 			if ok_edges.has(e):
 				incident.append(e)
 		net.nodes.append({"id": node_id, "kind": Graph.NODE_KIND_NAMES[node.kind], "x_m": node.x_cm / 100.0, "z_m": node.z_cm / 100.0, "edges": incident})
-	var network := RealizedRoadNetwork.new()
+	var network = _instance()
 	network._data = net
 	net["metrics"] = network._metrics(graph, backbone_edges, junction_rec)
 	return {"is_valid": true, "network": network, "reason_code": "", "analysis": {"degrade": degrade, "edge_records": data.edges, "junctions": data.junctions}}
@@ -470,6 +474,10 @@ static func from_bytes(bytes: PackedByteArray) -> Dictionary:
 	var value: Variant = bytes_to_var(bytes)
 	if not value is Dictionary or value.get("schema", "") != SCHEMA:
 		return {"is_valid": false, "network": null, "reason_code": "ERR_NETWORK_SCHEMA"}
-	var network := RealizedRoadNetwork.new()
+	var network = _instance()
 	network._data = value
 	return {"is_valid": true, "network": network, "reason_code": ""}
+
+
+static func _instance() -> RefCounted:
+	return load(SELF_PATH).new()
