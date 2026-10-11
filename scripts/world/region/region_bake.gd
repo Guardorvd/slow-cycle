@@ -14,8 +14,11 @@ extends RefCounted
 ## Output is region-local (x - min_x, z - min_z) so runtime float32 stays
 ## precise anywhere in the int64 world. Tiles may be built on WorkerThreadPool
 ## threads: each tile is independent and its arrays do not depend on order or
-## thread count (manifest hashes prove it). `progress` (optional Callable(stage:
-## String, fraction: float)) is called from the baking thread.
+## thread count (manifest hashes prove it). The whole bake runs off the main
+## thread (RoadSynthesizer.off_main_thread: main-thread `exp`/`pow` differ in
+## the last bits), so a probe, a test and the runtime loader bake identically.
+## `progress` (optional Callable(stage: String, fraction: float)) is called
+## from the baking thread.
 
 const Gen = preload("res://scripts/world/region/region_generator.gd")
 const Terrain = preload("res://scripts/world/region/terrain_field.gd")
@@ -27,6 +30,7 @@ const Surface = preload("res://scripts/world/region/final_surface.gd")
 const Renderer = preload("res://scripts/world/region/final_surface_tile_renderer.gd")
 const Bridges = preload("res://scripts/world/region/bridge_deck_builder.gd")
 const Graph = preload("res://scripts/world/region/region_route_graph.gd")
+const Synth = preload("res://scripts/world/region/road_synthesizer.gd")
 const SCHEMA := "slow_cycle.region_bake/1"
 const TILE_M: int = 512
 const TILES: int = 8
@@ -37,6 +41,10 @@ const LAYER_TERRAIN: int = 4
 
 
 static func bake(seed_value: int, region: Vector2i, options: Dictionary = {}, progress: Callable = Callable()) -> Dictionary:
+	return Synth.off_main_thread(func() -> Dictionary: return _bake(seed_value, region, options, progress))
+
+
+static func _bake(seed_value: int, region: Vector2i, options: Dictionary, progress: Callable) -> Dictionary:
 	var timings: Dictionary = {}
 	var t: int = Time.get_ticks_usec()
 	_report(progress, "upstream", 0.0)
@@ -76,7 +84,7 @@ static func bake(seed_value: int, region: Vector2i, options: Dictionary = {}, pr
 		_tile(surface, bounds, piece_class, slots[k])
 	var threads: int = int(options.get("threads", 1))
 	if threads > 1:
-		var group: int = WorkerThreadPool.add_group_task(job, slots.size(), threads, false, "region_bake_tiles")
+		var group: int = WorkerThreadPool.add_group_task(job, slots.size(), threads, true, "region_bake_tiles")
 		WorkerThreadPool.wait_for_group_task_completion(group)
 	else:
 		for k in range(slots.size()):

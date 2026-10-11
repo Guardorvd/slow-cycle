@@ -64,10 +64,31 @@ static func _result(status: int, plan: RefCounted, reason: String, diagnostics: 
 	return {"schema": Policy.RESULT_SCHEMA, "status": Policy.STATUS_NAMES[status], "is_valid": status == Policy.Status.READY, "plan": plan, "reason_code": reason, "diagnostics": diagnostics}
 
 
+## PR1 determinism (RCA, evidence m2_mathfn_1 / m2_heightthread_1): on this
+## engine the C runtime `exp` and `pow` return different last bits on the main
+## thread than on any other thread (Thread and WorkerThreadPool threads agree
+## bit for bit), and terrain heights inherit the difference (~1e-13 m). Region
+## generation therefore never runs on the main thread: called there, `action`
+## runs as one WorkerThreadPool task while the caller waits; on any other
+## thread it runs directly. Returns the action's result.
+static func off_main_thread(action: Callable) -> Variant:
+	if OS.get_thread_caller_id() != OS.get_main_thread_id():
+		return action.call()
+	var holder: Array = [null]
+	var task: int = WorkerThreadPool.add_task(func() -> void: holder[0] = action.call(), true, "region_generation")
+	WorkerThreadPool.wait_for_task_completion(task)
+	return holder[0]
+
+
 ## `threads` (PR1, additive): edge interiors are designed on that many
 ## WorkerThreadPool threads; outcomes do not depend on it (every piece is
-## designed in isolation; conflicts are resolved afterwards in stable order).
+## designed in isolation; conflicts are resolved afterwards in stable order)
+## nor on the calling thread (`off_main_thread`).
 static func synthesize(region_plan: RefCounted, terrain_field: RefCounted, hydrology_plan: RefCounted, graph: RefCounted, settings: Variant = {}, threads: int = 1) -> Dictionary:
+	return off_main_thread(func() -> Dictionary: return _synthesize(region_plan, terrain_field, hydrology_plan, graph, settings, threads))
+
+
+static func _synthesize(region_plan: RefCounted, terrain_field: RefCounted, hydrology_plan: RefCounted, graph: RefCounted, settings: Variant, threads: int) -> Dictionary:
 	if region_plan == null or terrain_field == null or hydrology_plan == null or graph == null:
 		return _result(Policy.Status.REJECT, null, "ERR_R6_INPUT_MISSING", {})
 	if not region_plan is Region or not terrain_field is Terrain or not hydrology_plan is Hydro or not graph is Graph:
@@ -180,7 +201,7 @@ func _run() -> Dictionary:
 	var job := func(i: int) -> void:
 		slots[i]["independent"] = _independent(slots[i].prep, _tools())
 	if _threads > 1 and slots.size() > 1:
-		var group: int = WorkerThreadPool.add_group_task(job, slots.size(), _threads, false, "r6_edges")
+		var group: int = WorkerThreadPool.add_group_task(job, slots.size(), _threads, true, "r6_edges")
 		WorkerThreadPool.wait_for_group_task_completion(group)
 	else:
 		for i in range(slots.size()):

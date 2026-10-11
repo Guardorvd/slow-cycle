@@ -12,7 +12,8 @@ extends RefCounted
 ##             junction, N4 class mix, N3 loops, N2 component length), with all
 ##             rounds' metrics, hints and DEGRADE records. The R5 graph schema is
 ##             never changed; R6 never edits the graph.
-## Deterministic: fixed round order, stable hint order, no time-based choice.
+## Deterministic: fixed round order, stable hint order, no time-based choice;
+## R5 and R6 never run on the main thread (RoadSynthesizer.off_main_thread).
 
 const Planner = preload("res://scripts/world/region/route_planner.gd")
 const Synth = preload("res://scripts/world/region/road_synthesizer.gd")
@@ -25,6 +26,10 @@ const WALL_REASONS: Array[String] = ["ERR_R6_EARTHWORK", "ERR_R6_NATURAL_BARRIER
 
 ## Returns {is_valid, reason_code, network, graph, plan, round, rounds}.
 static func build(region_plan: RefCounted, terrain_field: RefCounted, hydrology_plan: RefCounted, options: Dictionary = {}) -> Dictionary:
+	return Synth.off_main_thread(func() -> Dictionary: return _build(region_plan, terrain_field, hydrology_plan, options))
+
+
+static func _build(region_plan: RefCounted, terrain_field: RefCounted, hydrology_plan: RefCounted, options: Dictionary) -> Dictionary:
 	var spec := {"seed": options.get("seed", 0), "region": options.get("region", Vector2i.ZERO), "model": MODEL}
 	var hints: Array = []
 	var hint_keys: Dictionary = {}
