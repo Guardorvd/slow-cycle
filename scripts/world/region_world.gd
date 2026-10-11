@@ -258,8 +258,19 @@ func request_bike_recovery(query: Vector3) -> Transform3D:
 				best_rec = _recovery_recommended[p] if p < _recovery_recommended.size() else 0
 	if best_i < 0:
 		return Transform3D(Basis.IDENTITY, query + Vector3(0.0, 2.0, 0.0))
-	# Step back along the travel direction (descent-preferred: recommended).
-	var step: int = -1 if best_rec >= 0 else 1
+	# Travel direction along the path: the recommended one on descent-preferred
+	# pieces, else the rider's own heading (public transform); step back
+	# against it and face along it.
+	var travel: int = best_rec
+	if travel == 0:
+		travel = 1
+		var bike: BicycleController = get_bike()
+		if bike != null and bike.is_inside_tree() and best_path.size() > 1:
+			var a: int = clampi(best_i, 0, best_path.size() - 2)
+			var tangent: Vector3 = best_path[a + 1] - best_path[a]
+			var forward: Vector3 = -bike.global_transform.basis.z
+			travel = 1 if forward.x * tangent.x + forward.z * tangent.z >= 0.0 else -1
+	var step: int = -travel
 	var i: int = best_i
 	var travelled: float = 0.0
 	while i + step >= 0 and i + step < best_path.size() and travelled < RECOVERY_BACKOFF_M:
@@ -335,12 +346,23 @@ func _physics_process(_delta: float) -> void:
 	if now < _water_cooldown_ms:
 		return
 	var surface: float = water_surface_at(bike.global_position)
-	if not is_nan(surface) and bike.global_position.y < surface - FORD_DEPTH_M:
+	# A ford's riding plane lies up to the ford depth below the water: only
+	# off the road (no Road-layer collider under a wheel) is it deep water.
+	if not is_nan(surface) and bike.global_position.y < surface - FORD_DEPTH_M and not _on_road(bike):
 		# The controller's own recovery path (fade + request_bike_recovery).
 		water_recoveries += 1
 		_water_cooldown_ms = now + 2500
 		Input.action_press("recover_ride")
 		_release_recover.call_deferred()
+
+
+static func _on_road(bike: BicycleController) -> bool:
+	for ray: RayCast3D in [bike.front_ray, bike.rear_ray]:
+		if ray != null and ray.is_colliding():
+			var collider: Object = ray.get_collider()
+			if collider is CollisionObject3D and (collider.collision_layer & 2) != 0:
+				return true
+	return false
 
 
 func _release_recover() -> void:

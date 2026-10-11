@@ -38,9 +38,12 @@ static func sha(bytes: PackedByteArray) -> String:
 
 
 ## plan: RoadSynthesisPlan (READY or PARTIAL); graph: its RegionRouteGraph;
-## spec: {seed, region, settings, round} recorded in the header. Returns
-## {is_valid, network, reason_code, analysis} (analysis feeds R5 hints).
-static func from_plan(plan: RefCounted, graph: RefCounted, spec: Dictionary) -> Dictionary:
+## spec: {seed, region, settings, round} recorded in the header. `excluded`
+## (optional): piece id -> reason code of pieces a downstream consumer could
+## not construct (FinalSurface); they leave the candidates as DEGRADE records
+## "R7_<reason>" before the fixed point. Returns {is_valid, network,
+## reason_code, analysis} (analysis feeds R5 hints).
+static func from_plan(plan: RefCounted, graph: RefCounted, spec: Dictionary, excluded: Dictionary = {}) -> Dictionary:
 	if plan == null or graph == null or plan.get_header().graph_signature != graph.signature():
 		return {"is_valid": false, "network": null, "reason_code": "ERR_NETWORK_INPUT", "analysis": {}}
 	var data: Dictionary = plan.get_data()
@@ -84,6 +87,14 @@ static func from_plan(plan: RefCounted, graph: RefCounted, spec: Dictionary) -> 
 				degrade.append({"kind": "MOVEMENT", "id": m.piece_id, "reason": "INTENT_UNSUPPORTED", "detail": []})
 				continue
 			ok_moves[m.piece_id] = {"node": node_id, "a": m.edges[0], "b": m.edges[1]}
+	var excluded_ids: Array = excluded.keys()
+	excluded_ids.sort()
+	for id: String in excluded_ids:
+		var edge_id: int = int(id.get_slice(":", 1))
+		if id.begins_with("edge:") and ok_edges.erase(edge_id):
+			degrade.append({"kind": "EDGE", "id": edge_id, "reason": "R7_" + str(excluded[id]), "detail": [], "class": edge_rec[edge_id].class})
+		elif ok_moves.erase(id):
+			degrade.append({"kind": "MOVEMENT", "id": id, "reason": "R7_" + str(excluded[id]), "detail": []})
 	var lengths: Dictionary = {}
 	for e: int in ok_edges:
 		lengths[e] = plan.get_piece_info("edge:%d" % e).length_m

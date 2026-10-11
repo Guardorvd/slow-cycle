@@ -16,6 +16,8 @@ var _road_mask := PackedByteArray()
 var _intersections: Dictionary = {}
 var _local_boundary_points: Array[Vector2] = []
 var _reason := ""
+## Owning pieces of the failed sample (PR1: the bake isolates them).
+var _owners: Array = []
 
 static func tile_arrays(surface: RefCounted, tx: int, tz: int) -> Dictionary:
 	var builder := FinalSurfaceTileRenderer.new()
@@ -25,7 +27,7 @@ static func tile_arrays(surface: RefCounted, tx: int, tz: int) -> Dictionary:
 		for i in range(tx*32,(tx+1)*32):
 			builder._cell(i,j)
 			if not builder._reason.is_empty():
-				return {"is_valid": false, "reason_code": builder._reason}
+				return {"is_valid": false, "reason_code": builder._reason, "owners": builder._owners}
 	builder._weld()
 	# Derive interior shading normals from these very triangles. Only shared
 	# tile-boundary normals need the deterministic field stencil. This avoids
@@ -68,6 +70,7 @@ func _vertex(x2: float, z2: float) -> int:
 	var h: Dictionary = _sample(x2,z2)
 	if not h.is_valid:
 		_reason = h.reason_code
+		_owners = h.get("owners", [])
 		return 0
 	var id: int = _vertices.size()
 	_lookup[key] = id
@@ -202,6 +205,7 @@ func _split_edge(a: int,b: int) -> int:
 	var h: Dictionary=_surface._mesh_sample(inside.x,inside.y)
 	if not h.is_valid:
 		_reason=h.reason_code
+		_owners = h.get("owners", [])
 		return a
 	var id: int=_vertices.size()
 	_vertices.append(Vector3(inside.x-_origin.x,h.height_m,inside.y-_origin.y))
@@ -237,6 +241,7 @@ func _leaf_resolution(x2: int,z2: int) -> float:
 			var h: Dictionary = _sample(x2+offset.x,z2+offset.y)
 			if not h.is_valid:
 				_reason = h.reason_code
+				_owners = h.get("owners", [])
 				return 2.0
 			wet = wet or h.get("_wet",false)
 			all_road = all_road and h.kind=="ROAD"

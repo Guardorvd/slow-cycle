@@ -205,6 +205,93 @@ static func route_polyline(data: Dictionary) -> PackedVector3Array:
 	return out
 
 
+## PR1 region tour over RealizedRoadNetwork data (region-local design
+## stations): from edge `start_edge` travelled in `start_dir` (+1 node a -> b,
+## -1 b -> a), at each junction only through a kept movement connector, a
+## descent-preferred edge only in its recommended direction, preferring an
+## edge whose far end continues (not a dead end), then the least-ridden one
+## (ties: lowest id). Stops at a dead end or once the walk reaches `max_m`. Returns {path, steps: [[piece_id, dir]], length_m,
+## end, edges_ridden}.
+static func network_tour(data: Dictionary, start_edge: int, start_dir: int, max_m: float) -> Dictionary:
+	var edges: Dictionary = {}
+	for record: Dictionary in data.edges:
+		edges[record.edge_id] = record
+	var designs: Dictionary = {}
+	var moves: Dictionary = {}
+	for piece: Dictionary in data.pieces:
+		designs[piece.id] = piece.design
+		if piece.info.kind == "MOVEMENT":
+			var pair: Array = piece.info.owner.edges
+			var node_id: int = piece.info.owner.node_id
+			moves["%d:%d:%d" % [node_id, pair[0], pair[1]]] = [piece.id, pair[0]]
+			moves["%d:%d:%d" % [node_id, pair[1], pair[0]]] = [piece.id, pair[0]]
+	var ridden: Dictionary = {}
+	var steps: Array = []
+	var path := PackedVector3Array()
+	var e: int = start_edge
+	var dir: int = start_dir
+	var end: String = "LENGTH"
+	while true:
+		_append_design(path, designs[edges[e].piece_id], dir > 0)
+		steps.append([edges[e].piece_id, dir])
+		ridden[e] = int(ridden.get(e, 0)) + 1
+		if polyline_length(path) >= max_m:
+			break
+		var node: int = edges[e].b if dir > 0 else edges[e].a
+		var best: int = -1
+		var best_key: Array = []
+		for other: Dictionary in data.edges:
+			var o: int = other.edge_id
+			if o == e or not moves.has("%d:%d:%d" % [node, e, o]):
+				continue
+			var odir: int = 1 if other.a == node else -1
+			if other.recommended != 0 and other.recommended != odir:
+				continue
+			var far: int = other.b if odir > 0 else other.a
+			var continues: int = 0
+			for onward: Dictionary in data.edges:
+				if onward.edge_id != o and moves.has("%d:%d:%d" % [far, o, onward.edge_id]):
+					continues = 1
+					break
+			var key: Array = [continues, -int(ridden.get(o, 0)), -o]
+			if best_key.is_empty() or key > best_key:
+				best_key = key
+				best = o
+		if best < 0:
+			end = "DEAD_END"
+			break
+		var move: Array = moves["%d:%d:%d" % [node, e, best]]
+		_append_design(path, designs[move[0]], e == move[1])
+		steps.append([move[0], 1 if e == move[1] else -1])
+		dir = 1 if edges[best].a == node else -1
+		e = best
+	return {"path": path, "steps": steps, "length_m": polyline_length(path), "end": end, "edges_ridden": ridden.size()}
+
+
+## The longer of the two network tours from `start_edge` (ties: a -> b); a
+## descent-preferred start edge is ridden only in its recommended direction.
+static func longest_tour(data: Dictionary, start_edge: int, max_m: float) -> Dictionary:
+	var dirs: Array = [1, -1]
+	for record: Dictionary in data.edges:
+		if record.edge_id == start_edge and record.recommended != 0:
+			dirs = [record.recommended]
+	var best: Dictionary = {}
+	for dir: int in dirs:
+		var tour: Dictionary = network_tour(data, start_edge, dir, max_m)
+		if best.is_empty() or tour.length_m > best.length_m + 1e-6:
+			best = tour
+	return best
+
+
+static func _append_design(path: PackedVector3Array, d: Dictionary, forward: bool) -> void:
+	var n: int = d.s.size()
+	for i in range(n):
+		var k: int = i if forward else n - 1 - i
+		var p := Vector3(d.x[k], d.y[k], d.z[k])
+		if path.is_empty() or path[path.size() - 1].distance_to(p) > 0.001:
+			path.append(p)
+
+
 static func polyline_length(path: PackedVector3Array) -> float:
 	var total: float = 0.0
 	for i in range(1, path.size()):

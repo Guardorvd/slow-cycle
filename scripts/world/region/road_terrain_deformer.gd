@@ -8,7 +8,16 @@ extends RefCounted
 ## records with support BRIDGE_DECK) are not deformed - natural ground stays
 ## under the deck, abutments get radial caps - while an undeclared BRIDGE_DECK
 ## station is rejected (ERR_R7_BRIDGE_UNSUPPORTED).
+## Options (PR1, additive; the default rejects on the first failing piece as
+## before): collect_failures - check every piece and return
+## ERR_R7_PIECE_FAILURES with [{piece_id, reason_code, detail}] so the caller
+## can isolate failing pieces; check_cache - caller-owned memo of per-piece
+## checks by piece id (valid only for pieces of one synthesis plan).
 const Policy = preload("res://scripts/world/region/road_synthesis_policy.gd")
+const Geo = preload("res://scripts/world/region/road_corridor_geometry.gd")
+## 16 m fine cells per region side: a piece reaching a region-edge gateway
+## refines only cells inside the region domain (PR1 network).
+const DOMAIN_CELLS: int = int(Geo.DOMAIN_M / 16.0)
 var _segments: Array[Dictionary] = []
 var _index: Dictionary = {}
 var _query_index: Dictionary = {}
@@ -23,7 +32,7 @@ var _errors: Array[String] = []
 var _origin_x: float = 0.0
 var _origin_z: float = 0.0
 
-static func create(route: RefCounted, hydrology_field: RefCounted) -> Dictionary:
+static func create(route: RefCounted, hydrology_field: RefCounted, options: Dictionary = {}) -> Dictionary:
 	var out := RoadTerrainDeformer.new()
 	out._hydrology = hydrology_field
 	var data: Dictionary = route.get_data()
@@ -39,17 +48,25 @@ static func create(route: RefCounted, hydrology_field: RefCounted) -> Dictionary
 				decks[key] = []
 			decks[key].append(c.deck_span_m)
 	var gap_ends: Array = []
+	var collect: bool = options.get("collect_failures", false)
+	var cache: Dictionary = options.get("check_cache", {})
+	var failures: Array = []
 	for p: Dictionary in data.pieces:
+		var check: Dictionary = cache[p.id] if cache.has(p.id) else out._piece_check(p, decks)
+		cache[p.id] = check
+		if not check.is_valid:
+			if collect:
+				failures.append({"piece_id": p.id, "reason_code": check.reason_code, "detail": check.get("detail", {})})
+				continue
+			var rejected := {"is_valid": false, "reason_code": check.reason_code, "deformer": null}
+			if check.has("detail"):
+				rejected["detail"] = check.detail
+			return rejected
+		if not failures.is_empty():
+			continue
 		var d: Dictionary = p.design
 		var limits: Dictionary = p.intent.limits
-		var st: Dictionary=p.intent.stations
-		for i in range(st.s.size()):
-			var k: int=d.s.bsearch(st.s[i])
-			if k>=d.s.size() or d.s[k]!=st.s[i] or absf(st.y[i]-d.y[k])>0.01 or absf(st.delta_l[i]-d.fill_l[k])>0.01 or absf(st.delta_r[i]-d.fill_r[k])>0.01:
-				return {"is_valid":false,"reason_code":"ERR_R7_INTENT_MISMATCH","deformer":null}
-		var profile: Dictionary = out._ford_profile(d,p.intent)
-		if not profile.is_valid:
-			return {"is_valid":false,"reason_code":profile.reason_code,"deformer":null,"detail":profile.get("detail",{})}
+		var profile: Dictionary = check.profile
 		var shoulder: float = 0.75 if p.info.kind == "MOVEMENT" else limits.shoulder_m
 		for k in range(d.s.size()):
 			for sign: float in [-1.0,1.0]:
@@ -64,17 +81,9 @@ static func create(route: RefCounted, hydrology_field: RefCounted) -> Dictionary
 			for record: Dictionary in data.patches:
 				if record.owner.node_id == node:
 					patch = record.patch
-		# Deck stations must lie in a declared deck span; a segment is left to
-		# the deck builder only when both of its stations are such deck stations.
-		var on_deck := PackedByteArray()
-		on_deck.resize(d.s.size())
-		for k in range(d.s.size()):
-			if d.support[k] == Policy.Support.BRIDGE_DECK:
-				for span: Array in decks.get(p.id, []):
-					if d.s[k] >= span[0] - 0.001 and d.s[k] <= span[1] + 0.001:
-						on_deck[k] = 1
-				if on_deck[k] == 0:
-					return {"is_valid": false, "reason_code": "ERR_R7_BRIDGE_UNSUPPORTED", "deformer": null}
+		# A segment is left to the deck builder only when both of its stations
+		# are declared deck stations (_piece_check).
+		var on_deck: PackedByteArray = check.on_deck
 		var deck := PackedByteArray()
 		deck.resize(d.s.size() - 1)
 		for k in range(d.s.size() - 1):
@@ -127,7 +136,8 @@ static func create(route: RefCounted, hydrology_field: RefCounted) -> Dictionary
 			var fine_bounds: Rect2=query_bounds.grow(2.0)
 			for j in range(int(floor(fine_bounds.position.y/16)),int(floor(fine_bounds.end.y/16))+1):
 				for i in range(int(floor(fine_bounds.position.x/16)),int(floor(fine_bounds.end.x/16))+1):
-					out._fine[Vector2i(i,j)]=true
+					if i>=0 and j>=0 and i<DOMAIN_CELLS and j<DOMAIN_CELLS:
+						out._fine[Vector2i(i,j)]=true
 	for end: Array in _dangling_ends(data, gap_ends):
 		var d: Dictionary=data.pieces[end[0]].design
 		var k: int=end[1]
@@ -136,8 +146,36 @@ static func create(route: RefCounted, hydrology_field: RefCounted) -> Dictionary
 			for i in range(int(floor(d.x[k]-half-1)),int(floor(d.x[k]+half+1))+1):
 				var longitudinal: float=absf((i+0.5-d.x[k])*d.tx[k]+(j+0.5-d.z[k])*d.tz[k])
 				if longitudinal<1.5: out._cap_leaves[Vector2i(i,j)]=true
+	if not failures.is_empty():
+		return {"is_valid": false, "reason_code": "ERR_R7_PIECE_FAILURES", "deformer": null, "failures": failures}
 	print("R7_FINE_CELLS ",out._fine.size()," segments=",out._segments.size())
 	return {"is_valid": true, "reason_code": "", "deformer": out}
+
+
+## Construction checks of one piece in create()'s order: intent stations match
+## the design, the ford profile is feasible, and every bridge-deck station lies
+## in a declared deck span. A valid result carries the ford profile and the
+## per-station deck flags.
+func _piece_check(p: Dictionary, decks: Dictionary) -> Dictionary:
+	var d: Dictionary = p.design
+	var st: Dictionary=p.intent.stations
+	for i in range(st.s.size()):
+		var k: int=d.s.bsearch(st.s[i])
+		if k>=d.s.size() or d.s[k]!=st.s[i] or absf(st.y[i]-d.y[k])>0.01 or absf(st.delta_l[i]-d.fill_l[k])>0.01 or absf(st.delta_r[i]-d.fill_r[k])>0.01:
+			return {"is_valid": false, "reason_code": "ERR_R7_INTENT_MISMATCH"}
+	var profile: Dictionary = _ford_profile(d,p.intent)
+	if not profile.is_valid:
+		return {"is_valid": false, "reason_code": profile.reason_code, "detail": profile.get("detail",{})}
+	var on_deck := PackedByteArray()
+	on_deck.resize(d.s.size())
+	for k in range(d.s.size()):
+		if d.support[k] == Policy.Support.BRIDGE_DECK:
+			for span: Array in decks.get(p.id, []):
+				if d.s[k] >= span[0] - 0.001 and d.s[k] <= span[1] + 0.001:
+					on_deck[k] = 1
+			if on_deck[k] == 0:
+				return {"is_valid": false, "reason_code": "ERR_R7_BRIDGE_UNSUPPORTED"}
+	return {"is_valid": true, "reason_code": "", "profile": profile, "on_deck": on_deck}
 
 func fine_cells() -> Dictionary:
 	return _fine.duplicate()
@@ -214,6 +252,11 @@ func owner_at(lx: float, lz: float) -> String:
 
 static func _error(reason: String) -> Dictionary:
 	return {"is_valid": false, "reason_code": reason, "height_m": NAN, "kind": "INVALID", "owner": "", "lateral": INF, "half_width": 0.0}
+
+## PR1: the owning pieces of a failed evaluation (callers isolate them).
+static func _blame(error: Dictionary, owners: Array) -> Dictionary:
+	error["owners"] = owners.duplicate()
+	return error
 
 ## Invert the bilinear station quad: p = lerp(a,b,u)+t*lerp(n0,n1,u).
 ## End caps are radial extensions, with no plane ownership past the port.
@@ -307,6 +350,7 @@ func evaluate(lx: float, lz: float, h: float) -> Dictionary:
 		if c.is_empty():
 			continue
 		if not c.is_valid:
+			c["owners"] = [_segments[index].id]
 			return c
 		if not owners.has(c.owner) or c.weight > owners[c.owner].weight:
 			owners[c.owner] = c
@@ -325,13 +369,13 @@ func evaluate(lx: float, lz: float, h: float) -> Dictionary:
 		upper=minf(upper,c.upper)
 		if c.plane:
 			if not plane.is_empty() and absf(plane.height_m - c.height_m) > 0.001:
-				return _error("ERR_R7_OWNER_CONFLICT")
+				return _blame(_error("ERR_R7_OWNER_CONFLICT"), keys)
 			if plane.is_empty() or (id.begins_with("move:") and not plane.owner.begins_with("move:")):
 				plane = c
 		sum += c.weight * c.height_m
 		weights += c.weight
 	if lower>upper+0.001:
-		return _error("ERR_R7_OWNER_CONFLICT")
+		return _blame(_error("ERR_R7_OWNER_CONFLICT"), keys)
 	var height: float = h if weights == 0.0 or natural_unchanged else sum / weights
 	# Ownership and weights choose the authority. Bounds only constrain that
 	# choice; mutually inconsistent construction requests reject explicitly.
@@ -342,8 +386,13 @@ func evaluate(lx: float, lz: float, h: float) -> Dictionary:
 	for id: String in keys:
 		var c: Dictionary=owners[id]
 		if height-h>c.limits.fill_max_m+0.001 or h-height>c.limits.cut_max_m+0.001:
-			return _error("ERR_R7_INTENT_MISMATCH")
+			return _blame(_error("ERR_R7_INTENT_MISMATCH"), keys)
 	var water: Dictionary = _hydrology.sample_water(lx+_origin_x, lz+_origin_z) if _hydrology != null and not owners.is_empty() else {"is_water": false}
+	if water.is_water and absf(height - h) > 0.000001 and plane.is_empty() and (height > h + 0.10 + 0.001 or height>=water.water_surface_m):
+		# PR1 network (bridge abutments, oblique fords): earthwork dressing never
+		# fills a channel - beside the riding plane it stops at the water and
+		# the channel terrain stays natural.
+		height = h
 	if water.is_water and absf(height - h) > 0.000001:
 		# Wet earthwork meets the plane continuously, daylighting to unchanged
 		# channel terrain. Dressing cannot fill >10 cm or close the water gap;
@@ -354,7 +403,7 @@ func evaluate(lx: float, lz: float, h: float) -> Dictionary:
 			error["natural"] = h
 			error["water"] = water.water_surface_m
 			error["owner"] = plane.get("owner","earthwork")
-			return error
+			return _blame(error, keys)
 	return {"is_valid": true, "reason_code": "", "height_m": height, "kind": "ROAD" if not plane.is_empty() else "TERRAIN", "owner": plane.get("owner", ""), "lateral": plane.get("lateral", INF), "half_width": plane.get("half_width", 0.0),"_wet":water.is_water}
 
 ## Approved R7-F1: bounded vertical realization, retaining all R6 data.
@@ -362,8 +411,16 @@ func evaluate(lx: float, lz: float, h: float) -> Dictionary:
 ## exact depth/bed-fill limits and class grade/grade-change bounds. Cubic
 ## B-spline correction provides continuous derivatives and zero far effect.
 func _ford_profile(d: Dictionary, intent: Dictionary) -> Dictionary:
-	if intent.crossings.is_empty():
+	# Only fords lower the riding plane into their channel; a declared bridge
+	# deck spans its channel over natural ground (PR1).
+	var fords: Array = intent.crossings.filter(func(ref: Dictionary) -> bool: return ref.support == "FORD")
+	var decks: Array = intent.crossings.filter(func(ref: Dictionary) -> bool: return ref.support == "BRIDGE_DECK")
+	if fords.is_empty():
 		return {"is_valid":true,"reason_code":"","delta":PackedFloat64Array(),"step":0.5}
+	# Grade bounds of the piece class (PR1 network; BACKBONE keeps the R7 route
+	# values exactly: 5 deg acceptance, 0.086 projection target).
+	var grade_deg: float = Policy.CLASSES[intent.route_class].grade_hard_deg
+	var grade_ratio: float = tan(deg_to_rad(grade_deg))/tan(deg_to_rad(5.0))
 	var step: float = 0.5
 	var count: int = int(ceil(d.s[-1]/step))+1
 	var original := PackedFloat64Array()
@@ -383,9 +440,14 @@ func _ford_profile(d: Dictionary, intent: Dictionary) -> Dictionary:
 		var bank: float = tan(deg_to_rad(lerpf(d.bank[k],d.bank[k+1],u)))
 		var half: float = lerpf(d.width[k],d.width[k+1],u)/2.0+intent.limits.shoulder_m
 		var in_window := false
-		for ref: Dictionary in intent.crossings:
+		for ref: Dictionary in fords:
 			if s>=ref.wet_s0-35.0 and s<=ref.wet_s1+35.0:
 				in_window=true
+		# A ford window reaching a neighbouring deck: on the deck the road spans
+		# that channel and is not lowered.
+		for ref: Dictionary in decks:
+			if s>=ref.s0 and s<=ref.s1:
+				in_window=false
 		var lo: float = y-0.35 if in_window else y
 		var hi: float = y
 		if in_window:
@@ -405,7 +467,7 @@ func _ford_profile(d: Dictionary, intent: Dictionary) -> Dictionary:
 		upper.append(hi)
 	# Project onto the bounded crown, maximum grade and change of grade.
 	# Fixed order/count makes the result deterministic; nonconvergence rejects.
-	var grade_step: float = 0.086*step
+	var grade_step: float = 0.086*step*grade_ratio
 	var bend: float = 0.017*step*step
 	for iteration in range(10000):
 		for i in range(count-1):
@@ -421,16 +483,30 @@ func _ford_profile(d: Dictionary, intent: Dictionary) -> Dictionary:
 			values[i+1] -= excess/6.0
 		for i in range(count):
 			values[i] = clampf(values[i],lower[i],upper[i])
+	# Measured on the actual control spacing: the last control sits at the
+	# piece end, closer than `step` to its neighbour (PR1: networks end pieces
+	# anywhere; a uniform-step difference there was an artefact).
 	var max_grade: float = 0.0
 	var max_bend: float = 0.0
+	var worst: int = 0
 	for i in range(1,count):
-		max_grade = maxf(max_grade,absf(values[i]-values[i-1])/step)
+		var h0: float = minf(d.s[-1],i*step)-minf(d.s[-1],(i-1)*step)
+		max_grade = maxf(max_grade,absf(values[i]-values[i-1])/h0)
 		if i<count-1:
-			max_bend=maxf(max_bend,absf(values[i-1]-2*values[i]+values[i+1])/(step*step))
+			var h1: float = minf(d.s[-1],(i+1)*step)-minf(d.s[-1],i*step)
+			var curve: float = absf(2.0*((values[i+1]-values[i])/h1-(values[i]-values[i-1])/h0)/(h0+h1))
+			if curve>max_bend:
+				max_bend=curve
+				worst=i
 	# Conservative projection targets leave room for interpolation. Acceptance
 	# below uses the actual retained class bounds, not solver residual alone.
-	if max_grade>tan(deg_to_rad(5.0)) or max_bend>deg_to_rad(1.2):
-		return {"is_valid":false,"reason_code":"ERR_R7_FORD_CHANNEL","detail":{"stage":"bounded profile convergence","max_grade":max_grade,"max_grade_change":max_bend}}
+	if max_grade>tan(deg_to_rad(grade_deg)) or max_bend>deg_to_rad(1.2):
+		# PR1 diagnostics: the profile around the sharpest bend.
+		var around: Array = []
+		for i in range(maxi(0,worst-6),mini(count,worst+7)):
+			around.append([i*step,snappedf(original[i],0.001),snappedf(lower[i],0.001),snappedf(upper[i],0.001),snappedf(values[i],0.001)])
+		return {"is_valid":false,"reason_code":"ERR_R7_FORD_CHANNEL","detail":{"stage":"bounded profile convergence","max_grade":max_grade,"max_grade_change":max_bend,
+			"worst_s":worst*step,"s_original_lower_upper_value":around}}
 	var delta := PackedFloat64Array()
 	var max_drop: float = 0.0
 	for i in range(count):
@@ -451,7 +527,7 @@ func _ford_profile(d: Dictionary, intent: Dictionary) -> Dictionary:
 		curvature -= _profile_derivative(profile,s,2)
 		maximum_grade = maxf(maximum_grade,absf(rad_to_deg(atan(grade))))
 		maximum_change = maxf(maximum_change,absf(rad_to_deg(curvature/(1+grade*grade))))
-	if maximum_grade>5.0+0.00001 or maximum_change>1.2+0.00001:
+	if maximum_grade>grade_deg+0.00001 or maximum_change>1.2+0.00001:
 		return {"is_valid":false,"reason_code":"ERR_R7_FORD_CHANNEL","detail":{"stage":"exact interpolant grade","grade_deg":maximum_grade,"grade_change_deg_per_m":maximum_change}}
 	print("R7_FORD_INTERPOLANT grade_deg=",maximum_grade," grade_change_deg_per_m=",maximum_change)
 	return profile

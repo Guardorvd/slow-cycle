@@ -3,6 +3,10 @@ extends SceneTree
 ## PR1 Input-driven rides of the existing bicycle in the region runtime scene
 ## (registered collision, real physics, no teleport during a ride).
 ##   --target=r7_fixture   M1: authenticated v1 route slice, both directions
+##   --target=region       PR1 runtime: the region scene loads or bakes
+##                         (--seed=N, --region=X,Z read by the scene itself),
+##                         then one Input ride of a network tour of --tour-m
+##                         metres (default 4000) from the spawn edge
 ##   --out=DIR             JSON report (required)
 ## Output: RIDE_RUN lines, report and RIDE_SUMMARY checks=.. failures=.. completed=true.
 const Source = preload("res://scripts/test/final_surface_route_source.gd")
@@ -17,6 +21,7 @@ var _failures: Array = []
 var _runs: Array = []
 var _out: String = ""
 var _target: String = ""
+var _tour_m: float = 4000.0
 
 
 func _initialize() -> void:
@@ -36,9 +41,13 @@ func _run() -> void:
 			_out = arg.substr(6).replace("\\", "/")
 		elif arg.begins_with("--target="):
 			_target = arg.substr(9)
+		elif arg.begins_with("--tour-m="):
+			_tour_m = arg.substr(9).to_float()
+		elif arg.begins_with("--seed=") or arg.begins_with("--region="):
+			pass
 		else:
 			_target = "!invalid"
-	if _out.is_empty() or not _target in ["r7_fixture"]:
+	if _out.is_empty() or not _target in ["r7_fixture", "region"]:
 		print("RIDE_FAIL ERR_RIDE_CLI")
 		quit(2)
 		return
@@ -46,6 +55,8 @@ func _run() -> void:
 	var report: Dictionary = {"target": _target}
 	if _target == "r7_fixture":
 		report.merge(await _r7_fixture())
+	elif _target == "region":
+		report.merge(await _region())
 	report.merge({"checks": _checks, "failures": _failures, "runs": _runs, "duration_s": (Time.get_ticks_usec() - t0) / 1e6,
 		"controller_sha256": FileAccess.get_sha256("res://scripts/player/bicycle_controller.gd")})
 	DirAccess.make_dir_recursive_absolute(_out)
@@ -88,6 +99,42 @@ func _r7_fixture() -> Dictionary:
 		_check(run.stalls == 0, "no stalls " + direction, run.stall_at)
 		_check(not run.off_path and run.max_lateral_m <= 1.8, "stays on the road " + direction, run.max_lateral_m)
 		_check(run.road_frame_share >= 0.98, "road collider under wheels " + direction, run.road_frame_share)
+	scene.queue_free()
+	await process_frame
+	return result
+
+
+## PR1 region runtime: the real scene loads its cached bake (or bakes), then
+## one Input ride of a network tour starting at the spawn edge.
+func _region() -> Dictionary:
+	var scene: Node3D = WorldScene.instantiate()
+	root.add_child(scene)
+	var t0: int = Time.get_ticks_usec()
+	while not scene.is_ready_to_ride() and (Time.get_ticks_usec() - t0) / 1e6 < 3000.0:
+		await process_frame
+	_check(scene.is_ready_to_ride(), "region scene ready", scene.source)
+	if not scene.is_ready_to_ride():
+		return {}
+	var data: Dictionary = scene.products.network.get_data()
+	var spawn: Dictionary = scene.products.spawn
+	var start_edge: int = int(String(spawn.piece).get_slice(":", 1))
+	var tour: Dictionary = Bot.longest_tour(data, start_edge, _tour_m)
+	var line: PackedVector3Array = tour.path
+	var result := {"session_seed": scene.session_seed, "region": [scene.region.x, scene.region.y], "source": scene.source, "load_seconds": scene.load_seconds,
+		"metrics": data.metrics, "tour": {"length_m": tour.length_m, "end": tour.end, "edges_ridden": tour.edges_ridden, "steps": tour.steps},
+		"manifest": {"tiles_digest": scene.products.manifest.tiles_digest, "network_digest": scene.products.manifest.network_digest, "chosen_round": scene.products.manifest.chosen_round}}
+	print("RIDE_REGION ", JSON.stringify({"seed": scene.session_seed, "source": scene.source, "load_seconds": scene.load_seconds, "tour_m": tour.length_m, "end": tour.end,
+		"edges_ridden": tour.edges_ridden, "network_m": data.metrics.component_length_m}))
+	_check(tour.length_m >= minf(_tour_m, 1000.0), "tour long enough", tour.length_m)
+	scene.streamer.ensure_around(line[0])
+	var run: Dictionary = await _ride(scene, line, "tour", int(60.0 * (90.0 + tour.length_m / 2.5)))
+	_check(run.finished, "ride finished tour", run)
+	_check(run.stalls == 0, "no stalls tour", run.stall_at)
+	_check(not run.off_path and run.max_lateral_m <= 1.8, "stays on the road tour", run.max_lateral_m)
+	_check(run.road_frame_share >= 0.98, "road collider under wheels tour", run.road_frame_share)
+	_check(scene.water_recoveries == 0, "no deep-water recovery tour", scene.water_recoveries)
+	result["streamer"] = scene.streamer.stats.duplicate()
+	result["water_recoveries"] = scene.water_recoveries
 	scene.queue_free()
 	await process_frame
 	return result

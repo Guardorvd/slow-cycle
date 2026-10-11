@@ -210,7 +210,15 @@ func _run() -> Dictionary:
 		var e: int = slot.e
 		_fit_total += slot.independent.fit_evaluations
 		_natural.finished_queries += slot.independent.natural_queries
-		var outcome: Dictionary = _finish_edge(slot.prep, slot.independent, accepted)
+		# Region work budgets (R6 section 5: natural queries and fit evaluations
+		# per region) are accounted in this fixed (class, id) order: each design
+		# ran in isolation under its own per-piece budget; an edge whose work
+		# takes the region total past a budget is not accepted.
+		var outcome: Dictionary
+		if _natural.total_queries() > _settings.max_natural_queries or _fit_total + _junctions.fit_evaluations > _settings.max_fit_evaluations:
+			outcome = _budget_exhausted(slot.prep)
+		else:
+			outcome = _finish_edge(slot.prep, slot.independent, accepted)
 		edge_records[e] = outcome.record
 		crossing_records.append_array(outcome.crossings)
 		if outcome.has("piece"):
@@ -498,6 +506,19 @@ func _independent(prep: Dictionary, tools: Dictionary) -> Dictionary:
 	out["fit_evaluations"] = tools.designer.fit_evaluations
 	out["natural_queries"] = tools.natural.total_queries()
 	return out
+
+
+## Edge record of a design past the region work budget: REPLAN_REQUIRED with
+## ERR_R6_SEARCH_BUDGET (no failure point: the budget is not a place).
+func _budget_exhausted(prep: Dictionary) -> Dictionary:
+	var record: Dictionary = prep.record
+	record.reasons.append("ERR_R6_SEARCH_BUDGET")
+	record.detail["budget"] = {"natural_queries": _natural.total_queries(), "max_natural_queries": _settings.max_natural_queries,
+		"fit_evaluations": _fit_total + _junctions.fit_evaluations, "max_fit_evaluations": _settings.max_fit_evaluations}
+	for entry: Dictionary in prep.crossings:
+		if entry.reasons.is_empty():
+			entry.reasons.append("ERR_R6_EDGE_UNAVAILABLE")
+	return {"record": record, "crossings": prep.crossings, "zones": prep.zones}
 
 
 ## Sequential completion in (class, id) order: conflicts with the accepted

@@ -98,10 +98,10 @@ func _build_bridges(bridges: Dictionary) -> void:
 			var arrays: Array = []
 			arrays.resize(Mesh.ARRAY_MAX)
 			arrays[Mesh.ARRAY_VERTEX] = geometry.vertices
+			arrays[Mesh.ARRAY_NORMAL] = _normals(geometry.vertices, geometry.indices)
 			arrays[Mesh.ARRAY_INDEX] = geometry.indices
 			var mesh := ArrayMesh.new()
 			mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-			mesh.regen_normal_maps()
 			var node := MeshInstance3D.new()
 			node.mesh = mesh
 			node.material_override = bridge_material
@@ -120,6 +120,20 @@ func _build_bridges(bridges: Dictionary) -> void:
 			collider.shape = shape
 			body.add_child(collider)
 			add_child(body)
+
+
+## Area-weighted vertex normals of an indexed triangle list (clockwise front
+## faces, Godot convention).
+static func _normals(vertices: PackedVector3Array, indices: PackedInt32Array) -> PackedVector3Array:
+	var normals := PackedVector3Array()
+	normals.resize(vertices.size())
+	for k in range(0, indices.size(), 3):
+		var n: Vector3 = (vertices[indices[k + 2]] - vertices[indices[k]]).cross(vertices[indices[k + 1]] - vertices[indices[k]])
+		for m in range(3):
+			normals[indices[k + m]] += n
+	for k in range(normals.size()):
+		normals[k] = normals[k].normalized() if normals[k].length_squared() > 0.0 else Vector3.UP
+	return normals
 
 
 ## Walls on the region edges (Default layer: the bicycle body collides) and a
