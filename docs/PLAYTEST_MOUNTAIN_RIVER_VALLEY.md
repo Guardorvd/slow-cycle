@@ -21,7 +21,7 @@ STATUS: PLAYABLE BUILD AFTER M5 — Director condition 1 (after M4 and M5), comm
 & "C:\Users\Luisa\Downloads\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe" --path C:\Users\Luisa\Documents\antigravity\goofy-chandrasekhar res://scenes/region/region_world.tscn -- --seed=184729
 ```
 
-- Код изменился (растительность), поэтому первый запуск после обновления заново генерирует регион (~6–7 мин), затем загрузка из кэша ~2 с.
+- Кэш для текущего кода (3842a3f) уже построен на этом ПК, загрузка ~2 с. После любого изменения кода в `scripts/world` первый запуск заново генерирует регион (~6–7 мин).
 - Любой другой seed запускается так же: `-- --seed=<число>`. Другой участок мира: `--region=X,Z`.
 - В консольной версии виден лог с seed, временем и итогом генерации.
 
