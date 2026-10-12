@@ -212,3 +212,35 @@ Evidence root: `C:/Users/Luisa/Documents/Codex/2026-10-12/bc0/`.
 - ARCHITECTURE.md: status line and §6 as-is PR1 region runtime.
 - Navigation: docs/README.md (roadmap, suspended tasks), DECISIONS index (roadmap APPROVED, ACCEPTED at closeout), playtest note status (PR1 baseline).
 - TEST_PLAN.md and TEST_MATRIX unchanged (plan: SUPERSEDED / no new contract).
+
+## M3 — author checks (L0/L2, Markdown-only class)
+
+Script `C:/Users/Luisa/Documents/Codex/2026-10-12/bc0/bc0_checks.py` (reads committed git blobs only); output `bc0/l2/checks.json`, `bc0/l2/stdout.log`. Run on candidate `431ac13`: PASS. A rerun on the commit that adds this section is the VERIFY input.
+
+| Check | Result |
+|---|---|
+| 1 whitelist (`git diff --name-status --no-renames beacc9c..HEAD` ⊆ Allowed files) | PASS |
+| 2 forbidden paths byte-identical (scripts, scenes, resources, assets, project.godot, tools, .agents, .antigravity, Blueprint, TEST_MATRIX, TEST_PLAN, baselines, investigations, history, sprints; no other completed record); refs: `pr1-playable-region` = `origin/pr1-playable-region` = `pr1-suspended-baseline` = `beacc9c`, `master` = `origin/master` = `52a9c34` | PASS |
+| 3 verbatim PR1 copy = `beacc9c:implementation_plan.md`, SHA-256 `e63de9c1…38a4` recorded | PASS |
+| 3b slot body = approved body of `53a69f2:docs/proposals/BC0_EXECPLAN.md` (`abccce21…9a11`) | PASS |
+| 4 relative links in 15 changed Markdown files (280 links; files, line numbers, heading anchors; verbatim PR1 copy resolved from its original root location) | PASS |
+| 6 PR1 record lists M0–M6, N1–N7, P1–P4, D1–D13, E7, S3, T2.4, the missing suites, the baseline tag and the unconfirmed cache key | PASS |
+| Negatives: broken link and broken anchor reported in a scratch copy; out-of-scope path reported by the whitelist check | PASS |
+
+Not run (with reason): E0–E7, G gates, suites — Markdown-only diff, no runtime closure reached; waives nothing for BC1.
+
+**Check 5 — traceability (roadmap decision → where it now lives):**
+
+| Decision | Authority documents |
+|---|---|
+| RM-1 one network; ENGINEERED / NATURAL / SHAPED; class ≠ method | Target Architecture §1, §2, §8; Master XII-B item 1; Migration Matrix B+C section |
+| RM-2 R5/R6 pragmatic for roads; T1 contract scope | Target Architecture §2 (RoadSynthesizer), §8; Master R6 pointer, XII-B item 2; Migration Matrix |
+| RM-3 FinalSurface S1–S7, no storage choice | Target Architecture §2 (FinalSurface), §5, §8; Master R7 pointer, XII-B item 3 |
+| RM-4 route semantics, meaningful dead ends, no traps | Target Architecture §8; Migration Matrix retirement step 2 |
+| RM-5 acceptance of complete connections | Target Architecture §2 (published network), §8; Master XII-B item 4 |
+| RM-6 PLAYABLE / FORMALLY ACCEPTED, criticality, escalation | Test Strategy §8.1–8.3; PLANS «Playtest checkpoints»; Master XII-B item 5 |
+| RM-7 fast iteration after the first ride, by measurement | Roadmap §7.4 (executed by BC1; no authority-document change needed) |
+| RM-8 PR1 SUSPENDED with baseline | PLANS «Suspension lifecycle», AGENTS, `docs/plans/suspended/`, Current Project State, ARCHITECTURE.md, playtest note, Test Strategy §8.5 |
+| RM-9 test migration map T1–T9 | Roadmap §5.4; Test Strategy §8.4 |
+| RM-10 phases BC0–BC6, L3 mapping | Master XII-B table and L3 line; Target Architecture §7; Test Strategy §8.6; Current Project State |
+| RM-11 trail purpose from world data | Target Architecture §8; Master XII-B item 4 |
