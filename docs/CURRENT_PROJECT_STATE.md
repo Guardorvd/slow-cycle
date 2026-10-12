@@ -2,6 +2,8 @@
 
 STATUS: CURRENT
 
+**Актуально на 2026-10-12:** PR1 [SUSPENDED](plans/suspended/PR1.md); принято направление B+C ([roadmap](ROADMAP_B_C_ROUTE_REALIZATION.md), [Master XII-B](MASTER_IMPLEMENTATION_PLAN.md#xii-b-amendment-bc-2026-10-12)); следующая исполнимая фаза — BC1 после отдельного ExecPlan и approval. Подробно — раздел «PR1 и переход на B+C» ниже.
+
 Дата governance: 03.10.2026. Scope: D0 documentation reset + завершённая локальная D1 governance implementation; runtime/source baseline `ed7d1322da1a5700a8c64425708e1c813213c7f6`, никаких игровых изменений в D0. Runtime evidence ниже датировано 01.10 или ранее и в D0 заново не запускалось. Точную текущую docs revision/branch определять через `git log -1`/`git status`; это не новый runtime baseline Q2.
 
 ## 1. Authority и ближайшая работа
@@ -65,6 +67,17 @@ Accepted DEBT (no pass started; revisit phases in the record): CLOSED back-slope
 **R7 - FinalSurface: technical LIMITED ALPHA COMPLETE (2026-10-11); Game Director acceptance pending.** [Approved execution, reports, evidence identities and R8 handoff](plans/completed/R7.md). Actual standalone `scenes/test/final_surface_preview.tscn`: continuous 1118.5 m certified R6 route, three fords, both connectors, conforming adaptive/16 m mesh, matching Road 2 / Terrain 4 collision. Approved R7-F1 lowering <=0.35 m; R6/player/camera/protected tests unchanged. Independent VERIFY PASS + fresh REVIEW PASS: 426,043 assertions / 0 failures, 43,644 registered rays / 0 misses; eleven Vulkan captures plus measured profile.
 
 Three tiles: 174,623 vertices / 348,564 triangles / approximately56-57 s build / 81,848,100-byte static-memory delta. Synchronous loading and narrow terrain-ray tolerance margin remain R8 risks. No legacy integration, full region/network, bridges, props/vegetation, off-tile collision or water physics. R8 owns bicycle/Input, contact stability, loading/performance and human E7; no R8 implementation or master merge. Whole-game runtime acceptance INCOMPLETE; C10/C12 and R6 debt remain.
+
+## PR1 и переход на B+C (2026-10-12)
+
+**PR1 — Architectural Recovery & Playable Region: SUSPENDED** (решение Game Director 2026-10-12, variant B; [запись](plans/suspended/PR1.md)). Не COMPLETE и не PASS; L2, VERIFY и REVIEW PR1 не проводились.
+
+- **Что работает (реализовано, не принято; L0/L1 на disposable copies):** региональная сцена из меню (пункт 5) и `--seed=`; генерация вне main thread; политика `regional_road/2`, узлы D3, обратная связь R6→R5, RealizedRoadNetwork; RegionBake + disk cache; RegionStreamer (near tiles, collision patches, вода, мосты, стена на краю); броды в полосе FinalSurface; растительность с коллайдерами; recovery. Seed 184729: 9,39 км, 3 петли, BACKBONE + SECONDARY, 13 мостов; bake 383 с; загрузка из cache ≈ 1,9 с ([playtest note](PLAYTEST_MOUNTAIN_RIVER_VALLEY.md)).
+- **Не завершено:** N4 (SINGLETRACK / TECHNICAL в опубликованной сети) → BC2; сюиты `test_region_network` / `test_region_surface` / `test_region_runtime` и перенос проверок `handoff` (пробел защиты) → BC1; M6 (L2, GPU frame time, 20-минутная поездка, детерминизм полного bake 1 vs N) → L2 BC1 и L3; E7 — человек.
+- **Известные проблемы:** S3 — 10 × curvature в `test_road_synthesis --group=regions` 184729, ждёт решения Director; водоёмы рисуются плоской заплаткой; холодный bake 6–8 мин; случайные seed не гарантированы.
+- **Baseline:** `beacc9c` (= `origin/pr1-playable-region`), локальный тег `pr1-suspended-baseline`, Godot 4.7.2 mono, seed 184729. Какой каталог cache соответствует `beacc9c`, не подтверждено; cold bake воспроизводит регион ([запись PR1](plans/suspended/PR1.md) §6).
+- **Направление B+C:** одна маршрутная сеть; участки ENGINEERED (R5/R6 для основных дорог, пока оправдано), NATURAL и SHAPED; единая FinalSurface (принципы S1–S7); осмысленные тупики без ловушек; приёмка законченных связей; PLAYABLE отдельно от FORMALLY ACCEPTED ([Test Strategy §8](TEST_STRATEGY.md)).
+- **Следующая фаза:** BC1 — первая проезжаемая NATURAL-тропа на 184729, плейтест, затем первая операция SHAPED. Требует отдельного ExecPlan и approval. BC0 — [план и execution record](../implementation_plan.md).
 
 ## 2. Что фактически есть
 

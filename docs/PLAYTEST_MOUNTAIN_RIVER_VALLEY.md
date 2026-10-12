@@ -1,6 +1,6 @@
 # Плейтест: Mountain River Valley (PR1)
 
-STATUS: PLAYABLE BUILD AFTER M5 — Director condition 1 (after M4 and M5), commit 3842a3f; not an acceptance. E7 is human only.
+STATUS: PLAYABLE BUILD AFTER M5 — Director condition 1 (after M4 and M5), commit 3842a3f; not an acceptance. E7 is human only. Since 2026-10-12 this is the baseline of the SUSPENDED PR1: revision `beacc9c`, local tag `pr1-suspended-baseline`; reproduction and evidence limits — [PR1 record](plans/suspended/PR1.md) §6.
 
 Ранний запускаемый регион PR1. Финальный PASS не объявлен.
 

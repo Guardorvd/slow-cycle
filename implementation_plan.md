@@ -204,3 +204,11 @@ Evidence root: `C:/Users/Luisa/Documents/Codex/2026-10-12/bc0/`.
 - Master: appended «XII-B. Amendment B+C (2026-10-12)» before §XIV and one pointer line under R6, R7 (qualifies `FinalSurface.sample(x,z)` by S1–S7), R8, R13; no existing text removed; R9–R21 goals unchanged. L3 mapping: the R8 checkpoint was not run in PR1, the first L3 follows BC2 and covers R8 + R13.
 - Target Architecture: §1 diagram with route realization by segment; owner table (RoutePlanner, RoadSynthesizer = ENGINEERED, trail realization, published network, FinalSurface, WorldStreamer); §5 composition; §7 BC row; new §8 (modes, R5/R6 scope incl. T1 contract scope, S1–S7, network semantics, anti-R6 guard).
 - Migration Matrix: new section with B+C dispositions, baseline preservation and retirement order (trails at BC2 acceptance; PR1 network rules at BC2; legacy runtime after the accepted Vertical Slice).
+
+## M2 — state, strategy, navigation (DONE)
+
+- Test Strategy: navigation line + new §8 (PLAYABLE / FORMALLY ACCEPTED, playtest checkpoints, defect criticality, repeated failures and escalation, contract applicability summary T1–T9 incl. the recorded PR1 D10 T2.4 categories, the open protection gap and S3, PR1 evidence limits, L3 mapping). No test, category or gate changed.
+- Current Project State: dated pointer under STATUS and section «PR1 и переход на B+C» (works / unfinished / known problems / baseline with unconfirmed cache entry / direction / next phase BC1).
+- ARCHITECTURE.md: status line and §6 as-is PR1 region runtime.
+- Navigation: docs/README.md (roadmap, suspended tasks), DECISIONS index (roadmap APPROVED, ACCEPTED at closeout), playtest note status (PR1 baseline).
+- TEST_PLAN.md and TEST_MATRIX unchanged (plan: SUPERSEDED / no new contract).

@@ -18,7 +18,9 @@ Scope: навигация после D0/D1 и Q0 authority approval. Решен�
 | Что реально проверяет каждый test/tool? | [TEST_MATRIX](TEST_MATRIX.md) | Accepted Q0 authority/capability map; C10/C12 OPEN, runtime NOT_RUN |
 | Чем bounded-запускать существующие tests и получать PASS/FAIL/INCOMPLETE? | [tools/verify](../tools/verify/README.md) | Q1 harness (COMPLETE: VERIFY PASS + independent REVIEW PASS); pilot-результаты не являются baseline, acceptance или Q2 |
 | Что фактически работает сейчас? | [CURRENT_PROJECT_STATE](CURRENT_PROJECT_STATE.md), [ARCHITECTURE](../ARCHITECTURE.md) | Датированное состояние/as-is runtime |
+| Как реализуются маршруты после PR1? | [ROADMAP_B_C_ROUTE_REALIZATION](ROADMAP_B_C_ROUTE_REALIZATION.md), [Master XII-B](MASTER_IMPLEMENTATION_PLAN.md#xii-b-amendment-bc-2026-10-12) | Архитектурное решение B+C и фазы BC0–BC6, подчинено Blueprint/Master |
 | Что разрешено выполнять? | [AGENTS](../AGENTS.md), [active-plan slot](../implementation_plan.md) | Ограничения и явное approval одного task |
+| Какие задачи приостановлены? | [suspended](plans/suspended/README.md) | SUSPENDED ≠ COMPLETE; baseline и открытые обязательства |
 | Что стало историей и почему? | [DOCUMENTATION_AUDIT](DOCUMENTATION_AUDIT.md), [history](history/README.md) | Статусы/конфликты/source traceability |
 | Как запустить текущую игру? | [README](../README.md) | Существующие инструкции и controls |
 

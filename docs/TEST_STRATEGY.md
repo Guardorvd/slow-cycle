@@ -8,6 +8,8 @@ Q0 navigation (2026-10-03): [accepted Test Authority Map](TEST_MATRIX.md), Q0-TE
 
 Q1 navigation (2026-10-03, COMPLETE): внешний [bounded verification harness](../tools/verify/README.md) запускает существующие entry points с timeout, process-tree kill, raw stdout/stderr и версионированным JSON; результат строго PASS / FAIL / INCOMPLETE (ненулевой exit сам по себе не FAIL, exit 0 сам по себе не PASS; warning не fatal глобально). Harness не меняет tests, thresholds, gates и TEST_MATRIX; его pilot-прогоны не являются Q2 baseline и не заменяют runtime acceptance. Q1 получил fresh VERIFY PASS и fresh independent REVIEW PASS ([completed record](plans/completed/Q1.md)); он подтверждает механизм верификации, а не whole-game runtime acceptance, которое остаётся INCOMPLETE (известный текущий failure pilot: `route_branch_integration`; ObjectDB leak непостоянен и не имеет найденной причины; C10/C12 OPEN). Q2A: frozen campaign captured (29 invocations / 188 attempts; 127 PASS / 39 FAIL / 0 INCOMPLETE in 166 baseline attempts), Q2A COMPLETE — frozen baseline captured and accepted after fresh A4 VERIFY PASS (V1–V15) and independent R2 PASS; R1 REJECT retained, R1-F1 corrected by A4. R1 NB1–NB5 and R2-NB1 deferred; R2-NB1 is tooling hardening with no effect on frozen data. [Durable baseline](baselines/Q2A/README.md); [completed Q2A record](plans/completed/Q2A.md). Runtime acceptance INCOMPLETE, C10/C12 OPEN; Q2B NOT STARTED; R0 NOT STARTED and BLOCKED until Q2B completion.
 
+BC0 navigation (2026-10-12): Playable First, playtest checkpoints, defect criticality, applicability of existing contracts to B+C route realization and the PR1 lifecycle — §8. No test, assertion, threshold, category or gate changed.
+
 ## 1. Product authority и test integrity
 
 Blueprint/Master определяют целевую игру и архитектуру; assertions защищают своё согласованное требование/реализованную систему. Старый DAG test не вправе заставлять будущий RegionRouteGraph отказаться от loops. Это не разрешение менять тест либо игнорировать падение текущего RoadGraph: conflict сначала записывается с requirement/owner/evidence, затем конкретная reclassification/mutation согласуется человеком.
@@ -125,3 +127,45 @@ VERIFY audits identities, scope and the authentic stored raw evidence (harness r
 Budgets are targets: an overrun is recorded with its cause, never removes a required check and never changes a verdict; a critical failure stays FAIL/INCOMPLETE. Two consecutive overruns lead to a process proposal to the Director.
 
 Each execution record keeps one ledger table (±0.25 h) with rows Implementation, L0, L1, L2, VERIFY, REVIEW (Planning and Closeout shown separately) and two columns: elapsed wall-clock hours and aggregate agent/process hours (they differ when work overlaps). Verification overhead = (L0 + L1 + L2 + VERIFY + REVIEW) / (Implementation + those), reported for both columns. Target ≤ 20 % rolling over three phases; no tracking tool.
+
+## 8. Playable First, playtests and contract applicability (BC0)
+
+Introduced by BC0 under the Game Director's approval (2026-10-12) of the [B+C roadmap](ROADMAP_B_C_ROUTE_REALIZATION.md) §§5.4, 7. This section changes no test, assertion, threshold, Q0 category, TEST_MATRIX row, Q1 suite, frozen test-integrity rule, E-level, L0–L3 definition or product requirement. It applies to plans approved after BC0.
+
+### 8.1 Two states
+
+| State | Meaning | Requires |
+|---|---|---|
+| **PLAYABLE / REVIEWABLE** | A feature works, has no critical defect and can be given to a human | Recorded launch command; fixed revision (commit or source digest); seed and region; L0/L1 of touched contracts passed; known-issues list; short playtest note |
+| **FORMALLY ACCEPTED** | The phase met its approved requirements | L2 on the exact final candidate, VERIFY PASS, independent REVIEW PASS, E7 where required, Director decision |
+
+A PLAYABLE checkpoint is a point **inside** a task, declared in its ExecPlan field «Playtest checkpoints» ([PLANS](../.agent/PLANS.md)). It does not wait for L2, is not acceptance and never replaces L2, VERIFY, REVIEW or E7. Precedent: PR1 Director condition 1 («playable build after M5, not an acceptance»). A human playtest is decision data; it is E7 only when the human declares it so.
+
+### 8.2 Defect criticality before a playtest
+
+- **Critical** (blocks a playtest): crash or hang; falling through the world or a collision gap on an intended line; a trap without recovery; corrupt or inconsistent data (cache ≠ fresh bake); regression of the playable baseline.
+- **Non-critical** (visual artefacts, roughness, a suboptimal line): recorded with a reproduction place (seed, region, coordinates) and handled **after** the playtest by its results.
+- Before the first playtest of a phase only critical defects are fixed. All L2 obligations stay.
+
+### 8.3 Repeated failures and escalation
+
+Repeated failures call for a different way of solving, not continued mechanical fixing of the same algorithm. Within the approved architecture and scope the developer may choose another local method, simplify, defer an optional capability with a record, continue independent work or record the problem for later. The Game Director is consulted for a real architectural dead end, a scope expansion, a change of protected contracts or checks, or a serious product compromise. No arbitrary numeric attempt limits are set; an ExecPlan may still name its own stop conditions.
+
+### 8.4 Applicability of existing contracts to B+C segments
+
+The full map T1–T9 is in the [roadmap §5.4](ROADMAP_B_C_ROUTE_REALIZATION.md). Summary:
+
+- R6 class limits (`road_synthesis_oracle.gd`, `test_road_synthesis.gd`) guard ENGINEERED pieces realized by R6; NATURAL / SHAPED segments get their own contract and tests in BC1. No existing check changes.
+- R5 `ERR_GRAPH_UNJUSTIFIED_DEAD_END`, the R7 `test_final_surface.gd` fixture guard, the bicycle envelope, the retained legacy road guard and the G gates are unchanged; G applicability follows the §7.1 reference audit.
+- PR1 D10 T2.4 categories, approved with PR1 v1.1, are recorded here: `test_final_surface --source=fixture` (contracts/surface/collision) = REGRESSION_GUARD of the R7 machinery on HEAD; `--source=live` with `handoff` = LEGACY_CONTRACT of the R6 v1 handoff, run on `pr1-baseline`. TEST_MATRIX is unchanged (PR1 D10 T5).
+- **Open protection gap:** the PR1 suites `test_region_network`, `test_region_surface`, `test_region_runtime` and the transfer of the `handoff` checks were never created. BC1 must close or explicitly re-plan this before its L2.
+- **Known failure:** S3 — `test_road_synthesis --group=regions` 184729, 10 × `oracle_path_move:*` curvature, awaiting a Director decision; not reclassified.
+- Changing the PR1 network rules (`DEAD_END_NOT_TERMINUS`, fixed point) is planned and approved in BC2 together with new tests.
+
+### 8.5 PR1 lifecycle and evidence
+
+PR1 is [SUSPENDED](plans/suspended/PR1.md), not COMPLETE or PASS. Its evidence is L0/L1 on disposable copies (no L2, VERIFY, REVIEW, GPU frame-time distribution or E7); it may be reused only under §7.2 closure proofs, with its limitations. Its revision `beacc9c` is the playable comparison baseline.
+
+### 8.6 L3 checkpoints in the B+C order
+
+The L3 after R8 was not run (PR1 suspended). The first L3 follows BC2 and covers the R8 + R13 scope; then after BC5 (R18 Vertical Slice) and R19 (BC6), plus any checkpoint the Director schedules ([Master XII-B](MASTER_IMPLEMENTATION_PLAN.md#xii-b-amendment-bc-2026-10-12)).
