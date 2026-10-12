@@ -46,7 +46,7 @@ PR1 delivered a launchable regional game on branch `pr1-playable-region` (14 com
 | P3 off-road ≥ 150 m meadow and back; P4 no riding under deep water | Not run at L2 | BC1 (P4 behaviour implemented) / BC3 |
 | Performance: cache ≤ 20 s; 20 min ride max frame ≤ 100 ms, p99 ≤ 33 ms, p50 ≥ 60 FPS, memory ≤ 5 %, no leaks; cold bake ≤ 10 min | Cache 1.9 s and bake 383 s measured; headless ride max 78.6 ms; **GPU 20-min ride not run** | First phase whose L2 reaches it (BC1), then L3 |
 | Determinism: equal bake manifest in two processes and 1 vs N threads | Two processes equal; R6 1 vs 8 equal; full bake 1 vs N **not run** | BC1 L2 |
-| Protected suites (a)/(b)/(c) | On copies of `3842a3f`: R0 145/0, R6 contracts 72/0, R7 fixture 424259/0 = M0 hashes. R5 2230/0 was run on `37e584d` (`m2_head_r5`); the R5 source files are unchanged since `41f6c29`, but `region_seed_derivation.gd` (in the R5 suite's closure through `route_planner.gd`) changed in `3842a3f`, so this result is **not** byte-identity evidence for `beacc9c`. R6 regions 184729: 365 checks, 10 × S3 on `41f6c29`. R6 regions 2024 and the int64 row were **not run** on PR1 code (only on `pr1-baseline` in M0) | See §5; rerun in the first L2 that reaches them (BC1) |
+| Protected suites (a)/(b)/(c) | On copies of `3842a3f`: R0 145/0, R6 contracts 72/0, R7 fixture 424259/0 = M0 hashes. R5 2230/0 was run on `37e584d` (`m2_head_r5`); the only file of the R5 suite's closure changed since then is `region_seed_derivation.gd` (additive purpose `vegetation`, `3842a3f`; preloaded by `route_planner.gd` and directly by `test_route_network.gd`), so this result is **not** byte-identity evidence for `beacc9c`. R6 regions 184729: 365 checks, 10 × S3 on `41f6c29`. R6 regions 2024 and the int64 row were **not run** on PR1 code (only on `pr1-baseline` in M0) | See §5; rerun in the first L2 that reaches them (BC1) |
 | Build, menu, launch instruction, Blueprint §35 questions | Done ([playtest note](../../PLAYTEST_MOUNTAIN_RIVER_VALLEY.md)) | — |
 | VERIFY PASS + independent REVIEW PASS | **Not run** | Each BC phase for its own scope |
 
@@ -94,12 +94,12 @@ PR1 delivered a launchable regional game on branch `pr1-playable-region` (14 com
 | Formal acceptance of the implemented M0–M5 capabilities (region scene, streaming, bake/cache, FinalSurface render = collision, network, bridges, fords, vegetation, recovery) | L2 of the first phase that touches them (BC1), then L3 after BC2 |
 | N4 in the published network on the dev regions; holdout N1–N6 | BC2 formal acceptance |
 | Regression guard of the realized network (PR1 D10 T1/T2.4: `test_region_network` with the transferred `handoff` checks per ENGINEERED piece; `test_region_surface`, `test_region_runtime`) | BC1 ExecPlan must close or explicitly re-plan it before its L2; it cannot be dropped silently |
-| S3 oracle conflict (10 × curvature) | Director decision; until then a known failure |
+| S3 oracle conflict (10 × curvature) | Director decision; resolution in BC2 or as DEBT with an owner (roadmap §5.4 T7); until then a known failure |
 | PR1 L2 items never run: G gates for the main-scene closure change (`mode_select` entry 5), mutants (feedback off, deck flooding, separately sampled collision, v1 limits), Vulkan package (~14 frames), E6 ride with ObjectDB/leak check, R6 regions 2024 and int64 on PR1 code | BC1 L2 for the touched scope (reference audit decides G), then L3 |
 | P1–P4; determinism of the full bake 1 vs N threads; «different seeds give different results»; performance gates on GPU | BC1 L2 for the touched scope, then L3 after BC2 |
 | Director execution condition 2: explicit recommended direction for descent-preferred pieces with the reverse path proven to exist, be connected and be rideable | Implemented in RealizedRoadNetwork / runtime markers; **not exercised** (no SINGLETRACK/TECHNICAL realized) → BC2 |
 | Director execution condition 3 and E7 | Human; playtests from BC1, final E7 in BC5 |
-| D10 T2.5 (deformer internal model kept or checks moved to an equivalent entry point) | Held at L1: `test_final_surface --source=fixture` contracts group 424259/0 on `3842a3f`; re-checked by the first L2 that touches the deformer (BC1) |
+| D10 T2.5 (deformer internal model kept or checks moved to an equivalent entry point) | Held at L1: `test_final_surface --source=fixture` 424259/0 on `3842a3f` (total of the contracts, surface and collision groups); re-checked by the first L2 that touches the deformer (BC1) |
 | D1 documentation note | Done by BC0 as the B+C amendment |
 
 The decision cancels only (a) continuing the superseded N4 method inside PR1 and (b) running the PR1 L2 campaign solely to close PR1 formally. Every other obligation moves as listed above.

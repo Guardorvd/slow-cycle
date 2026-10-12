@@ -1,6 +1,6 @@
 TASK: BC0 — Architecture & Documentation Migration to B+C route realization (roadmap Phase 0)
 DATE: 2026-10-12
-STATUS: VERIFYING — ExecPlan v1.0 APPROVED; M0–M3 done; VERIFY #1 FAIL (B1) → fixes F1 → VERIFY #2 pending
+STATUS: VERIFYING — ExecPlan v1.0 APPROVED; M0–M3 done; VERIFY #1 FAIL (B1) → F1 → VERIFY #2 PASS → F2 (record wording) → VERIFY #3 of the F2 impact set, then REVIEW
 BRANCH/BASE/HEAD: bc0-architecture-migration / pr1-playable-region `beacc9c` (= origin/pr1-playable-region) / first branch commit holds only `docs/proposals/` (SHA reported in chat)
 BASELINE: clean at `beacc9c`; local tag `pr1-suspended-baseline` → `beacc9c` (unpublished); PR1 branch untouched
 APPROVAL: Game Director in chat 2026-10-12 — «APPROVE BC0 ExecPlan v1.0», SHA-256 `abccce2168c2cd0bb50dc2b0bbb8f6ec40fb5a63e8d6d1b70ac696d8d0cf9a11` (as committed in `53a69f2` `docs/proposals/BC0_EXECPLAN.md`): roadmap B+C v2 direction, PR1 → SUSPENDED, §A1–A4, full BC0 scope, local milestone commits, evidence root. Conditions: (1) the roadmap becomes ACCEPTED only after independent VERIFY/REVIEW PASS and BC0 closeout; (2) the presumed PR1 cache key is not presented as confirmed — exact revision, reproduction and evidence limits are recorded. Body below is the approved text; only this header changed
@@ -270,5 +270,12 @@ Report `C:/Users/Luisa/Documents/Codex/2026-10-12/bc0/verify/VERIFY_REPORT.md`, 
 | Planning (roadmap v1/v2, ExecPlan) | 1.5 | 1.5 |
 | Implementation M0–M2 + F1 | 1.0 | 1.0 |
 | L0/L2 author checks | 0.25 | 0.25 |
-| VERIFY #1 | 0.25 | 0.25 |
-| VERIFY #2, REVIEW, Closeout | pending | pending |
+| VERIFY #1 (per its report) | 0.75 | 0.75 |
+| VERIFY #2 (per its report) | 0.25 | 0.25 |
+| REVIEW, Closeout | pending | pending |
+
+## VERIFY #2 — PASS (fresh context) and F2
+
+Report `C:/Users/Luisa/Documents/Codex/2026-10-12/bc0/verify2/VERIFY_REPORT.md`, SHA-256 `b44cdb7e969257f2b349fd2e2b0b1d199f0479247bce0fe318d6870eab4f5f50`; candidate `1db5323`, diff digest `a500ed53…87b2c`. B1 resolved (roadmap = approved v2 except re-based links and the STATUS line). Non-blocking M1–M6.
+
+F2 (author): M1 R5 closure wording (closure unchanged since `37e584d` except `region_seed_derivation.gd`, also preloaded by `test_route_network.gd`); M2 S3 owner cites roadmap T7; M3 424259/0 is the total of the fixture groups; M4 ledger rows from the reports. M5 (roadmap errata: R7 «Принято (Alpha)» in §1.2, «used only by `region_ride_bot.gd`» in §5.4) and M6 (links to the slot re-based to the completed record) are closeout items.
