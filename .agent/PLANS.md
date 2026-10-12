@@ -6,7 +6,7 @@ A small local fix without ownership/contract/gate/phase change needs only goal, 
 
 ## Header
 
-TASK; date; status (PLAN_ONLY / APPROVED / IMPLEMENTING / VERIFYING / REVIEWING / COMPLETE); branch/base/HEAD; staged/unstaged/untracked baseline; approval source/date and approved version or digest. Record result source/diff digests for dirty results: HEAD alone is insufficient.
+TASK; date; status (PLAN_ONLY / APPROVED / IMPLEMENTING / VERIFYING / REVIEWING / COMPLETE / SUSPENDED); branch/base/HEAD; staged/unstaged/untracked baseline; approval source/date and approved version or digest. Record result source/diff digests for dirty results: HEAD alone is insufficient.
 
 ## Required task fields
 
@@ -31,6 +31,7 @@ TASK; date; status (PLAN_ONLY / APPROVED / IMPLEMENTING / VERIFYING / REVIEWING 
 | Legacy impact | Protected behavior, pending conflicts/known failures and next dependency |
 | Documentation changes | Exact owner documents and evidence updates within whitelist |
 | Definition of Done | Scope compliance, required actual evidence, VERIFY PASS, independent REVIEW PASS, documentation and limitations |
+| Playtest checkpoints | Where applicable: PLAYABLE / REVIEWABLE points inside the task (Test Strategy §8) — what a human rides, entry criteria, critical-defect list; never acceptance and never a substitute for L2/VERIFY/REVIEW/E7 |
 
 ## Approval and execution
 
@@ -54,3 +55,10 @@ Reviewer/context identity; approved plan + resulting diff + verification report 
 - Only after VERIFY PASS + independent REVIEW PASS: archive the approved plan, approval/progress, final scope, evidence/reports/limitations in `docs/plans/completed/<TASK-ID>.md` (full reports may stay in a durable evidence root cited by SHA-256, Test Strategy §7.4); replace root `implementation_plan.md` with NO_ACTIVE_PLAN and a link to the completed record.
 - Check final archival/navigation changes. Closeout edits that only transcribe already-verified results into the record, plan slot and state docs (Test Strategy §7.4), with the verified code manifest unchanged, need link/scope/hash checks only; any other late change needs fresh verification/review of its impact set. Bind reports to immutable content digests; the final commit SHA may be reported externally to avoid a self-referential digest.
 - At FAIL/INCOMPLETE/REJECT keep the active plan and honest status; do not create a completed record. Local commit/handoff follows user authorization and an audited exact stage scope; never start the next phase automatically.
+
+## Suspension lifecycle
+
+- SUSPENDED stops an unfinished task by explicit human decision (for example, its method is superseded). It is never COMPLETE or PASS, closes no obligation, and needs no VERIFY/REVIEW of the unfinished scope.
+- Before the root slot changes, create `docs/plans/suspended/<TASK-ID>.md`: decision source/date and reason; status of every milestone (done / not done / not run); the plan and execution record verbatim, with the SHA-256 of the root file it was copied from; retained evidence with its limitations; known failures; a reproducible baseline (revision or tag, engine, seed/configuration, launch command, cache/evidence location); every open obligation with its new owner task/phase or its explicit cancellation by the decision.
+- Then replace the root `implementation_plan.md` with NO_ACTIVE_PLAN or the next approved plan, linking the record. Keep the task branch and published history; no force-push or rewrite.
+- Resuming needs a new approved plan or amendment. Obligations move only as the decision names them.

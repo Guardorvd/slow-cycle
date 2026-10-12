@@ -1,1032 +1,199 @@
-TASK: PR1 — Architectural Recovery & Playable Region (Mountain River Valley)
-DATE: 2026-10-11
-STATUS: IMPLEMENTING — ExecPlan v1.1 + Director conditions 1–3; M0–M5 done; S1 (N4) re-raised after decision B, two iterations (Progress 5); M6 waits for N4
-BRANCH/BASE/HEAD: pr1-playable-region / master 52a9c34 (= origin/master) / 52a9c34; local tag pr1-baseline = 52a9c34
-BASELINE: clean before this plan record (0 staged / 0 unstaged / 0 untracked); only implementation_plan.md modified
-APPROVAL: Game Director in chat 2026-10-11 — v1.0 audit + architecture B accepted with conditions 1–6 + DEGRADE rule; v1.1 approved via plan approval
-APPROVED PLAN SOURCE SHA-256: 93252d063ccad6f00f193cd864bf6b372b9457136e0bf0d64dbe70b39f25462b
-EVIDENCE ROOT: C:/Users/Luisa/Documents/Codex/2026-10-11/pr1-playable-region/ (outside repo)
-RESUME: see "PR1 execution record" at the end of this file (milestone status, evidence, decisions, time ledger)
-PREVIOUS: [R7 record](docs/plans/completed/R7.md)
+TASK: BC0 — Architecture & Documentation Migration to B+C route realization (roadmap Phase 0)
+DATE: 2026-10-12
+STATUS: IMPLEMENTING — ExecPlan v1.0 APPROVED; M0 done
+BRANCH/BASE/HEAD: bc0-architecture-migration / pr1-playable-region `beacc9c` (= origin/pr1-playable-region) / first branch commit holds only `docs/proposals/` (SHA reported in chat)
+BASELINE: clean at `beacc9c`; local tag `pr1-suspended-baseline` → `beacc9c` (unpublished); PR1 branch untouched
+APPROVAL: Game Director in chat 2026-10-12 — «APPROVE BC0 ExecPlan v1.0», SHA-256 `abccce2168c2cd0bb50dc2b0bbb8f6ec40fb5a63e8d6d1b70ac696d8d0cf9a11` (as committed in `53a69f2` `docs/proposals/BC0_EXECPLAN.md`): roadmap B+C v2 direction, PR1 → SUSPENDED, §A1–A4, full BC0 scope, local milestone commits, evidence root. Conditions: (1) the roadmap becomes ACCEPTED only after independent VERIFY/REVIEW PASS and BC0 closeout; (2) the presumed PR1 cache key is not presented as confirmed — exact revision, reproduction and evidence limits are recorded. Body below is the approved text; only this header changed
+PRIOR DECISIONS: Game Director in chat 2026-10-12 — B+C direction approved with amendments A–E; RM-8 = variant B (suspend PR1); permission to prepare and execute Phase 0 under repository rules
+LOCATION: installed in the root slot by M0 after PR1 was suspended ([record](docs/plans/suspended/PR1.md)); the approved copy is `53a69f2:docs/proposals/BC0_EXECPLAN.md`
+INPUT: [ROADMAP_B_C_ROUTE_REALIZATION.md](docs/ROADMAP_B_C_ROUTE_REALIZATION.md) v2 (in `docs/proposals/` until M1)
 
 ---
 
-# Slow Cycle — PR1 «Playable Region»: ExecPlan v1.1 (исправленная редакция) + приложение v1.0
+## Goal
 
-# Редакция v1.1 — заменённые разделы
+Make the authority documents consistent with the approved B+C roadmap. Formally suspend PR1 with a reproducible baseline. Leave the repository ready for a BC1 ExecPlan. Documentation and governance only.
 
-Основание — условия Game Director от 2026-10-11: архитектура B и аудит приняты, нужны поправки 1–6, правило DEGRADE и порядок исполнения. Без изменений остаются:
-- единый PR1 и его цель — полноценный проезжаемый регион Mountain River Valley;
-- архитектура B;
-- milestones M0–M6;
-- R0–R4, полезное ядро R5–R7, BicycleController и legacy-режим.
+## Observed current state
 
-Ниже приведены только изменённые разделы, они **заменяют** соответствующие места v1.0 (приложение). При расхождении действует v1.1.
+- PR1 is the active plan (IMPLEMENTING, M0–M5 done, N4 unmet, M6/E7 not run). Its code is the playable baseline (roadmap §5.1). PLANS.md knows PLAN_ONLY…COMPLETE and keeps FAIL/INCOMPLETE/REJECT tasks active; there is no human-decided stop state.
+- Master R5–R13 and Target Architecture §1 describe one road pipeline (`RouteCorridor → RoadSynthesizer → RoadPathData → FinalSurface`) for every class. Current Project State ends at R7; ARCHITECTURE.md status says the region work is isolated and legacy runtime unchanged. That is stale since PR1 put the region scene in the menu.
+- Test Strategy has no PLAYABLE checkpoint or defect criticality. TEST_MATRIX (Q0, 204 rows) has no rows for R5–R7/PR1 suites. No repository test references the PR1 network rules (roadmap §5.4).
+- Unknown until M0 reads it: exact PR1 N1–N7 text, milestone list and recorded failures. Reading the full PR1 plan is allowed only during this approved execution.
 
-## v1.1 Header
+## Target behaviour
 
-```
-TASK: PR1 — Architectural Recovery & Playable Region (Mountain River Valley)
-VERSION: ExecPlan v1.1, 2026-10-11 — replaces v1.0 §4 (policy), §5–§11; STATUS: PLAN_ONLY → APPROVED on approval
-BRANCH/BASE/TAG/EVIDENCE/ENGINE: as in v1.0 (pr1-playable-region / 52a9c34 / pr1-baseline / Codex/2026-10-11/pr1-playable-region)
-EXECUTION: after approval, autonomously M0→M6 in one PR1; each milestone leaves a working intermediate result; one final acceptance
-```
+The authority documents state the same thing:
 
-## v1.1 §4a. Уклоны: политика v2 (`regional_road/2`) — D2
+- one route network;
+- ENGINEERED / NATURAL / SHAPED as ways to build segments, separate from route class;
+- FinalSurface as single owner of the final physical surface (principles S1–S7, no storage choice);
+- R5/R6 kept pragmatically for roads;
+- meaningful dead ends, no traps;
+- acceptance of complete connections;
+- PLAYABLE vs FORMALLY ACCEPTED;
+- PR1 SUSPENDED, not COMPLETE.
 
-Вместо одного жёсткого уклона на класс вводятся три вида ограничений. Значения берутся из замера M1 (реальный BicycleController, Input).
+R9–R21 goals and the Blueprint are unchanged.
 
-| Параметр | Смысл | Граница значения |
+**Exclusions:** no production code, tests, scenes, resources, project settings, tools, skills, scoped AGENTS or TEST_MATRIX change. No test is mutated, skipped or reclassified. No push, merge or tag publication.
+
+## KEEP / ADAPT / REPLACE / RETIRE
+
+- Documentation only. Blueprint: KEEP.
+- Master: ADAPT by an appended amendment plus pointer lines.
+- Target Architecture and Migration Matrix: ADAPT (new sections; superseded statements marked, not deleted).
+- PR1 plan: preserved verbatim in the suspension record.
+- System dispositions are those of roadmap §4, recorded in the matrix.
+
+## Ownership, contracts, dependencies
+
+- Product authority: Blueprint. Strategy: Master plus its B+C amendment. Accepted architecture decision: the roadmap, moved to `docs/`.
+- Lifecycle authority: PLANS.md.
+- Contract statements added (documentation, no code): R6 class limits apply to ENGINEERED pieces realized by R6 (T1); NATURAL/SHAPED contracts are defined by BC1. Dependency direction pure domain → bake → runtime is unchanged.
+
+## Allowed files
+
+| Path | Action | Responsibility |
 |---|---|---|
-| `climb_sustained` (окно `L_sus` ≈ 100 м) | Продолжительный подъём, который едет при удержании педали со скоростью не ниже `v_climb`. Порог `v_climb` фиксируется в M1 по телеметрии | min(A2 hard класса, замер) |
-| `climb_pitch` + `pitch_len_max` | Короткий крутой участок, проходимый с разгона и спринт-тапами без остановки | min(A2 hard, замер) |
-| `descent_max` | Спуск с управляемым торможением и прохождением радиуса класса на безопасной скорости | min(cap, замер). Cap = A2: 5/8/10° для BACKBONE/SECONDARY/SINGLETRACK; **15° для TECHNICAL** |
-| Земляные работы (выемка/насыпь/подрезка) | — | A2; для TECHNICAL — 3 / 2 / 8 м |
+| `.agent/PLANS.md` | modify | Amendment §A (SUSPENDED lifecycle, playtest checkpoints field) |
+| `AGENTS.md` | modify | One clause, §A3 |
+| `implementation_plan.md` | modify | M0: PR1 → this plan; M4: NO_ACTIVE_PLAN + link |
+| `docs/plans/suspended/README.md` | create | Index of suspended tasks (one row) |
+| `docs/plans/suspended/PR1.md` | create | Suspension record + verbatim PR1 plan |
+| `docs/plans/completed/BC0.md` | create | Closeout record |
+| `docs/ROADMAP_B_C_ROUTE_REALIZATION.md` | create (git mv from `docs/proposals/`) | STATUS ACCEPTED; links re-based; content otherwise v2 |
+| `docs/proposals/BC0_EXECPLAN.md` | delete (git mv into slot) | — |
+| `docs/MASTER_IMPLEMENTATION_PLAN.md` | modify | Appended section «XII-B. Amendment B+C (2026-10-12)»; one pointer line under R6, R7, R8, R13 headings; R7 sentence on `FinalSurface.sample(x,z)` qualified by S1–S7 |
+| `docs/TARGET_ARCHITECTURE.md` | modify | §1 diagram adds route realization; new section: realization modes, responsibilities, FinalSurface principles, route semantics, anti-R6 guard |
+| `docs/LEGACY_MIGRATION_MATRIX.md` | modify | Rows for regional/PR1 systems (roadmap §4); baseline preservation; retirement order |
+| `docs/CURRENT_PROJECT_STATE.md` | modify | PR1 section (SUSPENDED: works / unfinished / baseline), B+C direction, next phase BC1 |
+| `docs/TEST_STRATEGY.md` | modify | New §8: PLAYABLE / FORMALLY ACCEPTED, playtest before acceptance, defect criticality, escalation rule, applicability of old contracts (T1–T9 by reference), L3 mapping |
+| `ARCHITECTURE.md` | modify | Status line + short as-is PR1 region runtime paragraph |
+| `docs/README.md` | modify | Navigation rows: roadmap, suspended plans |
+| `docs/DECISIONS/README.md` | modify | Row for the accepted roadmap decision |
+| `docs/PLAYTEST_MOUNTAIN_RIVER_VALLEY.md` | modify | Status line: baseline of suspended PR1, tag, reproduction pointer |
 
-**Правило без противоречия:**
-- Подъёмные лимиты и все caps A2 могут только понижаться до замеренных значений.
-- Единственное явное повышение над A2 — спусковой cap и земляные работы TECHNICAL (R6 §19). Оно утверждается этим планом и всё равно ограничено замеренным безопасным спуском.
+## Forbidden files
 
-**Направления:**
-- BACKBONE и SECONDARY проезжаемы в обе стороны в пределах подъёмных лимитов.
-- SINGLETRACK и TECHNICAL могут иметь участки круче подъёмных лимитов только как спуск (`descent_preferred`), и только если в реализованной сети есть более лёгкая связь между теми же узлами (Blueprint §19; R5 уже требует параллельную лёгкую связь для technical). Бот проверяет такое ребро в направлении спуска.
+`scripts/**`, `scenes/**`, `resources/**`, `assets/**`, `project.godot`, `tools/**`, `.agents/skills/**`, `scripts/*/AGENTS.md`, `.antigravity/rules/test-integrity.md`, `docs/TARGET_GAME_BLUEPRINT.md`, `docs/TEST_MATRIX.md`, `TEST_PLAN.md` (already SUPERSEDED), existing `docs/plans/completed/*`, `docs/baselines/**`, `docs/investigations/**`, the evidence root (read-only), branch `pr1-playable-region`, published history.
 
-**R5 — coarse feasibility без глобального запрета по рельефу:**
-- Новый запрет по естественному уклону не вводится. Существующий natural barrier (уклон ≥ 1,0) остаётся как есть.
-- Ход круче `climb_sustained` класса оценивается как удлинённый (Δh / `climb_sustained` × overhead) и помечается DEVELOPMENT_REQUIRED, если укладка возможна хотя бы одним способом:
-  - серпантином — полоса вмещает ≥ 2·R_min + footprint, при необходимости полоса расширяется в пределах существующего cap 120 м;
-  - контурным траверсом — поперечный уклон допускает его в пределах земляных работ класса.
-- Если ни один способ невозможен, ход запрещается **только для этого класса**. Для рёбер `descent_preferred` спуск оценивается по `descent_max`.
-- Окончательно решает R6; его провалы возвращаются в R5 (D4).
+## §A Exact governance amendment
 
-**R6:**
-- `RegionalRoadMath.solve_profile` получает аддитивный необязательный параметр асимметричной границы (подъём/спуск по каноническому направлению). Существующий вызов эквивалентен прежнему.
-- `climb_sustained` и `pitch_len_max` проверяются отдельной стадией валидатора `_climb` с новыми причинами `ERR_R6_SUSTAINED_GRADE` и `ERR_R6_PITCH_LENGTH`. Это не `_geometry`, поэтому точные списки причин существующих фикстур не меняются.
-- `_grade_reach` оценивает нужное удлинение по `climb_sustained`.
+**A1. PLANS.md, Header line.** Replace the status list with `(PLAN_ONLY / APPROVED / IMPLEMENTING / VERIFYING / REVIEWING / COMPLETE / SUSPENDED)`.
 
-## v1.1 §4b. Узлы — D3
+**A2. PLANS.md, Required task fields.** Add the row:
 
-Ограничения movement вычисляются для каждого направления движения из обеих соединяемых дорог и доступного пространства:
-- **Скорость movement** `v_m` = min(design speed въезда, design speed выезда, скорость, до которой можно затормозить на доступной длине подхода). Торможение считается по `RoadKinematicModel` и замеру M1.
-- **Минимальный радиус** `R_m` = max(низкоскоростной минимальный радиус велосипеда из M1, v_m² / a_lat из M1).
-  - Если подход по более строгому классу не даёт нужного торможения, применяется hard-радиус более строгого класса.
-  - Безусловного перехода на лимиты менее строгого класса нет.
-- **Плоскость патча:** уклон ≤ preferred grade более строгого класса, без виража (как сейчас).
-- **Порт от 64 до 96 м** допускается только при доказанном выполнении всех условий:
-  - коннектор и подходы целиком внутри объединения R5-полос инцидентных рёбер: oracle band-union clearance ≥ половины footprint;
-  - нет конфликта footprint с другими кусками и патчами;
-  - в зоне порта нет R5-переправы;
-  - земляные работы патча в лимитах;
-  - сопряжение C1 (и C2, где применимо) с интерьером ребра в обоих направлениях.
-- Если условия не выполнены — movement недоступен с причиной и уходит в обратную связь R5 (другая точка примыкания).
+`| Playtest checkpoints | Where applicable: PLAYABLE / REVIEWABLE points inside the task (Test Strategy §8) — what a human rides, entry criteria, critical-defect list; never acceptance and never a substitute for L2/VERIFY/REVIEW/E7 |`
 
-## v1.1 §4c. Характер дороги — D5 (заменяет «seeded латеральное предпочтение»)
+**A3. PLANS.md, new section after «Completion lifecycle»:**
 
-- Никаких искусственных или периодических змеек.
-- В стоимости DP R6 и в оценке ходов R5 предпочтение получают линии, которые следуют естественной форме места:
-  - контур и террасы склона;
-  - край поймы и подножие склона;
-  - отступ вдоль водотока и естественные места переправ;
-  - обход препятствий;
-  - выход к существующим anchors R5 (SHOULDER, BENCH, MEADOW, RIVER_REACH, PASS) и видовым точкам.
-- Учитывается тип дороги: backbone — длинные плавные дуги по форме долины; singletrack — микрорельеф и опушки.
-- Стоимость кривизны отвечает только за комфорт и не является целью «прямее».
-- near-straight share, heading change/km и sinuosity — **только диагностика и сравнение** (до/после, относительно legacy), не порог PASS. Характер принимается по визуальному пакету и E7.
+```markdown
+## Suspension lifecycle
 
-## v1.1 §4d. Производительность и упрощение — D7
-
-- **Приоритеты:**
-  1. открытие закэшированного региона ≤ 20 с;
-  2. нет игровых зависаний: максимум кадра после загрузки ≤ 100 мс, p99 ≤ 33 мс;
-  3. стабильная физика контакта;
-  4. холодный bake — одноразовый, с прогрессом, цель ≤ 10 мин.
-- Оптимизируются только узкие места, замеренные на **полной сети**. Выбирается самый простой работающий подход.
-- WorkerThreadPool используется только если однопоточный bake не укладывается в цель и замер показывает реальный выигрыш.
-- Целей «N× ускорение» или «−N строк» нет.
-- Слой лестниц R6 удаляется, только если замер на dev-регионах с обратной связью показывает, что без него N-метрики реализованной сети не теряются. Слой с измеренным вкладом остаётся.
-
-## v1.1 §5/§6. Allowed / Forbidden — дополнения
-
-К списку v1.0 добавляются:
-- **Создаются:** `scripts/test/fixtures/r7_certified_route_184729_v1.bin` + `.json` с provenance (T2.1).
-- **Изменяются:**
-  - `regional_road_math.gd` — аддитивная граница;
-  - `road_feasibility_validator.gd` — аддитивная стадия `_climb`;
-  - `scripts/test/final_surface_route_source.gd` (T2.2) и `scripts/test/test_final_surface.gd` (T2.3) — строго в объёме D10;
-  - `scripts/test/test_road_synthesis.gd` — только адаптер вызова по T3 и только при изменении сигнатуры.
-
-`certified_road_route.gd`, `final_surface_slice.gd` и `final_surface_preview.*` остаются неизменными. Остальные запреты v1.0 §6 в силе.
-
-## v1.1 §7. Milestones — изменённые пункты
-
-- **M0** дополнительно: на `pr1-baseline` (disposable copy) один раз прогоняются эталоны защиты:
-  - `test_route_network` — 8 строк;
-  - `test_road_synthesis` — contracts + regions 184729;
-  - `test_final_surface --source=live` — все группы;
-  - R0.
-
-  Из этого же прогона снимается фикстура T2.1. Результаты — эталон для классификации падений (§8).
-- **M1 — ранняя интеграция и замер, а не отдельный продукт.**
-  - Первая езда существующего велосипеда на R7-участке, замер возможностей, бот v1.
-  - Выход M1 — значения политики v2 (§4a) и интеграционные риски (контакт с trimesh, спавн, восстановление).
-  - Оценки сети и продуктовых остановок в M1 нет.
-- **M2.**
-  - R5 coarse feasibility по §4a.
-  - R6: один проход DP + hybrid A* на development-участках → fit → профиль → валидатор; бюджет на ребро. Лестницы снимаются по §4d.
-  - Узлы по §4b, характер по §4c, обратная связь D4.
-  - **Здесь, после создания сети, впервые оцениваются N1–N6.**
-- **M3.** Ускорение — только по замеру на полной сети (§4d), без целевого множителя. Остальное как в v1.0.
-- **M4–M6.** Как в v1.0. Каждый milestone даёт работающий промежуточный результат:
-  - M2 — карты и профили реальной сети;
-  - M3 — сеть видна в сцене;
-  - M4 — сеть проезжаема;
-  - M5 — с окружением;
-  - M6 — принятая сборка.
-- **Правила исполнения (заменяют v1.0):**
-  - Ошибки реализации, неудачные оптимизации и исправления в утверждённом scope решаются внутри PR1 и не останавливают его.
-  - После двух однотипных неудач — root-cause analysis. По его итогу выбирается одно: смена метода, допустимая альтернатива или явный отказ от **необязательного** элемента (D13). Данные о неудачах сохраняются, новый подпроект не создаётся.
-  - Коэффициенты не подбираются без измеренного эффекта.
-
-## v1.1 §8. Verification — изменённые пункты
-
-- **Классификация любого падения:**
-  - **(a) Новая регрессия** — проверка проходила на `pr1-baseline` и падает на HEAD вне списка D10. Исправляется у причины в scope. Если причина — утверждённое намеренное поведение, это S3.
-  - **(b) Известный baseline failure** — падает и на `pr1-baseline` либо записан в Q1/Q2A. Классификация не меняется, фиксируется, не блокирует и не считается PASS.
-  - **(c) Утверждённая миграция** — выполняется ровно по D10.
-- **Изменённые пункты L2:**
-  - L2-3 существующие сюиты: R5 — 8 строк без изменений; R6 — contracts + regions (184729, 2024, int64), адаптеры T3 только при необходимости; R0 живьём; R1–R4 REUSED по byte-identity; G-гейты + `session_diagnostics`.
-  - L2-4: `test_final_surface --source=fixture` на HEAD — группы contracts/surface/collision с неизменными порогами. Surface signature и mesh hashes сравниваются с эталоном M0, ожидается равенство: для цепочки маршрута изменения геометрии не планируются; любое отличие — регрессия (a).
-  - L2-4b: `test_final_surface --source=live` один раз на `pr1-baseline` (LEGACY_CONTRACT evidence).
-  - Метрики характера (N7) только диагностические.
-
-## v1.1 §9. Решения на утверждение (полная таблица, заменяет v1.0 §9)
-
-| ID | Решение |
-|---|---|
-| D1 | Архитектура B; единый PR1 (R6-FR + подмножества R8–R13 для первого среза); заметка-поправка в Master и статусы в TARGET_ARCHITECTURE / migration matrix |
-| D2 | Политика уклонов v2 по §4a: sustained / pitch / descent из замера; подъём только понижается; TECHNICAL — спуск до 15° и земляные работы 3/2/8 м при наличии лёгкой параллели; R5 coarse feasibility без глобального запрета по рельефу |
-| D3 | Узлы по §4b: обе дороги, направление, безопасная скорость подхода, пространство; порт до 96 м только при доказанном соответствии |
-| D4 | Обратная связь R6→R5 через аддитивные `hints`, ≤ 2 повторных раундов; схема графа не меняется; потребляется только RealizedRoadNetwork |
-| D5 | Естественный характер по §4c; near-straight — только диагностика |
-| D6 | Мосты — отдельная геометрия и коллизия настила, грунт под ними натуральный |
-| D7 | RegionBake + дисковый кэш (`user://`, не коммитится); производительность и упрощение по §4d |
-| D8 | Новая сцена + пункт в mode_select (G-гейты на L2); стена на краю региона + юбка (исключение до R21); прибрежные заросли как естественная граница |
-| D9 | Минимальная растительность со стволами-коллайдерами; аддитивная seed-цель `vegetation` |
-| D10 | Миграция тестов T0–T5 (ниже) |
-| D11 | Единый L2 с элементами L3 и бюджетами v1.0 §8; классификация падений (a)/(b)/(c); пороги §11 — гейты, кроме N7 |
-| D12 | Ветка, локальный тег, локальные коммиты на каждый milestone; без push и merge в master |
-| D13 | Правило DEGRADE (ниже) |
-
-**D10 — точная миграция тестов (каждый пункт требует вашего явного согласия):**
-
-- **T0 — эталон.** Ничего не меняется. M0 фиксирует результаты защищённых сюит на `pr1-baseline` — без них классификация (a)/(b) невозможна.
-- **T1 — новые тестовые файлы.** `test_ride_envelope`, `test_region_network`, `test_region_surface`, `test_region_runtime`, `test_region_ride`, `region_ride_bot`, `capture_region_world`.
-- **T2 — `test_final_surface.gd`.**
-  - **Что устаревает:** путь `--source=live|cache` пересобирает R5/R6 для 184729. Он требует подпись v1-плана (`certified_road_route.gd:7-8,19`). Группа `_handoff` (`test_final_surface.gd:240-286`) сверяет подпись v1-графа R5, пять кусков, каналы [7,20,21] и длину 1118,5 м. После D2/D4 R5/R6 честно выдают другой план, и этот путь падает с `ERR_R7_ROUTE_DIGEST` по замыслу.
-  - **T2.1** Фикстура `scripts/test/fixtures/r7_certified_route_184729_v1.bin`: байты маршрута, полученные на `pr1-baseline` существующим live-путём. В `.json` рядом: SHA-256, route digest `835422e7…`, plan signature `e9c11c39…`, команда, движок.
-  - **T2.2** `final_surface_route_source.gd`: новая ветка `source=="fixture"`.
-    - R0–R3 строятся живьём (модули не меняются, подписи region/hydrology сверяются).
-    - Маршрут = `CertifiedRoadRoute.from_bytes(фикстура)` с существующей аутентификацией плюс проверка SHA.
-    - R5/R6 не вызываются.
-    - Ветки `cache` и `live` не меняются.
-  - **T2.3** `test_final_surface.gd`:
-    - принимает `--source=fixture`;
-    - в этом режиме группа `handoff` не запускается и **явно** указывается в итоговом JSON: `groups_not_run:["handoff"]`, причина `FIXTURE_NO_LIVE_R5_R6`, плюс `groups_run`;
-    - все остальные проверки, сообщения, пороги и негативы остаются байт-в-байт: 1 см / R7-F1 0,35 м, 5 см, 0 промахов, водонепроницаемость, рендер = коллизия, нулевая дельта объектов.
-  - **T2.4 Статус:**
-    - `--source=fixture` (contracts/surface/collision) = **REGRESSION_GUARD** машинерии R7 на HEAD, обязателен на L2;
-    - `--source=live` + `handoff` = **LEGACY_CONTRACT** handoff R6 v1, исполняется на `pr1-baseline`.
-  - **Перенос проверок `handoff` в `test_region_network`** — на каждый реализованный кусок HEAD, с теми же порогами:
-    - согласованность подписи графа;
-    - READY без reasons, movement READY;
-    - band containment для рёбер и коннекторов;
-    - барьер на обеих кромках, valid и unblocked;
-    - нет незапланированной water body;
-    - идентичность и порядок каналов относительно R5-переправ;
-    - швы ≤ 1 мм;
-    - Oracle path contract.
-
-    Не переносятся только константы старого маршрута (5 ID, [7,20,21], 1118,5 м).
-  - **T2.5** Обобщённый деформер сохраняет внутреннюю модель, которую используют contracts и `_index_parity` (`_segments`, `_candidate`, `_index`, `_query_index`, `_fine`, `_data`), потому что это его ядро. Если что-то из неё по архитектурной причине должно измениться, проверки `test_final_surface.gd:166-237, 288-302` переводятся на эквивалентную новую точку входа: те же фикстуры, причины и счётчики, точный diff — в записи. Сохранять устаревшую реализацию ради теста не нужно, удалять assertion нельзя.
-- **T3 — `test_road_synthesis.gd`.**
-  - Приватные вызовы:
-    - `designer._profile` — 4 проверки;
-    - `_sight` — 2;
-    - `_grade_reach` — 1;
-    - `planner._plane` / `_attempt` и `Junctions._essential_pairs` — 1 (`neg_junction_height`).
-  - Эти функции — сохраняемое ядро. Если D2/D3 меняют их сигнатуру (асимметричная граница профиля, скорость movement), меняется только адаптер вызова в тесте; фикстуры, коды причин и assertions остаются, diff — в записи.
-  - `neg_search_budget` сохраняет ожидаемую причину при бюджете на ребро.
-  - Новая валидация `_climb` не затрагивает `_geometry`, поэтому точные списки причин негативов не меняются.
-- **T4 — `test_route_network.gd`.** Не меняется. Профили читаются из политики, а тест читает профили. Падение V8 (backbone + ≥ 1 петля) — это регрессия сети (a), её чинят в R5 или в обратной связи, а не в тесте.
-- **T5 — TEST_MATRIX.** Правка **не требуется**: сюиты R0–R7 там никогда не регистрировались, их авторитет держат записи фаз. Статус T2.4 записывается в `docs/plans/completed/PR1.md` и `CURRENT_PROJECT_STATE`. Вариант по вашему решению: добавить в TEST_MATRIX ровно 2 строки (`test_final_surface` fixture / live) с категориями T2.4.
-
-**D13 — правило DEGRADE.**
-- DEGRADE **не засчитывается**, если теряется ядро игровой цели:
-  - непрерывный backbone;
-  - связная компонента ≥ 8 км;
-  - ≥ 2 петли;
-  - наличие SECONDARY и SINGLETRACK;
-  - работающие узлы и переправы (броды/мосты) компоненты;
-  - возможность off-road;
-  - 20–30 минут езды без обязательного повтора;
-  - на плейтест- и dev-регионах — ≥ 1 TECHNICAL.
-- Допустим документированный DEGRADE необязательных элементов:
-  - рёбра вне основной компоненты;
-  - TECHNICAL на holdout;
-  - тонкие ячейки ручьёв вдали от дорог;
-  - указатели, дополнительные виды растительности;
-  - качество дальнего LOD и юбки.
-
-## v1.1 §10. Стоп-условия (заменяют v1.0 §10)
-
-Директору возвращается только настоящий конфликт:
-- **S1** — только после M2, когда сеть создана, и после двух root-cause-циклов. На dev-регионах N1–N6 недостижимы в утверждённой политике и географии без изменения физики велосипеда или продуктовых требований. Отчёт с evidence и вариантами.
-- **S2** — нужна правка плеера, камеры, управления, физики или project settings.
-- **S3** — существующий тест падает из-за намеренного поведения вне D10. Конфликт записывается; работа, которую он не затрагивает, продолжается.
-- **S4** — нужна правка R0–R4, публичных контрактов или файлов вне whitelist.
-- **S5** — недетерминизм, не объяснённый после RCA.
-
-**Не стоп:**
-- ошибки реализации, неудачные оптимизации, локальные исправления в scope;
-- известные baseline failures;
-- утверждённые миграции;
-- промежуточные промахи по производительности — это гейты финального L2, их решают в scope.
-
-## v1.1 §11. Definition of Done (заменяет v1.0 §11)
-
-- **Сеть** на 3 dev-регионах (плейтест-регион входит в их число) и ≥ 3/4 holdout:
-  - N1 непрерывный backbone;
-  - N2 ≥ 8 км в связной компоненте;
-  - N3 ≥ 2 петли;
-  - N4 SECONDARY + SINGLETRACK, на dev-регионах TECHNICAL ≥ 1;
-  - N5 0 BLOCKED-узлов в компоненте;
-  - N6 тупики только как TERMINUS из R5.
-  - Любой DEGRADE — по D13.
-  - **N7** (near-straight и др.) — диагностика и сравнение, не PASS-порог.
-- **Физика:**
-  - P1 бот проходит каждое ребро в обязательных направлениях (§4a) без провалов и неустранимых застреваний;
-  - P2 лучи: 0 промахов, ≤ 1 см на дороге, ≤ 5 см на грунте, стык моста ≤ 1 см;
-  - P3 off-road: съезд, ≥ 150 м по лугу, возврат;
-  - P4 нет езды под глубокой водой.
-- **Производительность** в порядке приоритетов §4d (этот ПК):
-  - кэш ≤ 20 с;
-  - 20 минут езды: максимум кадра после загрузки ≤ 100 мс, p99 ≤ 33 мс, p50 ≥ 60 FPS, рост памяти ≤ 5 %, без утечек;
-  - холодный bake ≤ 10 мин.
-- **Детерминизм:** одинаковый манифест bake в двух процессах и при 1 vs N потоках; разные seed дают разное.
-- **Защита тестов:** все существующие защищённые сюиты в статусе (a) PASS, (b) без изменений или (c) по D10. `test_final_surface --source=fixture` проходит с эталонными хешами.
-- **Сборка:** сцена и пункт меню, инструкция запуска и вопросы Blueprint §35.
-- **Приёмка:** VERIFY PASS + независимый REVIEW PASS; документы и запись PR1. E7 не объявляется: его проводит человек.
-
----
-
-# Приложение — ExecPlan v1.0 и аудит (действует, кроме разделов, заменённых выше)
-
-## Контекст
-
-R0–R7 построили детерминированный мир, сеть маршрутов, дорожную геометрию и поверхность. Но играть можно только на 1118,5 м одного маршрута, а новый мир так и не ездили велосипедом. Задача этого плана — архитектурный выход к одному полноценному региону Mountain River Valley на 20–30 минут реальной езды. План сохраняет R0–R4 и полезную математику R5–R7 и убирает слои, которые не дают результата.
-
-Аудит выполнен 2026-10-11 на `master` = `origin/master` = `52a9c34`, дерево чистое, активного плана нет (`implementation_plan.md` = NO_ACTIVE_PLAN). Прочитаны документы управления, R5/R6/R7-записи и весь код R5–R7. Отдельно изучены legacy runtime, плеер и ассеты.
-
----
-
-# Часть 1. Управленческий отчёт
-
-## 1. Диагноз: почему R5–R7 завели проект в сложность
-
-1. **R5 и R6 используют разные модели допустимой дороги, и обратной связи между ними нет.**
-   - Предельные уклоны R5 выше жёстких лимитов R6 во всех классах:
-
-     | Класс | R5 `g_max` | R6 жёсткий лимит |
-     |---|---|---|
-     | BACKBONE | .10 | 5° (.087) |
-     | SECONDARY | .15 | 8° (.141) |
-     | SINGLETRACK | .22 | 10° (.176) |
-     | TECHNICAL | .38 | 12° (.213) |
-
-     Источники: `route_search.gd:28-31` и `road_synthesis_policy.gd:58-68`.
-   - Слишком крутой уклон в R5 никогда не запрещён, он лишь дороже стоит (`route_search.gd:73-75`). Радиус, бровки и серпантины R5 не моделирует.
-   - Полосу, броды и узлы R5 при этом выдаёт как обязательные. R6 «never edits the graph» (`road_synthesizer.gd:21-22`), а статус REPLAN_REQUIRED никем не обрабатывается.
-   - Итог по 87 провалившимся рёбрам (R6.md §19): 30 геометрически невозможны в выданной полосе, 20 упираются в броды, зазоры и полосу, 11 в поиск, 11 в fitting.
-2. **Невозможное R6 пытался решить нарастанием поиска.**
-   - Лестницы в `road_alignment_designer.gd` (2740 строк) вложены друг в друга:
-     - SEARCH_ATTEMPTS ×5;
-     - SLACK ×3;
-     - 3 весовых профиля;
-     - 8 раундов `_develop`;
-     - hybrid A* 6×4;
-     - fit 18 итераций, profile-ladder 4;
-     - повтор с принудительным мостом;
-     - повтор при конфликте.
-
-     Код: `:145-184`, `:198-813`, `road_synthesizer.gd:413-430`.
-   - Вся recovery-надстройка дала +2 годных ребра из 87 (R6.md:654).
-   - Бюджеты fit/natural общие на весь регион и не сбрасываются между рёбрами (`:107`, `road_synthesizer.gd:97`). Поэтому исход ребра зависит от порядка обработки.
-3. **Узлы блокируются из-за правила, а не из-за формы коннектора.**
-   - Коннектор строится по лимитам *более строгого* класса при радиусе порта ≤ 64 м (`road_junction_planner.gd:524-534`).
-   - Итог: 57 essential-movements недоступны, 24 узла BLOCKED. Добавление нового углового коннектора дало лишь 460→461 из 552.
-4. **Приёмка сужала результат до «сертифицированного участка», а не до работающей системы.**
-   - R6-LA1, затем R7 LIMITED. Продуктивный код R7 привязан к одному маршруту: `certified_road_route.gd:6-8` (ID кусков, подпись плана, дайджест), каналы 7/20/21 (`final_surface_slice.gd:94`), цепочка «первый/последний кусок» в деформере.
-   - Сеть, мосты (`road_terrain_deformer.gd:54-55` → ERR_R7_BRIDGE_UNSUPPORTED), off-road и велосипед не тронуты.
-   - Доля верификации: 56 % в R7 и 75–78 % в R6-LA.
-5. **Масштабная стоимость.**
-   - Один аналитический запрос высоты стоит ~120 µs, запрос R4 ~0,7 ms.
-   - R7: 56 с на 1,1 км, из них 92 % — меш-массивы (~0,3 мс на вершину), 174 623 вершины.
-   - Сеть в 10–15 км потребовала бы ~10+ минут. R6 тратит 47,5 с на регион 184729 и до 432 с на 2024; R5 — 44 с.
-   - Между запусками кэшируется только маршрут R7.
-6. **Скрытый продуктовый конфликт: дорожная политика не выведена из возможностей велосипеда.**
-   - Модель велосипеда: `pedal_acceleration` 1,4, `gravity_slope_mult` 1,1, качение 0,125 на гравии и 0,45 на траве (`bicycle_controller.gd:11,20-23,377-418`).
-   - По этой модели при удержании педали предел подъёма ≈ 6,8° у нуля скорости и ≈ 5° на 3 м/с; на траве ≈ 5° у нуля.
-   - Значит, жёсткие лимиты A2 (8/10/12°) в гору без постоянных спринт-тапов почти непроезжаемы.
-   - Это расчёт по коду; в M1 его подтвердит или опровергнет реальная езда.
-7. **Характер дороги.**
-   - Backbone повторяет прямую референс-линию R5 на растре 32 м: 72 % длины near-straight против 57–65 % у legacy. У стоимости R5 нет мотива к дугам, а R6 штрафует кривизну.
-   - Ритм дороги нигде не задан как цель.
-
-**Главная причина.** R5 принимает окончательные геометрические решения по более грубой и более мягкой модели, чем та, по которой R6 проверяет дорогу. R6 запрещено отступать от этих решений. Вместо исправления контракта на стыке наращивали сложность внутри R6, а затем сужали область приёмки.
-
-## 2. Решение — вариант B с обратной связью (выбран по доказательствам)
-
-| Вариант | Переиспользование | Сложность | Качество / связность | Производительность | Риск |
-|---|---|---|---|---|---|
-| A. Доработать R5–R7 как есть (R6-FR) | максимум | растёт | §19: тюнинг не лечит невозможную полосу (+2/87) | без изменений | бесконечная настройка — **отклонено** |
-| **B. Единые лимиты + coarse feasibility в R5 + однопроходный R6 + обратная связь R6→R5** | ~80 % кода | лестницы R6 снимаются по измеренному вкладу (v1.1 §4d) | устраняет корень (п. 1–3) | R6 ограничен бюджетом на ребро | изменение поведения R5/R6 — **выбрано** |
-| C. Заменить R6 простым сплайном + подгонкой рельефа | малое | меньше кода | наследует уклоны .38 из R5 → неограниченные выемки («road-first world»); теряет пины бродов, узлы, точный профиль | быстрый fit | регресс качества — **отклонено** |
-
-Почему C отклонён: там, где коридор выполним, ядро R6 работает — 84/86 backbone READY.
-
-Целевой конвейер:
-
-```
-R0–R4 (KEEP) → RoutePlanner R5 (единые лимиты из политики; замкнуты ноды круче класса)
-  → RoadSynthesizer R6 (один проход: DP + hybrid A* только на development-участках → fit → точный профиль → валидатор)
-  → RegionNetworkBuilder: провалы R6 с координатами → hints → повторный план R5 (≤ 2 раундов) → RealizedRoadNetwork
-  → FinalSurface R7 (обобщён на сеть, мосты отдельной геометрией; единственный владелец высоты)
-  → RegionBake (детерминированный, кэш на диске, привязан к исходникам)
-  → RegionWorld runtime (тайлы, коллизия рядом с игроком, растительность, вода, существующий велосипед)
+- SUSPENDED stops an unfinished task by explicit human decision (for example, its method is superseded). It is never COMPLETE or PASS, closes no obligation, and needs no VERIFY/REVIEW of the unfinished scope.
+- Before the root slot changes, create `docs/plans/suspended/<TASK-ID>.md`: decision source/date and reason; status of every milestone (done / not done / not run); the plan and execution record verbatim, with the SHA-256 of the root file it was copied from; retained evidence with its limitations; known failures; a reproducible baseline (revision or tag, engine, seed/configuration, launch command, cache/evidence location); every open obligation with its new owner task/phase or its explicit cancellation by the decision.
+- Then replace the root `implementation_plan.md` with NO_ACTIVE_PLAN or the next approved plan, linking the record. Keep the task branch and published history; no force-push or rewrite.
+- Resuming needs a new approved plan or amendment. Obligations move only as the decision names them.
 ```
 
-**Встроенные средства Godot:**
-- ArrayMesh из упакованных массивов — оставляем.
-- ConcavePolygonShape3D для патчей коллизии рядом с игроком из тех же треугольников, что и рендер — выбран.
-- MultiMeshInstance3D + `visibility_range` — выбран для растительности и для LOD тайлов.
-- WorkerThreadPool — только для bake и только после замера.
-- Сжатый FileAccess / `var_to_bytes` — для кэша.
-- Curve3D не нужен: G2-квинтика и таблицы длины дуги уже есть и проверены, а ограничений по уклону и кривизне Curve3D не даёт.
-- SurfaceTool медленнее массивов.
-- HeightMapShape3D не может нести тонкие дорожные ячейки без перекрытия коллайдеров и нарушает инвариант «рендер = коллизия». Откладывается до R19.
-- Terrain3D и внешние библиотеки не нужны.
+**A4. AGENTS.md, Workflow bullet «Update owned current documentation…».** After «…then clear the root slot to NO_ACTIVE_PLAN.» insert: «An unfinished task stops only by explicit human decision as SUSPENDED under [.agent/PLANS.md](.agent/PLANS.md), never as COMPLETE.»
 
-## 3. Судьба кода
+## Migration path
 
-| Решение | Что |
-|---|---|
-| **KEEP** | R0–R4 целиком; HydrologySurface; TerrainTileRenderer; схема и валидатор RegionRouteGraph; ядро RouteSearch (A*/Dijkstra); RouteAnchorFinder; RouteJourneyScoring; RouteCorridorBuilder; RegionalRoadMath (квинтика, `solve_profile`, fairing); RoadFeasibilityValidator; RoadbedIntent; RoadSynthesisPlan; Band/Natural; аналитический угловой коннектор; композиция FinalSurface и разбиение коллизии (Road 2 / Terrain 4); Bicycle/камера/HUD/аудио; legacy-режим (WorldManager, ChunkStreamer, RoadLogic/Grammar, TerrainCarver, ChunkFoliage) как отдельный режим, без изменений |
-| **ADAPT** | RouteSearch/RoutePlanningRaster: лимиты из политики, класс-зависимый «buildable slope», убрать двойной запрос высоты. RoutePlanner: аддитивный вход `hints`. RoadSynthesisPolicy v2. RoadAlignmentDesigner: один проход, бюджет на ребро, без лестниц. RoadJunctionPlanner: лимиты менее строгого класса, порт ≤ 96 м. RoadSynthesizer: изоляция и координаты провалов. RoadTerrainDeformer / FinalSurface / FinalSurfaceTileRenderer: сеть, мосты, тайловая сборка, производительность |
-| **REPLACE** | CertifiedRoadRoute (5 фиксированных кусков) → RealizedRoadNetwork (любая потребляемая сеть из плана). Тестовый `final_surface_route_source` → производственный RegionBake-кэш |
-| **RETIRE** (из нового конвейера) | SEARCH_ATTEMPTS, SLACK_LADDER, 3 профиля (останется 1–2 по измеренному вкладу), раунды `_develop`/LONGEST, повтор с принудительным мостом, повтор при конфликте, хуки `relax_*` (DEBT 14), отладочная прогрессия 300 sweeps |
-| **NEW** | Замер возможностей велосипеда; RegionNetworkBuilder; RealizedRoadNetwork; BridgeDeckBuilder; RegionBake + кэш; RegionWorld + RegionStreamer; планировщик растительности + меши флоры; Input-бот езды по сети |
-| **DEFER** | Landmarks/vistas/Journey Director (R14–R17), LOD/clipmaps, продолжение региона (R21), retirement TerrainCarver/ChunkStreamer, ForkDecisionModel |
-
-## 4. Путь к игровому результату — один ExecPlan, milestones M0–M6
-
-1. **M1 — первая езда и замер возможностей велосипеда.** Новая сцена с существующим велосипедом на R7-участке. Синтетические рампы дают предельные уклоны, торможение и радиусы. Первый Input-бот. По сути, R8 делается сразу.
-2. **M2 — выполнимая сеть.** Политика v2 из замера, R5 на тех же лимитах, упрощённый R6, правило узлов, обратная связь R6→R5, параметр характера дороги.
-3. **M3 — поверхность масштаба сети.** Обобщённый деформер, мосты, ≥ 5× ускорение, детерминированный bake + кэш.
-4. **M4 — игровой runtime.** Стриминг тайлов и коллизии рядом с игроком, off-road, восстановление, граница региона, пункт в mode select.
-5. **M5 — минимальное окружение.** Растительность по биомам, стволы-коллайдеры, прибрежные заросли как естественная граница, дорожный материал, поверхность по классу.
-6. **M6 — сквозная проверка.** Оптимизация замеренных узких мест, единый L2 (с элементами L3), VERIFY и REVIEW, инструкция для 20–30-минутного плейтеста.
-
-**Критерии готовности.** Их проходят 3 dev-региона и ≥ 3 из 4 нетронутых holdout-регионов.
-- **Сеть:**
-  - связная компонента ≥ 8 км с непрерывным backbone;
-  - ≥ 2 петли;
-  - есть SECONDARY и SINGLETRACK; TECHNICAL ≥ 1 или явный DEGRADE с причиной;
-  - 0 BLOCKED-узлов внутри компоненты.
-- **Физика:**
-  - бот проходит каждое ребро без провалов и застреваний;
-  - лучи: 0 промахов, ≤ 1 см на дороге и ≤ 5 см на грунте;
-  - off-road-кейсы проходят.
-- **Производительность:**
-  - холодный bake ≤ 10 мин;
-  - загрузка из кэша ≤ 20 с;
-  - 20 минут езды: p50 ≥ 60 FPS, p99 ≤ 33 мс, без утечек.
-- **Воспроизводимость:** детерминизм по seed.
-- **Приёмка:** VERIFY PASS + независимый REVIEW PASS; E7 проводит человек.
-
-## 5. Риски и что требует вашего решения
-
-> **Заменено v1.1 §9, §10.** Ниже — исходный текст v1.0 для истории.
-
-Утверждение плана означает утверждение решений D1–D12 из §9 ExecPlan, если вы явно не исключите какое-то из них. Ключевые:
-- **D2** — политика уклонов v2 из реального замера велосипеда. Уклоны можно только понижать до замеренных значений. TECHNICAL по R6 §19: 15°, выемка 3 м / насыпь 2 м / подрезка 8 м, только при наличии более лёгкой параллели.
-- **D3** — правило узлов.
-- **D8** — правка mode_select. Она задевает legacy-closure, поэтому G-гейты прогоняются на L2.
-- **D10** — миграция `test_final_surface.gd`. После изменения R5/R6 маршрут 184729 неизбежно меняется. Тест не правится: он становится LEGACY_CONTRACT и прогоняется на теге `pr1-baseline`, а его семейства проверок с теми же порогами переносятся в новый сетевой тест.
-- **Поправка к Master.** Этот план объединяет R6-FR и подмножества R8–R13 в один путь к срезу.
-
-**Остановка только по S1–S7 (§10).** Главные поводы:
-- **S1.** Замер покажет, что велосипед при неизменной физике не даёт интересной сети.
-- **S2.** Понадобится трогать плеер или физику.
-- **S3.** Существующий тест упадёт вне D10.
-
----
-
-# Часть 2. ExecPlan v1.0 (после утверждения сохраняется в `implementation_plan.md`)
-
-```
-TASK: PR1 — Architectural Recovery & Playable Region (Mountain River Valley)
-DATE: 2026-10-11   STATUS: PLAN_ONLY → APPROVED on user approval of this plan
-BRANCH/BASE/HEAD: pr1-playable-region / master 52a9c34 (= origin/master) / 52a9c34; local tag pr1-baseline
-BASELINE: clean (0 staged / 0 unstaged / 0 untracked)
-APPROVAL: user approval in chat of v1.0 + D1–D12 (exceptions recorded verbatim)
-EVIDENCE ROOT (outside the repo): C:/Users/Luisa/Documents/Codex/2026-10-11/pr1-playable-region/
-ENGINE: Godot 4.7.2 mono (existing executable); disposable copies outside the repo; ≤ 4 processes, ≤ 1 Vulkan
-```
-
-## 1. Goal
-
-Запускаемая игровая сцена процедурного региона Mountain River Valley. В ней существующий велосипед под управлением Input ездит по связной сети дорог и троп с развилками и петлями, может съезжать на проезжаемую местность, видит воду и растительность. Результат воспроизводим по seed, производительность измерена. Регион готов к 20–30-минутному плейтесту человеком.
-
-## 2. Observed state (факты аудита)
-
-- **R5.**
-  - Растр 129×129 узлов по 32 м, 16 направлений.
-  - Лимиты: `route_search.gd:28-31`; блок только при уклоне ≥ 1,0.
-  - Один коридор на ребро; обратной связи с R6 нет.
-  - Время: растр 17 с, планировщик 44 с, 155 поисков.
-  - Высота запрашивается дважды на узел растра.
-- **R6.**
-  - 6,36 тыс. строк, из них дизайнер 2740.
-  - Батарея из 12 регионов: backbone 84/86, secondary 86/112, singletrack 15/61, technical 0/15.
-  - 57 essential-movements недоступны, 24 узла BLOCKED.
-  - Время: 47,5–432 с на регион.
-  - Тесты обращаются к `Designer.create`, `_profile`, `_sight`, `_grade_reach`, `Junctions.create`, `_essential_pairs`, `Synth.synthesize` и внутренностям валидатора — эти сигнатуры сохраняются.
-- **R7.**
-  - 1,1 тыс. строк.
-  - `CertifiedRoadRoute` содержит хардкод; наборы деформера жёстко заданы.
-  - Рендер, коллизия и сетка (1 / 0,5 / 0,25 / 0,125 м + веера к 16 м) корректны.
-  - 56 с, 174 623 вершины, 81,8 МБ.
-  - `test_final_surface.gd` связан с подписью плана 184729 и каналами [7,20,21].
-- **Плеер.**
-  - Не зависит от WorldManager, кроме duck-typed `request_bike_recovery(pos) → Transform3D`.
-  - Лучи колёс маскируют 2|4|16, тело — слой 8 с маской 7.
-  - Поверхность определяется по битам коллайдера.
-  - Камера, HUD и аудио от мира не зависят.
-- **Растительность legacy.** Привязана к дороге. Меши процедурные, внутри WorldManager. В `assets/` есть только гравийный шейдер (UV 0..1) и материал травы. Export presets отсутствуют.
-- **Тесты.** R5–R7 нет в TEST_MATRIX. Тесты R5 и R6 проверяют свойства, без золотых подписей.
-
-## 3. Target behaviour и исключения
-
-Целевое поведение перечислено в §1 и критериях §11.
-
-**Исключено:**
-- landmarks, vista, Journey Director, ride-situation library;
-- LOD и clipmaps сверх двух уровней видимости;
-- продолжение региона;
-- водная физика (плавание);
-- NPC и любые механики Blueprint §27/§36 (передачи, выносливость, счёт и т. п.);
-- изменения плеера, камеры, управления и физических настроек;
-- retirement legacy-режима.
-
-## 4. Ownership и контракты (один владелец каждого состояния)
-
-| Владелец | Состояние / контракт |
-|---|---|
-| RoadSynthesisPolicy v2 (`regional_road/2`) | Единые лимиты классов: уклоны climb_sustained / pitch / descent (v1.1 §4a), радиус, ширина, земляные работы, параметры узлов (v1.1 §4b). Их читают и R5, и R6 |
-| RoutePlanner (R5) | RegionRouteGraph; схема без изменений; аддитивный `settings.hints` (закрытые узлы, штрафные зоны, запрещённые переправы) |
-| RoadSynthesizer (R6) | RoadSynthesisPlan; для каждого провала — `failure_xz` и класс причины |
-| RegionNetworkBuilder (новый, pure) | Раунды R5↔R6 (≤ 2 повтора) → RealizedRoadNetwork + DEGRADE-записи |
-| RealizedRoadNetwork (новый, pure) | Потребляемые куски (READY с пустым `reasons`), патчи, переправы, связность, дайджест сети |
-| RoadTerrainDeformer / FinalSurface (R7) | Единственная итоговая высота; на пролётах мостов — натуральный грунт |
-| BridgeDeckBuilder (новый, pure) | Массивы настила и коллизии из данных BRIDGE_DECK, слой Road |
-| RegionVegetationPlanner (новый, pure) | Экземпляры по ячейкам 64 м × тип из BiomeField/Rideability/FinalSurface; аддитивная seed-цель `vegetation` |
-| RegionBake (новый, pure) + region_bake_cache (адаптер ввода-вывода) | Манифест bake; кэш `user://regions/<key>/`; ключ = SHA closure исходников + версия движка + seed/регион/настройки; несовпадение → `ERR_BAKE_STALE` → пересборка |
-| RegionWorld / RegionStreamer (runtime, main thread) | Ноды, физические тела, жизненный цикл тайлов, патчей, растительности, воды и мостов; спавн, `request_bike_recovery`, граница региона |
-| BicycleController | Движение. KEEP, без изменений |
-
-Направление зависимостей: R0–R4 → политика → R5 → R6 → builder → network → R7 → bake → runtime. Обратных ссылок нет. Домен ничего не знает о сцене. Потоки допускаются только в bake (массивы); регистрация нод и физики — только в main thread.
-
-## 5. Allowed files
-
-> **v1.1 §5/§6:** список дополнен (фикстура T2.1; правки T2.2, T2.3, T3; аддитивные изменения в `regional_road_math` и `road_feasibility_validator`).
-
-**Создаются** (каждый `.gd` вместе с `.uid`):
-- `scripts/world/region/`: `region_network_builder.gd`, `realized_road_network.gd`, `bridge_deck_builder.gd`, `region_bake.gd`, `region_vegetation_planner.gd`;
-- `scripts/world/`: `region_world.gd`, `region_streamer.gd`, `region_bake_cache.gd`, `region_flora_meshes.gd`;
-- `scenes/region/region_world.tscn`;
-- `assets/shaders/region_road.gdshader`;
-- `docs/PLAYTEST_MOUNTAIN_RIVER_VALLEY.md`.
-
-**Тесты** (D10):
-- `scripts/test/test_ride_envelope.gd` (рампы создаются в коде);
-- `test_region_network.gd`, `test_region_surface.gd`, `test_region_runtime.gd`, `test_region_ride.gd`;
-- `region_ride_bot.gd`, `capture_region_world.gd`.
-
-**Изменяются:**
-- R5: `route_search.gd`, `route_planning_raster.gd`, `route_planner.gd`;
-- R6: `road_synthesis_policy.gd`, `road_alignment_designer.gd`, `road_junction_planner.gd`, `road_synthesizer.gd`, при необходимости `road_corridor_geometry.gd`;
-- R7: `road_terrain_deformer.gd`, `final_surface.gd`, `final_surface_tile_renderer.gd`;
-- `region_seed_derivation.gd` — только аддитивная цель с доказательством отсутствия влияния;
-- `scenes/mode_select.tscn`, `scripts/ui/mode_select.gd` — один пункт меню (D8).
-
-**Документы:**
-- `implementation_plan.md`, `docs/CURRENT_PROJECT_STATE.md`, `ARCHITECTURE.md` (строка статуса), `TEST_PLAN.md` (статус);
-- `docs/TARGET_ARCHITECTURE.md`, `docs/LEGACY_MIGRATION_MATRIX.md`, `docs/MASTER_IMPLEMENTATION_PLAN.md` (заметка о консолидации, D1);
-- при закрытии — `docs/plans/completed/PR1.md`.
-
-## 6. Forbidden
-
-> **v1.1:** исключения из запрета — только `final_surface_route_source.gd`, `test_final_surface.gd` и `test_road_synthesis.gd`, строго в объёме D10 (T2.2, T2.3, T3).
-
-- `scripts/player/**`, `scenes/player/**`, `scripts/camera/**`, `scenes/main.tscn`, `project.godot` (ввод, слои, физика, main scene), `default_bus_layout.tres`.
-- R0–R4: `region_*`, `macro_*`, `terrain_field`, `hydrology_*`, `environment_context`, `biome_field`, `rideability_field`.
-- Legacy runtime: `world_manager`, `chunk_streamer`, `road_logic`, `road_grammar`, `road_chunk`, `chunk_foliage`, `terrain_carver`, `road_graph` и прочие файлы `scripts/world/*.gd`, кроме новых.
-- R7: `certified_road_route.gd`, `final_surface_slice.gd`, `final_surface_route_source.gd`, `final_surface_preview.*` — остаются как legacy-путь R7.
-- Все существующие тесты, оракулы и capture-скрипты; `tools/**`; AGENTS, skills, правила; Blueprint, TEST_STRATEGY, TEST_MATRIX, test-integrity.
-
-## 7. Milestones (одно утверждение; checkpoints — это отчёты, а не новые согласования)
-
-> **v1.1:** пункты M0, M1, M2 (R5-feasibility, характер), M3 (ускорение) и правила исполнения заменены разделом v1.1 §7. При расхождении действует v1.1.
-
-**M0. Baseline (≤ 0,5 ч).**
-- Создать ветку и локальный тег `pr1-baseline`.
-- Сохранить план в слот, завести evidence root.
-- Зафиксировать время R5/R6/R7 на 184729 как точку «до».
-
-**M1. Первая езда + возможности велосипеда.**
-- `region_world.tscn` v0: окружение из main, существующий `bicycle.tscn`, HUD, fader; земля — существующий R7-участок; спавн в forward-позе +0,45 м; восстановление — ближайшая точка маршрута минус 20 м.
-- `test_ride_envelope`: реальный BicycleController на рампах 0–15° (гравий и трава); удержание педали и тапы с фиксированной частотой; спуск и торможение; радиус в зависимости от скорости; ступени 0,5/1/2/5 см; изломы уклона.
-- Результат: таблица возможностей → константы политики v2 со ссылкой на evidence.
-- `region_ride_bot` v1 (Input, pure-pursuit по `export_path`) проходит R7-маршрут в обе стороны.
-- L1: 3–4 Vulkan-кадра езды; таблица возможностей; статистика бота (контакт, застревания, отклонение, время кадра).
-
-**M2. Выполнимая сеть.**
-- Политика v2 по D2/D3.
-- R5:
-  - `g_max` класса берётся из политики;
-  - узлы круче buildable slope класса закрыты;
-  - development только там, где ширина полосы ≥ 2·R_min + footprint.
-- R6:
-  - один проход: 1–2 весовых профиля DP по измеренному вкладу + hybrid A* только на development-участках → один fit (с ограниченным повтором) → `solve_profile` → валидатор;
-  - бюджет сбрасывается на каждое ребро, есть потолок времени на ребро;
-  - провал → REPLAN с `failure_xz`;
-  - удалены лестницы и `relax_*`; сигнатуры, которые вызывают тесты, сохранены.
-- Узлы: лимиты менее строгого класса, порт ≤ 96 м.
-- RegionNetworkBuilder + RealizedRoadNetwork.
-- Характер (D5): для долинных BACKBONE/SECONDARY — seeded низкочастотное латеральное предпочтение (длина волны 150–400 м, ≤ 30 % ширины полосы) в стоимости DP; жёсткие ограничения важнее; параметр отключаем.
-- L1 на 184729@(0,0), 2024@(−1,−1), 3628391@(3,−2) + int64-граница: метрики сети N1–N7 «до/после» относительно батареи R6, карты, профили.
-
-**M3. Поверхность масштаба сети + bake.**
-- Деформер:
-  - произвольные куски; концевые «шапки» на висячих концах;
-  - провал одного куска изолирован (кусок исключается с причиной);
-  - пролёты мостов исключены из деформации; BridgeDeckBuilder.
-- Ускорение:
-  - точный мемо натуральных высот по мировым узлам решётки, побитово равный аналитике, локальный на тайл;
-  - горячий путь без Dictionary;
-  - сборка по тайлам;
-  - WorkerThreadPool только для массивов bake и только после замера, порядок детерминирован.
-- Тонкие ячейки вдоль многолетних водотоков вне дорог, если укладываются в бюджет; иначе явный DEGRADE (только ленты).
-- RegionBake + кэш.
-- L1: полный bake 184729 (время по стадиям, память, два bake в разных процессах дают одинаковый манифест), 3–4 кадра (мост, брод, узел, сеть сверху).
-
-**M4. Runtime.**
-- RegionStreamer:
-  - рендер-тайлы: тонкие вблизи (`visibility_range` ~700 м), дальние на 16 м;
-  - патчи коллизии 64 м в радиусе ~160 м, нарезанные по центроидам тех же треугольников (каждый треугольник ровно один раз), не больше 1 коммита за кадр;
-  - вода, мосты.
-- Off-road-коллизия на всей местности в радиусе.
-- Граница региона: стена на краю + рендер-юбка, явное исключение до R21.
-- Экран загрузки с прогрессом bake; seed случайный и записывается в лог, `--seed=` переопределяет.
-- Пункт «Mountain River Valley» в mode_select.
-- L1: 10 минут бота по нескольким тайлам, время кадра, 2 off-road-кейса, кадры.
-
-**M5. Окружение.**
-- Растительность по BiomeField/Rideability: хвоя, береза/осень, кусты/камыш, камни, трава.
-- Исключения: footprint дороги (`sample_surface.kind`), вода, мосты.
-- MultiMesh на ячейку × тип с дальностью видимости.
-- Коллайдеры стволов и камней в радиусе ~40 м на слое 1.
-- Прибрежные заросли вдоль глубокой воды (кроме переправ) как естественная граница.
-- Новый дорожный шейдер (UV из `lateral`/`half_width`).
-- SINGLETRACK/TECHNICAL на слое RoughRoad (16) — поведение велосипеда уже поддерживает его.
-- L1: кадры леса, луга, реки, моста, узла; FPS с растительностью.
-
-**M6. Hardening и приёмка.**
-- Оптимизировать только то, что замерено.
-- Freeze-манифест → единый L2 (§8) → независимый slow-cycle-verify → свежий slow-cycle-review → исправления только в своём scope с повторной проверкой затронутого.
-- `docs/PLAYTEST_*` (команда запуска, известные ограничения, вопросы Blueprint §35).
-- Документы и запись `PR1.md`; локальный коммит; без push и merge.
-
-**Правила исполнения.**
-- Две неудачные попытки одного класса локального решения → root-cause review и запись. Дальше выбирается одно: другой метод, допустимая альтернатива или явный отказ от ветки (DEGRADE). Данные о провалах сохраняются.
-- Тюнинг коэффициентов не продолжается после второго цикла без измеренного эффекта.
-- Локальные коммиты делаются на ветке в конце каждого milestone.
-
-## 8. Verification plan (D2 §7)
-
-> **v1.1:** классификация падений и пункты L2-3/L2-4 заменены разделом v1.1 §8.
-
-- **Класс бюджета:** runtime/physics integration — L1 ≤ 1 ч на milestone, L2 ≤ 5 ч с G-гейтами, VERIFY ≤ 2 ч, REVIEW ≤ 1,5 ч. Перерасход записывается с причиной. Ведётся журнал времени.
-- **L0:** E0 изменённых скриптов; группы новых тестов по затронутым контрактам; `test_road_synthesis --group=contracts`; `test_route_network` строки V1/V2. Фикстуры — только с source-bound кэшем upstream.
-- **L1:** то, что перечислено в каждом milestone.
-- **L2, один раз на замороженном кандидате:**
-  1. E0 — импорт всего проекта.
-  2. Новые сюиты:
-     - `test_region_network`, `test_region_surface`, `test_region_runtime` — по два процесса;
-     - `test_ride_envelope`, `test_region_ride` — полная сеть: каждое ребро в каждом подъёмном направлении, 4 off-road-кейса, 20-минутный прогон для E6.
-  3. Существующие сюиты без изменений:
-     - R5 `test_route_network` — 8 строк;
-     - R6 `test_road_synthesis` — contracts + regions на 184729, 2024 и int64-строке;
-     - R0 — живьём;
-     - R1–R4 — REUSED с доказательством byte-identity (их файлы не меняются);
-     - region_preview с маршрутами — по замыканию.
-  4. Legacy R7: `test_final_surface` на теге `pr1-baseline` (D10).
-  5. Holdout, не использовавшийся для тюнинга: 4 нетронутых seed — 5000021@(0,0), 5100012@(3,−2), 5200003@(−1,−1), 5299994@(2,1). Если seed отвергается upstream (ERR_ROUTE_GRAPH_INVALID), берётся следующий индекс; замена записывается.
-  6. Мутанты, каждый должен упасть с точной причиной:
-     - отключена обратная связь → N-метрика 184729 / причина в DEGRADE;
-     - деформер заливает пролёт моста → water/ray-проверка;
-     - коллизия из отдельно сэмплированных высот;
-     - лимиты R5 подняты обратно к v1 → провалы R6 возвращаются.
-  7. Vulkan: ~14 кадров (обзор сети, backbone, singletrack, technical, брод, мост, узел, лес, луг, река, off-road, граница) + профили.
-  8. E6: время холодного bake и загрузки из кэша (изолированно); 20 минут езды — распределение времени кадра, худшие хитчи, память в начале/середине/конце; ObjectDB / утечки при выходе.
-  9. G-гейты (`seed_diversity`, `monotony`, `virtual_rider`, `capture_visual_vulkan`) + `session_diagnostics` — closure main scene задета через mode_select. Известные провалы legacy сохраняют свою классификацию.
-  10. Аудит ссылок.
-  11. VERIFY + REVIEW.
-- **L3:** этот L2 включает межсистемный набор после R8 (E4, E5, E6, G). E7 — человек после передачи.
-
-## 9. Decisions requiring approval
-
-> **Заменено полностью v1.1 §9.** Ниже — исходный текст v1.0 для истории.
-
-| ID | Решение |
-|---|---|
-| D1 | Архитектура B и консолидированный scope (R6-FR + подмножества R8–R13 для первого среза); заметка-поправка в Master и статусы в TARGET_ARCHITECTURE / migration matrix |
-| D2 | Политика v2 (поправка к A2): жёсткие уклоны классов = min(A2, предел, замеренный в M1) — только понижение. TECHNICAL: 15°, выемка 3 / насыпь 2 / подрезка 8 м — только если у ребра есть более лёгкая параллельная связь (правило R5 уже требует этого). R5 использует те же лимиты |
-| D3 | Узлы: movement строится по лимитам менее строгого инцидентного класса; радиус порта ≤ 96 м (зона узла R5) |
-| D4 | Обратная связь R6→R5 через аддитивные `hints`, ≤ 2 повторных раунда; схема графа не меняется; потребляется только RealizedRoadNetwork; отброшенные рёбра — явный DEGRADE |
-| D5 | Художественный параметр характера (латеральное предпочтение) отделён от физических ограничений |
-| D6 | Мосты — отдельная геометрия и коллизия настила, грунт под ними натуральный |
-| D7 | RegionBake + дисковый кэш (`user://`, не коммитится); потоки только в bake после замера |
-| D8 | Новая сцена + пункт в mode_select (G-гейты на L2); стена на краю региона + юбка (исключение до R21); прибрежные заросли как естественная граница |
-| D9 | Минимальная растительность со стволами-коллайдерами; аддитивная seed-цель `vegetation` |
-| D10 | Новые тестовые файлы из §5. `test_final_surface.gd` и модули сертифицированного маршрута не меняются: они становятся LEGACY_CONTRACT на теге `pr1-baseline` и на HEAD записываются как known failure. Их проверки (шов, лучи 1 см / 5 см, брод, водонепроницаемость, рендер = коллизия) с теми же порогами переносятся в `test_region_surface`. Существующие тесты R5/R6 должны проходить без изменений, иначе стоп по S3 |
-| D11 | Единый L2 с элементами L3 и бюджетами §8; пороги §11 становятся гейтами |
-| D12 | Ветка, локальный тег, локальные коммиты на каждый milestone; без push и merge в master |
-
-## 10. Risks / stop conditions
-
-> **Стоп-условия заменены v1.1 §10.** Список рисков действует.
-
-**Основные риски:**
-- Более строгие лимиты R5 уменьшат число петель или классов. Защита — строки V8 существующего теста и критерии N1–N7.
-- Edge-контакты трёхмерной сетки (trimesh) у CharacterBody — проверяются в M1.
-- Хитчи стриминга на сборке коллизии — инкрементальный коммит, замер.
-- Объём кэша (~0,1–0,2 ГБ) — сжатие.
-- Детерминизм при многопоточности — порядок по индексу тайла, тест 1 поток vs 4.
-- Прямолинейность — D5 и цели N7.
-
-**Стоп и отчёт** (блокер, evidence, минимальное решение):
-- **S1.** Замер M1 даёт сеть ниже N1–N5 при неизменной физике. Это продуктовое решение: более плоская сеть или отдельная задача по плееру.
-- **S2.** Нужна любая правка плеера, камеры, управления или физики.
-- **S3.** Существующий тест падает вне D10.
-- **S4.** После M2 и двух root-cause-циклов на dev-регионе нет N1–N5.
-- **S5.** Холодный bake > 20 мин или загрузка > 60 с после одного цикла оптимизации.
-- **S6.** Необъяснимый недетерминизм.
-- **S7.** Нужна правка R0–R4 или контрактов вне §4.
-
-## 11. Definition of Done
-
-> **Заменено v1.1 §11.** «Откат» и «Наследие legacy» ниже действуют.
-
-- **Сеть N1–N7** на 3 dev-регионах и ≥ 3/4 holdout:
-  - N1 непрерывный backbone;
-  - N2 ≥ 8 км в связной компоненте;
-  - N3 ≥ 2 петли;
-  - N4 SECONDARY + SINGLETRACK, TECHNICAL ≥ 1 или DEGRADE с причиной;
-  - N5 0 BLOCKED-узлов;
-  - N6 тупики только как TERMINUS из R5;
-  - N7 near-straight: backbone ≤ 55 %, остальные ≤ 40 % (наблюдаемо).
-- **Физика:**
-  - P1 бот проходит все рёбра без провалов и неустранимых застреваний;
-  - P2 лучи: 0 промахов, ≤ 1 см на дороге, ≤ 5 см на грунте, стык моста ≤ 1 см;
-  - P3 off-road: съезд, ≥ 150 м по лугу, возврат;
-  - P4 нет езды под глубокой водой.
-- **Производительность** (этот ПК): холодный bake ≤ 10 мин, кэш ≤ 20 с, 20 минут: p50 ≥ 60 FPS, p99 ≤ 33 мс, максимум после загрузки ≤ 100 мс, рост памяти ≤ 5 %, без утечек.
-- **Детерминизм:** одинаковый манифест bake в двух процессах и при 1 vs 4 потоках; разные seed дают разное.
-- **Сборка:** сцена и пункт меню, инструкция запуска.
-- **Приёмка:** VERIFY PASS + независимый REVIEW PASS; документы и запись PR1. E7 не объявляется: его проводит человек.
-
-**Откат.** Всё лежит на ветке; база сохранена тегом `pr1-baseline`. Новые файлы удаляются. Изменённые файлы R5–R7 и mode_select откатываются по коммитам milestone. Legacy runtime и плеер не меняются; master и origin не трогаются.
-
-**Наследие legacy.** Legacy-режим работает как раньше. Известные провалы (`route_branch_integration` и т. д.) сохраняют классификацию. C10/C12 остаются OPEN.
-
----
-
-# PR1 execution record
-
-Approval: Director execution message 2026-10-11 (verbatim: evidence root `APPROVAL_EXECUTION.md`), conditions 1–3: early playable region after M4 and M5 with a human-ride instruction; explicit recommended direction for descent-preferred pieces in RealizedRoadNetwork and its runtime use, with the reverse path proven to exist, be connected and be rideable; real ride quality is checked by a human (E7 human only).
-Evidence root: `C:/Users/Luisa/Documents/Codex/2026-10-11/pr1-playable-region/` (`work/` runners, `outputs/evidence/<run>/{stdout,stderr,result.json}`).
-Tooling note: an editor import (`--editor --import`) in the working tree regenerates unrelated legacy `.uid`/`.import` sidecars and rewrites `default_bus_layout.tres`; `work/cleanup_imports.py` saves and reverts them after every E0 (receipts in `outputs/evidence/import_cleanup/`). New scripts are referenced by `preload`, never by an unregistered `class_name`.
-
-## M0 — baseline (DONE)
-
-Disposable copy `work/baseline` = `git archive pr1-baseline` (52a9c34), fresh E0 import 0 errors (`m0_base_e0`, empty stderr).
-
-| Suite (pr1-baseline copy) | Run | Result |
+| Milestone | Content | Stop point |
 |---|---|---|
-| R0 `test_region_domain_skeleton` | m0_base_r0 | 145/0 |
-| R5 `test_route_network` (8 rows) | m0_base_r5 (745.7 s) | 2235/0 completed; 184729 graph `c2fbb68d…` |
-| R6 `test_road_synthesis --group=contracts` | m0_base_r6_contracts | 72/0 |
-| R6 regions 184729,0,0 | m0_base_r6_regions_184729 | 411/0; plan `e9c11c39…a8b4` PARTIAL, 13/16 edges READY, R6 61.8 s |
-| R6 regions 2024,-1,-1 | m0_base_r6_regions_2024 | 657/0; plan `9cdfa5eb…` PARTIAL, 16/26 edges, R6 364.8 s |
-| R6 regions int64 row | m0_base_r6_regions_i64 | 622/0; plan `1ad1325a…` PARTIAL, 17/24 edges, R6 186.4 s |
-| R7 `test_final_surface --source=live` | m0_base_r7_live | 1 failure: `authenticated fixture equals actual live extract` — shared `user://r7` cache was stale (written by an older tree); run aborted after 9079 assertions. Recorded, not a code failure |
-| R7 live, cache repopulated | m0_base_r7_live2 (253 s) | 426044/0 complete, fixture_equal=true; surface `e1523d47…`, meshes `87ab6861…`/`a0503081…`/`2cdb9357…`, R5 55.7 s, R6 60.3 s, deformer 7.5 s, mesh build 63.2 s (parallel load) |
-
-T2.1: fixture `scripts/test/fixtures/r7_certified_route_184729_v1.bin` (+ `.json`), SHA `70b2738e…`, route digest `835422e7…`, plan `e9c11c39…`, extracted from the authenticated baseline cache (`m0_fixture_extract`). T2.2/T2.3 implemented. HEAD `test_final_surface --source=fixture` (m0_head_r7_fixture, 113.7 s): 424259/0 complete, groups_run contracts/surface/collision, groups_not_run [handoff] (FIXTURE_NO_LIVE_R5_R6), surface and all three mesh signatures equal to the baseline (difference 1785 = handoff + live-equality assertions).
-
-## M1 — first ride and measured envelope (DONE)
-
-New: `scenes/region/region_world.tscn` + `scripts/world/region_world.gd` (runtime composition root v0: forest environment, sun, existing `bicycle.tscn`, HUD, fader; content attach, spawn at ground +0.45 m, duck-typed `request_bike_recovery` = nearest riding-path point stepped back 20 m), `scripts/test/region_ride_bot.gd` (Input-only pure pursuit + curvature/braking speed plan), `test_ride_envelope.gd`, `test_region_ride.gd`, `capture_region_world.gd`. No player/camera/input/project-setting change.
-
-Envelope (`m1_envelope_all_final`, 407.6 s, 204/0, controller sha recorded in the report), real BicycleController on registered trimesh ramps, Input only:
-
-| Measure | Gravel (layer 2) | Rough (2\|16) | Grass (4) |
-|---|---|---|---|
-| Pedal-hold steady speed 0/2/4/5/5.5/6/6.5/7 deg (m/s) | 7.05/5.84/4.26/3.29/2.72/2.04/1.13/stall | 7.05/5.76/4.01/2.87/2.15/1.18/stall | 4.25/3.20/1.68/stall(5) |
-| Sustained grade at v_climb 2.0 m/s | 6.02 deg | 5.58 deg | 3.58 deg |
-| Pitch length above 2 m/s, cruise entry, 1 tap/2 s: 8/9/10/12/15 deg | ≥320/42.6/30.9/23.0/18.3 m | 61.4/37.4/29.8/22.6/18.7 m | — |
-| One tap per second | 15 deg held at 5.4 m/s (sprint boost saturates) | | |
-
-Descent: modulated brake holds 8 m/s within 0.46 m/s up to 15 deg; full-brake mean deceleration ≥ 5.47 m/s². Turning: half-lock radius 7.5/8.5/9.7/11.2/13.3/17.1/22.1 m at 2.3/3.3/4.3/5.3/6.2/7.3/8.2 m/s; median steady lateral load 2.45 m/s²; full lock beyond ~5 m/s² bleeds speed (scrub); flat sprint top speed ≈10.6 m/s. Mesh tolerance: steps up to 10 cm (up/down) and abrupt 10 deg sags/crests at 8.8 m/s keep contact (no airborne frame); 0.5 m vs 8 m trimesh triangles, flat and 5 deg cross slope: identical speed, zero vertical jitter (trimesh edge contact is not a risk).
-
-Derived policy v2 (fixed rules in `derive_policy`): v_climb 2.0 m/s (knee of the pedal-hold curve: 6.0→6.5 deg halves the speed); climb_sustained BACKBONE 5.0 (A2) / SECONDARY 6.0 / SINGLETRACK 5.5 / TECHNICAL 5.5 deg; climb_pitch = A2 5/8/10/12 deg with the measured pitch-length table per surface; descent_max = caps 5/8/10/15 deg; junction lateral 2.4 m/s², approach braking 2.0 m/s², low-speed radius 8.0 m, movement floor 3.0 m/s.
-
-First ride on the new world (`m1_ride_r7_dev3`): authenticated v1 route slice, real scene, Input bot, both directions 1115 m finished, 0 stalls, max lateral 0.083 / 0.040 m, 100 % road collider, 0 ungrounded frames (109 single-ray frames in reverse), physics frame p99 1.4 ms headless. Vulkan (`m1_capture_r7_dev1`): 4 captures saved/reloaded (first/third person). Integration risks: trimesh contact none; spawn/settle fine; recovery query implemented (exercised in M4 runtime tests).
-
-## M2–M4 — WORK IN PROGRESS (checkpoint 2026-10-11, not verified, not accepted)
-
-Checkpoint commit "PR1 WIP checkpoint" on `pr1-playable-region`. Nothing below is verified at L2; protected suites have NOT been rerun on this code.
-
-**Implemented (code present):**
-- Policy v2 `regional_road/2` (`road_synthesis_policy.gd`): climb_sustained 5/6/5.5/5.5°, climb_pitch 5/8/10/12°, descent 5/8/10/15°, TECHNICAL grade_hard 15° + earthwork 3/2/8, measured pitch-length table, SUSTAINED_WINDOW_M 100, V_CLIMB 2.0, junction kinematics (lateral 2.4, brake 2.0, R_low 8 m, floor 3 m/s), PORT_RADII to 96 m, shared `cross_limit` / `buildable_slope` / `traverse_slope`, `movement_speed` / `movement_radius`; grade_pref lowered below sustained (ST/TECH keep v1 values as `descent_pref`).
-- `regional_road_math.solve_profile`: additive `gd_down` (asymmetric bound; default call unchanged).
-- Designer: `climb_limits(request)` (canonical up/down development, pointwise and preference grades; `recommended` 0/±1); lattice development zones, transition grade terms, hybrid A* running excess and `_grade_reach` use them; two-pass profile (sustained first, then pitch/descent) with asymmetric Lipschitz envelopes; `_cross_limit`/`_slope_limit` delegate to the policy.
-- Validator: separate `_climb` stage (ERR_R6_SUSTAINED_GRADE / ERR_R6_PITCH_LENGTH) in the required directions; optional connector curvature limit in `_geometry`.
-- Junctions (D3): `movement_limit` (speed per direction from braking room, radius max(R_low, v²/a_lat) ≤ stricter hard radius), corner radii down to it, ports to 96 m outside other junction zones, crossing cap to 106 m.
-- Synthesizer: per-piece isolation (`Natural.begin_piece`, per-piece fit budget), descent-preferred retry for ST/TECH on climb failures (`recommended` on edge record and piece), `failure_xz` on failures, edges designed in parallel (`synthesize(..., threads)`; prepare → independent (any thread) → finish in (class,id) order with conflict retry).
-- R5: profiles from policy (static var), per-move development feasibility (serpentine room or contour traverse; v1.1 §4a), per-move cross-slope buildability (CROSS_MARGIN 1.1; root-cause fix for "walls", interpretation of v1.1 §4a — record for review), `settings.hints` (CLOSE / PENALTY per class), raster reuse between rounds (`result.raster`), hints in diagnostics. The first attempt (node closure by buildable slope) was reverted: it contradicted "no new natural-slope ban" and stranded slope anchors.
-- New: `realized_road_network.gd` (fixed-point exclusions: component, junction groups, dead ends, descent-preferred needs easier path; metrics N1–N7; get_data in deformer shape), `region_network_builder.gd` (≤ 2 replans, hints from failures, best round by score), `bridge_deck_builder.gd`, `region_bake.gd` (tiles, layers, patches, coarse LOD, water, spawn, manifest; threaded tiles), `region_bake_cache.gd`, `region_streamer.gd`, runtime `region_world.gd` (session seed, cache/bake thread, overlay, spawn, recovery, deep-water recovery, descent markers), `assets/shaders/region_road.gdshader`, mode_select entry 5 "Mountain River Valley".
-- Deformer: dangling-end caps (generalises first/last piece), declared bridge-deck spans not deformed (undeclared deck station still ERR_R7_BRIDGE_UNSUPPORTED), `owner_at`; FinalSurface `road_owner`.
-
-**Measured so far (L1 probes, candidate copy; evidence `outputs/evidence/m2_*`):**
-- 184729@(0,0), current code (`m2_net_dev2_184729`): best round 1: backbone continuous, 9.43 km, 3 cycles, 0 blocked, 0 dead ends, classes B7+S5 — **no SINGLETRACK/TECHNICAL** (ST edge fails on walls near region edge; R5 yields no technical: NO_ATTACH / NO_SECOND_ATTACH). D3: almost all movements READY (v1: 24 BLOCKED in battery).
-- 3628391@(3,-2) (older closure code, `m2_net_dev1_3628391`): round 0 B8+S1+ST1 7.45 km; round 2 B8+S5 10.4 km; R6 233–387 s/round → builder 1133 s (too slow).
-- R6 parallel: 8 threads R6 22.5 s vs 44 s single. **Determinism finding:** 8-thread vs main-thread single differ at ~1e-13 (signature differs); 1-thread run inside a WorkerThreadPool task == 8-thread run exactly (`m2_synthdiff_3`); main-thread vs main-thread identical (`m2_synthdiff_2`). Cause: main-thread floating-point environment differs from worker threads. **Fix to apply:** run all edge designs (and ideally the whole bake) on worker threads in every mode.
-
-**Open problems / next steps (in order):**
-1. Determinism fix (always worker threads), recheck 1 vs 8 equality.
-2. Rerun on HEAD: `test_final_surface --source=fixture` (deformer changed: hashes must equal M0), R6 contracts, R5 suite. Expect an **S3 conflict**: `road_synthesis_oracle.gd` hardcodes v1 limits (grade 5/8/10/12°, radius 35/25/19/19, connector radius = stricter hard) — D3 connectors (R ≥ 8 m) and TECH 15° descents fail it in `test_road_synthesis --group=regions`. Record precisely and escalate; do not edit the test.
-3. N4: get SINGLETRACK/TECHNICAL realized (R5 candidate generation / feedback); N2 ≥ 8 km together with N4; scoring must not pick < 8 km.
-4. First bake of 184729 (`work/tools/bake_probe.gd`), cache save/load, then runtime scene run + bot ride + Vulkan captures → deliver playable build + ride instruction (Director condition 1) even before N4 is solved.
-5. Bake time (R6 dominates), D5 character, M5 vegetation, M6 L2.
-
-## M2–M4 — progress 2 (2026-10-11, commits 37e584d, 705b3b6; not accepted)
-
-**Determinism (done, 37e584d).** RCA: the old note's "main-thread FP environment" hypothesis is not supported. MXCSR rounding and denormal handling are equal on all threads (`m2_fpenv_1`). The measured cause is the C runtime: `exp` and `pow` return different last bits on the main thread than on any other thread. Thread and WorkerThreadPool agree bit for bit (`m2_mathfn_1`: exp 3362/20000, pow 16755/20000 differ). Terrain heights inherit the difference, about 3e-13 m (`m2_heightthread_1`). Fix: `RoadSynthesizer.off_main_thread`. `synthesize`, `RegionNetworkBuilder.build` and `RegionBake.bake` never run on the main thread. The runtime bakes on a Thread. R6 at 1 vs 8 threads gives an equal plan signature `b7feaf44…` in two processes (`m2_synthdiff_det1/2`).
-
-**Protected suites on a disposable copy (`git archive`).**
-
-| Suite | 37e584d | 705b3b6 | Class |
-|---|---|---|---|
-| E0 import | 0 errors (`m2_head_e0`) | 0 errors (`m4_head_e0`) | — |
-| R7 `test_final_surface --source=fixture` | 424259/0, surface and 3 mesh hashes = M0 (`m2_head_r7_fixture`) | 424259/0, = M0 (`m4_head_r7_fixture`) | REGRESSION_GUARD, PASS |
-| R6 `--group=contracts` | 72/0 (`m2_head_r6_contracts`) | 72/0 (`m4_head_r6_contracts`) | PASS |
-| R5 `test_route_network` | 2230/0, completed, 8 rows (`m2_head_r5`; baseline 2235/0, count follows the graphs) | R5 files unchanged since | PASS |
-| R6 `--group=regions` 184729 | 362 checks, 11 failures (`m2_head_r6_regions_184729`) | 362 checks, 10 failures (`m4_head_r6_regions_184729`) | 10 × S3; 1 × (a) fixed |
-
-- **(a) regression, fixed in scope:** `neg_search_budget`. The per-piece budget had dropped the R6 §5 *per-region* work limit. Restored: designs stay isolated, and the region totals (natural queries, fit evaluations) are accounted in the fixed (class, id) completion order. `max_natural_queries=10000` now gives PARTIAL with ERR_R6_SEARCH_BUDGET; the default plan signature is unchanged (`m2_budget_probe_2`).
-- **S3 — escalated to the Director:** 10 × `oracle_path_move:<node>:<a>-<b>` failures = ["curvature"]. Source: `scripts/test/road_synthesis_oracle.gd:27-28` (`GRADE_HARD_DEG [5,8,10,12]`, `RADIUS_HARD_M [35,25,19,19]`), `:103` `k_limit = 1/RADIUS_HARD_M[route_class]` (connectors use the stricter class), `:118` curvature failure; caller `test_road_synthesis.gd:576-577`. Measured connector max curvature 0.0306–0.0519 1/m (R 19.3–32.7 m), against the BACKBONE limit 1/35 m. These are the D3 movement radii approved by v1.1 §4b (R_m = max(8 m, v²/a_lat) ≤ stricter hard radius). The TECH 15° descent conflict is not observed on 184729 (no TECHNICAL realized). Test not changed; work it does not cover continues. Decision needed: the oracle limits follow policy v2 / D3, or another resolution.
-
-**Network surface and bake (M3).** First bakes of 184729 surfaced R7 defects that appear only on a network. All are fixed; the fixture path is unchanged (hashes = M0 after each change):
-- the ford window was applied to bridge decks;
-- the ford grade bound was fixed at the BACKBONE 5°; the class hard grade is used now;
-- a piece-end control spacing artefact;
-- fine cells beyond the region edge at gateways (ERR_TERRAIN_OUT_OF_DOMAIN);
-- earthwork filling channels at bridge abutments.
-
-Isolation (M3): pieces FinalSurface cannot construct are excluded with DEGRADE `R7_<reason>`, and the network is realized again.
-
-- Bake `m3_bake_184729_t8g`: 327.6 s at 8 threads. Network 196 s, deformer 39 s, tiles 90 s.
-- Network: 7.86 km, backbone continuous, 2 cycles, B7 + S3 edges, 7 bridges, 0 blocked nodes, 0 dead ends.
-- Size: 1.17 M vertices. Cache save 1.1 s, load 0.7 s.
-- Excluded: `edge:8` (SECONDARY, about 0.5 km), `ERR_R7_FORD_CHANNEL`. A steep, oblique stream: the water surface under the road falls 0.47 m over about 5 m (depth ≤ 0.30 everywhere). The R7 ford plane must follow the bed within 12 cm, which is not reachable with ≤ 0.35 m drop and 1.2°/m. Root fix belongs to R6: the ford profile should be designed in that band. Open.
-- A footprint-depth support rule for R6 is prepared but deferred (`work/edits/deferred_ford_footprint_depth.patch`): it did not change 184729 and is unverified.
-
-**Runtime and ride (M4, condition 1).**
-- `region_world.tscn --seed=184729` from cache: REGION_READY in 1.36 s.
-- A runtime bake on the scene's thread also works: 341 s, same network.
-- Input bot tour (`m4_ride_region_184729_3`): 2943 m over 6 edges, finished, 0 stalls, max lateral 0.043 m, 100 % road collider, 0 ungrounded frames, 0 deep-water recoveries, physics p99 1.54 ms.
-- One frame of 118 ms is not yet localized (D7 gate ≤ 100 ms after load is open).
-- Fixed on the way:
-  - deep-water recovery falsely triggered on legal fords; it now applies only off the road;
-  - recovery stepped back along design order instead of against travel;
-  - bridge meshes produced tangent errors.
-- Vulkan (`m4_capture_region_184729_1`): 6/6 captures saved and reloaded. The overview was washed out by the scene fog; the overview camera now gets a fog-free environment copy (rerun pending). Ride frames show roads, junctions and a cut on a hillside.
-- Human ride instruction: `docs/PLAYTEST_MOUNTAIN_RIVER_VALLEY.md`. No PASS is declared.
-
-**N4 RCA (in progress, two cycles).**
-- 184729 R5 (HEAD) yields 1 SINGLETRACK route and 0 TECHNICAL (baseline: 1 TECH).
-- The ST edge (2938 m, 366 → 518 → 336 m) fails R6 at lattice construction: no admissible lateral slot, 29/45 slots blocked by natural slope ≥ buildable slope (`m4_n4probe_184729`).
-- Ablations in a disposable copy: without the cross-slope rule, without the development rule, or with v1 g_max, nothing changes. Serpentine also requiring buildable legs changes nothing. Closing nodes at raster slope ≥ buildable slope removes ST entirely (`m4_abl_*`, `m4_abl2_*`).
-- Diagnosis: R5 judges buildability on the 32 m raster (±16 m stencil), R6 on the 8 m search grid (±4 m). Fine-scale slopes exceed the class buildable slope (ST 0.63, TECH 0.82) where the coarse slope does not.
-- Next method (per the rules: method change, not coefficients): per-node fine buildability in the R5 raster, from the same natural surface and R6's gradient definition, as the per-class admissibility of moves. Then check N2–N4 on 184729, 2024 and 3628391.
-
-**Next:** N4 method change; R6 ford profile band (edge 8); rerun the overview capture; 10-minute ride and off-road cases (M4 L1); D5; M5; M6.
-
-## Launch fix (2026-10-11, commit 00bf10d) — user report: the game did not start
-
-**Reproduced from the working tree** (`m5_user_repro_1`):
-- `Identifier not found: RealizedRoadNetwork` (`realized_road_network.gd:245`);
-- cascade compile failures in region_network_builder, region_bake and region_world;
-- `from_bytes` nonexistent;
-- `is_valid` on an empty Dictionary.
-
-**Root cause.** A launch without an editor import uses `.godot/global_script_class_cache.cfg`. In the working tree it was last written at M1 (16:00) and lacks the PR1 classes. `realized_road_network.gd` made instances through its own `class_name`. The branch is correct and there is one worktree.
-
-**Fix.** Instances are made from the script path; no PR1 code depends on the global class cache. With the user's stale cache, all 169 scripts compile (`m5_userstate_parse2`).
-
-**Further defects found by the user-path checks, fixed:**
-- the menu handler called `set_input_as_handled()` after `change_scene_to_file` (Godot 4.7 removes the scene immediately: null viewport error on keys 1–5 / Enter);
-- leaving the scene or quitting during a bake freed a running bake: 174 script errors, crash (`m5_fail_ui_probe`).
-
-The bake is now a self-contained job owned by a drain node under the root, with cooperative cancel between stages:
-- Esc during a bake: menu in 0.03 s, thread joined 29 s later (`m5_exit_esc_probe`);
-- quit during a bake: clean exit after about 40 s (`m5_exit_quit_probe`).
-
-Generation failures are presented, not cascaded: on-screen seed and reason, diagnostics JSON under `user://regions/failures/`, Enter for another random region (`m5_fail_ui_probe`).
-
-**Checks (all with empty stderr unless noted):**
-
-| Check | Evidence | Result |
-|---|---|---|
-| User's repo, stale class cache, `region_world.tscn --seed=184729` | `m5_repo_direct_184729_final` | cache, READY in 1.37 s |
-| Stale-cache copy, direct scene, bake | `m5_userstate_direct_184729` | READY after 355 s (concurrent bake); bike moved under pedal |
-| Menu → key 5 / Enter on item 5, seed 184729 | `m5_userstate_menu_key5_184729`, `_enter_` | READY from cache |
-| Final code, menu → 5, seed 184729 | `m5_userstate_menu_184729_final` | bake 319 s alone, same network 7860 m |
-| Clean import (no `.godot`, `--editor --import` 0 errors), menu → 5 random | `m5_clean_menu_random_1` | seed 4627278186771687215: READY, 718 s (concurrent), 6.9 km, 1 cycle, B9+S1, edge 9 isolated (R7 ford) |
-| Clean import of commit 00bf10d, menu → 5 random | `m5_head00bf_menu_random_1` | seed 3855061512140275683: ERR_REGION_NO_NETWORK after 472 s, presented, diagnostics saved |
-
-The last row: the chosen round had 7.85 km, B6+S4, 1 cycle. R7 excluded edges 2 and 10 (ford outside the R7 band), and the N6 dead-end fixed point then emptied the network.
-
-**Network consequences, next:**
-1. R6 must design fords inside the R7 ford band (edge-8 class; it also causes no-network seeds).
-2. The bake should consider R7 feasibility in the choice of round instead of collapsing the chosen one.
-
-The playtest instruction now covers random seeds through the menu.
-
-## Progress 3 (2026-10-11, commit 41f6c29; stopped by the user for a new chat)
-
-**Fords — done (41f6c29).**
-- R6 now designs every ford inside the band FinalSurface realizes. Wherever water lies under the footprint (riding width and shoulders, every 0.25 m) of a section within 4 m of the wet span, the band is checked every 0.5 m over both neighbouring intervals. An unreachable band gives ERR_R6_CROSSING_APPROACH, and the existing small-bridge retry applies.
-- R7: no ford lowering within 1 m of a piece end.
-- 184729: 31/31 pieces constructible (`m6_fordband3_184729`; edge 8 restored).
-- Seed 3855061512140275683: 22/22 (`m6_fordband3_3855`; the no-network failure class is removed for this seed).
-- R7 fixture 424259/0, hashes = M0 (`m6_diag_r7_fixture`).
-- On a copy of 41f6c29: R6 contracts 72/0; R6 regions 184729: 365 checks, 10 failures, all the escalated S3 `oracle_path_move:*` curvature (`m6_head_r6_*`).
-- A fresh bake of 184729 on 41f6c29 has not been run yet. The network should exceed 7.86 km with edge 8 back.
-
-**N4 — RCA cycle 2 result (ablation, disposable copy, `work/edits/ablation_fine.py`).**
-- R5 node admissibility at the R6 scale: a node is closed for a class when every 8 m lattice point within ±16 m has |grad| ≥ `Policy.buildable_slope(class)` (R6 lattice slot rule).
-- With this rule, 184729 yields 0 SINGLETRACK and 0 TECHNICAL candidates, for ST/TECH only and for all classes alike (`m7_abl_finest_184729`, `m7_abl_fineall_184729`): singletrack NO_ATTACH 8 / DUPLICATE 9 / UNJUSTIFIED_SPUR 5; technical NO_SECOND_ATTACH 12.
-- So once R5 and R6 agree, the terrain around the ST/TECH anchors of 184729 is steeper at 8 m than the approved policy allows: ST cut 1.5 m / tie 6 m → buildable about 0.63 (32°); TECH 3/2/8 m → 0.82.
-- Not yet done: the same measurement on 2024@(−1,−1) and 3628391@(3,−2) (3628391 realized a ST in an earlier round). Also not done: terrain statistics, i.e. the share of nodes closed per class and the anchor positions.
-- Next options, decided by evidence:
-  - (a) R5 candidate generation for ST/TECH on buildable terrain (valley sides, benches, descent lines) instead of only from the current anchor kinds;
-  - (b) if the dev regions also have no buildable ST/TECH terrain, an S1 report to the Director: the approved earthwork policy vs. the generated geography.
-- Do not tune coefficients.
-
-## Progress 4 (2026-10-11, commit 3842a3f; S1 raised for N4)
-
-**N4 — RCA cycle 3, S1 escalated to the Director.** Full report with evidence and options: evidence root `S1_N4_REPORT.md`. No N4 experiment is in the repository; ablation patches are in `work/edits/ablation_{fine,nodev,bench,dir,r8}.py`.
-- Terrain statistics (`m8_terrain_*`) refute the cycle-2 conclusion. At the R6 scale, only 18 % (184729) and 10 % (2024) of standing nodes are closed for SINGLETRACK, and 5 % / 2 % for TECHNICAL. Almost every anchor is buildable.
-- R5 on 184729 (`m8_cand_*`):
-  - the whole network is on the valley floor, while the ST/TECH anchors are 400–570 m higher;
-  - loops climb and return on one slope (`REJECT_DUPLICATE`), spurs exceed 1500 m;
-  - technical candidates fail with `NO_SECOND_ATTACH`.
-- R6 does not lay out steep ST/TECH corridors. Across all ablations: `ERR_R6_GRADE` (development room) about 19 pieces, `CORRIDOR_CLEARANCE` 7, `EARTHWORK` 3, `CURVATURE` 2. Only gentle ST pieces were built, and no TECHNICAL piece.
-- Methods tried in a disposable copy, each with the full builder over 3 feedback rounds:
-  - (a1) fine buildability;
-  - (a2) no R5 development for ST/TECH;
-  - (a3) terrace (BENCH-rule) loops;
-  - (a4) the §4a direction rule (climb branch ≤ `climb_sustained`).
-
-  Results:
-
-  | Region | HEAD | Method |
-  |---|---|---|
-  | 184729 | 9.39 km, B+S | 9.51 km, B+S, no ST |
-  | 2024 | 9.14 km, 2 cycles | 7.78 km, 1 cycle (worse) |
-  | 3628391 | 9.05 km, B+S | 14.10 km, B7+S5+ST5 |
-  | TECHNICAL | 0/3 | 0/3 |
-
-  The measured low-speed radius (8 m) for ST/TECH changes nothing.
-- Not adopted: the method gives no net gain and regresses N2/N3 on 2024. N4 and the M6 acceptance wait for the Director's decision. Options: earthwork / band for ST/TECH, an R6 switchback capability task, DEGRADE, or other dev regions.
-
-**Bake round choice with R7 (done).**
-- `RegionNetworkBuilder` returns every OK round as a candidate.
-- `RegionBake` isolates R7-unconstructible pieces per candidate, in score order, and keeps the best network after isolation.
-- A further round is tried only while its pre-isolation score exceeds the best post-isolation score.
-- The manifest records `chosen_round`, `network_best_round` and `r7_rounds`.
-
-**Fresh bake of 184729 (current code).**
-- `m9_bake_184729` and `m9_bake2_184729`:
-  - 9.39 km, backbone continuous, 3 cycles, B7+S5, 13 bridges, 0 R7 exclusions;
-  - edge 8 is back: N2 ≥ 8 km holds on the playtest region.
-- 383 s at 8 threads: network 210 s, tiles 94 s, vegetation 64 s, deformer 12 s.
-- Cache save 1.5 s, load 0.94 s.
-- Two processes give equal `tiles_digest` (`c94451cf…`) and `network_digest` (`183eef0c…`).
-
-**M5 vegetation (done, D9).**
-- `region_vegetation_planner.gd` (pure, per tile, stateless hash of the additive `vegetation` seed):
-  - trees by R4 woody cover and biome weights (pine / birch / autumn birch);
-  - riparian shrubs within 12 m of water, meadow grass, rocks by slope;
-  - road clearance 3.5 / 1.5 / 0.6 / 2.5 m, no water, region margin.
-- `region_flora_meshes.gd`: procedural low-poly meshes.
-- Streamer:
-  - one MultiMesh per tile × kind with a visibility range (spatial cell × type partition);
-  - trunk / rock cylinders on layer 1 inside the active collision patches.
-- 184729: 160 216 instances. Planner deterministic (equal bytes in two planners, `m9_veg_probe_1`).
-- `region_seed_derivation.gd` additive purpose `vegetation`: R0 145/0 on a copy of 3842a3f (`m9_head_r0`; baseline 145/0), existing preimages unchanged.
-
-**D7 frame spike (measured, fixed).**
-- Ride `m9_ride_184729`: max frame 154 ms = one patch commit. The first commit in a tile counting-sorted the whole tile on the main thread.
-- The sort now runs in the bake (threaded, cached as `patch_order` / `patch_offsets`).
-- Ride `m9_ride2_184729`, 10.66 km tour over 10 edges, Input bot:
-  - finished, 0 stalls, 0 ungrounded frames, 100 % road, max lateral 0.063 m;
-  - frame p50 1.04 ms, p99 2.28 ms, max 78.6 ms (headless, ≤ 100 ms);
-  - 43 267 flora colliders built over the ride.
-
-**Vulkan.**
-- `m9_capture2_184729`: 6/6 frames saved, with forest, autumn pockets, junction and slopes.
-- The overview is no longer washed out.
-- Known visual defect: lake water cells render as a pale flat patch from above (pre-existing, seen at M4 too).
-
-**Protected suites on a copy of 3842a3f** (E0 import 0 errors, `m9_head_e0`):
-
-| Suite | Evidence | Result |
-|---|---|---|
-| R0 | `m9_head_r0` | 145/0 |
-| R6 contracts | `m9_head_r6_contracts` | 72/0 |
-| R7 `--source=fixture` | `m9_head_r7_fixture` | 424259/0, complete; surface `e1523d47…` and meshes `87ab6861…` / `a0503081…` / `2cdb9357…` = M0 |
-
-R5 and R6 files are unchanged since 41f6c29 (R5 2230/0 and R6 regions as recorded in Progress 3; the 10 S3 failures stay escalated).
-
-**User path.** `m9_userstate_menu_184729` (stale class cache): menu → 5 → READY from cache in 1.87 s, bike moves, empty stderr.
-
-**Not done / next:**
-- D5: R6 already has DIRECT / TERRAIN / FLOW candidate profiles; no further change; N7 recorded in the manifest.
-- M6 (L2 + slow-cycle-verify + independent slow-cycle-review) waits for the S1 decision on N4, because verify would return FAIL on N4.
-
-## Progress 5 (2026-10-12; Director decision B on S1; S1 re-raised after two iterations)
-
-**Decision B** (Director, 2026-10-12): fix R5 target selection and topology first, then the minimal R6 development only where needed. ST must be real loops and TECH a real descent from a reachable ledge with an easier return. No global earthwork raise; option A only as a diagnostic sensitivity test on a copy. Stop after two failed iterations of the chosen method.
-
-**Method.** The repository code is unchanged. The method lives in the disposable copy `work/n4b` as patches `work/edits/n4b_{raster_search,planner,synth,iter2}.py`; `n4b_apply.sh` syncs and applies them. Only SINGLETRACK and TECHNICAL change.
-
-- *Iteration 1:*
-  - R5 plans ST/TECH in the ridden direction: a loop climbs one branch within `climb_sustained` and descends the other within `descent_max`; pairs are searched top-down. The direction rule `REJECT_CLIMB_DIRECTION` applies.
-  - No R5 development for ST/TECH. The R6 8 m slot rule closes nodes (`fine_min_slope`).
-  - Terrace loops are chosen by route budget: sustained-climb reach within half the typical class length, at least 40 m above the source, one per 800 m. The climb branch is planned first.
-  - TECH comes from ledge stretches: any network point at least 60 m lower, 200–1200 m away and at least 1.5× further along the network. This replaces station pairs.
-  - R6 takes the descent direction of a piece from the R5 corridor.
-- *Iteration 2:* branches stay within the class preference grades, and ST/TECH attach to the network only by moves no steeper than `PATCH_GRADE_MAX`.
-
-**Results.**
-- Route budget (`n10_budget_*`): within 1–1.5 km, hundreds of nodes lie 40–120 m above the network on all three dev regions.
-- R5 now yields ST/TECH on all three regions:
-  - iteration 2, round 0: 184729 1 ST, 2024 1 ST + 2 TECH, 3628391 4 ST;
-  - R6 builds 6 of 11 of these edges READY (iteration 1: 5 of 13).
-- **Realized networks have no ST/TECH on any region in either iteration.**
-  - Iteration 1 (`n10_net1_*`): 184729 10.34 km, 2024 9.15 km, 3628391 7.21 km.
-  - Iteration 2 (`n11_net_*`): 9.51 km, 9.11 km, 10.50 km. All B+S, with at least 2 cycles.
-- When one edge of a loop fails, the rest of the loop is removed as dead ends (N6), and any TECH on it goes too.
-
-**Root cause** (`n11_turns_*`). With no development and a gentle climb cap, the 32 m / 16-direction R5 search climbs by zig-zagging on the raster.
-
-| R5 corridor shape | R6 result |
-|---|---|
-| ≤ 2 turns > 45°, max 27–65° | READY (4 edges) |
-| 19–23 turns > 45°, max 153–167° | GRADE / CURVATURE / CLEARANCE at those turns (4 edges) |
-
-One further failure is a 7 m / 20 m step that the 32 m raster does not see.
-
-**Option A, diagnostic only** (copies; policy unchanged):
-- ST earthwork 3/2/8 fixes only the step (`n11_sense_*`).
-- A doubled ST/TECH band fixes 1 edge and breaks 2 (`n11_sensw_*`).
-
-**S1 re-raised** with `S1_N4_REPORT_v2.md` (evidence root). The proposed minimal correction is a heading-aware R5 search (node × incoming direction) for ST/TECH branches only, with the per-step turn bounded by what R6 lays out. One measured iteration on the three dev regions. BACKBONE/SECONDARY and R6 unchanged.
-
-**Playtest preserved:** the repository scripts are unchanged; `work/playtest_45b99cf` (byte copy) also opens 184729 from cache in 2.56 s (`n11_playtest_copy_184729`).
-
-**Next:** the Director's decision on the correction. M6 waits for N4.
+| M0 Transition | Apply A1–A4. Read the PR1 plan fully. Create `suspended/PR1.md` (decision; milestone table; N1–N7 verbatim; recorded results with limitations; known failures; baseline kit roadmap §5.1; obligations table roadmap §5.3) + verbatim copy; check byte identity of the embedded copy against the recorded SHA-256. Install this plan in the slot with the approval line. Commit. | If PR1 content contradicts roadmap §5.3 (for example, an obligation not listed), add it to the record and report it; do not drop it |
+| M1 Architecture docs | Move the roadmap to `docs/` (ACCEPTED). Master amendment; Target Architecture; Migration Matrix. Commit. | — |
+| M2 State, strategy, navigation | Test Strategy §8; Current Project State; ARCHITECTURE.md status; README; DECISIONS; playtest note. Commit. | — |
+| M3 Verification | L0/L2 checks below → slow-cycle-verify (fresh context) → slow-cycle-review (fresh independent context) | Any FAIL/REJECT returns to the implementation owner inside this scope |
+| M4 Closeout | `completed/BC0.md` with reports summary and ledger; slot → NO_ACTIVE_PLAN; commit | Stop. BC1 is not started |
+
+## Risks
+
+- **Lost protection** through rewording. Every superseded statement is marked with its new owner, not deleted. The T1–T9 map is carried unchanged.
+- **Authority drift** (roadmap overriding Blueprint/Master). The roadmap stays subordinate; the Master amendment carries the strategy change explicitly.
+- **Scope creep** into a documentation reset. Whitelist only; pointer lines rather than rewrites.
+- **PR1 obligations silently dropped.** M0 stop point; verify checks the obligations table against the verbatim plan.
+
+## Verification plan
+
+**Class.** Markdown-only plus governance edit (Test Strategy §7.1 row 1, §7.4 «Docs-only closeout» — governance edits need verification of their impact set). Budget: L2 ≤ 0.5 h, VERIFY ≤ 1 h, REVIEW ≤ 1 h. No engine.
+
+**L0/L2 checks (author, recorded output):**
+
+1. `git diff --name-status beacc9c..HEAD` equals the whitelist.
+2. Byte identity (`git diff --quiet beacc9c..HEAD -- <path>`) of all forbidden paths, explicitly `scripts scenes resources project.godot tools .agents .antigravity docs/TARGET_GAME_BLUEPRINT.md docs/TEST_MATRIX.md docs/plans/completed`, except the new `BC0.md`.
+3. SHA-256 of the root PR1 plan at `beacc9c` equals the hash recorded in `suspended/PR1.md`, and the embedded copy is byte-identical (extract and compare).
+4. Relative-link check of every changed Markdown file (all targets exist; line anchors exist where given).
+5. Traceability table in the closeout record: each roadmap §3–§7 decision → document/section where it now lives.
+6. PR1 obligations: every milestone and N1–N7 item of the verbatim plan appears in the record with a state and an owner.
+
+**Negative checks:**
+
+- the link checker reports a deliberately broken link in a scratchpad copy;
+- the whitelist check reports a deliberately added out-of-scope path in a scratchpad worktree.
+
+**Not run, with reason:** E0–E7, G gates, suites. No `.gd/.tscn/.tres/.gdshader/project.godot/tools` change, so no runtime closure is reached. This waives nothing for BC1. L3 is not applicable.
+
+**Independence.** VERIFY and REVIEW run as separate fresh agent contexts using the repo skills, with inputs: this approved plan (SHA-256), the diff `beacc9c..HEAD`, and the verification report. Reports are saved in a durable evidence root `C:/Users/Luisa/Documents/Codex/2026-10-12/bc0/`.
+
+## Runtime / visual / physics / performance
+
+N/A: documentation only. The roadmap's runtime requirements bind BC1+.
+
+## Rollback boundary
+
+Branch-local commits are revertible. `pr1-playable-region`, its remote, `master` and tag `pr1-suspended-baseline` stay untouched. The PR1 plan is recoverable from `beacc9c` and the verbatim copy.
+
+## Legacy impact
+
+Preserved and restated, not reclassified:
+
+- `route_branch_integration` known failure;
+- R6 regions 10 × S3;
+- C10/C12 OPEN;
+- whole-game runtime acceptance INCOMPLETE;
+- the R6 LIMITED and R7 technical LIMITED scopes.
+
+Next dependency: the BC1 ExecPlan.
+
+## Documentation changes
+
+As in Allowed files. Current Project State and README describe implemented / planned / not run / known failures separately.
+
+## Definition of Done
+
+- Whitelist respected; A1–A4 applied verbatim.
+- PR1 SUSPENDED with record, verbatim copy, baseline and obligations.
+- Documents consistent with roadmap v2; T1–T9 unchanged.
+- Checks 1–6 and the negatives recorded.
+- VERIFY PASS and independent REVIEW PASS.
+- Completed record exists and the slot is NO_ACTIVE_PLAN.
+- Local commits only.
+
+## Approval requested
+
+1. ExecPlan v1.0 (this file, SHA-256 reported in chat), including the exact text §A.
+2. Local commits on `bc0-architecture-migration` per milestone (no push).
+3. Durable evidence root as stated.
+
+## Time ledger
+
+To be kept in the execution record (Planning, Implementation, L0, L2, VERIFY, REVIEW, Closeout; elapsed and agent hours).
+
+---
+
+# BC0 execution record
+
+Evidence root: `C:/Users/Luisa/Documents/Codex/2026-10-12/bc0/`.
+
+## M0 — transition (DONE)
+
+- §A1–A4 applied verbatim to `.agent/PLANS.md` and `AGENTS.md`.
+- PR1 plan read in full (allowed by this approved execution). [Suspension record](docs/plans/suspended/PR1.md) created with milestone and DoD state, D1–D13 state, known failures, baseline and obligations; [index](docs/plans/suspended/README.md).
+- Verbatim copy: embedded bytes SHA-256 `e63de9c1…38a4` = `git show beacc9c:implementation_plan.md` (checked by extraction; the CRLF working-tree checkout hashes `5978d182…048b`, same content).
+- This approved plan installed in the slot; body byte-identical to `53a69f2:docs/proposals/BC0_EXECPLAN.md`, header updated (status, approval, location, input link).
+- **Stop-point findings (added to the record, roadmap §5.3/§5.4 corrected in M1):** PR1 D10 T1 suites `test_region_network` / `test_region_surface` / `test_region_runtime` were never created, and the T2.4 transfer of the `handoff` checks was not done — a protection gap for the realized network, now an open obligation owned by BC1. The S3 oracle conflict (10 × curvature) is still undecided. PR1 D10 T2.4 categories (fixture = REGRESSION_GUARD, live = LEGACY_CONTRACT) were approved with PR1 v1.1 and are recorded, not newly decided.
+- **Approval condition 1 applied to M1:** the roadmap moves to `docs/` in M1 with status «APPROVED — becomes ACCEPTED at BC0 closeout»; ACCEPTED is set only in M4 after VERIFY/REVIEW PASS.
+- **Approval condition 2:** the PR1 cache directory for `beacc9c` is recorded as unconfirmed (two candidate entries, key not computed).
