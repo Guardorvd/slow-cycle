@@ -2,7 +2,7 @@
 
 STATUS: CURRENT
 
-**Актуально на 2026-10-12:** PR1 [SUSPENDED](plans/suspended/PR1.md); принято направление B+C ([roadmap](ROADMAP_B_C_ROUTE_REALIZATION.md), [Master XII-B](MASTER_IMPLEMENTATION_PLAN.md#xii-b-amendment-bc-2026-10-12)); следующая исполнимая фаза — BC1 после отдельного ExecPlan и approval. Подробно — раздел «PR1 и переход на B+C» ниже.
+**Актуально на 2026-10-12:** PR1 [SUSPENDED](plans/suspended/PR1.md); одобрено направление B+C ([roadmap](ROADMAP_B_C_ROUTE_REALIZATION.md), [Master XII-B](MASTER_IMPLEMENTATION_PLAN.md#xii-b-amendment-bc-2026-10-12)); следующая исполнимая фаза — BC1 после отдельного ExecPlan и approval. Подробно — раздел «PR1 и переход на B+C» ниже.
 
 Дата governance: 03.10.2026. Scope: D0 documentation reset + завершённая локальная D1 governance implementation; runtime/source baseline `ed7d1322da1a5700a8c64425708e1c813213c7f6`, никаких игровых изменений в D0. Runtime evidence ниже датировано 01.10 или ранее и в D0 заново не запускалось. Точную текущую docs revision/branch определять через `git log -1`/`git status`; это не новый runtime baseline Q2.
 

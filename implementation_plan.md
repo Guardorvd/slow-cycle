@@ -1,12 +1,12 @@
 TASK: BC0 — Architecture & Documentation Migration to B+C route realization (roadmap Phase 0)
 DATE: 2026-10-12
-STATUS: IMPLEMENTING — ExecPlan v1.0 APPROVED; M0 done
+STATUS: VERIFYING — ExecPlan v1.0 APPROVED; M0–M3 done; VERIFY #1 FAIL (B1) → fixes F1 → VERIFY #2 pending
 BRANCH/BASE/HEAD: bc0-architecture-migration / pr1-playable-region `beacc9c` (= origin/pr1-playable-region) / first branch commit holds only `docs/proposals/` (SHA reported in chat)
 BASELINE: clean at `beacc9c`; local tag `pr1-suspended-baseline` → `beacc9c` (unpublished); PR1 branch untouched
 APPROVAL: Game Director in chat 2026-10-12 — «APPROVE BC0 ExecPlan v1.0», SHA-256 `abccce2168c2cd0bb50dc2b0bbb8f6ec40fb5a63e8d6d1b70ac696d8d0cf9a11` (as committed in `53a69f2` `docs/proposals/BC0_EXECPLAN.md`): roadmap B+C v2 direction, PR1 → SUSPENDED, §A1–A4, full BC0 scope, local milestone commits, evidence root. Conditions: (1) the roadmap becomes ACCEPTED only after independent VERIFY/REVIEW PASS and BC0 closeout; (2) the presumed PR1 cache key is not presented as confirmed — exact revision, reproduction and evidence limits are recorded. Body below is the approved text; only this header changed
 PRIOR DECISIONS: Game Director in chat 2026-10-12 — B+C direction approved with amendments A–E; RM-8 = variant B (suspend PR1); permission to prepare and execute Phase 0 under repository rules
 LOCATION: installed in the root slot by M0 after PR1 was suspended ([record](docs/plans/suspended/PR1.md)); the approved copy is `53a69f2:docs/proposals/BC0_EXECPLAN.md`
-INPUT: [ROADMAP_B_C_ROUTE_REALIZATION.md](docs/ROADMAP_B_C_ROUTE_REALIZATION.md) v2 (in `docs/proposals/` until M1)
+INPUT: [ROADMAP_B_C_ROUTE_REALIZATION.md](docs/ROADMAP_B_C_ROUTE_REALIZATION.md) v2 (moved to `docs/` in M1; text restored to v2 by F1)
 
 ---
 
@@ -244,3 +244,31 @@ Not run (with reason): E0–E7, G gates, suites — Markdown-only diff, no runti
 | RM-9 test migration map T1–T9 | Roadmap §5.4; Test Strategy §8.4 |
 | RM-10 phases BC0–BC6, L3 mapping | Master XII-B table and L3 line; Target Architecture §7; Test Strategy §8.6; Current Project State |
 | RM-11 trail purpose from world data | Target Architecture §8; Master XII-B item 4 |
+
+## VERIFY #1 — FAIL (independent fresh context, 2026-10-12)
+
+Report `C:/Users/Luisa/Documents/Codex/2026-10-12/bc0/verify/VERIFY_REPORT.md`, SHA-256 `f388720b13a40a31610b3ead73e664132365f34f1a8348a77e4d2cbd98319ed9`; candidate `83e2695`, diff digest `ce0ba727…0abe2`. All mechanical checks passed (scope, forbidden identity, refs, §A verbatim, slot body, PR1 verbatim copy, numbers, links 280/280, traceability, conditions 1–2). **B1 (blocking):** the roadmap content was changed beyond «links re-based; content otherwise v2» (v2.1: §5.3 rows, T3/T5/T7, RM-8/RM-9 status) without recorded approval. Non-blocking N1–N10.
+
+## F1 — fixes (author, within the whitelist)
+
+- **B1 → option (b):** roadmap restored to the approved v2 text (`53a69f2`); only links are re-based (the «план PR1» link now points to its moved location `docs/plans/suspended/PR1.md`) and the STATUS line follows approval condition 1. The M0 findings stay in the PR1 record and Test Strategy §8.4. Roadmap v2 errata found by VERIFY (network-rule usage wording in §5.4, R7 listed as «Принято (Alpha)» in §1.2) are corrected in the authority documents (Test Strategy §8.4, ARCHITECTURE.md / Current Project State) and listed for a later Director-approved roadmap revision; the roadmap text itself is not changed without approval.
+- N1 PR1 record: R5 2230/0 attributed to `37e584d`, closure change of `region_seed_derivation.gd` in `3842a3f` stated, R6 regions 2024/int64 not run on PR1 code.
+- N2 T2.4 categories location corrected (Test Strategy §8.4).
+- N3 obligations table completed (M0–M5 formal acceptance, PR1 L2 items incl. G gates for the `mode_select` change, mutants, Vulkan package, E6/ObjectDB, R6 regions 2024/int64, «different seeds differ», Director conditions 2–3, D10 T2.5); cancellation sentence made consistent with the decision.
+- N4 cache: nine directories for seed 184729, two with the expected digests; key not computed.
+- N5 D12 «no push» deviation recorded factually.
+- N6 Test Strategy §8.4: rules executed (not asserted) by `test_region_ride.gd`, `capture_region_world.gd`, `region_ride_bot.gd`.
+- N7 Target Architecture rebuilt additively from `beacc9c`: original statements kept verbatim, B+C refinements added as marked text/rows.
+- N8 ARCHITECTURE.md status keeps «Director acceptance pending» for R7.
+- N9 Current Project State: «одобрено направление B+C».
+- N10 slot header updated; time ledger added below.
+
+## Time ledger (±0.25 h; agent-session estimates)
+
+| Row | Elapsed h | Agent/process h |
+|---|---|---|
+| Planning (roadmap v1/v2, ExecPlan) | 1.5 | 1.5 |
+| Implementation M0–M2 + F1 | 1.0 | 1.0 |
+| L0/L2 author checks | 0.25 | 0.25 |
+| VERIFY #1 | 0.25 | 0.25 |
+| VERIFY #2, REVIEW, Closeout | pending | pending |

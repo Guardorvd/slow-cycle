@@ -160,7 +160,7 @@ The full map T1–T9 is in the [roadmap §5.4](ROADMAP_B_C_ROUTE_REALIZATION.md)
 - PR1 D10 T2.4 categories, approved with PR1 v1.1, are recorded here: `test_final_surface --source=fixture` (contracts/surface/collision) = REGRESSION_GUARD of the R7 machinery on HEAD; `--source=live` with `handoff` = LEGACY_CONTRACT of the R6 v1 handoff, run on `pr1-baseline`. TEST_MATRIX is unchanged (PR1 D10 T5).
 - **Open protection gap:** the PR1 suites `test_region_network`, `test_region_surface`, `test_region_runtime` and the transfer of the `handoff` checks were never created. BC1 must close or explicitly re-plan this before its L2.
 - **Known failure:** S3 — `test_road_synthesis --group=regions` 184729, 10 × `oracle_path_move:*` curvature, awaiting a Director decision; not reclassified.
-- Changing the PR1 network rules (`DEAD_END_NOT_TERMINUS`, fixed point) is planned and approved in BC2 together with new tests.
+- The PR1 network rules (RealizedRoadNetwork, RegionNetworkBuilder) are **executed but not asserted** by `test_region_ride.gd` and `capture_region_world.gd` (through `region_world.tscn` → `region_bake.gd`) and by the `region_ride_bot.gd` tool; no test asserts them. (This corrects the narrower wording «used only by `region_ride_bot.gd`» in roadmap v2 §5.4.) Changing these rules (`DEAD_END_NOT_TERMINUS`, fixed point) is planned and approved in BC2 together with new tests.
 
 ### 8.5 PR1 lifecycle and evidence
 

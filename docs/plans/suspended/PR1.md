@@ -46,7 +46,7 @@ PR1 delivered a launchable regional game on branch `pr1-playable-region` (14 com
 | P3 off-road ≥ 150 m meadow and back; P4 no riding under deep water | Not run at L2 | BC1 (P4 behaviour implemented) / BC3 |
 | Performance: cache ≤ 20 s; 20 min ride max frame ≤ 100 ms, p99 ≤ 33 ms, p50 ≥ 60 FPS, memory ≤ 5 %, no leaks; cold bake ≤ 10 min | Cache 1.9 s and bake 383 s measured; headless ride max 78.6 ms; **GPU 20-min ride not run** | First phase whose L2 reaches it (BC1), then L3 |
 | Determinism: equal bake manifest in two processes and 1 vs N threads | Two processes equal; R6 1 vs 8 equal; full bake 1 vs N **not run** | BC1 L2 |
-| Protected suites (a)/(b)/(c) | R0 145/0; R6 contracts 72/0; R7 fixture 424259/0 = M0 hashes; R5 2230/0 (41f6c29, files unchanged since); R6 regions 184729 10 × S3 | See §5 |
+| Protected suites (a)/(b)/(c) | On copies of `3842a3f`: R0 145/0, R6 contracts 72/0, R7 fixture 424259/0 = M0 hashes. R5 2230/0 was run on `37e584d` (`m2_head_r5`); the R5 source files are unchanged since `41f6c29`, but `region_seed_derivation.gd` (in the R5 suite's closure through `route_planner.gd`) changed in `3842a3f`, so this result is **not** byte-identity evidence for `beacc9c`. R6 regions 184729: 365 checks, 10 × S3 on `41f6c29`. R6 regions 2024 and the int64 row were **not run** on PR1 code (only on `pr1-baseline` in M0) | See §5; rerun in the first L2 that reaches them (BC1) |
 | Build, menu, launch instruction, Blueprint §35 questions | Done ([playtest note](../../PLAYTEST_MOUNTAIN_RIVER_VALLEY.md)) | — |
 | VERIFY PASS + independent REVIEW PASS | **Not run** | Each BC phase for its own scope |
 
@@ -60,11 +60,11 @@ PR1 delivered a launchable regional game on branch `pr1-playable-region` (14 com
 | D7 bake + cache, performance priorities | Implemented; GPU gates not measured |
 | D10 T0 baseline; T2.1–T2.3 fixture mode | Done |
 | D10 T1 new test files | **Partial**: created `test_ride_envelope`, `test_region_ride`, `region_ride_bot`, `capture_region_world`; **not created** `test_region_network`, `test_region_surface`, `test_region_runtime` |
-| D10 T2.4 status: `test_final_surface --source=fixture` (contracts/surface/collision) = REGRESSION_GUARD of R7 machinery on HEAD; `--source=live` + `handoff` = LEGACY_CONTRACT of the R6 v1 handoff, run on `pr1-baseline` | Approved with v1.1; recorded here and in Current Project State (T5: TEST_MATRIX unchanged) |
+| D10 T2.4 status: `test_final_surface --source=fixture` (contracts/surface/collision) = REGRESSION_GUARD of R7 machinery on HEAD; `--source=live` + `handoff` = LEGACY_CONTRACT of the R6 v1 handoff, run on `pr1-baseline` | Approved with v1.1; recorded here and in [Test Strategy §8.4](../../TEST_STRATEGY.md) (T5: TEST_MATRIX unchanged) |
 | D10 T2.4 transfer of `handoff` checks (graph signature, READY, band containment, barrier, water body, channel order, seams ≤ 1 mm, oracle path contract) to `test_region_network` per realized piece | **Not done** — protection gap: in fixture mode `handoff` does not run and its replacement does not exist |
 | D10 T3 `test_road_synthesis.gd` adapters | Not needed: file unchanged by PR1 |
 | D10 T4 `test_route_network.gd` unchanged | Holds |
-| D11 single L2; D12 branch/tag/local commits | L2 not run; branch, tag `pr1-baseline` (= `52a9c34`), local commits — holds; branch also published at `origin/pr1-playable-region` = `beacc9c` |
+| D11 single L2; D12 branch, local tag, local commits, no push / no merge to master | L2 not run. Branch, tag `pr1-baseline` (= `52a9c34`) and milestone commits as planned; no merge to master. **Deviation from «no push»:** the branch exists at `origin/pr1-playable-region` = `beacc9c`; the PR1 execution record does not record that push or its authorization |
 | D13 DEGRADE rule | N4 (SINGLETRACK, dev-region TECHNICAL) is core and was not met; no DEGRADE is claimed |
 
 ## 5. Known failures and open conflicts (classification unchanged)
@@ -83,7 +83,7 @@ PR1 delivered a launchable regional game on branch `pr1-playable-region` (14 com
 | Configuration | seed 184729, region 0,0, default settings, 8 bake threads |
 | Launch | `<godot_console.exe> --path <checkout of beacc9c> res://scenes/region/region_world.tscn -- --seed=184729`; or menu → 5 (random seed) |
 | Expected | 9.39 km, 3 cycles, B7 + S5, 13 bridges, 0 R7 exclusions; `tiles_digest` `c94451cf…`, `network_digest` `183eef0c…` (`m9_bake_184729`, `m9_bake2_184729`) |
-| Cache | `%APPDATA%\Godot\app_userdata\Slow Cycle\regions\<key>\` (`manifest.json`, `network.bin`, `tile_*.bin`, `extras.bin`), schema `slow_cycle.region_bake/1`; key = SHA-256 over format, schema, engine version, seed, region, settings and the digest of `scripts/world`, `scripts/core`, `resources`, `project.godot`. **Which directory matches `beacc9c` is not confirmed:** two entries exist for seed 184729 (`f26225f1…` 2026-10-11 22:47 and `1cee73fe…` 22:32); the key was not computed. A cache hit is not required: a cold bake reproduces the region (383 s measured) and the digests above identify it |
+| Cache | `%APPDATA%\Godot\app_userdata\Slow Cycle\regions\<key>\` (`manifest.json`, `network.bin`, `tile_*.bin`, `extras.bin`), schema `slow_cycle.region_bake/1`; key = SHA-256 over format, schema, engine version, seed, region, settings and the digest of `scripts/world`, `scripts/core`, `resources`, `project.godot`. **Which directory matches the key of `beacc9c` is not confirmed:** on 2026-10-12 nine cache directories have seed 184729; two of them carry the expected digests in their manifest (`f26225f1…`, written 2026-10-11 22:47, and `1cee73fe…`, 22:32); the key was not computed. A cache hit is not required: a cold bake reproduces the region (383 s measured) and the digests above identify it |
 | Evidence | `C:/Users/Luisa/Documents/Codex/2026-10-11/pr1-playable-region/` (outside the repository): `APPROVAL_EXECUTION.md`, `S1_N4_REPORT.md`, `S1_N4_REPORT_v2.md`, `HANDOFF_NEXT_CHAT.md`, `outputs/evidence/<run>/`, `work/` (disposable copies, ablation and n4b patches, byte copy `work/playtest_45b99cf`) |
 | Evidence limits | All PR1 runs are L0/L1 on disposable copies; no L2, no VERIFY/REVIEW; bot rides are headless fixed-fps Input simulations, all on GRAVEL; no GPU frame-time distribution, no 20-minute ride, no E7 |
 
@@ -91,14 +91,18 @@ PR1 delivered a launchable regional game on branch `pr1-playable-region` (14 com
 
 | Obligation | Owner |
 |---|---|
+| Formal acceptance of the implemented M0–M5 capabilities (region scene, streaming, bake/cache, FinalSurface render = collision, network, bridges, fords, vegetation, recovery) | L2 of the first phase that touches them (BC1), then L3 after BC2 |
 | N4 in the published network on the dev regions; holdout N1–N6 | BC2 formal acceptance |
 | Regression guard of the realized network (PR1 D10 T1/T2.4: `test_region_network` with the transferred `handoff` checks per ENGINEERED piece; `test_region_surface`, `test_region_runtime`) | BC1 ExecPlan must close or explicitly re-plan it before its L2; it cannot be dropped silently |
-| S3 oracle conflict (10 × curvature) | Director decision; BC2 or an earlier explicit decision. Until then a known failure |
-| P1–P4, determinism 1 vs N for the full bake, performance gates on GPU | BC1 L2 for the touched scope, then L3 after BC2 |
-| E7 | Human; playtests from BC1, final E7 in BC5 |
+| S3 oracle conflict (10 × curvature) | Director decision; until then a known failure |
+| PR1 L2 items never run: G gates for the main-scene closure change (`mode_select` entry 5), mutants (feedback off, deck flooding, separately sampled collision, v1 limits), Vulkan package (~14 frames), E6 ride with ObjectDB/leak check, R6 regions 2024 and int64 on PR1 code | BC1 L2 for the touched scope (reference audit decides G), then L3 |
+| P1–P4; determinism of the full bake 1 vs N threads; «different seeds give different results»; performance gates on GPU | BC1 L2 for the touched scope, then L3 after BC2 |
+| Director execution condition 2: explicit recommended direction for descent-preferred pieces with the reverse path proven to exist, be connected and be rideable | Implemented in RealizedRoadNetwork / runtime markers; **not exercised** (no SINGLETRACK/TECHNICAL realized) → BC2 |
+| Director execution condition 3 and E7 | Human; playtests from BC1, final E7 in BC5 |
+| D10 T2.5 (deformer internal model kept or checks moved to an equivalent entry point) | Held at L1: `test_final_surface --source=fixture` contracts group 424259/0 on `3842a3f`; re-checked by the first L2 that touches the deformer (BC1) |
 | D1 documentation note | Done by BC0 as the B+C amendment |
 
-No obligation is cancelled by the decision except continuing the superseded N4 method inside PR1.
+The decision cancels only (a) continuing the superseded N4 method inside PR1 and (b) running the PR1 L2 campaign solely to close PR1 formally. Every other obligation moves as listed above.
 
 ---
 

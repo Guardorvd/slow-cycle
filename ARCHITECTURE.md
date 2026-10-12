@@ -1,6 +1,6 @@
 # Slow Cycle — current runtime architecture
 
-STATUS: CURRENT - legacy runtime unchanged; R7 certified-route surface technically verified ([record](docs/plans/completed/R7.md)); PR1 region runtime implemented on branch `pr1-playable-region` and reachable from the main menu, not accepted, PR1 SUSPENDED ([record](docs/plans/suspended/PR1.md)) — see §6
+STATUS: CURRENT - legacy runtime unchanged; R7 isolated certified-route surface technically verified, Director acceptance pending ([record](docs/plans/completed/R7.md)); PR1 region runtime implemented on branch `pr1-playable-region` and reachable from the main menu, not accepted, PR1 SUSPENDED ([record](docs/plans/suspended/PR1.md)) — see §6
 
 Scope: **as-is legacy runtime**, read-only observations до D0 на `ed7d132`; D0 не меняет код. Целевая архитектура отдельно в [TARGET_ARCHITECTURE](docs/TARGET_ARCHITECTURE.md), первоисточники — [Blueprint](docs/TARGET_GAME_BLUEPRINT.md) и [Master](docs/MASTER_IMPLEMENTATION_PLAN.md). [Index](docs/README.md), [migration](docs/LEGACY_MIGRATION_MATRIX.md), [current state](docs/CURRENT_PROJECT_STATE.md).
 

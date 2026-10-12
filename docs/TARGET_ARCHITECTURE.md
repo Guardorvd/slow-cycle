@@ -2,7 +2,7 @@
 
 STATUS: CURRENT
 
-Scope: производное описание region-first цели, NOT_IMPLEMENTED как полный pipeline. Authority: [Blueprint §§5–18,24–36](TARGET_GAME_BLUEPRINT.md), [Master §§I–II, R0–R21, XII-B](MASTER_IMPLEMENTATION_PLAN.md); route realization B+C — [roadmap](ROADMAP_B_C_ROUTE_REALIZATION.md) (поправка 2026-10-12, §8 ниже). As-is: [ARCHITECTURE](../ARCHITECTURE.md); migration: [matrix](LEGACY_MIGRATION_MATRIX.md); navigation: [index](README.md).
+Scope: производное описание region-first цели, NOT_IMPLEMENTED как полный pipeline. Authority: [Blueprint §§5–18,24–36](TARGET_GAME_BLUEPRINT.md), [Master §§I–II, R0–R21](MASTER_IMPLEMENTATION_PLAN.md). As-is: [ARCHITECTURE](../ARCHITECTURE.md); migration: [matrix](LEGACY_MIGRATION_MATRIX.md); navigation: [index](README.md). **Поправка B+C (2026-10-12):** [Master XII-B](MASTER_IMPLEMENTATION_PLAN.md#xii-b-amendment-bc-2026-10-12), [roadmap](ROADMAP_B_C_ROUTE_REALIZATION.md), §8 ниже; формулировки ниже, которые она уточняет, сохранены и помечены.
 
 ## 1. World first → Route second → Road third
 
@@ -15,6 +15,18 @@ Region generation → RegionPlan
                          ↓
 TerrainField / HydrologyPlan / BiomeField / RideabilityField
                          ↓
+Route planning → RouteNetworkPlan / RegionRouteGraph / RouteCorridor
+                         ↓
+Road synthesis → RoadPathData
+                         ↓
+FinalSurface → runtime presentation → render / collision / vegetation / water
+
+Player → world query contracts / collision
+```
+
+**Поправка B+C (2026-10-12).** Шаг `Road synthesis → RoadPathData` выше относится только к участкам ENGINEERED; маршрут реализуется по участкам (§8):
+
+```text
 Route planning → RouteNetworkPlan / RegionRouteGraph (роли, причины, направленная доступность, возврат)
                          ↓
 Route realization по участкам (§8):
@@ -25,8 +37,6 @@ Route realization по участкам (§8):
 FinalSurface + публикация региона (опубликованная сеть, продукты bake/cache)
                          ↓
 runtime presentation → render / collision / vegetation / water
-
-Player → world query contracts / collision
 ```
 
 Названия здесь — будущие domain responsibilities из Master, не утверждённые D0 schemas. Существующий RoutePlan из P2.1b не становится автоматически RouteNetworkPlan; точные API/serialization/версионирование требуют отдельного фазового ExecPlan.
@@ -39,17 +49,21 @@ Player → world query contracts / collision
 | Terrain field layer | height/gradient/normal world queries | Независимая от дороги основа; renderer не владеет высотой | R1–R2 |
 | Hydrology layer | HydrologyPlan | River/tributary/drainage влияет на terrain/moisture/routes, не просто decoration spline | R3 |
 | Biome/Rideability layers | BiomeField/RideabilityField | Geography-driven placement/cost; не biome из одного road arc-distance | R4 |
-| RoutePlanner | RouteNetworkPlan, RegionRouteGraph, RouteCorridor | Network/corridors по terrain/water/cost/классу пути; не mesh builder. По B+C — также роль, причина и способ реализации участка, направленная доступность (BC2) | R5; BC2 |
-| RoadSynthesizer | RegionRouteGraph + TerrainField/HydrologyPlan/R4 → RoadSynthesisPlan (RoadPathData-совместимые виды, roadbed intent) | R6 LIMITED ALPHA ACCEPTED 2026-10-10 (certified R7/R8 handoff route only; full regional network NOT READY; [record](plans/completed/R6.md)); isolated, `scripts/world/region/road_*.gd`, no runtime consumer: REWRITE регионального композитора, не RoadGrammar FSM; terrain-aware alignment designer (lattice DP + fairing + G2 quintic + exact vertical profile), shared junction patches, exact crossing pins (C2 envelope), bounded roadbed intent for R7; грунтовая геометрия без airborne; PARTIAL/REPLAN_REQUIRED выходы честны. R7 владеет deformation/surface/collision. **По B+C — только участки ENGINEERED** (основные дороги), пока оправдано (§8) | R6 |
-| Trail realization (NATURAL / SHAPED) | RegionRouteGraph + природные слои → линия тропы, маска, ограниченные операции | Реализует тропы на существующей поверхности; не владеет поверхностью и опубликованной сетью; NOT_IMPLEMENTED | BC1–BC2 |
-| Опубликованная сеть (RealizedRoadNetwork в PR1) | Реализованные участки → сеть, которую потребляют FinalSurface, bake и runtime | Приёмка законченных связей; метрики только по опубликованной сети (§8). PR1: реализовано, не принято | PR1; BC1–BC2 |
-| FinalSurface | BaseTerrain + hydrology / ENGINEERED road / SHAPED / landmark deformation; NATURAL-маска без изменения формы | Единственный владелец итоговой физической поверхности для всех consumers (принципы §8) | R7 - technical LIMITED ALPHA complete on certified route; Director acceptance pending ([record](plans/completed/R7.md)) |
-| WorldStreamer | WorldCellData/runtime lifecycle | Пространственные terrain/collision/road/vegetation/prop/water cells. PR1 RegionStreamer: реализован, не принят | R10 |
+| RoutePlanner | RouteNetworkPlan, RegionRouteGraph, RouteCorridor | Network/corridors по terrain/water/cost/классу пути; не mesh builder | R5 |
+| RoadSynthesizer | RegionRouteGraph + TerrainField/HydrologyPlan/R4 → RoadSynthesisPlan (RoadPathData-совместимые виды, roadbed intent) | R6 LIMITED ALPHA ACCEPTED 2026-10-10 (certified R7/R8 handoff route only; full regional network NOT READY; [record](plans/completed/R6.md)); isolated, `scripts/world/region/road_*.gd`, no runtime consumer: REWRITE регионального композитора, не RoadGrammar FSM; terrain-aware alignment designer (lattice DP + fairing + G2 quintic + exact vertical profile), shared junction patches, exact crossing pins (C2 envelope), bounded roadbed intent for R7; грунтовая геометрия без airborne; PARTIAL/REPLAN_REQUIRED выходы честны. R7 владеет deformation/surface/collision | R6 |
+| FinalSurface | BaseTerrain + hydrology/road/landmark deformation | Единственная итоговая высота для всех consumers | R7 - technical LIMITED ALPHA complete on certified route; Director acceptance pending ([record](plans/completed/R7.md)) |
+| WorldStreamer | WorldCellData/runtime lifecycle | Пространственные terrain/collision/road/vegetation/prop/water cells | R10 |
 | Vegetation planning/adapter | Ecology fields → VegetationCell/transforms | World-space placement, road/view exclusions; не меняет terrain | R11 |
 | Landmark/Vista planning | RegionPlan + spatial opportunities/intents | Композиция/approach/view corridors; не случайные renderer props | R14–R15 |
 | JourneyDirector | Недавний опыт → intents CALM/DISCOVERY/FLOW/INTENSITY/RELEASE/WONDER | Предложения, не решения игрока, не spline/physics | R16 |
 | Bicycle | Public movement/telemetry/query interface | Владелец движения; не generator input с командами создать гору | Стабильная KEEP-система |
 | WorldManager | Composition root | Собирает contracts/owners; не God Object с генерационной математикой | Поэтапная integration |
+| *Поправка B+C:* RoutePlanner | + роль, причина и способ реализации участка | Направленная доступность и возврат; не mesh builder | BC2 |
+| *Поправка B+C:* RoadSynthesizer | Без изменения входов/выходов | Только участки ENGINEERED (основные дороги), пока оправдано (§8) | — |
+| *Поправка B+C:* Trail realization (NATURAL / SHAPED) | RegionRouteGraph + природные слои → линия тропы, маска, ограниченные операции | Реализует тропы на существующей поверхности; не владеет поверхностью и опубликованной сетью; NOT_IMPLEMENTED | BC1–BC2 |
+| *Поправка B+C:* опубликованная сеть (RealizedRoadNetwork в PR1) | Реализованные участки → сеть, которую потребляют FinalSurface, bake и runtime | Приёмка законченных связей; метрики только по опубликованной сети (§8). PR1: реализовано, не принято | PR1; BC1–BC2 |
+| *Поправка B+C:* FinalSurface | + ограниченные изменения SHAPED; NATURAL-маска без изменения формы | Единственный владелец итоговой физической поверхности; принципы S1–S7 (§8) | BC1–BC2 |
+| *Поправка B+C:* WorldStreamer | — | PR1 RegionStreamer: реализован, не принят | PR1 |
 
 ## 3. Domain и Godot boundary
 
@@ -67,7 +81,9 @@ Legacy RoadGraph strict DAG сохраняется для старого runtime
 
 ## 5. FinalSurface и runtime consumers
 
-`BaseTerrain + Hydrology deformation + Road deformation (ENGINEERED) + SHAPED trail modifications + Landmark deformation = FinalSurface`; NATURAL-маска меняет только след, материал и растительность (§8).
+`BaseTerrain + Hydrology deformation + Road deformation + Landmark deformation = FinalSurface`.
+
+**Поправка B+C (2026-10-12):** `BaseTerrain + Hydrology deformation + Road deformation (ENGINEERED) + SHAPED trail modifications + Landmark deformation = FinalSurface`; NATURAL-маска меняет только след, материал и растительность (§8).
 
 Сумма обозначает ответственность, не фиксирует ещё не спроектированный численный алгоритм. Terrain render/collision, vegetation/props, water banks и off-road queries используют согласованную итоговую поверхность. RoadTerrainDeformer может переиспользовать CUT/FILL/SHELF math; TerrainCarver перестаёт быть owner всей земли только после R7 parity.
 
