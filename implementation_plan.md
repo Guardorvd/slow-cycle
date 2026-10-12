@@ -1,6 +1,6 @@
 TASK: PR1 — Architectural Recovery & Playable Region (Mountain River Valley)
 DATE: 2026-10-11
-STATUS: IMPLEMENTING — ExecPlan v1.1 (D1–D13, T0–T5) + Director conditions 1–3; M0+M1 done (e12a641, 21a9264); M2–M4 in progress (37e584d, 705b3b6); early playable build delivered (condition 1, not PASS); S3 escalated (R6 oracle v1 connector radius)
+STATUS: IMPLEMENTING — ExecPlan v1.1 + Director conditions 1–3; M0–M5 done; S1 (N4) re-raised after decision B, two iterations (Progress 5); M6 waits for N4
 BRANCH/BASE/HEAD: pr1-playable-region / master 52a9c34 (= origin/master) / 52a9c34; local tag pr1-baseline = 52a9c34
 BASELINE: clean before this plan record (0 staged / 0 unstaged / 0 untracked); only implementation_plan.md modified
 APPROVAL: Game Director in chat 2026-10-11 — v1.0 audit + architecture B accepted with conditions 1–6 + DEGRADE rule; v1.1 approved via plan approval
@@ -987,3 +987,46 @@ R5 and R6 files are unchanged since 41f6c29 (R5 2230/0 and R6 regions as recorde
 **Not done / next:**
 - D5: R6 already has DIRECT / TERRAIN / FLOW candidate profiles; no further change; N7 recorded in the manifest.
 - M6 (L2 + slow-cycle-verify + independent slow-cycle-review) waits for the S1 decision on N4, because verify would return FAIL on N4.
+
+## Progress 5 (2026-10-12; Director decision B on S1; S1 re-raised after two iterations)
+
+**Decision B** (Director, 2026-10-12): fix R5 target selection and topology first, then the minimal R6 development only where needed. ST must be real loops and TECH a real descent from a reachable ledge with an easier return. No global earthwork raise; option A only as a diagnostic sensitivity test on a copy. Stop after two failed iterations of the chosen method.
+
+**Method.** The repository code is unchanged. The method lives in the disposable copy `work/n4b` as patches `work/edits/n4b_{raster_search,planner,synth,iter2}.py`; `n4b_apply.sh` syncs and applies them. Only SINGLETRACK and TECHNICAL change.
+
+- *Iteration 1:*
+  - R5 plans ST/TECH in the ridden direction: a loop climbs one branch within `climb_sustained` and descends the other within `descent_max`; pairs are searched top-down. The direction rule `REJECT_CLIMB_DIRECTION` applies.
+  - No R5 development for ST/TECH. The R6 8 m slot rule closes nodes (`fine_min_slope`).
+  - Terrace loops are chosen by route budget: sustained-climb reach within half the typical class length, at least 40 m above the source, one per 800 m. The climb branch is planned first.
+  - TECH comes from ledge stretches: any network point at least 60 m lower, 200–1200 m away and at least 1.5× further along the network. This replaces station pairs.
+  - R6 takes the descent direction of a piece from the R5 corridor.
+- *Iteration 2:* branches stay within the class preference grades, and ST/TECH attach to the network only by moves no steeper than `PATCH_GRADE_MAX`.
+
+**Results.**
+- Route budget (`n10_budget_*`): within 1–1.5 km, hundreds of nodes lie 40–120 m above the network on all three dev regions.
+- R5 now yields ST/TECH on all three regions:
+  - iteration 2, round 0: 184729 1 ST, 2024 1 ST + 2 TECH, 3628391 4 ST;
+  - R6 builds 6 of 11 of these edges READY (iteration 1: 5 of 13).
+- **Realized networks have no ST/TECH on any region in either iteration.**
+  - Iteration 1 (`n10_net1_*`): 184729 10.34 km, 2024 9.15 km, 3628391 7.21 km.
+  - Iteration 2 (`n11_net_*`): 9.51 km, 9.11 km, 10.50 km. All B+S, with at least 2 cycles.
+- When one edge of a loop fails, the rest of the loop is removed as dead ends (N6), and any TECH on it goes too.
+
+**Root cause** (`n11_turns_*`). With no development and a gentle climb cap, the 32 m / 16-direction R5 search climbs by zig-zagging on the raster.
+
+| R5 corridor shape | R6 result |
+|---|---|
+| ≤ 2 turns > 45°, max 27–65° | READY (4 edges) |
+| 19–23 turns > 45°, max 153–167° | GRADE / CURVATURE / CLEARANCE at those turns (4 edges) |
+
+One further failure is a 7 m / 20 m step that the 32 m raster does not see.
+
+**Option A, diagnostic only** (copies; policy unchanged):
+- ST earthwork 3/2/8 fixes only the step (`n11_sense_*`).
+- A doubled ST/TECH band fixes 1 edge and breaks 2 (`n11_sensw_*`).
+
+**S1 re-raised** with `S1_N4_REPORT_v2.md` (evidence root). The proposed minimal correction is a heading-aware R5 search (node × incoming direction) for ST/TECH branches only, with the per-step turn bounded by what R6 lays out. One measured iteration on the three dev regions. BACKBONE/SECONDARY and R6 unchanged.
+
+**Playtest preserved:** the repository scripts are unchanged; `work/playtest_45b99cf` (byte copy) also opens 184729 from cache in 2.56 s (`n11_playtest_copy_184729`).
+
+**Next:** the Director's decision on the correction. M6 waits for N4.
