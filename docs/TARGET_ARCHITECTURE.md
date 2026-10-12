@@ -2,7 +2,7 @@
 
 STATUS: CURRENT
 
-Scope: производное описание region-first цели, NOT_IMPLEMENTED как полный pipeline. Authority: [Blueprint §§5–18,24–36](TARGET_GAME_BLUEPRINT.md), [Master §§I–II, R0–R21](MASTER_IMPLEMENTATION_PLAN.md). As-is: [ARCHITECTURE](../ARCHITECTURE.md); migration: [matrix](LEGACY_MIGRATION_MATRIX.md); navigation: [index](README.md).
+Scope: производное описание region-first цели, NOT_IMPLEMENTED как полный pipeline. Authority: [Blueprint §§5–18,24–36](TARGET_GAME_BLUEPRINT.md), [Master §§I–II, R0–R21, XII-B](MASTER_IMPLEMENTATION_PLAN.md); route realization B+C — [roadmap](ROADMAP_B_C_ROUTE_REALIZATION.md) (поправка 2026-10-12, §8 ниже). As-is: [ARCHITECTURE](../ARCHITECTURE.md); migration: [matrix](LEGACY_MIGRATION_MATRIX.md); navigation: [index](README.md).
 
 ## 1. World first → Route second → Road third
 
@@ -15,11 +15,16 @@ Region generation → RegionPlan
                          ↓
 TerrainField / HydrologyPlan / BiomeField / RideabilityField
                          ↓
-Route planning → RouteNetworkPlan / RegionRouteGraph / RouteCorridor
+Route planning → RouteNetworkPlan / RegionRouteGraph (роли, причины, направленная доступность, возврат)
                          ↓
-Road synthesis → RoadPathData
+Route realization по участкам (§8):
+  ENGINEERED — RouteCorridor → RoadSynthesizer → RoadPathData + roadbed intent
+  NATURAL    — тропа на существующей поверхности (след, материал, растительность)
+  SHAPED     — явное ограниченное локальное изменение поверхности
                          ↓
-FinalSurface → runtime presentation → render / collision / vegetation / water
+FinalSurface + публикация региона (опубликованная сеть, продукты bake/cache)
+                         ↓
+runtime presentation → render / collision / vegetation / water
 
 Player → world query contracts / collision
 ```
@@ -34,10 +39,12 @@ Player → world query contracts / collision
 | Terrain field layer | height/gradient/normal world queries | Независимая от дороги основа; renderer не владеет высотой | R1–R2 |
 | Hydrology layer | HydrologyPlan | River/tributary/drainage влияет на terrain/moisture/routes, не просто decoration spline | R3 |
 | Biome/Rideability layers | BiomeField/RideabilityField | Geography-driven placement/cost; не biome из одного road arc-distance | R4 |
-| RoutePlanner | RouteNetworkPlan, RegionRouteGraph, RouteCorridor | Network/corridors по terrain/water/cost/классу пути; не mesh builder | R5 |
-| RoadSynthesizer | RegionRouteGraph + TerrainField/HydrologyPlan/R4 → RoadSynthesisPlan (RoadPathData-совместимые виды, roadbed intent) | R6 LIMITED ALPHA ACCEPTED 2026-10-10 (certified R7/R8 handoff route only; full regional network NOT READY; [record](plans/completed/R6.md)); isolated, `scripts/world/region/road_*.gd`, no runtime consumer: REWRITE регионального композитора, не RoadGrammar FSM; terrain-aware alignment designer (lattice DP + fairing + G2 quintic + exact vertical profile), shared junction patches, exact crossing pins (C2 envelope), bounded roadbed intent for R7; грунтовая геометрия без airborne; PARTIAL/REPLAN_REQUIRED выходы честны. R7 владеет deformation/surface/collision | R6 |
-| FinalSurface | BaseTerrain + hydrology/road/landmark deformation | Единственная итоговая высота для всех consumers | R7 - technical LIMITED ALPHA complete on certified route; Director acceptance pending ([record](plans/completed/R7.md)) |
-| WorldStreamer | WorldCellData/runtime lifecycle | Пространственные terrain/collision/road/vegetation/prop/water cells | R10 |
+| RoutePlanner | RouteNetworkPlan, RegionRouteGraph, RouteCorridor | Network/corridors по terrain/water/cost/классу пути; не mesh builder. По B+C — также роль, причина и способ реализации участка, направленная доступность (BC2) | R5; BC2 |
+| RoadSynthesizer | RegionRouteGraph + TerrainField/HydrologyPlan/R4 → RoadSynthesisPlan (RoadPathData-совместимые виды, roadbed intent) | R6 LIMITED ALPHA ACCEPTED 2026-10-10 (certified R7/R8 handoff route only; full regional network NOT READY; [record](plans/completed/R6.md)); isolated, `scripts/world/region/road_*.gd`, no runtime consumer: REWRITE регионального композитора, не RoadGrammar FSM; terrain-aware alignment designer (lattice DP + fairing + G2 quintic + exact vertical profile), shared junction patches, exact crossing pins (C2 envelope), bounded roadbed intent for R7; грунтовая геометрия без airborne; PARTIAL/REPLAN_REQUIRED выходы честны. R7 владеет deformation/surface/collision. **По B+C — только участки ENGINEERED** (основные дороги), пока оправдано (§8) | R6 |
+| Trail realization (NATURAL / SHAPED) | RegionRouteGraph + природные слои → линия тропы, маска, ограниченные операции | Реализует тропы на существующей поверхности; не владеет поверхностью и опубликованной сетью; NOT_IMPLEMENTED | BC1–BC2 |
+| Опубликованная сеть (RealizedRoadNetwork в PR1) | Реализованные участки → сеть, которую потребляют FinalSurface, bake и runtime | Приёмка законченных связей; метрики только по опубликованной сети (§8). PR1: реализовано, не принято | PR1; BC1–BC2 |
+| FinalSurface | BaseTerrain + hydrology / ENGINEERED road / SHAPED / landmark deformation; NATURAL-маска без изменения формы | Единственный владелец итоговой физической поверхности для всех consumers (принципы §8) | R7 - technical LIMITED ALPHA complete on certified route; Director acceptance pending ([record](plans/completed/R7.md)) |
+| WorldStreamer | WorldCellData/runtime lifecycle | Пространственные terrain/collision/road/vegetation/prop/water cells. PR1 RegionStreamer: реализован, не принят | R10 |
 | Vegetation planning/adapter | Ecology fields → VegetationCell/transforms | World-space placement, road/view exclusions; не меняет terrain | R11 |
 | Landmark/Vista planning | RegionPlan + spatial opportunities/intents | Композиция/approach/view corridors; не случайные renderer props | R14–R15 |
 | JourneyDirector | Недавний опыт → intents CALM/DISCOVERY/FLOW/INTENSITY/RELEASE/WONDER | Предложения, не решения игрока, не spline/physics | R16 |
@@ -60,7 +67,7 @@ Legacy RoadGraph strict DAG сохраняется для старого runtime
 
 ## 5. FinalSurface и runtime consumers
 
-`BaseTerrain + Hydrology deformation + Road deformation + Landmark deformation = FinalSurface`.
+`BaseTerrain + Hydrology deformation + Road deformation (ENGINEERED) + SHAPED trail modifications + Landmark deformation = FinalSurface`; NATURAL-маска меняет только след, материал и растительность (§8).
 
 Сумма обозначает ответственность, не фиксирует ещё не спроектированный численный алгоритм. Terrain render/collision, vegetation/props, water banks и off-road queries используют согласованную итоговую поверхность. RoadTerrainDeformer может переиспользовать CUT/FILL/SHELF math; TerrainCarver перестаёт быть owner всей земли только после R7 parity.
 
@@ -84,5 +91,20 @@ REJECT / REPLAN / DEGRADE_EXPLICITLY / FAIL имеют причину и coverag
 | R12–R17 | Water/traces/network gameplay/exploration/vistas/journey/situations | Human acceptance без человека |
 | R18 | 20–30 минут Mountain River Valley slice и E7 | Зрелый регион 40–70 минут или continuation |
 | R19 → R20 → R21 | Performance hardening → archetype diversity → region continuation | Повод строить LOD/clipmaps заранее |
+| BC0–BC6 ([Master XII-B](MASTER_IMPLEMENTATION_PLAN.md#xii-b-amendment-bc-2026-10-12)) | Технический путь B+C к целям R8–R21; PLAYABLE-контрольные точки внутри фаз | Формальную приёмку без L2/VERIFY/REVIEW/E7 |
 
 Старые code/assets/API определяют reuse и safe migration, не право изменить target. Каждый следующий шаг имеет отдельный approved plan, tests/evidence и rollback boundary. D0 завершён только как документационная фаза.
+
+## 8. Route realization B+C (поправка 2026-10-12)
+
+Источник: [roadmap](ROADMAP_B_C_ROUTE_REALIZATION.md) §§3–4. Ниже — роли и контракты, а не утверждённые API; конкретные структуры, алгоритмы поиска, сетки высот и размеры операций определяются фазовыми планами BC1+ по измерениям.
+
+**Одна сеть, три способа строительства.** BACKBONE / SECONDARY / SINGLETRACK / TECHNICAL — роль и характер маршрута. Способ выбирается по участкам и может меняться вдоль одного маршрута: ENGINEERED (R5/R6 + RoadTerrainDeformer), NATURAL (линия на существующей поверхности), SHAPED (явное ограниченное изменение с границей и бюджетом). Отдельного «мира троп» нет.
+
+**R5/R6.** Остаются реализацией основных дорог, пока это оправдано; подключены к той же границе «реализация → FinalSurface», что и тропы, поэтому заменимы локально. Пересмотр — только по измеренной проблеме (время bake, расширяемость, качество игры, стоимость сопровождения) и отдельным планом. Контракт классов `regional_road/1 §6` (уклоны, радиусы) действует для участков ENGINEERED, реализованных R6; участки NATURAL / SHAPED получают собственный контракт тропы (BC1).
+
+**FinalSurface — принципы S1–S7.** S1 одна итоговая физическая геометрия для collision, проверки троп, recovery, растительности и берегов. S2 запросы итогового мира совпадают с опубликованной геометрией в объявленном допуске; запросы этапа проектирования явно помечены. S3 NATURAL не меняет форму (новые вершины лежат на исходной поверхности). S4 SHAPED — явное, ограниченное, записанное изменение. S5 fresh bake = cache hit для всех потребителей. S6 дальний LOD — визуальное приближение; мосты — отдельные конструкции. S7 WORLD FIRST; renderer — потребитель, не владелец формы. Способ хранения не фиксируется.
+
+**Семантика сети.** Геометрическая связность, направленная проходимость, доступный возврат и осмысленность — разные свойства. Осмысленный тупик допустим (цель соразмерна, обратный путь проходим); ловушка — нет. У тропы есть записанная причина из существующих данных мира (терраса, вода, лес, седловина, спуск, полезная связь); полноценные Landmark/Vista/Journey остаются R14–R16. Принимается законченная связь (линия, оба примыкания, crossings, при необходимости возврат); недостроенная петля не публикуется как доступная.
+
+**Защита от второго универсального solver.** Малый словарь операций SHAPED, каждая новая — по конкретным отказам или плейтесту; локальная граница воздействия (вне неё поверхность бит-в-бит неизменна); конечный бюджет попыток и право отказа; различия регионов и биомов — данными, без веток кода под биом; наблюдаемые метрики (доля SHAPED, объём изменений, попытки, причины отказов).

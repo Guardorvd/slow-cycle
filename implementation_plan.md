@@ -197,3 +197,10 @@ Evidence root: `C:/Users/Luisa/Documents/Codex/2026-10-12/bc0/`.
 - **Stop-point findings (added to the record, roadmap §5.3/§5.4 corrected in M1):** PR1 D10 T1 suites `test_region_network` / `test_region_surface` / `test_region_runtime` were never created, and the T2.4 transfer of the `handoff` checks was not done — a protection gap for the realized network, now an open obligation owned by BC1. The S3 oracle conflict (10 × curvature) is still undecided. PR1 D10 T2.4 categories (fixture = REGRESSION_GUARD, live = LEGACY_CONTRACT) were approved with PR1 v1.1 and are recorded, not newly decided.
 - **Approval condition 1 applied to M1:** the roadmap moves to `docs/` in M1 with status «APPROVED — becomes ACCEPTED at BC0 closeout»; ACCEPTED is set only in M4 after VERIFY/REVIEW PASS.
 - **Approval condition 2:** the PR1 cache directory for `beacc9c` is recorded as unconfirmed (two candidate entries, key not computed).
+
+## M1 — architecture documents (DONE)
+
+- Roadmap moved to [docs/ROADMAP_B_C_ROUTE_REALIZATION.md](docs/ROADMAP_B_C_ROUTE_REALIZATION.md), links re-based, status «APPROVED — becomes ACCEPTED at BC0 closeout» (condition 1); v2.1 adds the M0 findings to §5.3/§5.4 (D10 T1/T2.4 protection gap → BC1; S3 → Director decision), updates K1 and the RM-8/RM-9 status.
+- Master: appended «XII-B. Amendment B+C (2026-10-12)» before §XIV and one pointer line under R6, R7 (qualifies `FinalSurface.sample(x,z)` by S1–S7), R8, R13; no existing text removed; R9–R21 goals unchanged. L3 mapping: the R8 checkpoint was not run in PR1, the first L3 follows BC2 and covers R8 + R13.
+- Target Architecture: §1 diagram with route realization by segment; owner table (RoutePlanner, RoadSynthesizer = ENGINEERED, trail realization, published network, FinalSurface, WorldStreamer); §5 composition; §7 BC row; new §8 (modes, R5/R6 scope incl. T1 contract scope, S1–S7, network semantics, anti-R6 guard).
+- Migration Matrix: new section with B+C dispositions, baseline preservation and retirement order (trails at BC2 acceptance; PR1 network rules at BC2; legacy runtime after the accepted Vertical Slice).

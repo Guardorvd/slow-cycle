@@ -44,6 +44,32 @@ KEEP сохраняет правильную responsibility; EXTEND добавл
 
 До любого удаления старой системы нужен separate approved task: consumers migrated, coverage определено, stable APIs защищены, negative/determinism/integration evidence сохранено и rollback возможен. Baseline старого runtime ещё не frozen Q2; старые отчёты — reference, не свежая parity certification.
 
+## B+C: региональные системы после PR1 (поправка 2026-10-12)
+
+Источник: [roadmap](ROADMAP_B_C_ROUTE_REALIZATION.md) §§4–5, [Master XII-B](MASTER_IMPLEMENTATION_PLAN.md#xii-b-amendment-bc-2026-10-12). PR1 — [SUSPENDED](plans/suspended/PR1.md): его системы реализованы, но не приняты.
+
+| Система | Решение | Граница |
+|---|---|---|
+| Region identity, макрогеография, TerrainField, гидрология, биомы (R0–R4) | KEEP | Продуктовые дефекты — отдельными задачами |
+| RideabilityField | ADAPT | Природные признаки сохраняются; общий traversal cost не доказывает проходимость велосипедом |
+| RegionRouteGraph, anchors, journey scoring (R5) | KEEP / ADAPT | + способ реализации участка, причина тропы, направленная доступность, ценность тупика (BC2) |
+| R5 search / corridors | ADAPT | Для основных дорог и выбора районов; для троп коридор R5 не обязателен |
+| RoadSynthesizer и связанные (R6, policy `regional_road/2` из PR1) | KEEP для ENGINEERED, пока оправдано | Не переписывать работающие дороги; для NATURAL / SHAPED не используется; пересмотр по измеренной проблеме |
+| Junctions, bridges, fords | ADAPT | Переиспользовать; примыкание тропы не обязано создавать большую дорожную площадку |
+| RoadTerrainDeformer / FinalSurface (R7 + PR1) | ADAPT / EXTEND | Единственный владелец поверхности; природная маска отдельно от деформации; запросы согласуются с опубликованной геометрией |
+| RealizedRoadNetwork / RegionNetworkBuilder (PR1) | ADAPT | Приёмка законченных связей; правила тупиков по roadmap §3.6 заменяют `DEAD_END_NOT_TERMINUS` и удаление до неподвижной точки в BC2 (T3) |
+| RegionBake, RegionBakeCache, RegionStreamer, vegetation planner (PR1) | KEEP / ADAPT | Расширять продукты и инвалидирование; новый streaming framework не создаётся |
+| BicycleController, камера, управление | KEEP | Правка — только отдельная измеренная задача игрока |
+| Экспериментальные N4 patches (evidence root PR1) | Evidence | Автоматически не переносятся |
+
+**Сохранение baseline.** Приостановленный PR1 (`beacc9c`, локальный тег `pr1-suspended-baseline`, seed 184729) — играбельный эталон для сравнения; комплект воспроизведения и ограничения свидетельств — в [записи PR1](plans/suspended/PR1.md) §6. На конце каждой фазы BC регион остаётся играбельным; регрессия работающего (backbone, мосты, броды, recovery, streaming, съезд с дороги) блокирует фазу. Новая версия продуктов bake получает собственную schema; откат — по revision.
+
+**Порядок вывода без вечной двойной поддержки.**
+
+1. **Тропы.** В BC1 прототип тропы подключается явной конфигурацией; путь R5/R6 для SINGLETRACK / TECHNICAL остаётся как есть. При формальной приёмке BC2 NATURAL / SHAPED становится единственным путём генерации троп по умолчанию; код R6 для ST/TECH либо выводится в том же плане, либо остаётся только как ENGINEERED-способ отдельного участка с явным обоснованием.
+2. **Правила сети PR1** (`DEAD_END_NOT_TERMINUS`, неподвижная точка) заменяются в BC2 вместе с новыми тестами; утверждение изменения — в плане BC2.
+3. **Legacy road-first runtime** (RoadGraph, RoadLogic, TerrainCarver, ChunkStreamer, ChunkFoliage и их G gates) остаётся REGRESSION_GUARD, пока он доступен в меню. Вывод — отдельная задача после принятого Vertical Slice (BC5): потребители перенесены, решение по G gates утверждено, rollback возможен. Раньше этого legacy не расширяется новыми функциями.
+
 ## Out of scope D0
 
 Нет удаления классов, adapters, schemas, ресурсных migrations, новых tests или изменений assertions/categories. Новые domain contracts, ownership и код создаются в R-фазах. Код определяет безопасный путь перехода; наличие работающей legacy системы не делает её target обязательной.
