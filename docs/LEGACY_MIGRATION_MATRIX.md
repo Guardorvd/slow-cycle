@@ -66,9 +66,9 @@ KEEP сохраняет правильную responsibility; EXTEND добавл
 
 **Порядок вывода без вечной двойной поддержки.**
 
-1. **Тропы.** В BC1 прототип тропы подключается явной конфигурацией; путь R5/R6 для SINGLETRACK / TECHNICAL остаётся как есть. При формальной приёмке BC2 NATURAL / SHAPED становится единственным путём генерации троп по умолчанию; код R6 для ST/TECH либо выводится в том же плане, либо остаётся только как ENGINEERED-способ отдельного участка с явным обоснованием.
+1. **Тропы.** В BC1 прототип тропы подключается явной конфигурацией; путь R5/R6 для SINGLETRACK / TECHNICAL остаётся как есть. При формальной приёмке BC2 NATURAL / SHAPED становится единственным путём генерации троп по умолчанию; код R6 для ST/TECH либо выводится в том же плане, либо остаётся только как ENGINEERED-способ отдельного участка с явным обоснованием. Изменения, затрагивающие проверки T1/T7 (roadmap §5.4), требуют отдельного конкретного утверждения.
 2. **Правила сети PR1** (`DEAD_END_NOT_TERMINUS`, неподвижная точка) заменяются в BC2 вместе с новыми тестами; утверждение изменения — в плане BC2.
-3. **Legacy road-first runtime** (RoadGraph, RoadLogic, TerrainCarver, ChunkStreamer, ChunkFoliage и их G gates) остаётся REGRESSION_GUARD, пока он доступен в меню. Вывод — отдельная задача после принятого Vertical Slice (BC5): потребители перенесены, решение по G gates утверждено, rollback возможен. Раньше этого legacy не расширяется новыми функциями.
+3. **Legacy road-first runtime** (RoadGraph, RoadLogic, TerrainCarver, ChunkStreamer, ChunkFoliage) выводится постепенно, по строкам выше и точкам Master (R7 TerrainCarver, R10 ChunkStreamer, R11 ChunkFoliage, R13 RoadGraph/ForkDecisionModel): только после миграции потребителей, parity и отдельной утверждённой задачи с возможностью rollback. Поправка B+C не добавляет новых условий вывода. G gates остаются обязательными по [world AGENTS](../scripts/world/AGENTS.md); их категории — по [TEST_MATRIX](TEST_MATRIX.md), без изменений.
 
 ## Out of scope D0
 

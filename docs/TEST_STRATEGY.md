@@ -149,7 +149,7 @@ A PLAYABLE checkpoint is a point **inside** a task, declared in its ExecPlan fie
 
 ### 8.3 Repeated failures and escalation
 
-Repeated failures call for a different way of solving, not continued mechanical fixing of the same algorithm. Within the approved architecture and scope the developer may choose another local method, simplify, defer an optional capability with a record, continue independent work or record the problem for later. The Game Director is consulted for a real architectural dead end, a scope expansion, a change of protected contracts or checks, or a serious product compromise. No arbitrary numeric attempt limits are set; an ExecPlan may still name its own stop conditions.
+Repeated failures call for a different way of solving, not continued mechanical fixing of the same algorithm. Within the approved architecture and scope the developer may choose another local method, simplify, defer an optional capability with a record (optional per roadmap §3.7 and PR1 D13 — never a mandatory route class such as N4 or another core requirement), continue independent work or record the problem for later. The Game Director is consulted for a real architectural dead end, a scope expansion, a change of protected contracts or checks, or a serious product compromise. No arbitrary numeric attempt limits are set; an ExecPlan may still name its own stop conditions.
 
 ### 8.4 Applicability of existing contracts to B+C segments
 
@@ -157,7 +157,7 @@ The full map T1–T9 is in the [roadmap §5.4](ROADMAP_B_C_ROUTE_REALIZATION.md)
 
 - R6 class limits (`road_synthesis_oracle.gd`, `test_road_synthesis.gd`) guard ENGINEERED pieces realized by R6; NATURAL / SHAPED segments get their own contract and tests in BC1. No existing check changes.
 - R5 `ERR_GRAPH_UNJUSTIFIED_DEAD_END`, the R7 `test_final_surface.gd` fixture guard, the bicycle envelope, the retained legacy road guard and the G gates are unchanged; G applicability follows the §7.1 reference audit.
-- PR1 D10 T2.4 categories, approved with PR1 v1.1, are recorded here: `test_final_surface --source=fixture` (contracts/surface/collision) = REGRESSION_GUARD of the R7 machinery on HEAD; `--source=live` with `handoff` = LEGACY_CONTRACT of the R6 v1 handoff, run on `pr1-baseline`. TEST_MATRIX is unchanged (PR1 D10 T5).
+- PR1 D10 T2.4 categories, approved with PR1 v1.1, are recorded here: `test_final_surface --source=fixture` (contracts/surface/collision) = REGRESSION_GUARD of the R7 machinery on HEAD, mandatory at L2; `--source=live` with `handoff` = LEGACY_CONTRACT of the R6 v1 handoff, run on `pr1-baseline`. TEST_MATRIX is unchanged (PR1 D10 T5).
 - **Open protection gap:** the PR1 suites `test_region_network`, `test_region_surface`, `test_region_runtime` and the transfer of the `handoff` checks were never created. BC1 must close or explicitly re-plan this before its L2.
 - **Known failure:** S3 — `test_road_synthesis --group=regions` 184729, 10 × `oracle_path_move:*` curvature, awaiting a Director decision; not reclassified.
 - The PR1 network rules (RealizedRoadNetwork, RegionNetworkBuilder) are **executed but not asserted** by `test_region_ride.gd` and `capture_region_world.gd` (through `region_world.tscn` → `region_bake.gd`) and by the `region_ride_bot.gd` tool; no test asserts them. (This corrects the narrower wording «used only by `region_ride_bot.gd`» in roadmap v2 §5.4.) Changing these rules (`DEAD_END_NOT_TERMINUS`, fixed point) is planned and approved in BC2 together with new tests.

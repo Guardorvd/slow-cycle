@@ -1,6 +1,6 @@
 TASK: BC0 — Architecture & Documentation Migration to B+C route realization (roadmap Phase 0)
 DATE: 2026-10-12
-STATUS: VERIFYING — ExecPlan v1.0 APPROVED; M0–M3 done; VERIFY #1 FAIL (B1) → F1 → VERIFY #2 PASS → F2 (record wording) → VERIFY #3 of the F2 impact set, then REVIEW
+STATUS: REVIEWING — ExecPlan v1.0 APPROVED; VERIFY #1 FAIL → F1 → VERIFY #2 PASS → F2 → VERIFY #3 PASS → REVIEW #1 REJECT (R-B1) → F3 → VERIFY #4 + REVIEW #2 of the F3 delta
 BRANCH/BASE/HEAD: bc0-architecture-migration / pr1-playable-region `beacc9c` (= origin/pr1-playable-region) / first branch commit holds only `docs/proposals/` (SHA reported in chat)
 BASELINE: clean at `beacc9c`; local tag `pr1-suspended-baseline` → `beacc9c` (unpublished); PR1 branch untouched
 APPROVAL: Game Director in chat 2026-10-12 — «APPROVE BC0 ExecPlan v1.0», SHA-256 `abccce2168c2cd0bb50dc2b0bbb8f6ec40fb5a63e8d6d1b70ac696d8d0cf9a11` (as committed in `53a69f2` `docs/proposals/BC0_EXECPLAN.md`): roadmap B+C v2 direction, PR1 → SUSPENDED, §A1–A4, full BC0 scope, local milestone commits, evidence root. Conditions: (1) the roadmap becomes ACCEPTED only after independent VERIFY/REVIEW PASS and BC0 closeout; (2) the presumed PR1 cache key is not presented as confirmed — exact revision, reproduction and evidence limits are recorded. Body below is the approved text; only this header changed
@@ -194,16 +194,16 @@ Evidence root: `C:/Users/Luisa/Documents/Codex/2026-10-12/bc0/`.
 - PR1 plan read in full (allowed by this approved execution). [Suspension record](docs/plans/suspended/PR1.md) created with milestone and DoD state, D1–D13 state, known failures, baseline and obligations; [index](docs/plans/suspended/README.md).
 - Verbatim copy: embedded bytes SHA-256 `e63de9c1…38a4` = `git show beacc9c:implementation_plan.md` (checked by extraction; the CRLF working-tree checkout hashes `5978d182…048b`, same content).
 - This approved plan installed in the slot; body byte-identical to `53a69f2:docs/proposals/BC0_EXECPLAN.md`, header updated (status, approval, location, input link).
-- **Stop-point findings (added to the record, roadmap §5.3/§5.4 corrected in M1):** PR1 D10 T1 suites `test_region_network` / `test_region_surface` / `test_region_runtime` were never created, and the T2.4 transfer of the `handoff` checks was not done — a protection gap for the realized network, now an open obligation owned by BC1. The S3 oracle conflict (10 × curvature) is still undecided. PR1 D10 T2.4 categories (fixture = REGRESSION_GUARD, live = LEGACY_CONTRACT) were approved with PR1 v1.1 and are recorded, not newly decided.
+- **Stop-point findings (added to the record; the roadmap §5.3/§5.4 edits made in M1 were reverted by F1, the findings stay in the PR1 record and Test Strategy §8.4):** PR1 D10 T1 suites `test_region_network` / `test_region_surface` / `test_region_runtime` were never created, and the T2.4 transfer of the `handoff` checks was not done — a protection gap for the realized network, now an open obligation owned by BC1. The S3 oracle conflict (10 × curvature) is still undecided. PR1 D10 T2.4 categories (fixture = REGRESSION_GUARD, live = LEGACY_CONTRACT) were approved with PR1 v1.1 and are recorded, not newly decided.
 - **Approval condition 1 applied to M1:** the roadmap moves to `docs/` in M1 with status «APPROVED — becomes ACCEPTED at BC0 closeout»; ACCEPTED is set only in M4 after VERIFY/REVIEW PASS.
 - **Approval condition 2:** the PR1 cache directory for `beacc9c` is recorded as unconfirmed (two candidate entries, key not computed).
 
 ## M1 — architecture documents (DONE)
 
-- Roadmap moved to [docs/ROADMAP_B_C_ROUTE_REALIZATION.md](docs/ROADMAP_B_C_ROUTE_REALIZATION.md), links re-based, status «APPROVED — becomes ACCEPTED at BC0 closeout» (condition 1); v2.1 adds the M0 findings to §5.3/§5.4 (D10 T1/T2.4 protection gap → BC1; S3 → Director decision), updates K1 and the RM-8/RM-9 status.
+- Roadmap moved to [docs/ROADMAP_B_C_ROUTE_REALIZATION.md](docs/ROADMAP_B_C_ROUTE_REALIZATION.md), links re-based, status «APPROVED — becomes ACCEPTED at BC0 closeout» (condition 1); v2.1 added the M0 findings to §5.3/§5.4 and updated K1 and the RM-8/RM-9 status — **reverted by F1** (VERIFY #1 B1).
 - Master: appended «XII-B. Amendment B+C (2026-10-12)» before §XIV and one pointer line under R6, R7 (qualifies `FinalSurface.sample(x,z)` by S1–S7), R8, R13; no existing text removed; R9–R21 goals unchanged. L3 mapping: the R8 checkpoint was not run in PR1, the first L3 follows BC2 and covers R8 + R13.
 - Target Architecture: §1 diagram with route realization by segment; owner table (RoutePlanner, RoadSynthesizer = ENGINEERED, trail realization, published network, FinalSurface, WorldStreamer); §5 composition; §7 BC row; new §8 (modes, R5/R6 scope incl. T1 contract scope, S1–S7, network semantics, anti-R6 guard).
-- Migration Matrix: new section with B+C dispositions, baseline preservation and retirement order (trails at BC2 acceptance; PR1 network rules at BC2; legacy runtime after the accepted Vertical Slice).
+- Migration Matrix: new section with B+C dispositions, baseline preservation and retirement order (trails at BC2 acceptance; PR1 network rules at BC2; legacy runtime — step 3 **restated by F3** after REVIEW R-B1: gradual retirement per Master's retire points, no new condition).
 
 ## M2 — state, strategy, navigation (DONE)
 
@@ -279,3 +279,21 @@ Report `C:/Users/Luisa/Documents/Codex/2026-10-12/bc0/verify/VERIFY_REPORT.md`, 
 Report `C:/Users/Luisa/Documents/Codex/2026-10-12/bc0/verify2/VERIFY_REPORT.md`, SHA-256 `b44cdb7e969257f2b349fd2e2b0b1d199f0479247bce0fe318d6870eab4f5f50`; candidate `1db5323`, diff digest `a500ed53…87b2c`. B1 resolved (roadmap = approved v2 except re-based links and the STATUS line). Non-blocking M1–M6.
 
 F2 (author): M1 R5 closure wording (closure unchanged since `37e584d` except `region_seed_derivation.gd`, also preloaded by `test_route_network.gd`); M2 S3 owner cites roadmap T7; M3 424259/0 is the total of the fixture groups; M4 ledger rows from the reports. M5 (roadmap errata: R7 «Принято (Alpha)» in §1.2, «used only by `region_ride_bot.gd`» in §5.4) and M6 (links to the slot re-based to the completed record) are closeout items.
+
+## VERIFY #3 — PASS (fresh context, F2 impact set)
+
+Report `C:/Users/Luisa/Documents/Codex/2026-10-12/bc0/verify3/VERIFY_REPORT.md`, SHA-256 `d841a40828351b73e2669445ca75e7219cb2e24e992507f694668030075af301`; candidate `ce7edff`, diff digest `c13b33dd…23b`; VERIFY #2 reused by byte identity for all other files. Non-blocking P1–P3 (ledger, «analysis» wording, reverted-edit marks).
+
+## REVIEW #1 — REJECT (independent fresh context)
+
+Report `C:/Users/Luisa/Documents/Codex/2026-10-12/bc0/review/REVIEW_REPORT.md`, SHA-256 `61c48ed49076a7b3febd91bb55d2533e44ce135641f5ac3f0f5430efe1efc6c3`; inputs plan `abccce21…`, diff `c13b33dd…`, VERIFY #1–#3. **R-B1 (blocking):** Migration Matrix retirement step 3 introduced an unapproved migration gate (legacy retirement tied to BC5 and a feature freeze) and a category claim («REGRESSION_GUARD» for the G gates) that differs from TEST_MATRIX. Non-blocking R-N1–R-N10; R-N1, R-N2, R-N3, R-N9 are closeout items. Governance amendment, PR1 honesty, Master/Target fidelity, T1 scope and F1 found sound.
+
+## F3 — fixes (author, within the whitelist)
+
+- R-B1: step 3 restated — gradual retirement per the matrix rows and Master's retire points (R7, R10, R11, R13) after consumer migration, parity and a separate approved task; «no new conditions»; G gates mandatory under world AGENTS, categories per TEST_MATRIX unchanged.
+- R-N4: PR1 record — BC1 L2 runs the G gates for the PR1 main-scene closure change regardless of BC1's own scope; also a precondition for merging PR1 code into master.
+- R-N5: Target Architecture — published-network row names its owner (roadmap §3.1 «FinalSurface и публикация региона») and RealizedRoadNetwork as ADAPT; flow candidates → FinalSurface check → published network → bake/runtime.
+- R-N6: T2.4 categories carry «mandatory at L2» (Test Strategy §8.4, PR1 record) and are also recorded in Current Project State (the place PR1 T5 named).
+- R-N7: Test Strategy §8.3 — «optional» bound to roadmap §3.7 / PR1 D13; never a mandatory route class.
+- R-N8: Migration Matrix step 1 — changes touching T1/T7 need specific approval.
+- R-N9 partly: «analysis in BC2» wording; reverted/restated marks on the M0/M1 bullets. Ledger completion, R-N1, R-N2, R-N3 at closeout.
