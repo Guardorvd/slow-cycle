@@ -89,6 +89,8 @@ PR1 delivered a launchable regional game on branch `pr1-playable-region` (14 com
 
 ## 7. Open obligations and new owners
 
+Owners not named in roadmap v2 §5.3 (approved) are **proposed by BC0** and reported to the Director ([BC0 record §5](../completed/BC0.md)).
+
 | Obligation | Owner |
 |---|---|
 | Formal acceptance of the implemented M0–M5 capabilities (region scene, streaming, bake/cache, FinalSurface render = collision, network, bridges, fords, vegetation, recovery) | L2 of the first phase that touches them (BC1), then L3 after BC2 |

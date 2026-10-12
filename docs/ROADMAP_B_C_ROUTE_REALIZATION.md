@@ -1,10 +1,10 @@
 # Slow Cycle — реализация маршрутов B+C: архитектура и Implementation Roadmap
 
-STATUS: APPROVED (Game Director, 2026-10-12, with amendments A–E and RM-8 = variant B) — becomes ACCEPTED at BC0 closeout after independent VERIFY/REVIEW PASS
+STATUS: ACCEPTED (2026-10-12, BC0 closeout after independent VERIFY PASS + REVIEW PASS; approved by the Game Director with amendments A–E and RM-8 = variant B). Errata of this v2 text: [BC0 record §4](plans/completed/BC0.md)
 
 Версии: v1 — 2026-10-12, `pr1-playable-region` @ `beacc9c`. v2 — 2026-10-12, ветка `bc0-architecture-migration`: поправки Director A–E, PR1 variant B, карта миграции проверок (§5.4). Godot и тестовые кампании для документа не запускались.
 
-**Полномочия документа.** До завершения фазы 0 это одобренное предложение, а не источник истины. Он не меняет [Blueprint](TARGET_GAME_BLUEPRINT.md), [Master](MASTER_IMPLEMENTATION_PLAN.md), [Target Architecture](TARGET_ARCHITECTURE.md), [Migration Matrix](LEGACY_MIGRATION_MATRIX.md), [Test Strategy](TEST_STRATEGY.md), [AGENTS](../AGENTS.md) и [план PR1](plans/suspended/PR1.md). Фаза 0 согласованно обновляет эти документы по [ExecPlan BC0](../implementation_plan.md). После этого документ становится принятым архитектурным решением, подчинённым Blueprint и Master. Каждая фаза ниже исполняется только по собственному утверждённому ExecPlan. Идентификаторы задач фаз: BC0…BC6.
+**Полномочия документа.** До завершения фазы 0 это одобренное предложение, а не источник истины. Он не меняет [Blueprint](TARGET_GAME_BLUEPRINT.md), [Master](MASTER_IMPLEMENTATION_PLAN.md), [Target Architecture](TARGET_ARCHITECTURE.md), [Migration Matrix](LEGACY_MIGRATION_MATRIX.md), [Test Strategy](TEST_STRATEGY.md), [AGENTS](../AGENTS.md) и [план PR1](plans/suspended/PR1.md). Фаза 0 согласованно обновляет эти документы по [ExecPlan BC0](plans/completed/BC0.md). После этого документ становится принятым архитектурным решением, подчинённым Blueprint и Master. Каждая фаза ниже исполняется только по собственному утверждённому ExecPlan. Идентификаторы задач фаз: BC0…BC6.
 
 **Обозначения.** **Факт** — проверено по коду или сохранённым свидетельствам (источник указан). **Предположение** — рабочая гипотеза; фаза, где её проверяют, указана. **Решение** — пункт §9.
 
@@ -204,7 +204,7 @@ Landmarks и vistas (R14–R15) дают цели, зоны подхода и о
 
 **Решение Director (2026-10-12): вариант B.** PR1 приостанавливается и сохраняется как воспроизводимый baseline. Эксперименты N4 и старая полная кампания ради формального закрытия не продолжаются. PR1 **не COMPLETE и не PASS**.
 
-Новое состояние жизненного цикла **SUSPENDED** вводится поправкой `.agent/PLANS.md`. Точный текст — в [ExecPlan BC0](../implementation_plan.md), §A. Порядок:
+Новое состояние жизненного цикла **SUSPENDED** вводится поправкой `.agent/PLANS.md`. Точный текст — в [ExecPlan BC0](plans/completed/BC0.md), §A. Порядок:
 
 1. Запись `docs/plans/suspended/PR1.md` содержит: решение и его источник; статус каждого milestone (сделан / не сделан / не запускался); сохранённые результаты проверок с их ограничениями; известные проблемы; комплект baseline (§5.1); открытые обязательства и их новых владельцев. Дословная копия плана PR1 привязана к SHA-256 корневого файла.
 2. Слот `implementation_plan.md` освобождается только после создания этой записи. Тихого удаления нет.
@@ -263,7 +263,7 @@ BC0 решения, документы ─► BC1 одна тропа B+C ──
 ### Фаза 0 (BC0) — решения, документы и переход из PR1
 
 - **Результат.** PR1 переведён в SUSPENDED с воспроизводимым baseline. Источники истины согласованы с этим документом. Слот плана свободен для ExecPlan BC1.
-- **Затрагивает (только документы).** Точный whitelist — в [ExecPlan BC0](../implementation_plan.md).
+- **Затрагивает (только документы).** Точный whitelist — в [ExecPlan BC0](plans/completed/BC0.md).
   - `.agent/PLANS.md` (SUSPENDED и поле playtest checkpoints) и одна фраза в AGENTS.
   - Запись приостановки PR1.
   - Master: короткая поправка о вкладе PR1 и пути B+C; цели R9–R21 не переписываются; формулировка R7 `FinalSurface.sample(x,z)` уточняется в духе §3.5.
@@ -411,7 +411,7 @@ PLAYABLE — контрольная точка **внутри** фазы. Она
 
 | # | Конфликт | Правило | Разрешение |
 |---|---|---|---|
-| K1 | Слот плана занят PR1 (IMPLEMENTING); одна активная задача; нет состояния SUSPENDED | [AGENTS](../AGENTS.md) «Keep one active plan»; [PLANS.md](../.agent/PLANS.md) Completion lifecycle | Variant B выбран. Поправка PLANS.md (SUSPENDED) — [BC0 §A](../implementation_plan.md). До её утверждения ExecPlan BC0 хранится рядом с этим документом, а не в слоте |
+| K1 | Слот плана занят PR1 (IMPLEMENTING); одна активная задача; нет состояния SUSPENDED | [AGENTS](../AGENTS.md) «Keep one active plan»; [PLANS.md](../.agent/PLANS.md) Completion lifecycle | Variant B выбран. Поправка PLANS.md (SUSPENDED) — [BC0 §A](plans/completed/BC0.md). До её утверждения ExecPlan BC0 хранится рядом с этим документом, а не в слоте |
 | K2 | Состояние PLAYABLE / REVIEWABLE не определено в governance | AGENTS / PLANS.md знают только статусы плана и COMPLETE | Поле «Playtest checkpoints» в PLANS.md и раздел Test Strategy (BC0) без изменения VERIFY/REVIEW/L2. Прецедент — Director condition 1 |
 | K3 | Изменение правил сети PR1 (T3) затронет будущие проверки | [test-integrity](../.antigravity/rules/test-integrity.md); AGENTS «Test mutation/reclassification needs explicit human approval» | Карта §5.4: в BC0/BC1 существующие проверки не меняются. T3 утверждается в BC2 |
 | K4 | Snapshot региона допустим для L0/L1, но не для L2 | [Test Strategy §7.4](TEST_STRATEGY.md) Fixtures | Конфликта нет, если быстрый режим остаётся dev-only. L2 строит регион live. Записано, чтобы не размыть границу |
@@ -475,7 +475,7 @@ PLAYABLE — контрольная точка **внутри** фазы. Она
 
 ## 10. Следующий шаг
 
-1. Director утверждает [ExecPlan BC0](../implementation_plan.md) v1.0, включая текст поправки PLANS.md (§A) и разрешение на локальные коммиты BC0.
+1. Director утверждает [ExecPlan BC0](plans/completed/BC0.md) v1.0, включая текст поправки PLANS.md (§A) и разрешение на локальные коммиты BC0.
 2. BC0 исполняется: PR1 → SUSPENDED, документы согласуются, независимые VERIFY и REVIEW, закрытие BC0.
 3. Готовится ExecPlan BC1. Его первый результат — минимальная проезжаемая NATURAL-тропа на 184729 и плейтест 1.
 

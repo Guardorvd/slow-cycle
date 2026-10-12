@@ -2,7 +2,7 @@
 
 STATUS: CURRENT
 
-**Актуально на 2026-10-12:** PR1 [SUSPENDED](plans/suspended/PR1.md); одобрено направление B+C ([roadmap](ROADMAP_B_C_ROUTE_REALIZATION.md), [Master XII-B](MASTER_IMPLEMENTATION_PLAN.md#xii-b-amendment-bc-2026-10-12)); следующая исполнимая фаза — BC1 после отдельного ExecPlan и approval. Подробно — раздел «PR1 и переход на B+C» ниже.
+**Актуально на 2026-10-12:** PR1 [SUSPENDED](plans/suspended/PR1.md); направление B+C принято ([roadmap](ROADMAP_B_C_ROUTE_REALIZATION.md) ACCEPTED при закрытии BC0 — [record](plans/completed/BC0.md), [Master XII-B](MASTER_IMPLEMENTATION_PLAN.md#xii-b-amendment-bc-2026-10-12)); следующая исполнимая фаза — BC1 после отдельного ExecPlan и approval. Подробно — раздел «PR1 и переход на B+C» ниже.
 
 Дата governance: 03.10.2026. Scope: D0 documentation reset + завершённая локальная D1 governance implementation; runtime/source baseline `ed7d1322da1a5700a8c64425708e1c813213c7f6`, никаких игровых изменений в D0. Runtime evidence ниже датировано 01.10 или ранее и в D0 заново не запускалось. Точную текущую docs revision/branch определять через `git log -1`/`git status`; это не новый runtime baseline Q2.
 
@@ -78,7 +78,7 @@ Three tiles: 174,623 vertices / 348,564 triangles / approximately56-57 s build /
 - **Известные проблемы:** S3 — 10 × curvature в `test_road_synthesis --group=regions` 184729, ждёт решения Director; водоёмы рисуются плоской заплаткой; холодный bake 6–8 мин; случайные seed не гарантированы.
 - **Baseline:** `beacc9c` (= `origin/pr1-playable-region`), локальный тег `pr1-suspended-baseline`, Godot 4.7.2 mono, seed 184729. Какой каталог cache соответствует `beacc9c`, не подтверждено; cold bake воспроизводит регион ([запись PR1](plans/suspended/PR1.md) §6).
 - **Направление B+C:** одна маршрутная сеть; участки ENGINEERED (R5/R6 для основных дорог, пока оправдано), NATURAL и SHAPED; единая FinalSurface (принципы S1–S7); осмысленные тупики без ловушек; приёмка законченных связей; PLAYABLE отдельно от FORMALLY ACCEPTED ([Test Strategy §8](TEST_STRATEGY.md)).
-- **Следующая фаза:** BC1 — первая проезжаемая NATURAL-тропа на 184729, плейтест, затем первая операция SHAPED. Требует отдельного ExecPlan и approval. BC0 — [план и execution record](../implementation_plan.md).
+- **Следующая фаза:** BC1 — первая проезжаемая NATURAL-тропа на 184729, плейтест, затем первая операция SHAPED. Требует отдельного ExecPlan и approval. BC0 — COMPLETE ([completed record](plans/completed/BC0.md)).
 
 ## 2. Что фактически есть
 
