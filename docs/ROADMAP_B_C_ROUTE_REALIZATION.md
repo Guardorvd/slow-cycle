@@ -1,10 +1,10 @@
 # Slow Cycle — реализация маршрутов B+C: архитектура и Implementation Roadmap
 
-STATUS: ACCEPTED (2026-10-12, BC0 closeout after independent VERIFY PASS + REVIEW PASS; approved by the Game Director with amendments A–E and RM-8 = variant B). Errata of this v2 text: [BC0 record §4](plans/completed/BC0.md)
+STATUS: ACCEPTED (2026-10-12, BC0 closeout after independent VERIFY PASS + REVIEW PASS; approved by the Game Director with amendments A–E and RM-8 = variant B). Factual errata E1–E5 applied 2026-10-13 by Director authorization; history: [errata record](ROADMAP_B_C_ERRATA_2026-10-13.md), [original findings](plans/completed/BC0.md#4-roadmap-v2-errata-reported-to-the-director-roadmap-text-unchanged). BC0 remains COMPLETE.
 
-Версии: v1 — 2026-10-12, `pr1-playable-region` @ `beacc9c`. v2 — 2026-10-12, ветка `bc0-architecture-migration`: поправки Director A–E, PR1 variant B, карта миграции проверок (§5.4). Godot и тестовые кампании для документа не запускались.
+Версии: v1 — 2026-10-12, `pr1-playable-region` @ `beacc9c`. v2 — 2026-10-12, ветка `bc0-architecture-migration`: поправки Director A–E, PR1 variant B, карта миграции проверок (§5.4). v2.1 — 2026-10-13: только фактическая errata E1–E5, без изменения архитектуры, фаз и продуктовых требований. Godot и тестовые кампании для документа не запускались.
 
-**Полномочия документа.** До завершения фазы 0 это одобренное предложение, а не источник истины. Он не меняет [Blueprint](TARGET_GAME_BLUEPRINT.md), [Master](MASTER_IMPLEMENTATION_PLAN.md), [Target Architecture](TARGET_ARCHITECTURE.md), [Migration Matrix](LEGACY_MIGRATION_MATRIX.md), [Test Strategy](TEST_STRATEGY.md), [AGENTS](../AGENTS.md) и [план PR1](plans/suspended/PR1.md). Фаза 0 согласованно обновляет эти документы по [ExecPlan BC0](plans/completed/BC0.md). После этого документ становится принятым архитектурным решением, подчинённым Blueprint и Master. Каждая фаза ниже исполняется только по собственному утверждённому ExecPlan. Идентификаторы задач фаз: BC0…BC6.
+**Полномочия документа.** После закрытия [BC0](plans/completed/BC0.md) это принятое архитектурное решение, подчинённое [Blueprint](TARGET_GAME_BLUEPRINT.md) и [Master](MASTER_IMPLEMENTATION_PLAN.md). Согласованные источники истины: [Target Architecture](TARGET_ARCHITECTURE.md), [Migration Matrix](LEGACY_MIGRATION_MATRIX.md), [Test Strategy](TEST_STRATEGY.md), [AGENTS](../AGENTS.md); PR1 — [SUSPENDED](plans/suspended/PR1.md). Каждая фаза ниже исполняется только по собственному утверждённому ExecPlan. Идентификаторы задач фаз: BC0…BC6.
 
 **Обозначения.** **Факт** — проверено по коду или сохранённым свидетельствам (источник указан). **Предположение** — рабочая гипотеза; фаза, где её проверяют, указана. **Решение** — пункт §9.
 
@@ -20,8 +20,9 @@ STATUS: ACCEPTED (2026-10-12, BC0 closeout after independent VERIFY PASS + REVIE
 
 | Состояние | Возможности |
 |---|---|
-| Принято (Alpha) | R0 identity/bounds, R1 макрогеография, R2 TerrainField, R3 гидрология, R4 биомы и RideabilityField, R5 маршрутный граф и коридоры; R6 — LIMITED ALPHA (сертифицирован только ограниченный маршрут); R7 FinalSurface — технический LIMITED ALPHA; D2 — уровни проверки L0–L3 |
-| Реализовано в PR1, **не принято** (M0–M5; по решению 2026-10-12 PR1 приостанавливается — SUSPENDED, §5.3) | Региональная сцена из меню; spatial streaming (RegionStreamer); threaded bake + cache; near-render и collision из одних треугольников; съезд с дороги; реализованная сеть BACKBONE + SECONDARY с петлями, мостами и бродами; растительность в мировых координатах (M5); recovery. Seed 184729: 9,39 км, 3 петли, 13 мостов ([playtest note](PLAYTEST_MOUNTAIN_RIVER_VALLEY.md)) |
+| Принято (Alpha) | R0 identity/bounds, R1 макрогеография, R2 TerrainField, R3 гидрология, R4 биомы и RideabilityField, R5 маршрутный граф и коридоры; R6 — LIMITED ALPHA (сертифицирован только ограниченный маршрут); D2 — уровни проверки L0–L3 |
+| Технически завершено, Director acceptance pending | R7 FinalSurface — technical LIMITED ALPHA, VERIFY PASS + REVIEW PASS только для сертифицированного ограниченного маршрута ([R7 record](plans/completed/R7.md)); не принято Director |
+| Реализовано в PR1, **не принято** (M0–M5; по решению 2026-10-12 PR1 приостановлен — SUSPENDED, §5.3) | Региональная сцена из меню; spatial streaming (RegionStreamer); threaded bake + cache; near-render и collision из одних треугольников; съезд с дороги; реализованная сеть BACKBONE + SECONDARY с петлями, мостами и бродами; растительность в мировых координатах (M5); recovery. Seed 184729: 9,39 км, 3 петли, 13 мостов ([playtest note](PLAYTEST_MOUNTAIN_RIVER_VALLEY.md)) |
 | Не выполнено в PR1 | N4 — SINGLETRACK/TECHNICAL в итоговой сети (S1 поднят повторно после двух итераций решения B); M6 — измерения frame time на GPU и памяти; E7 |
 | Не начато | Landmarks, vistas, Journey Director, библиотека ездовых ситуаций как полноценные владельцы (R14–R17); R18–R21 |
 
@@ -204,7 +205,7 @@ Landmarks и vistas (R14–R15) дают цели, зоны подхода и о
 
 **Решение Director (2026-10-12): вариант B.** PR1 приостанавливается и сохраняется как воспроизводимый baseline. Эксперименты N4 и старая полная кампания ради формального закрытия не продолжаются. PR1 **не COMPLETE и не PASS**.
 
-Новое состояние жизненного цикла **SUSPENDED** вводится поправкой `.agent/PLANS.md`. Точный текст — в [ExecPlan BC0](plans/completed/BC0.md), §A. Порядок:
+Состояние жизненного цикла **SUSPENDED** введено в BC0 поправкой `.agent/PLANS.md`. Утверждённый текст — в [ExecPlan BC0](plans/completed/BC0.md), §A. Выполненный порядок:
 
 1. Запись `docs/plans/suspended/PR1.md` содержит: решение и его источник; статус каждого milestone (сделан / не сделан / не запускался); сохранённые результаты проверок с их ограничениями; известные проблемы; комплект baseline (§5.1); открытые обязательства и их новых владельцев. Дословная копия плана PR1 привязана к SHA-256 корневого файла.
 2. Слот `implementation_plan.md` освобождается только после создания этой записи. Тихого удаления нет.
@@ -216,19 +217,20 @@ Landmarks и vistas (R14–R15) дают цели, зоны подхода и о
 | N4: SINGLETRACK и TECHNICAL в опубликованной сети | Не выполнено | BC2, формальная приёмка; требование не ослабляется |
 | M6: L2-кампания, GPU frame time, память | Не запускалась | Измерения на baseline допускаются как входные данные BC1. Приёмка — по фазам и L3 |
 | E7 | Не проводилась | Только человек; плейтесты BC1+ и итоговая E7 в BC5 |
-| Известные проблемы (R6 regions 10 × S3, водоёмы-заплатки, bake 6–8 мин) | Сохраняются видимыми | Классификация не меняется; владельцы — в записи |
+| PR1 D10 T1/T2.4: отсутствующие suites и перенос handoff | Созданы test_ride_envelope, test_region_ride, region_ride_bot, capture_region_world; test_region_network / test_region_surface / test_region_runtime и замена handoff не созданы | Открытые обязательства: [PR1 §4, §7](plans/suspended/PR1.md); распределение по ответственности и минимум первой NATURAL-тропы задаёт ExecPlan BC1 по решению Director 2026-10-13; три полные suites не являются условием первого плейтеста |
+| Известные проблемы (R6 regions 10 × S3, водоёмы-заплатки, bake 6–8 мин) | Сохраняются видимыми | S3 — OPEN / KNOWN FAILURE по решению Director 2026-10-13; оценка при соответствующей геометрии и формальной приёмке BC2. Не блокирует BC1, пока не затрагивает тропу, безопасность или обязательные проверки scope. Остальные владельцы — в записи |
 
 ### 5.4 Миграция защищённых контрактов и проверок
 
 Утверждение архитектуры **не разрешает** удалять проверки, менять их категории или assertions. Каждое изменение — отдельное конкретное утверждение ([test-integrity](../.antigravity/rules/test-integrity.md), [Test Strategy §1](TEST_STRATEGY.md)).
 
-**Факт — область поиска.** Проверены ссылки на `road_synthesis_oracle`, `realized_road_network`, `region_network_builder`, `region_bake`, `dead_ends_not_terminus`, `TERMINUS` в `scripts/test` и `tools/verify`, а также строки [TEST_MATRIX](TEST_MATRIX.md). Суиты R5–R7 появились после Q0 и в TEST_MATRIX не входят. Правила сети PR1 не проверяются ни одним тестом репозитория: их использует только инструмент `region_ride_bot.gd`.
+**Факт — область поиска.** Проверены ссылки на `road_synthesis_oracle`, `realized_road_network`, `region_network_builder`, `region_bake`, `dead_ends_not_terminus`, `TERMINUS` в `scripts/test` и `tools/verify`, а также строки [TEST_MATRIX](TEST_MATRIX.md). Суиты R5–R7 появились после Q0 и в TEST_MATRIX не входят. Правила сети PR1 исполняются, но не проверяются assertions: `test_region_ride.gd` и `capture_region_world.gd` достигают их через `region_world.tscn` → `region_bake.gd`; их также использует `region_ride_bot.gd`. Ни один существующий тест не утверждает эти правила; запланированный `test_region_network` не создан.
 
 | # | Прежнее требование (владелец) | Новое требование | Область применимости | Затронутые проверки | Причина | Изменение проверок |
 |---|---|---|---|---|---|---|
 | T1 | Пределы классов `regional_road/1 §6`: уклоны [5,8,10,12]°, радиусы [35,25,19,19] м (R6) | Без изменений для полотна R6. Участки NATURAL/SHAPED получают собственный контракт тропы (BC1, критерии §3.4, числа по измерению) | Только участки ENGINEERED, реализованные R6, любого класса | `test_road_synthesis.gd` через `road_synthesis_oracle.gd`: `oracle_path_*`, `oracle_band_*`, `oracle_crossings_*`, `oracle_barrier_*`, `oracle_feature_*` | P1: радиус 19 м не следует из возможностей велосипеда | **Нет.** Oracle перебирает только экспортированные R6 pieces; новые участки в него не попадают. Изменение области записывается как контракт в Target Architecture |
 | T2 | TERMINUS графа должен быть обоснован anchor (`ERR_GRAPH_UNJUSTIFIED_DEAD_END`, R5) | Сохраняется и обобщается: у тупика тропы есть записанная причина (§3.4, §3.6) | Граф R5 и будущие тропы | `test_route_network.gd`: негативы unjustified terminus | Согласуется с новой архитектурой | **Нет** |
-| T3 | Правила сети PR1 (RealizedRoadNetwork): крупнейшая компонента, `DEAD_END_NOT_TERMINUS`, лёгкий возврат для descent-preferred, неподвижная точка; score и `complete()` N1–N6 (RegionNetworkBuilder) | Запланированные тупики с причиной; направленная проходимость и возврат; приёмка законченных связей (§3.6–3.7) | Production-правила PR1 | Тестов в репозитории нет; план PR1 M6 не исполнялся | P3 | **Нет тестов.** Изменение кода правил — в ExecPlan BC2 с новыми тестами. В BC1 правила не меняются: прототип тропы соединяется с узлами по обоим концам |
+| T3 | Правила сети PR1 (RealizedRoadNetwork): крупнейшая компонента, `DEAD_END_NOT_TERMINUS`, лёгкий возврат для descent-preferred, неподвижная точка; score и `complete()` N1–N6 (RegionNetworkBuilder) | Запланированные тупики с причиной; направленная проходимость и возврат; приёмка законченных связей (§3.6–3.7) | Production-правила PR1 | Нет assertions этих правил; test_region_network не создан; PR1 M6 не исполнялся | P3 | **Нет существующих assertions этих правил для изменения.** Изменение кода правил — в ExecPlan BC2 с новыми тестами. В BC1 правила не меняются: прототип тропы соединяется с узлами по обоим концам |
 | T4 | Приёмка PR1 N1–N7, включая N4 (план PR1) | Переходит в формальную приёмку BC2 без ослабления смысла: SINGLETRACK и TECHNICAL в **опубликованной** сети заявленных dev-регионов | BC2 | Критерии плана, не тесты | Решение variant B | **Нет.** Точный текст N1–N7 переносится из записи PR1 при её архивации (BC0 M0) |
 | T5 | Контракты R7 FinalSurface: `test_final_surface.gd` с fixture `r7_certified_route_184729_v1.bin` | Сохраняются для деформации ENGINEERED. Без тропы маска NATURAL не меняет результат: fixture-хеши идентичны | R7 certified route | `test_final_surface.gd` | S3–S5 | **Нет.** Новые тесты маски и SHAPED — BC1 |
 | T6 | Retained legacy road guard: C1, Soft-Repair R ≥ 19 м, запрет straight fallback ([world AGENTS](../scripts/world/AGENTS.md)) и G gates | Без изменений | Legacy RoadLogic runtime. Для региональных троп не применяется — world AGENTS уже запрещает переносить legacy-числа в региональные схемы | G gates (`test_seed_diversity_matrix`, `test_monotony_profiler`, `test_virtual_rider_bot`, `capture_visual_audit`) | — | **Нет.** Применимость G — по reference audit каждой фазы |
@@ -411,8 +413,8 @@ PLAYABLE — контрольная точка **внутри** фазы. Она
 
 | # | Конфликт | Правило | Разрешение |
 |---|---|---|---|
-| K1 | Слот плана занят PR1 (IMPLEMENTING); одна активная задача; нет состояния SUSPENDED | [AGENTS](../AGENTS.md) «Keep one active plan»; [PLANS.md](../.agent/PLANS.md) Completion lifecycle | Variant B выбран. Поправка PLANS.md (SUSPENDED) — [BC0 §A](plans/completed/BC0.md). До её утверждения ExecPlan BC0 хранится рядом с этим документом, а не в слоте |
-| K2 | Состояние PLAYABLE / REVIEWABLE не определено в governance | AGENTS / PLANS.md знают только статусы плана и COMPLETE | Поле «Playtest checkpoints» в PLANS.md и раздел Test Strategy (BC0) без изменения VERIFY/REVIEW/L2. Прецедент — Director condition 1 |
+| K1 | Исторический конфликт до BC0: PR1 занимал слот, SUSPENDED не было | [AGENTS](../AGENTS.md) «Keep one active plan»; [PLANS.md](../.agent/PLANS.md) Suspension lifecycle | RESOLVED в BC0: variant B выполнен, PR1 SUSPENDED; BC0 COMPLETE, слот освобождён для плана BC1. История и §A — [BC0 record](plans/completed/BC0.md) |
+| K2 | Исторический пробел до BC0: PLAYABLE / REVIEWABLE не определено | AGENTS / PLANS.md | RESOLVED в BC0: поле «Playtest checkpoints» и Test Strategy §8 введены без изменения VERIFY/REVIEW/L2 |
 | K3 | Изменение правил сети PR1 (T3) затронет будущие проверки | [test-integrity](../.antigravity/rules/test-integrity.md); AGENTS «Test mutation/reclassification needs explicit human approval» | Карта §5.4: в BC0/BC1 существующие проверки не меняются. T3 утверждается в BC2 |
 | K4 | Snapshot региона допустим для L0/L1, но не для L2 | [Test Strategy §7.4](TEST_STRATEGY.md) Fixtures | Конфликта нет, если быстрый режим остаётся dev-only. L2 строит регион live. Записано, чтобы не размыть границу |
 | K5 | Региональный код теперь достижим из главного меню. Вероятно, изменения bake попадают в legacy runtime closure, и на L2 нужны G gates | [world AGENTS](../scripts/world/AGENTS.md); Test Strategy §7.1 | Не конфликт, а стоимость L2. Reference audit каждой фазы решает применимость; при неясности G gates запускаются |
@@ -464,8 +466,8 @@ PLAYABLE — контрольная точка **внутри** фазы. Она
 | RM-5 | Приёмка законченных связей; метрики по опубликованной сети | §3.7 | Одобрено |
 | RM-6 | PLAYABLE / FORMALLY ACCEPTED; критичность дефектов; пересмотр способа решения вместо лимита попыток; правила эскалации | §7.1–7.2 | Одобрено с поправкой D |
 | RM-7 | Ускорение итераций после первой поездки, по замеру; production cache key не ослабляется | §7.4 | Одобрено с поправкой A |
-| RM-8 | PR1 → SUSPENDED (variant B) с сохранённым baseline | §5.1, 5.3 | Выбран variant B; текст lifecycle утверждается с ExecPlan BC0 |
-| RM-9 | Карта миграции T1–T9: BC0/BC1 без изменения проверок; T3 — в BC2 | §5.4 | Утверждается с ExecPlan BC0 |
+| RM-8 | PR1 → SUSPENDED (variant B) с сохранённым baseline | §5.1, 5.3 | Variant B и lifecycle утверждены с BC0 v1.0 и выполнены; PR1 SUSPENDED |
+| RM-9 | Карта миграции T1–T9: BC0/BC1 без изменения проверок; T3 — в BC2 | §5.4 | Утверждено с BC0 v1.0; существующие проверки не изменены |
 | RM-10 | Фазы BC0–BC6 с уточнениями §6 (порядок внутри BC1/BC2, возможная перестановка BC2/BC3, L3: BC2 ≈ R13, BC5 = R18, R19) | §6 | Одобрено с поправками A–B |
 | RM-11 | Причина существования тропы из существующих данных мира, без досрочной системы landmarks | §3.4 | Одобрено (поправка C) |
 
@@ -475,8 +477,8 @@ PLAYABLE — контрольная точка **внутри** фазы. Она
 
 ## 10. Следующий шаг
 
-1. Director утверждает [ExecPlan BC0](plans/completed/BC0.md) v1.0, включая текст поправки PLANS.md (§A) и разрешение на локальные коммиты BC0.
-2. BC0 исполняется: PR1 → SUSPENDED, документы согласуются, независимые VERIFY и REVIEW, закрытие BC0.
+1. Выполнено: [ExecPlan BC0](plans/completed/BC0.md) v1.0 утверждён и исполнен; BC0 закрыт.
+2. Зафиксировано: PR1 SUSPENDED, roadmap ACCEPTED, независимые VERIFY PASS и REVIEW PASS документационной фазы. BC0 не переоткрывается.
 3. Готовится ExecPlan BC1. Его первый результат — минимальная проезжаемая NATURAL-тропа на 184729 и плейтест 1.
 
 Ни одна фаза не начинается автоматически.
