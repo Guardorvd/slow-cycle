@@ -23,13 +23,35 @@ extends RefCounted
 ##   ERR_TRAIL_IDENTITY    configured for another seed, region or node layout
 ##   ERR_TRAIL_CONNECTION  ends not joined to their nodes, or another road met
 ##   ERR_TRAIL_UNRIDEABLE  water, a deck, grade, side slope or radius limit
-## (ERR_TRAIL_BUDGET belongs to the shaping operations of a later mode.)
+##   ERR_TRAIL_BUDGET      a shaping operation beyond its declared budget
+##
+## SHAPED (BC1 amendment A1): at most one operation per trail, BENCH - a local
+## traverse bench where the trail crosses a side slope. Over its interval the
+## band is levelled across (uphill edge cut, downhill edge filled by the design
+## cross slope c(s), tapered by a smoothstep over taper_m at both ends) and a
+## daylight strip on each side blends back to the surface; the centre line
+## keeps its height. c(s) is the straight fit across the band of the surface
+## the bench levels, (h(+hw) - h(-hw)) / (2 hw): realize() screens it on the
+## design surface, shape() measures it on the published (pre-bench) surface
+## and checks the amplitude budgets there. The record carries per-sample
+## amplitudes a = c * taper;
+## FinalSurface.trail_displacement() evaluates the displacement d(s, t):
+##   |t| <= hw                  d = -a * t
+##   hw < |t| <= hw + daylight  d = -a * sign(t) * hw * (hw + daylight - |t|) / daylight
+## Budgets (fixed before implementation, never enlarged to pass): one
+## operation, interval <= BENCH_MAX_LENGTH_M inside the trail interior,
+## daylight / taper ranges, |d| <= BENCH_MAX_DISPLACEMENT_M, earthwork
+## <= BENCH_MAX_VOLUME_M3, published band side slope <= BENCH_CROSS_MAX, and
+## footprint + BENCH_CLEARANCE_M clear of water and road planes and
+## BENCH_BORDER_M from every tile border.
 ##
 ## Configuration (JSON object):
 ##   {"schema": SCHEMA, "seed": int, "region": [x, z], "trails": [{
 ##     "id": "trail:<name>", "mode": "NATURAL", "purpose": text,
 ##     "nodes": [{"id": int, "x_m": float, "z_m": float}, {...}]   (region-local),
-##     "half_width_m": float, "control_points": [[x_m, z_m], ...]  (region-local)}]}
+##     "half_width_m": float, "control_points": [[x_m, z_m], ...]  (region-local),
+##     "operations": [{"kind": "BENCH", "from": [x_m, z_m], "to": [x_m, z_m],
+##                     "daylight_m": float, "taper_m": float}]      (optional)}]}
 
 const Graph = preload("res://scripts/world/region/region_route_graph.gd")
 const Policy = preload("res://scripts/world/region/road_synthesis_policy.gd")
@@ -47,18 +69,29 @@ const HALF_WIDTH_MIN_M: float = 0.5
 const HALF_WIDTH_MAX_M: float = 1.0
 ## Node layout tolerance of the identity check.
 const NODE_TOLERANCE_M: float = 1.0
-## PROVISIONAL screening limits for the first BC1 line, not NATURAL norms:
-## grade over GRADE_WINDOW_M and radius over +-RADIUS_WINDOW_M reuse the
-## SINGLETRACK/R6 class values (10 deg, 19 m) as conservative stand-ins; side
-## slope of the untouched ground across the band (no benching in NATURAL);
-## short pitches over one sample (road shoulders and earthwork the trail
-## crosses at its joins). Real two-way rideability is established by Input
-## rides of the existing BicycleController (BC1 runtime check), and NATURAL
-## norms are owned by BC2.
+## PROVISIONAL screening limits, not NATURAL norms (BC1 amendment A1): grade
+## over GRADE_WINDOW_M reuses the SINGLETRACK class value (10 deg); radius over
+## +-RADIUS_WINDOW_M is RADIUS_MIN_M, the BicycleController's full-lock radius
+## at 8 m/s (its exported steering defaults, as mirrored by the ride bot), not
+## R6's road radius; side slope of the untouched ground across the band
+## outside a bench; short pitches over one sample (road shoulders and
+## earthwork at the joins). Real two-way rideability is established by Input
+## rides of the existing BicycleController; NATURAL norms are owned by BC2.
 const GRADE_WINDOW_M: float = 4.0
 const RADIUS_WINDOW_M: float = 3.0
+const RADIUS_MIN_M: float = 8.0
 const CROSS_SLOPE_MAX: float = 0.35
 const PITCH_GRADE_MAX: float = 0.30
+## BENCH budgets (amendment A1).
+const BENCH_MAX_LENGTH_M: float = 60.0
+const BENCH_DAYLIGHT_RANGE_M := Vector2(0.5, 2.0)
+const BENCH_TAPER_RANGE_M := Vector2(2.0, 8.0)
+const BENCH_MAX_DISPLACEMENT_M: float = 0.30
+const BENCH_MAX_VOLUME_M3: float = 30.0
+const BENCH_CROSS_MAX: float = 0.06
+const BENCH_CLEARANCE_M: float = 1.5
+const BENCH_BORDER_M: float = 2.0
+const TILE_M: float = 512.0
 
 
 ## Validated configuration or ERR_TRAIL_INPUT. `value`: the parsed JSON.
@@ -178,14 +211,156 @@ static func realize(trail: Dictionary, config: Dictionary, context: Dictionary) 
 		var k_edge: int = first_off if end == 0 else last_off
 		joins.append({"node": node.id, "piece": owners[k_end], "end_s_m": line.s[k_end], "leave_s_m": line.s[k_edge], "leave_index": k_edge, "x_m": line.x[k_end],
 			"z_m": line.z[k_end], "y_m": line.y[k_end], "node_distance_m": distance})
+	# Shaping operation (budgets before riding limits: its interval replaces the
+	# NATURAL side-slope screening there).
+	var shaped: Dictionary = _operations(trail, line, float(half), first_off, last_off, context, bounds)
+	if not shaped.is_valid:
+		return _reject(id, shaped.reason_code, shaped.detail)
 	# Rideability on the existing surface.
-	var check: Dictionary = _rideability(line, float(half), first_off, last_off, context, bounds)
+	var check: Dictionary = _rideability(line, float(half), first_off, last_off, context, bounds, _bench(shaped.operations), INF)
 	if not check.is_valid:
 		return _reject(id, "ERR_TRAIL_UNRIDEABLE", check.detail)
+	var metrics: Dictionary = check.metrics
+	metrics["shaped_length_m"] = 0.0
+	for op: Dictionary in shaped.operations:
+		metrics.shaped_length_m += op.s1_m - op.s0_m
+	metrics["shaped_fraction"] = metrics.shaped_length_m / line.s[n - 1]
 	var record := {"id": id, "mode": trail.mode, "class": TRAIL_CLASS, "purpose": str(trail.get("purpose", "")), "nodes": node_ids.duplicate(), "half_width_m": float(half),
 		"line": {"s": line.s, "x": line.x, "y": line.y, "z": line.z, "tx": line.tx, "tz": line.tz}, "length_m": line.s[n - 1], "joins": joins,
-		"directions": ["FORWARD", "REVERSE"], "metrics": check.metrics, "operations": [], "config_sha256": JSON.stringify(trail, "", true).sha256_text()}
+		"directions": ["FORWARD", "REVERSE"], "metrics": metrics, "operations": shaped.operations, "config_sha256": JSON.stringify(trail, "", true).sha256_text()}
 	return {"is_valid": true, "id": id, "reason_code": "", "detail": {}, "trail": record}
+
+
+## The configured shaping operation (amendment A1: at most one BENCH), its
+## per-sample amplitudes and budget checks. {is_valid, operations} or
+## {is_valid: false, reason_code, detail}.
+static func _operations(trail: Dictionary, line: Dictionary, half: float, first_off: int, last_off: int, context: Dictionary, bounds: Dictionary) -> Dictionary:
+	var configured: Variant = trail.get("operations", [])
+	if not configured is Array:
+		return {"is_valid": false, "reason_code": "ERR_TRAIL_INPUT", "detail": {"stage": "operations"}}
+	if configured.is_empty():
+		return {"is_valid": true, "operations": []}
+	if configured.size() > 1:
+		return {"is_valid": false, "reason_code": "ERR_TRAIL_BUDGET", "detail": {"stage": "one operation", "count": configured.size()}}
+	var op: Variant = configured[0]
+	if not op is Dictionary or op.get("kind", "") != "BENCH" or not _point(op.get("from")) or not _point(op.get("to")) or not _number(op.get("daylight_m")) or not _number(op.get("taper_m")):
+		return {"is_valid": false, "reason_code": "ERR_TRAIL_INPUT", "detail": {"stage": "operation fields", "value": str(op)}}
+	var daylight: float = float(op.daylight_m)
+	var taper: float = float(op.taper_m)
+	if daylight < BENCH_DAYLIGHT_RANGE_M.x or daylight > BENCH_DAYLIGHT_RANGE_M.y or taper < BENCH_TAPER_RANGE_M.x or taper > BENCH_TAPER_RANGE_M.y:
+		return {"is_valid": false, "reason_code": "ERR_TRAIL_BUDGET", "detail": {"stage": "daylight/taper", "daylight_m": daylight, "taper_m": taper}}
+	var ends: Array[int] = [_nearest_sample(line, Vector2(float(op.from[0]), float(op.from[1]))), _nearest_sample(line, Vector2(float(op.to[0]), float(op.to[1])))]
+	var k0: int = mini(ends[0], ends[1])
+	var k1: int = maxi(ends[0], ends[1])
+	var s0: float = line.s[k0]
+	var s1: float = line.s[k1]
+	if k0 <= first_off or k1 >= last_off or k1 - k0 < 2:
+		return {"is_valid": false, "reason_code": "ERR_TRAIL_BUDGET", "detail": {"stage": "interior", "s0_m": s0, "s1_m": s1}}
+	if s1 - s0 > BENCH_MAX_LENGTH_M:
+		return {"is_valid": false, "reason_code": "ERR_TRAIL_BUDGET", "detail": {"stage": "length", "length_m": s1 - s0, "limit": BENCH_MAX_LENGTH_M}}
+	var surface: RefCounted = context.surface
+	for k in range(k0, k1 + 1):
+		var p := Vector2(line.x[k], line.z[k])
+		var normal := Vector2(-line.tz[k], line.tx[k])
+		for side: float in [-1.0, 1.0]:
+			for reach: float in [half, half + daylight, half + daylight + BENCH_CLEARANCE_M]:
+				var q: Vector2 = p + normal * side * reach
+				if context.field.sample_water(bounds.min_x + q.x, bounds.min_z + q.y).get("is_water", false):
+					return {"is_valid": false, "reason_code": "ERR_TRAIL_BUDGET", "detail": {"stage": "water clearance", "s_m": line.s[k], "lateral_m": side * reach}}
+				if not surface.road_owner(bounds.min_x + q.x, bounds.min_z + q.y).is_empty():
+					return {"is_valid": false, "reason_code": "ERR_TRAIL_BUDGET", "detail": {"stage": "road clearance", "s_m": line.s[k], "lateral_m": side * reach}}
+				var wx: float = bounds.min_x + q.x
+				var wz: float = bounds.min_z + q.y
+				var border: float = minf(minf(fposmod(wx, TILE_M), TILE_M - fposmod(wx, TILE_M)), minf(fposmod(wz, TILE_M), TILE_M - fposmod(wz, TILE_M)))
+				if reach <= half + daylight and border < BENCH_BORDER_M:
+					return {"is_valid": false, "reason_code": "ERR_TRAIL_BUDGET", "detail": {"stage": "tile border", "s_m": line.s[k], "border_m": border}}
+	var op_record := {"kind": "BENCH", "mode": "SHAPED", "k0": k0, "k1": k1, "s0_m": s0, "s1_m": s1, "daylight_m": daylight, "taper_m": taper}
+	var amplitudes: Dictionary = _amplitudes(op_record, line, half, surface, bounds)
+	if not amplitudes.is_valid:
+		return amplitudes
+	op_record.merge(amplitudes.op, true)
+	return {"is_valid": true, "operations": [op_record]}
+
+
+## The bench amplitudes of `op` (k0, k1, s0_m, s1_m, daylight_m, taper_m) on
+## `surface` - c(s) the straight fit across the band - with the amplitude
+## budgets (|d|, volume). {is_valid, op: {amplitude, metrics}} or a rejection.
+static func _amplitudes(op: Dictionary, line: Dictionary, half: float, surface: RefCounted, bounds: Dictionary) -> Dictionary:
+	var amplitude := PackedFloat64Array()
+	var volume: float = 0.0
+	var largest: float = 0.0
+	var cross_before: float = 0.0
+	for k in range(op.k0, op.k1 + 1):
+		var p := Vector2(line.x[k], line.z[k])
+		var normal := Vector2(-line.tz[k], line.tx[k])
+		var c: Variant = _band_fit(surface, bounds, p, normal, half)
+		if c == null:
+			return {"is_valid": false, "reason_code": "ERR_TRAIL_INPUT", "detail": {"stage": "bench surface", "s_m": line.s[k]}}
+		var f: float = smoothstep(0.0, op.taper_m, line.s[k] - op.s0_m) * smoothstep(0.0, op.taper_m, op.s1_m - line.s[k])
+		amplitude.append(c * f)
+		cross_before = maxf(cross_before, absf(c))
+		largest = maxf(largest, absf(c * f) * half)
+		if k > op.k0:
+			volume += 0.5 * (absf(amplitude[k - op.k0]) + absf(amplitude[k - op.k0 - 1])) * half * (half + op.daylight_m) * (line.s[k] - line.s[k - 1])
+	if largest > BENCH_MAX_DISPLACEMENT_M:
+		return {"is_valid": false, "reason_code": "ERR_TRAIL_BUDGET", "detail": {"stage": "displacement", "max_m": largest, "limit": BENCH_MAX_DISPLACEMENT_M}}
+	if volume > BENCH_MAX_VOLUME_M3:
+		return {"is_valid": false, "reason_code": "ERR_TRAIL_BUDGET", "detail": {"stage": "volume", "volume_m3": volume, "limit": BENCH_MAX_VOLUME_M3}}
+	return {"is_valid": true, "op": {"amplitude": amplitude, "metrics": {"length_m": op.s1_m - op.s0_m, "max_displacement_m": largest, "volume_m3": volume,
+		"cross_before_max": cross_before, "attempts": 1}}}
+
+
+## Straight fit of the surface across the band at p: (h(+hw) - h(-hw)) / 2hw
+## (null off the surface).
+static func _band_fit(surface: RefCounted, bounds: Dictionary, p: Vector2, normal: Vector2, half: float) -> Variant:
+	var hi: Dictionary = surface.sample_height(bounds.min_x + p.x + normal.x * half, bounds.min_z + p.y + normal.y * half)
+	var lo: Dictionary = surface.sample_height(bounds.min_x + p.x - normal.x * half, bounds.min_z + p.y - normal.y * half)
+	if not hi.is_valid or not lo.is_valid:
+		return null
+	return (hi.height_m - lo.height_m) / (2.0 * half)
+
+
+## A realized trail's bench measured on the published pre-bench surface
+## (FinalSurface.with_published of the prototype-off tiles of its zone): the
+## amplitudes the tiles are shaped with, budgets checked on them
+## (ERR_TRAIL_BUDGET). Trails without a bench come back unchanged.
+static func shape(trail: Dictionary, published: RefCounted) -> Dictionary:
+	var record: Dictionary = trail.duplicate(true)
+	for op: Dictionary in record.operations:
+		if op.kind != "BENCH":
+			continue
+		var made: Dictionary = _amplitudes(op, record.line, record.half_width_m, published, published.get_bounds_m())
+		if not made.is_valid:
+			return _reject(record.id, made.reason_code, made.detail)
+		op.merge(made.op, true)
+	return {"is_valid": true, "id": record.id, "reason_code": "", "detail": {}, "trail": record}
+
+
+## A trail's bench operation ({} without one).
+static func _bench(operations: Array) -> Dictionary:
+	for op: Dictionary in operations:
+		if op.kind == "BENCH":
+			return op
+	return {}
+
+
+static func _nearest_sample(line: Dictionary, p: Vector2) -> int:
+	var best: int = 0
+	var best_d: float = INF
+	for k in range(line.s.size()):
+		var d: float = Vector2(line.x[k], line.z[k]).distance_squared_to(p)
+		if d < best_d:
+			best_d = d
+			best = k
+	return best
+
+
+static func _number(value: Variant) -> bool:
+	return (value is float or value is int) and is_finite(float(value))
+
+
+static func _point(value: Variant) -> bool:
+	return value is Array and value.size() == 2 and _number(value[0]) and _number(value[1])
 
 
 ## A realized trail on the published surface (FinalSurface.with_published):
@@ -208,13 +383,18 @@ static func finalize(trail: Dictionary, published: RefCounted, context: Dictiona
 	line.y = heights
 	var checked := context.duplicate()
 	checked.surface = published
-	var check: Dictionary = _rideability(line, record.half_width_m, record.joins[0].leave_index, record.joins[1].leave_index, checked, bounds)
+	var check: Dictionary = _rideability(line, record.half_width_m, record.joins[0].leave_index, record.joins[1].leave_index, checked, bounds, _bench(record.operations), BENCH_CROSS_MAX)
 	if not check.is_valid:
 		var detail: Dictionary = check.detail.duplicate()
 		detail.stage = "published " + str(detail.get("stage", ""))
-		return _reject(record.id, "ERR_TRAIL_UNRIDEABLE", detail)
+		return _reject(record.id, "ERR_TRAIL_BUDGET" if detail.get("bench", false) else "ERR_TRAIL_UNRIDEABLE", detail)
+	var shaped_length: float = record.metrics.get("shaped_length_m", 0.0)
 	record.metrics = check.metrics
+	record.metrics["shaped_length_m"] = shaped_length
+	record.metrics["shaped_fraction"] = shaped_length / record.length_m
 	record.metrics["design_parity_max_m"] = deviation
+	for op: Dictionary in record.operations:
+		op.metrics["cross_after_max"] = check.bench_cross_max
 	record.joins[0].y_m = heights[0]
 	record.joins[1].y_m = heights[heights.size() - 1]
 	return {"is_valid": true, "id": record.id, "reason_code": "", "detail": {}, "trail": record}
@@ -289,14 +469,19 @@ static func _line(points: Array[Vector2], half: float, surface: RefCounted, boun
 
 
 ## Water, decks, grade, pitch, side slope and radius along the realized line.
-static func _rideability(line: Dictionary, half: float, first_off: int, last_off: int, context: Dictionary, bounds: Dictionary) -> Dictionary:
+## Where `bench` (an operation, {} for none) is fully formed (taper 1) the side
+## slope limit is `bench_limit` (INF before shaping, BENCH_CROSS_MAX on the
+## published bench); its tapers keep the NATURAL limit.
+static func _rideability(line: Dictionary, half: float, first_off: int, last_off: int, context: Dictionary, bounds: Dictionary, bench: Dictionary = {},
+		bench_limit: float = INF) -> Dictionary:
 	var surface: RefCounted = context.surface
 	var field: RefCounted = context.field
 	var n: int = line.s.size()
 	var grade_max: float = Policy.grade_hard(TRAIL_CLASS)
-	var radius_min: float = Policy.CLASSES[TRAIL_CLASS].radius_hard_m
+	var radius_min: float = RADIUS_MIN_M
 	var decks: Array = _deck_lines(context.network)
 	var metrics := {"max_grade": 0.0, "max_pitch_grade": 0.0, "max_cross_slope": 0.0, "min_radius_m": INF, "climb_m": 0.0, "descent_m": 0.0}
+	var bench_cross: float = 0.0
 	var w: int = int(round(GRADE_WINDOW_M / SAMPLE_M / 2.0))
 	var r: int = int(round(RADIUS_WINDOW_M / SAMPLE_M))
 	for k in range(n):
@@ -331,9 +516,18 @@ static func _rideability(line: Dictionary, half: float, first_off: int, last_off
 			if not g.is_valid:
 				return {"is_valid": false, "detail": {"stage": "gradient", "s_m": line.s[k]}}
 			var cross: float = absf(g.gradient.dot(normal))
-			metrics.max_cross_slope = maxf(metrics.max_cross_slope, cross)
-			if cross > CROSS_SLOPE_MAX:
-				return {"is_valid": false, "detail": {"stage": "side slope", "s_m": line.s[k], "slope": cross, "limit": CROSS_SLOPE_MAX}}
+			var on_bench: bool = not bench.is_empty() and line.s[k] >= bench.s0_m and line.s[k] <= bench.s1_m and 				smoothstep(0.0, bench.taper_m, line.s[k] - bench.s0_m) * smoothstep(0.0, bench.taper_m, bench.s1_m - line.s[k]) >= 0.999
+			if on_bench:
+				# The bench levels the band: its side slope is the band fit.
+				var fit: Variant = _band_fit(surface, bounds, p, normal, half)
+				cross = absf(fit) if fit != null else INF
+			var limit: float = bench_limit if on_bench else CROSS_SLOPE_MAX
+			if on_bench:
+				bench_cross = maxf(bench_cross, cross)
+			else:
+				metrics.max_cross_slope = maxf(metrics.max_cross_slope, cross)
+			if cross > limit:
+				return {"is_valid": false, "detail": {"stage": "side slope", "s_m": line.s[k], "slope": cross, "limit": limit, "bench": on_bench}}
 		if k - r >= 0 and k + r < n:
 			var pa := Vector2(line.x[k - r], line.z[k - r])
 			var pc := Vector2(line.x[k + r], line.z[k + r])
@@ -343,7 +537,7 @@ static func _rideability(line: Dictionary, half: float, first_off: int, last_off
 			metrics.min_radius_m = minf(metrics.min_radius_m, radius)
 			if radius < radius_min:
 				return {"is_valid": false, "detail": {"stage": "radius", "s_m": line.s[k], "radius_m": radius, "limit": radius_min}}
-	return {"is_valid": true, "metrics": metrics}
+	return {"is_valid": true, "metrics": metrics, "bench_cross_max": bench_cross}
 
 
 ## Centre lines and half widths of declared bridge decks: [[Vector2...], half].

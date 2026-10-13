@@ -195,8 +195,21 @@ static func _trails(config: Variant, seed_value: int, region: Vector2i, network:
 	for piece: Dictionary in network.get_data().pieces:
 		piece_class[piece.id] = piece.info.route_class
 	while not trails.is_empty():
-		var trail_surface: RefCounted = surface.with_trails(trails)
 		var indices: Array = _trail_tiles(trails, slots, bounds)
+		# Benches are measured on the published pre-bench surface of their zone.
+		var pre: RefCounted = surface.with_trails(trails).with_published(indices.map(func(k: int) -> Dictionary: return slots[k]))
+		var shaped: Array = []
+		for trail: Dictionary in trails:
+			var made: Dictionary = Trail.shape(trail, pre)
+			if made.is_valid:
+				shaped.append(made.trail)
+			else:
+				rejected.append({"id": made.id, "reason_code": made.reason_code, "detail": made.detail})
+		if shaped.size() < trails.size():
+			trails = shaped
+			continue
+		trails = shaped
+		var trail_surface: RefCounted = surface.with_trails(trails)
 		var forced: Dictionary = {}
 		var refined: Array = []
 		var failure: Dictionary = {}
@@ -254,7 +267,9 @@ static func _trails(config: Variant, seed_value: int, region: Vector2i, network:
 			out_slots[indices[m]] = refined[m]
 		for trail: Dictionary in finished:
 			report.published.append({"id": trail.id, "mode": trail.mode, "length_m": trail.length_m, "nodes": trail.nodes, "joins": trail.joins, "metrics": trail.metrics,
-				"directions": trail.directions, "tiles": indices.map(func(k: int) -> Array: return [slots[k].tx, slots[k].tz]), "border_points": forced.size()})
+				"directions": trail.directions, "tiles": indices.map(func(k: int) -> Array: return [slots[k].tx, slots[k].tz]), "border_points": forced.size(),
+				"operations": trail.operations.map(func(op: Dictionary) -> Dictionary: return {"kind": op.kind, "mode": op.mode, "s0_m": op.s0_m, "s1_m": op.s1_m,
+					"daylight_m": op.daylight_m, "taper_m": op.taper_m, "metrics": op.metrics})})
 		return {"network": joined.network, "surface": published, "slots": out_slots, "report": report}
 	return unchanged
 

@@ -38,6 +38,8 @@ var _mids: Dictionary = {}
 var _band_points: Dictionary = {}
 var _inside: Dictionary = {}
 var _border_made: Dictionary = {}
+## Bench displacement applied to each vertex (step 2b; 0 elsewhere).
+var _shift: Dictionary = {}
 
 static func tile_arrays(surface: RefCounted, tx: int, tz: int) -> Dictionary:
 	var builder := FinalSurfaceTileRenderer.new()
@@ -227,6 +229,10 @@ func _weld() -> void:
 ##     both triangles of that edge, after refining the neighbour first when
 ##     the edge is not its longest (longest-edge propagation, Rivara), so the
 ##     tile stays conforming; border midpoints made here are reported.
+##  2b. BENCH (amendment A1): triangles within TRAIL_EDGE_M of a bench
+##     footprint are refined the same way, then every vertex moves by
+##     FinalSurface.trail_displacement() (0 outside the footprints, which keep
+##     clear of tile borders: outside them the tile is unchanged).
 ##  3. Triangles crossing a band edge are clipped at it: one point per edge
 ##     by world-coordinate bisection, height linear along the edge.
 ##  4. Terrain vertices within TRAIL_SHADE_M of a band carry UV (lateral,
@@ -256,6 +262,7 @@ func _refine_trails(forced: Dictionary) -> void:
 	_band_points.clear()
 	_inside.clear()
 	_border_made.clear()
+	_shift.clear()
 	var bad: Dictionary = {}
 	for t in range(_tri.size() / 3):
 		_link(t, bad)
@@ -281,12 +288,21 @@ func _refine_trails(forced: Dictionary) -> void:
 	var t: int = 0
 	while t < _tri.size() / 3:
 		if _tri[3 * t] >= 0 and _edge_length(_longest(t)) > TRAIL_EDGE_M:
-			var gap: float = _surface.trail_triangle_gap(_world(_tri[3 * t]), _world(_tri[3 * t + 1]), _world(_tri[3 * t + 2]))
-			if gap <= TRAIL_REFINE_M:
+			var corners: Array[Vector2] = [_world(_tri[3 * t]), _world(_tri[3 * t + 1]), _world(_tri[3 * t + 2])]
+			if _surface.trail_triangle_gap(corners[0], corners[1], corners[2]) <= TRAIL_REFINE_M or _surface.trail_bench_gap(corners[0], corners[1], corners[2]) <= TRAIL_EDGE_M:
 				_lepp(t, bad, 0)
 				if not _reason.is_empty():
 					return
 		t += 1
+	# 2b. Bench displacement of the refined footprint.
+	for v in range(_vertices.size()):
+		var world: Vector2 = _world(v)
+		var d: float = _surface.trail_displacement(world.x, world.y)
+		if d != 0.0:
+			var moved: Vector3 = _vertices[v]
+			moved.y += d
+			_vertices[v] = moved
+			_shift[v] = d
 	# 3. Clip at the band edges.
 	var count: int = _tri.size() / 3
 	for q in range(count):
@@ -492,8 +508,9 @@ func _in_band(v: int) -> bool:
 
 ## The band edge point on edge a-b (endpoints on opposite sides): parameter
 ## by bisection of the band test in world coordinates from the lower world
-## endpoint (both tiles of a border edge find the same one); position, height
-## and UV linear along the tile-local edge.
+## endpoint (both tiles of a border edge find the same one); position and UV
+## linear along the tile-local edge; height the edge's height before the
+## bench plus the bench displacement at the point (0 off a bench).
 func _band_point(a: int, b: int) -> int:
 	var key: Vector2i = _ekey(a, b)
 	if _band_points.has(key):
@@ -523,7 +540,12 @@ func _band_point(a: int, b: int) -> int:
 	var id: int = _vertices.size()
 	var va: Vector3 = _vertices[a]
 	var vb: Vector3 = _vertices[b]
-	_vertices.append(va + (vb - va) * u)
+	var point: Vector3 = va + (vb - va) * u
+	var ya: float = va.y - float(_shift.get(a, 0.0))
+	var yb: float = vb.y - float(_shift.get(b, 0.0))
+	var world: Vector2 = Vector2(point.x + _origin.x, point.z + _origin.y)
+	point.y = ya + (yb - ya) * u + _surface.trail_displacement(world.x, world.y) if not _shift.is_empty() else point.y
+	_vertices.append(point)
 	_uv.append(Vector2(100, 0) if _uv[a] == Vector2(100, 0) and _uv[b] == Vector2(100, 0) else _uv[a].lerp(_uv[b], u))
 	_inside[id] = true
 	_band_points[key] = id

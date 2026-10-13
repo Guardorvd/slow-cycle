@@ -10,6 +10,9 @@ extends RefCounted
 ## off the road planes) from the published tile triangles themselves, so
 ## queries there agree with what renders and collides; elsewhere they stay
 ## the design evaluation (general off-road parity is BC2's).
+## A trail's BENCH operation (TrailRealization, amendment A1) is evaluated by
+## trail_displacement(); the tile renderer moves the published vertices of its
+## footprint by it, so final queries follow it through with_published().
 const Natural = preload("res://scripts/world/region/hydrology_surface.gd")
 const Field = preload("res://scripts/world/region/terrain_field.gd")
 const TRAIL_CELL_M: float = 4.0
@@ -150,9 +153,40 @@ func _trail_near_local(lx: float, lz: float, reach: float) -> Dictionary:
 		best = {"id": trail.id, "index": pairs[m], "lateral": side * distance, "half_width": trail.half_width_m, "s": lerpf(line.s[k], line.s[k + 1], u), "distance": distance}
 	return best
 
+## BENCH displacement (m) of the published surface at a world point (0 off
+## every bench footprint; amendment A1 formula in TrailRealization).
+func trail_displacement(x: float, z: float) -> float:
+	if _trails.is_empty():
+		return 0.0
+	var near: Dictionary = _trail_near_local(x - _bounds.min_x, z - _bounds.min_z, TRAIL_REACH_M)
+	if near.is_empty():
+		return 0.0
+	var trail: Dictionary = _trails[near.index]
+	for op: Dictionary in trail.get("operations", []):
+		if op.kind != "BENCH" or near.s < op.s0_m or near.s > op.s1_m:
+			continue
+		var half: float = trail.half_width_m
+		var t: float = near.lateral
+		if absf(t) >= half + op.daylight_m:
+			return 0.0
+		var line: Dictionary = trail.line
+		var k: int = clampi(line.s.bsearch(near.s) - 1, op.k0, op.k1 - 1)
+		var u: float = clampf((near.s - line.s[k]) / maxf(line.s[k + 1] - line.s[k], 1e-12), 0.0, 1.0)
+		var a: float = lerpf(op.amplitude[k - op.k0], op.amplitude[k + 1 - op.k0], u)
+		if absf(t) <= half:
+			return -a * t
+		return -a * signf(t) * half * (half + op.daylight_m - absf(t)) / op.daylight_m
+	return 0.0
+
+## Distance (m) from a world triangle to the nearest BENCH footprint (band +
+## daylight over the bench interval), 0 when they overlap; INF without one.
+func trail_bench_gap(a: Vector2, b: Vector2, c: Vector2) -> float:
+	return trail_triangle_gap(a, b, c, true)
+
 ## Distance (m) from a world triangle to the nearest trail band, 0 when they
 ## overlap; INF when no centre line is within TRAIL_REACH_M of its band edge.
-func trail_triangle_gap(a: Vector2, b: Vector2, c: Vector2) -> float:
+## `bench_only`: only bench intervals, measured from their daylight edge.
+func trail_triangle_gap(a: Vector2, b: Vector2, c: Vector2, bench_only: bool = false) -> float:
 	if _trails.is_empty():
 		return INF
 	var o := Vector2(_bounds.min_x, _bounds.min_z)
@@ -172,9 +206,17 @@ func trail_triangle_gap(a: Vector2, b: Vector2, c: Vector2) -> float:
 					continue
 				seen[key] = true
 				var trail: Dictionary = _trails[key.x]
+				var extra: float = 0.0
+				if bench_only:
+					extra = -1.0
+					for op: Dictionary in trail.get("operations", []):
+						if op.kind == "BENCH" and key.y + 1 >= op.k0 and key.y <= op.k1:
+							extra = op.daylight_m
+					if extra < 0.0:
+						continue
 				var p := Vector2(trail.line.x[key.y], trail.line.z[key.y])
 				var q := Vector2(trail.line.x[key.y + 1], trail.line.z[key.y + 1])
-				best = minf(best, maxf(0.0, _triangle_segment_distance(la, lb, lc, p, q) - trail.half_width_m))
+				best = minf(best, maxf(0.0, _triangle_segment_distance(la, lb, lc, p, q) - trail.half_width_m - extra))
 	return best
 
 ## Distance (m) from a world segment to the nearest trail band (all trail

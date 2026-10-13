@@ -1,6 +1,6 @@
 TASK: BC1 — первая природная тропа Slow Cycle; ExecPlan v1.0
 DATE: 2026-10-13
-STATUS: P1 ACCEPTED as PLAYABLE / REVIEWABLE (Director, 2026-10-13); amendment A1 recorded; P2 in work (line character + one SHAPED bench); STOP before L2 for the second human ride
+STATUS: P2 PLAYABLE / REVIEWABLE (2026-10-13) — P1 ACCEPTED; amendment A1 implemented; STOP for the Director's second human ride before the formal L2 campaign
 BRANCH: bc1-natural-trail; BASE: final BC0 2a43bc092b503987a9a2845232a3791b0ad69e21
 HEAD AT PLAN DRAFT: a8414ac0a6becc989fef24d060cff40bc8ceb149 (factual errata); submission HEAD/digests in planning manifest
 BASELINE: source/new checkout clean (staged/unstaged/untracked 0/0/0); docs-only planning changes
@@ -193,6 +193,45 @@ Authority: Director decision "BC1 — P1 Human Feedback Accepted / Proceed to SH
 - **Out of scope.** Other operations, jumps, obstacles, a general sculpting tool. Changing files, protected contracts or adding operations needs separate approval.
 
 **Product observations (for BC3–BC5, no BC1 work).** Landscape variety, visual content and overall expressiveness of the region; the meadow terrain is smooth.
+
+## Progress P2 (2026-10-13, amendment A1)
+
+Status: **P2 PLAYABLE / REVIEWABLE. Waiting for the Director's second ride; L2/VERIFY/REVIEW not started.** Evidence: `outputs/bc1-evidence/p2/` (comparison page `bc1_p1_p2_comparison.html`), P1 control `outputs/bc1-evidence/p1_control/`.
+
+- **Relief study.**
+  - The meadow is a smooth 3–15 % slope; the creek gully is the only nearby feature.
+  - The analytic gully (3 m deep, 35 % banks) is published by the off-road 16 m cells as a ~16 m-wide V trench on its straight N–S stretch and as a staircase on its diagonal stretch.
+  - Published vs analytic heights differ by up to 3.6 m there (`p2/pub_*`). The line was designed on the published heights and the bench placed on the straight stretch.
+  - Product observation for BC2/BC3.
+- **Line (data).** 453 m; +14.6 / −3.6 m; grade ≤ 12.7 %; R_min 26.8 m (P1 34 m); water ≥ 7 m from the centre line; same joins (edge:4 / edge:7), one tile (4,5).
+- **SHAPED BENCH.**
+  - Interval s 126–183 m (57 m, 12.6 %).
+  - Band side slope (fit) 19.5 % → 0.24 %; max |d| 12.7 cm; earthwork 14.1 m³.
+  - Daylight 1.5 m, taper 4 m; water/road/border clearances held.
+- **Implementation within the whitelist.**
+  - TrailRealization: RADIUS_MIN_M 8; BENCH parse, budgets, `shape()` on the published pre-bench surface; the bench side slope uses the band fit, with tapers on the NATURAL limit.
+  - FinalSurface: `trail_displacement`, `trail_bench_gap`.
+  - Renderer: footprint refinement, vertex displacement, clip points at off height + d.
+  - Bake: shaping on the published off surface, operation metrics in the report.
+  - Config: new control points and the operation.
+- **P2 evidence (L1; all stderr free of errors/warnings/leaks).**
+  - **integration 52/0** (`runs/p2_integration2`):
+    - off bake equals baseline;
+    - off vertices kept and new vertices on the off triangles, each moved exactly by d (≤ 1 mm);
+    - displacement only in the dry footprint, off tile borders; bench budgets;
+    - seams, layers (band-edge tolerance 1 mm + chord sagitta 1.2 mm), final queries, vegetation, cache reload, stale cache, key identity, atomic rejection.
+  - **domain 25/0** (`runs/p2_domain2`): 18 negatives with their reasons, including 5 ERR_TRAIL_BUDGET bench cases.
+  - **runtime 24/0** (`runs/p2_runtime`, Vulkan):
+    - Input rides both ways: 0 stalls, grounded;
+    - lateral ≤ 0.39 / 0.86 m; rough share 100 / 99.2 %; climb minimum 1.78 m/s;
+    - P2 rays 1365, 0 misses, ≤ 0.04 mm; recovery on the trail;
+    - 5 views including the bench.
+  - **Baseline smoke:** `test_region_ride --target=region` (`runs/p2_baseline_smoke`).
+- **Fixture corrections in the new BC1 entry (not protected tests).**
+  - Water and bench-near-water lines.
+  - Cache-identity edit.
+  - Band-edge tolerance derived from the chord sagitta of curved band edges.
+- **Cost.** Region vertices 1,381,359 → 1,406,273 (+1.80 %), triangles +1.81 %; trails step ~45 s.
 
 ## Progress (2026-10-13)
 

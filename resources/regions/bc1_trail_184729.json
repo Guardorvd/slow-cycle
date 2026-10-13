@@ -6,7 +6,7 @@
 		{
 			"id": "trail:bc1_meadow",
 			"mode": "NATURAL",
-			"purpose": "MEADOW_PASSAGE: from the valley road south of junction 5 across the meadow terrace east of the creek to the loop road below junction 4",
+			"purpose": "CREEK_PASSAGE: from the valley road south of junction 5 down to the creek gully, along a benched traverse of its east bank above the water, out of the gully and up the terrace to the loop road below junction 4",
 			"nodes": [
 				{"id": 5, "x_m": 2176.0, "z_m": 2784.0},
 				{"id": 4, "x_m": 2528.0, "z_m": 2944.0}
@@ -14,15 +14,26 @@
 			"half_width_m": 0.65,
 			"control_points": [
 				[2300.4, 2840.6],
-				[2303.0, 2862.0],
-				[2318.0, 2900.0],
-				[2340.0, 2945.0],
-				[2348.0, 2990.0],
-				[2365.0, 3035.0],
-				[2395.0, 3068.0],
-				[2430.0, 3088.0],
-				[2455.0, 3094.0],
-				[2472.8, 3092.0]
+				[2296.0, 2862.0],
+				[2280.0, 2885.0],
+				[2258.0, 2903.0],
+				[2238.0, 2915.0],
+				[2225.0, 2926.0],
+				[2218.0, 2940.0],
+				[2216.0, 2958.0],
+				[2216.5, 2974.0],
+				[2219.0, 2986.0],
+				[2225.0, 2996.0],
+				[2236.0, 3004.0],
+				[2256.0, 3011.0],
+				[2290.0, 3022.0],
+				[2340.0, 3036.0],
+				[2400.0, 3046.0],
+				[2440.0, 3050.0],
+				[2476.6, 3050.0]
+			],
+			"operations": [
+				{"kind": "BENCH", "from": [2221.2, 2931.9], "to": [2219.7, 2987.7], "daylight_m": 1.5, "taper_m": 4.0}
 			]
 		}
 	]

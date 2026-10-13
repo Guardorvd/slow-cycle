@@ -3,9 +3,12 @@ extends SceneTree
 ## BC1 trail entry (additive; real production code, existing bot helper).
 ##   --group=integration  fresh prototype-off bake (baseline identity, cache
 ##                        saved), fresh bake with the trail configuration
-##                        (publication, shape equality against the off tiles,
-##                        seams, layers, final queries, vegetation clearance,
-##                        cache reload equality), stale cache, cache identity,
+##                        (publication; shape: off vertices kept and new
+##                        vertices on the off triangles, both moved exactly by
+##                        the BENCH displacement inside its footprint and not
+##                        at all outside; bench budgets and locality; seams,
+##                        layers, final queries, vegetation clearance, cache
+##                        reload equality), stale cache, cache identity,
 ##                        atomic rejection
 ##   --group=domain       realization contract and negatives on the cached
 ##                        prototype-off products (run integration first)
@@ -19,6 +22,7 @@ const Bake = preload("res://scripts/world/region/region_bake.gd")
 const Cache = preload("res://scripts/world/region_bake_cache.gd")
 const Trail = preload("res://scripts/world/region/trail_realization.gd")
 const Network = preload("res://scripts/world/region/realized_road_network.gd")
+const Renderer = preload("res://scripts/world/region/final_surface_tile_renderer.gd")
 const Vegetation = preload("res://scripts/world/region/region_vegetation_planner.gd")
 const Gen = preload("res://scripts/world/region/region_generator.gd")
 const Terrain = preload("res://scripts/world/region/terrain_field.gd")
@@ -34,14 +38,23 @@ const BASE_TILES := "c94451cf56f26326743d1ce5acd01bd465c50c7f23dbc42843959caca56
 const BASE_NETWORK := "183eef0c8d205747287eec3f18dc24d2bde5e8fb52cca6c349c3f4cfa7466fbc"
 const BASE_VEGETATION := "35212949edb612ba1118d9e1765144b959550e8b35b45248bea5fe3c56d2aa4e"
 ## Tolerances: new vertices on the off triangles (float32 at region scale);
-## band-edge layer probes closer than EDGE_TOLERANCE_M to a band edge are
-## decided by float32 rounding of the clip vertices and are only counted.
+## band-edge layer probes closer than the edge tolerance to a band edge are
+## only counted: EDGE_TOLERANCE_M (float32 rounding of clip vertices) plus the
+## sagitta of a refined chord (<= TRAIL_EDGE_M) on the band edge of the
+## tightest turn, TRAIL_EDGE_M^2 / (8 (R_min - hw)) - the band edge is a curve,
+## the clipped triangles' edges are straight.
 const SHAPE_TOLERANCE_M: float = 0.001
 const EDGE_TOLERANCE_M: float = 0.001
 const P2_GROUND_M: float = 0.05
 ## Trail mouth: band edges may still lie on the joined road plane this far
 ## past a join's leave station (oblique exit of a 1.3 m band).
 const MOUTH_M: float = 2.0
+## Floodplain north of the valley road to the river's south bank (gentle dry
+## approach, M0 mask), back to the same road near junction 4.
+const WATER_LINE: Array = [[2300.4, 2840.6], [2330.0, 2832.0], [2380.0, 2838.0], [2440.0, 2852.0], [2490.0, 2862.0], [2515.0, 2866.0], [2522.0, 2895.0], [2500.0, 2930.0]]
+## The configured line with a sharp kink near its start (radius screening).
+const KINKED_LINE: Array = [[2300.4, 2840.6], [2296.0, 2862.0], [2280.0, 2885.0], [2258.0, 2903.0], [2251.0, 2928.0], [2225.0, 2926.0], [2218.0, 2940.0], [2216.0, 2958.0],
+	[2216.5, 2974.0], [2219.0, 2986.0], [2225.0, 2996.0], [2236.0, 3004.0], [2256.0, 3011.0], [2290.0, 3022.0], [2340.0, 3036.0], [2400.0, 3046.0], [2440.0, 3050.0], [2476.6, 3050.0]]
 
 var _checks: int = 0
 var _failures: Array = []
@@ -191,6 +204,11 @@ func _network_checks(off: Dictionary, on: Dictionary, trail: Dictionary) -> void
 		joined = joined and piece_ok
 	_check(joined, "both ends joined on pieces of their nodes", trail.joins)
 	_check(trail.directions == ["FORWARD", "REVERSE"], "trail rideable both ways (declared limits)", trail.directions)
+	# The one SHAPED operation (amendment A1) and its budgets.
+	_check(trail.operations.size() <= 1, "at most one shaping operation", trail.operations.size())
+	for op: Dictionary in trail.operations:
+		_check(op.kind == "BENCH" and op.s1_m - op.s0_m <= Trail.BENCH_MAX_LENGTH_M and op.metrics.volume_m3 <= Trail.BENCH_MAX_VOLUME_M3 and
+			op.metrics.max_displacement_m <= Trail.BENCH_MAX_DISPLACEMENT_M and op.metrics.cross_after_max <= Trail.BENCH_CROSS_MAX, "bench within its budgets", op.metrics)
 	_check(trail.metrics.design_parity_max_m >= 0.0 and trail.metrics.max_grade <= Trail.Policy.grade_hard(Trail.TRAIL_CLASS), "metrics recorded", trail.metrics)
 
 
@@ -209,33 +227,55 @@ func _tile_checks(off: Dictionary, on: Dictionary, trail: Dictionary) -> Diction
 	var listed: Array = on.manifest.trails.published[0].tiles
 	for k: int in changed:
 		_check([on.tiles[k].tx, on.tiles[k].tz] in listed, "changed tile listed by the trail report", [on.tiles[k].tx, on.tiles[k].tz])
+	var edge_tolerance: float = EDGE_TOLERANCE_M + Renderer.TRAIL_EDGE_M * Renderer.TRAIL_EDGE_M / (8.0 * (trail.metrics.min_radius_m - trail.half_width_m))
+	out["edge_tolerance_m"] = edge_tolerance
 	for k: int in changed:
 		var base: Dictionary = off.tiles[k]
 		var tile: Dictionary = on.tiles[k]
 		var bv: PackedVector3Array = base.arrays[Mesh.ARRAY_VERTEX]
 		var tv: PackedVector3Array = tile.arrays[Mesh.ARRAY_VERTEX]
 		var ti: PackedInt32Array = tile.arrays[Mesh.ARRAY_INDEX]
-		var kept: Dictionary = {}
+		var origin := Vector2(tile.origin[0] + bounds.min_x, tile.origin[1] + bounds.min_z)
+		# Off vertices: same position, height moved by exactly the published
+		# displacement d (0 outside a bench footprint).
+		var by_xz: Dictionary = {}
 		for v: Vector3 in tv:
-			kept[v] = true
+			by_xz[Vector2(v.x, v.z)] = v.y
 		var missing: int = 0
 		var base_set: Dictionary = {}
 		for v: Vector3 in bv:
-			base_set[v] = true
-			missing += 0 if kept.has(v) else 1
+			base_set[Vector2(v.x, v.z)] = true
+			var d: float = surface.trail_displacement(origin.x + v.x, origin.y + v.z)
+			if not by_xz.has(Vector2(v.x, v.z)) or absf(by_xz[Vector2(v.x, v.z)] - (v.y + d)) > SHAPE_TOLERANCE_M:
+				missing += 1
+		# New vertices: on the off triangles plus d.
 		var grid: Dictionary = _grid(base)
 		var max_dy: float = 0.0
 		var misses: int = 0
+		var displaced: int = 0
+		var max_d: float = 0.0
+		var outside_footprint: int = 0
+		var wet: int = 0
+		var on_border: int = 0
 		for v: Vector3 in tv:
-			if base_set.has(v):
+			var d: float = surface.trail_displacement(origin.x + v.x, origin.y + v.z)
+			if d != 0.0:
+				displaced += 1
+				max_d = maxf(max_d, absf(d))
+				if not _in_footprint(surface, trail, origin.x + v.x, origin.y + v.z):
+					outside_footprint += 1
+				if off.field.sample_water(origin.x + v.x, origin.y + v.z).get("is_water", false):
+					wet += 1
+				if v.x == 0.0 or v.z == 0.0 or v.x == 512.0 or v.z == 512.0:
+					on_border += 1
+			if base_set.has(Vector2(v.x, v.z)):
 				continue
 			var h: float = _mesh_height(base, grid, Vector2(v.x, v.z))
 			if is_nan(h):
 				misses += 1
 			else:
-				max_dy = maxf(max_dy, absf(h - v.y))
+				max_dy = maxf(max_dy, absf(h + d - v.y))
 		var layers: PackedByteArray = tile.layers
-		var origin := Vector2(tile.origin[0] + bounds.min_x, tile.origin[1] + bounds.min_z)
 		var rough: int = 0
 		var probes: int = 0
 		var at_edge: int = 0
@@ -258,16 +298,19 @@ func _tile_checks(off: Dictionary, on: Dictionary, trail: Dictionary) -> Diction
 				var near: Dictionary = surface.trail_near(x, z, 2.0)
 				var expect: int = Bake.LAYER_ROUGH if not surface.trail_owner(x, z).is_empty() else Bake.LAYER_TERRAIN
 				if layers[q] != expect:
-					if not near.is_empty() and absf(near.distance - near.half_width) <= EDGE_TOLERANCE_M:
+					if not near.is_empty() and absf(near.distance - near.half_width) <= edge_tolerance:
 						at_edge += 1
 					elif disagree.size() < 8:
 						disagree.append([x, z, layers[q], expect])
 		var row := {"tile": [tile.tx, tile.tz], "vertices": [bv.size(), tv.size()], "triangles": [base.arrays[Mesh.ARRAY_INDEX].size() / 3, ti.size() / 3],
 			"off_vertices_missing": missing, "new_vertex_max_dy_m": max_dy, "location_misses": misses, "rough_triangles": rough, "layer_probes": probes,
-			"edge_rounding": at_edge, "layer_disagreements": disagree}
+			"edge_rounding": at_edge, "layer_disagreements": disagree, "displaced_vertices": displaced, "max_displacement_m": max_d}
 		out.per_tile.append(row)
-		_check(missing == 0, "off vertices kept " + str(row.tile), missing)
-		_check(misses == 0 and max_dy <= SHAPE_TOLERANCE_M, "new vertices on the off triangles " + str(row.tile), row)
+		_check(missing == 0, "off vertices kept (moved only by the bench) " + str(row.tile), missing)
+		_check(misses == 0 and max_dy <= SHAPE_TOLERANCE_M, "new vertices on the off triangles (+ bench) " + str(row.tile), row)
+		_check(outside_footprint == 0 and wet == 0 and on_border == 0, "displacement only inside the dry bench footprint, off tile borders " + str(row.tile),
+			[outside_footprint, wet, on_border])
+		_check(max_d <= Trail.BENCH_MAX_DISPLACEMENT_M, "bench displacement within budget " + str(row.tile), max_d)
 		_check(disagree.is_empty(), "band layer agrees with the material query " + str(row.tile), disagree)
 	_check(out.per_tile.reduce(func(sum: int, row: Dictionary) -> int: return sum + row.rough_triangles, 0) > 0, "band triangles on the rough layer")
 	# Seams: border vertex sets of every changed tile and each neighbour.
@@ -290,6 +333,23 @@ func _tile_checks(off: Dictionary, on: Dictionary, trail: Dictionary) -> Diction
 			_check(equal, "seam %s|%s" % [str([tile.tx, tile.tz]), str([other.tx, other.tz])], [mine.size(), theirs.size()])
 	out["seams"] = seams
 	return out
+
+
+## Replace a configured trail's line and operations (negative fixtures).
+func _set_line(c: Dictionary, points: Array, operations: Array) -> void:
+	c.trails[0].control_points = points.duplicate(true)
+	c.trails[0].operations = operations
+
+
+## A world point inside a bench footprint of `trail` (interval, band + daylight).
+func _in_footprint(surface: RefCounted, trail: Dictionary, x: float, z: float) -> bool:
+	var near: Dictionary = surface.trail_near(x, z, 4.0)
+	if near.is_empty():
+		return false
+	for op: Dictionary in trail.operations:
+		if near.s >= op.s0_m and near.s <= op.s1_m and absf(near.lateral) <= trail.half_width_m + op.daylight_m:
+			return true
+	return false
 
 
 ## Vegetation unchanged outside the trail tiles; no collider in the band.
@@ -362,8 +422,9 @@ func _stale_checks(on: Dictionary) -> void:
 func _identity_checks(off_key: String, on_key: String) -> void:
 	var copy: String = "user://bc1_identity_config.json"
 	var text: String = FileAccess.get_file_as_string(_config_path)
+	_check(text.contains("\"half_width_m\": 0.65"), "identity fixture edits a real field")
 	var file := FileAccess.open(copy, FileAccess.WRITE)
-	file.store_string(text.replace("2455.0", "2455.5"))
+	file.store_string(text.replace("\"half_width_m\": 0.65", "\"half_width_m\": 0.66"))
 	file.close()
 	var settings: Dictionary = Cache.trail_settings(copy)
 	settings.trail_config = _config_path
@@ -404,9 +465,15 @@ func _domain() -> Dictionary:
 		["end on a foreign piece", "ERR_TRAIL_CONNECTION", func(c: Dictionary) -> void: c.trails[0].nodes[1] = {"id": 8, "x_m": 2976.0, "z_m": 3296.0}],
 		# Floodplain north of the valley road to the river's south bank (gentle
 		# dry approach, M0 mask), back to the same road near junction 4.
-		["water", "ERR_TRAIL_UNRIDEABLE", func(c: Dictionary) -> void: c.trails[0].control_points = [[2300.4, 2840.6], [2330.0, 2832.0], [2380.0, 2838.0], [2440.0, 2852.0],
-			[2490.0, 2862.0], [2515.0, 2866.0], [2522.0, 2895.0], [2500.0, 2930.0]]],
-		["radius", "ERR_TRAIL_UNRIDEABLE", func(c: Dictionary) -> void: c.trails[0].control_points.insert(5, [2330.0, 3005.0])],
+		["water", "ERR_TRAIL_UNRIDEABLE", func(c: Dictionary) -> void: _set_line(c, WATER_LINE, [])],
+		["radius", "ERR_TRAIL_UNRIDEABLE", func(c: Dictionary) -> void: _set_line(c, KINKED_LINE, [])],
+		# The one SHAPED operation (amendment A1): budgets.
+		["bench too long", "ERR_TRAIL_BUDGET", func(c: Dictionary) -> void: c.trails[0].operations[0].to = [2290.0, 3022.0]],
+		["bench daylight", "ERR_TRAIL_BUDGET", func(c: Dictionary) -> void: c.trails[0].operations[0].daylight_m = 3.0],
+		["bench at a join", "ERR_TRAIL_BUDGET", func(c: Dictionary) -> void: c.trails[0].operations[0].from = [2300.4, 2840.6]],
+		["two operations", "ERR_TRAIL_BUDGET", func(c: Dictionary) -> void: c.trails[0].operations.append(c.trails[0].operations[0].duplicate(true))],
+		["bench near water", "ERR_TRAIL_BUDGET", func(c: Dictionary) -> void: _set_line(c, WATER_LINE, [{"kind": "BENCH", "from": [2470.0, 2858.0], "to": [2515.0, 2866.0],
+			"daylight_m": 1.5, "taper_m": 4.0}])],
 	]
 	for case: Array in cases:
 		var config: Dictionary = _config().duplicate(true)
@@ -415,8 +482,12 @@ func _domain() -> Dictionary:
 		var reason: String = made.rejected[0].reason_code if made.rejected.size() == 1 else "NONE"
 		out.negatives.append({"case": case[0], "expected": case[1], "reason": reason, "detail": made.rejected[0].detail if made.rejected.size() == 1 else {}})
 		_check(made.trails.is_empty() and reason == case[1], "negative %s -> %s" % [case[0], case[1]], [reason, made.rejected])
-	var water: Dictionary = out.negatives[11].detail
-	_check(water.get("stage", "") == "water", "water negative stops at water", water)
+	var stages: Dictionary = {}
+	for row: Dictionary in out.negatives:
+		stages[row.case] = row.detail.get("stage", "")
+	_check(stages.water == "water", "water negative stops at water", stages.water)
+	_check(stages.radius == "radius", "radius negative stops at the radius screening", stages.radius)
+	_check(stages["bench near water"] == "water clearance", "bench near water stops at its clearance", stages["bench near water"])
 	_check(Trail.realize_all("not json", context).rejected[0].reason_code == "ERR_TRAIL_INPUT", "unparsable configuration -> ERR_TRAIL_INPUT")
 	return out
 
@@ -538,12 +609,14 @@ func _ride(scene: Node3D, points: PackedVector3Array, window: Vector2, label: St
 	var ungrounded: int = 0
 	var max_lateral: float = 0.0
 	var shots: Array = []
-	var targets: Array = [["join_a", window.x + 6.0], ["middle", (window.x + window.y) * 0.5], ["tile_border", -1.0], ["join_b", window.y - 6.0]]
-	var border_s: float = -1.0
+	var to_path: float = window.x - trail.joins[0].leave_s_m
+	var targets: Array = [["join_a", window.x + 6.0], ["middle", (window.x + window.y) * 0.5], ["join_b", window.y - 6.0]]
+	for op: Dictionary in trail.operations:
+		targets.append(["bench", to_path + 0.5 * (op.s0_m + op.s1_m)])
+		targets.append(["bench_entry", to_path + op.s0_m - 4.0])
 	for k in range(trail.line.s.size() - 1):
 		if floorf(trail.line.z[k] / 512.0) != floorf(trail.line.z[k + 1] / 512.0) or floorf(trail.line.x[k] / 512.0) != floorf(trail.line.x[k + 1] / 512.0):
-			border_s = window.x - trail.joins[0].leave_s_m + trail.line.s[k]
-	targets[2][1] = border_s
+			targets.append(["tile_border", to_path + trail.line.s[k]])
 	var max_frames: int = int(60.0 * (60.0 + bot.total_m / 2.0))
 	while frames < max_frames and not bot.stats.finished:
 		bot.step(bike)
@@ -584,7 +657,7 @@ func _ride(scene: Node3D, points: PackedVector3Array, window: Vector2, label: St
 	summary["trail_ungrounded_share"] = float(ungrounded) / maxi(trail_frames, 1)
 	summary["views"] = shots
 	if capture:
-		_check(shots.size() == 4, "four views (joins, middle, tile border)", shots)
+		_check(shots.size() == targets.size(), "views at the joins, middle, bench and tile borders", [shots, targets])
 	for i in range(60):
 		await physics_frame
 	return summary
