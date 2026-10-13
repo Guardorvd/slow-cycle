@@ -1,6 +1,6 @@
 TASK: BC1 — первая природная тропа Slow Cycle; ExecPlan v1.0
 DATE: 2026-10-13
-STATUS: P2 PLAYABLE / REVIEWABLE (2026-10-13) — P1 ACCEPTED; amendment A1 implemented; STOP for the Director's second human ride before the formal L2 campaign
+STATUS: M4 IN PROGRESS — P2 ACCEPTED (Director, 2026-10-13); formal L2, G, VERIFY and independent REVIEW authorized; no further trail shape changes without a confirmed defect
 BRANCH: bc1-natural-trail; BASE: final BC0 2a43bc092b503987a9a2845232a3791b0ad69e21
 HEAD AT PLAN DRAFT: a8414ac0a6becc989fef24d060cff40bc8ceb149 (factual errata); submission HEAD/digests in planning manifest
 BASELINE: source/new checkout clean (staged/unstaged/untracked 0/0/0); docs-only planning changes
@@ -193,6 +193,17 @@ Authority: Director decision "BC1 — P1 Human Feedback Accepted / Proceed to SH
 - **Out of scope.** Other operations, jumps, obstacles, a general sculpting tool. Changing files, protected contracts or adding operations needs separate approval.
 
 **Product observations (for BC3–BC5, no BC1 work).** Landscape variety, visual content and overall expressiveness of the region; the meadow terrain is smooth.
+
+## Director decision after P2 (2026-10-13)
+
+- **P2 ACCEPTED** as PLAYABLE / REVIEWABLE (human: more interesting, SHAPED natural, climb comfortable, gully natural). NATURAL and the one SHAPED operation are sufficient for BC1. The trail's shape stays frozen unless a defect is confirmed. P1/P2 are kept as controls (tags `bc1-p1`, `bc1-p2`).
+- **M4 authorized:** L2, applicable G gates, performance, determinism, runtime, cache, regression and negatives under the existing Test Strategy and scope, then independent VERIFY and REVIEW. Blocking defects are fixed within scope and re-verified; non-blocking findings are recorded as known limitations or later-phase work. S3 stays OPEN / KNOWN FAILURE. A mandatory FAIL on the candidate forbids a formal PASS until its impact is separated from BC1.
+- **BC2 architectural risk (research requirement for BC2, no BC1 work).** The off-road published surface (16 m cells) can differ from the natural height field by up to 3.6 m (184729 creek gully, BC1 P2), although the human ride found the gully natural. Procedural route search must evaluate lines on geometry consistent with the final physical surface. At the start of BC2 planning:
+  - measure how common significant discrepancies are on characteristic terrain;
+  - determine when they affect rideability, the relief profile and line choice;
+  - check whether search can use the published geometry or a consistent surface representation;
+  - if needed, propose a minimal local refinement;
+  - no global terrain rework without proven product or technical grounds.
 
 ## Progress P2 (2026-10-13, amendment A1)
 
