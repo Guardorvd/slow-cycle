@@ -1,6 +1,6 @@
 TASK: BC1 — первая природная тропа Slow Cycle; ExecPlan v1.0
 DATE: 2026-10-13
-STATUS: P1 PLAYABLE / REVIEWABLE (2026-10-13) — STOP for the Director's human ride and feedback before M2/SHAPED; not a phase PASS, not E7
+STATUS: P1 ACCEPTED as PLAYABLE / REVIEWABLE (Director, 2026-10-13); amendment A1 recorded; P2 in work (line character + one SHAPED bench); STOP before L2 for the second human ride
 BRANCH: bc1-natural-trail; BASE: final BC0 2a43bc092b503987a9a2845232a3791b0ad69e21
 HEAD AT PLAN DRAFT: a8414ac0a6becc989fef24d060cff40bc8ceb149 (factual errata); submission HEAD/digests in planning manifest
 BASELINE: source/new checkout clean (staged/unstaged/untracked 0/0/0); docs-only planning changes
@@ -142,6 +142,57 @@ Approve **BC1 ExecPlan v1.0** including whitelist, one new additive test entry, 
 STOP: [.agent/PLANS.md](.agent/PLANS.md) requires “save one reviewable plan ... and STOP for explicit human approval”; [slow-cycle-worldgen §1](.agents/skills/slow-cycle-worldgen/SKILL.md) requires “STOP until their concrete plan is approved”. No production changes before approval.
 
 Ledger (wall / aggregate hours, ±0.25 h): planning in submission manifest; Implementation/L0/L1/L2/VERIFY/REVIEW/Closeout NOT_STARTED. On execution maintain separate rows and both verification-overhead ratios per Test Strategy §7.6.
+
+## Amendment A1 — P1 feedback, line character and the one SHAPED operation (Director 2026-10-13)
+
+Authority: Director decision "BC1 — P1 Human Feedback Accepted / Proceed to SHAPED", 2026-10-13. It replaces only the content of the one SHAPED operation (contract 5, step M3/P2). Files, contracts, gates and the rest of the plan are unchanged.
+
+**P1 control.**
+- Tag `bc1-p1` = `0f635f7`.
+- Configuration copy and published line dump: `outputs/bc1-evidence/p1_control/`.
+
+**Line (data only, same purpose, same joins).** `trail:bc1_meadow` keeps nodes 5/4 and pieces edge:4/edge:7.
+- It now runs from the valley road south-west to the creek ravine terrace, along the ravine's east bank, out at the creek's bend, and east up the terrace to the loop road.
+- Measured on the 0.5 m relief before implementation (`outputs/bc1-evidence/p2/`):
+  - ~470 m; +14 m / −3 m; grade ≤ 9.3 %; minimum radius ≈ 20 m (P1: 34 m).
+  - Water ≥ 5.4 m from the centre line.
+  - Side slope 0.34–0.35 on ~35 m of bank (beyond NATURAL's 0.35 screening), ≤ 0.14 elsewhere.
+- No other relief within reach is more expressive: the area is a smooth 3–15 % slope from the river (323 m) to the south-east (348 m); the ravine is the only natural feature. Broader landscape expressiveness is a product observation for BC3–BC5, not BC1 work.
+
+**NATURAL screening limits (provisional).**
+- Radius: 8 m, the BicycleController's full-lock radius at 8 m/s (mirrored from the controller's exported steering defaults, as the bot helper does). It replaces R6's 19 m, which no longer binds NATURAL.
+- Grade 10° and side slope 0.35 stay as screening values.
+- Real rideability is the Input ride.
+
+**The one SHAPED operation: BENCH (local traverse bench).** Where the trail traverses the creek bank, the band is levelled across: the uphill edge is cut and the downhill edge filled by the natural cross slope. This is the classic benched trail on a side slope; it exists only where the bank does.
+- **Displacement.** At station s and lateral t, with c(s) the design cross slope at the centre line and f(s) a smoothstep taper over `taper_m` at both ends:
+  - in the band (|t| ≤ hw): d = −c·f·t;
+  - in the daylight (hw < |t| ≤ hw + daylight): d = −c·f·sign(t)·hw·(hw + daylight − |t|)/daylight;
+  - elsewhere 0.
+  - The centre line keeps its height.
+- **Configuration.** `operations: [{kind: BENCH, from: [x, z], to: [x, z], daylight_m, taper_m}]`; from/to are projected onto the line.
+- **Implementation.**
+  - TrailRealization owns the operation: interval, c(s), budgets, reasons.
+  - FinalSurface evaluates d.
+  - The tile renderer refines the footprint and moves its vertices before band clipping.
+  - Render, collision, final queries, recovery heights and vegetation follow from the same published triangles.
+- **Budgets, fixed before implementation** (ERR_TRAIL_BUDGET; never enlarged to pass):
+  - one operation per trail;
+  - interval length ≤ 60 m;
+  - daylight 0.5–2.0 m, taper 2–8 m;
+  - |d| ≤ 0.30 m;
+  - earthwork |cut| + |fill| ≤ 30 m³;
+  - published band side slope inside the interval ≤ 0.06;
+  - footprint + 1.5 m: no water, no road plane, ≥ 2 m from every tile border;
+  - inside the trail interior (between the joins' leave stations).
+- **Locality (tests).**
+  - Every published vertex with d = 0 lies on the prototype-off triangles (≤ 1 mm).
+  - Every vertex inside the footprint is its off height + d (≤ 1 mm).
+  - Tiles, vegetation and network outside the trail are unchanged.
+- **Logged.** Footprint length, SHAPED fraction, volume, max |d|, cross slope before/after, attempts, reasons.
+- **Out of scope.** Other operations, jumps, obstacles, a general sculpting tool. Changing files, protected contracts or adding operations needs separate approval.
+
+**Product observations (for BC3–BC5, no BC1 work).** Landscape variety, visual content and overall expressiveness of the region; the meadow terrain is smooth.
 
 ## Progress (2026-10-13)
 
