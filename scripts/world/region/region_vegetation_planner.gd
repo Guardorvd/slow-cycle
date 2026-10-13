@@ -12,7 +12,9 @@ extends RefCounted
 ##   rocks   one candidate per 16 m cell, more on steep ground.
 ## Exclusions: water (R3 surface), every road footprint with a clearance per
 ## kind (FinalSurface road owner; bridge decks and fords are road pieces), the
-## region margin. Heights are FinalSurface heights (what renders and collides).
+## region margin; BC1 trails (FinalSurface.with_trails): a clearance per kind
+## from the band edge (TRAIL_CLEAR_M), none without trails. Heights are
+## FinalSurface heights (what renders and collides).
 ## Randomness: a stateless 64-bit mix of (vegetation seed, kind, cell), so the
 ## result depends only on the seed, the region and the products, never on
 ## thread count, order or time. Output is region-local:
@@ -21,7 +23,7 @@ extends RefCounted
 const Context = preload("res://scripts/world/region/environment_context.gd")
 const Biome = preload("res://scripts/world/region/biome_field.gd")
 const Seeds = preload("res://scripts/world/region/region_seed_derivation.gd")
-const MODEL := "vegetation/1;tree=8;rock=16;thicket=12;clear=3.5,1.5,0.6,2.5;margin=8"
+const MODEL := "vegetation/1;tree=8;rock=16;thicket=12;clear=3.5,1.5,0.6,2.5;margin=8;trail_clear=1.2,0.8,0.3,2.2"
 const KINDS: Array[String] = ["pine", "birch", "autumn", "shrub", "grass", "rock"]
 const TREE_CELL_M: float = 8.0
 const ROCK_CELL_M: float = 16.0
@@ -29,6 +31,10 @@ const THICKET_M: float = 12.0
 ## Clearance from a road footprint (m): trees, shrubs, grass, rocks.
 const CLEAR_M := {"tree": 3.5, "shrub": 1.5, "grass": 0.6, "rock": 2.5}
 const MARGIN_M: float = 8.0
+## BC1: clearance from a trail band edge (m): trees (handlebar and shoulder
+## room), shrubs, grass (the band is worn ground), rocks (centre: beyond the
+## largest rock collider, 0.6 m x scale 1.8).
+const TRAIL_CLEAR_M := {"tree": 1.2, "shrub": 0.8, "grass": 0.3, "rock": 2.2}
 const TILE_M: int = 512
 ## Trunk / rock collider radii (m) at scale 1 (runtime uses them).
 const TRUNK_RADIUS := {"pine": 0.18, "birch": 0.12, "autumn": 0.12, "rock": 0.6}
@@ -77,6 +83,12 @@ func _road_clear(x: float, z: float, clear: float) -> bool:
 	return true
 
 
+## Clear of every trail band by `clear` m (BC1).
+func _trail_clear(x: float, z: float, clear: float) -> bool:
+	var near: Dictionary = _surface.trail_near(x, z, clear)
+	return near.is_empty() or near.distance > near.half_width + clear
+
+
 ## Vegetation of one tile (tile indices in world 512 m units).
 func tile(tx: int, tz: int) -> Dictionary:
 	var out: Dictionary = {}
@@ -122,6 +134,8 @@ func tile(tx: int, tz: int) -> Dictionary:
 			var clear: float = CLEAR_M.tree if kind in ["pine", "birch", "autumn"] else CLEAR_M[kind]
 			if not _road_clear(x, z, clear):
 				continue
+			if not _trail_clear(x, z, TRAIL_CLEAR_M.tree if kind in ["pine", "birch", "autumn"] else TRAIL_CLEAR_M[kind]):
+				continue
 			var h: Dictionary = _surface.sample_height(x, z)
 			if not h.is_valid:
 				continue
@@ -142,6 +156,8 @@ func tile(tx: int, tz: int) -> Dictionary:
 			if _unit(13, i, j) >= 0.04 + 0.5 * Context.smooth(0.2, 0.9, signals.slope_grade):
 				continue
 			if not _road_clear(x, z, CLEAR_M.rock):
+				continue
+			if not _trail_clear(x, z, TRAIL_CLEAR_M.rock):
 				continue
 			var h: Dictionary = _surface.sample_height(x, z)
 			if not h.is_valid:

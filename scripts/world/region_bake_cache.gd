@@ -9,7 +9,10 @@ extends RefCounted
 ## tile_<i>.bin (one per tile), extras.bin (bridges, water, spawn); binary
 ## files are zstd-compressed var_to_bytes, each SHA-256 recorded in the
 ## manifest. The domain bake never touches files. extras.bin also carries the
-## vegetation (M5).
+## vegetation (M5). BC1: a bake with a trail configuration is keyed by
+## trail_settings() of that file (path and content SHA-256), so prototype-on
+## products never answer a prototype-off key and vice versa; their network
+## (with trails) has its own schema.
 
 const Bake = preload("res://scripts/world/region/region_bake.gd")
 const Network = preload("res://scripts/world/region/realized_road_network.gd")
@@ -43,6 +46,11 @@ static func _collect(directory: String, paths: Array[String]) -> void:
 			paths.append(directory.path_join(file))
 	for sub: String in dir.get_directories():
 		_collect(directory.path_join(sub), paths)
+
+
+## Settings entry of a trail configuration file for key() (BC1).
+static func trail_settings(path: String) -> Dictionary:
+	return {"trail_config": path, "trail_sha256": FileAccess.get_sha256(path)}
 
 
 static func directory_of(cache_key: String) -> String:

@@ -14,6 +14,10 @@ extends Node3D
 ## transform the controller itself requests.
 ##   --seed=N (int64; default: random, logged)   --region=X,Z (default 0,0)
 ##   --bake-threads=N (default 8)
+##   --trail-config=res://... (BC1 opt-in: a TrailRealization configuration
+##   baked with the region and keyed in the cache; default off). Published
+##   trails join recovery and get a post at each end; a rejected trail leaves
+##   the region as without it and is named on screen and in the log.
 ## A region that cannot be generated (bake failure, crashed bake, empty
 ## network) is a recorded result, not a script failure: the screen names the
 ## seed and reason, the diagnostics are saved under user://regions/failures/
@@ -51,6 +55,7 @@ var _water_cooldown_ms: int = 0
 var water_recoveries: int = 0
 var failed: bool = false
 var failure: Dictionary = {}
+var trail_config_path: String = ""
 ## Set before reloading the scene for "another random region": the next load
 ## ignores --seed once.
 static var force_random_next: bool = false
@@ -85,15 +90,17 @@ func _ready() -> void:
 				region = Vector2i(parts[0].to_int(), parts[1].to_int())
 		elif arg.begins_with("--bake-threads="):
 			threads = maxi(1, arg.substr(15).to_int())
+		elif arg.begins_with("--trail-config="):
+			trail_config_path = arg.substr(15)
 	force_random_next = false
 	if not seeded:
 		var rng := RandomNumberGenerator.new()
 		rng.randomize()
 		session_seed = (int(rng.randi()) << 31) ^ int(rng.randi())
-	print("REGION_SESSION seed=%d region=%d,%d mode=%s" % [session_seed, region.x, region.y, "given" if seeded else "random"])
+	print("REGION_SESSION seed=%d region=%d,%d mode=%s trail_config=%s" % [session_seed, region.x, region.y, "given" if seeded else "random", trail_config_path])
 	_build_overlay()
 	_t0 = Time.get_ticks_usec()
-	var key: String = Cache.key(session_seed, region, {})
+	var key: String = Cache.key(session_seed, region, _cache_settings())
 	var cached: Dictionary = Cache.load_products(key)
 	if cached.is_valid:
 		source = "cache"
@@ -105,6 +112,9 @@ func _ready() -> void:
 	_job.region = region
 	_job.key = key
 	_job.threads = threads
+	if not trail_config_path.is_empty():
+		_job.has_trails = true
+		_job.trail_config = JSON.parse_string(FileAccess.get_file_as_string(trail_config_path))
 	_thread = Thread.new()
 	# The thread belongs to a drain node under the root, so leaving the scene
 	# during a bake (Esc to the menu, window close) never frees a running bake.
@@ -113,6 +123,10 @@ func _ready() -> void:
 	drain.adopt(_thread, _job)
 	get_tree().root.add_child.call_deferred(drain)
 	_thread.start(_job.run)
+
+
+func _cache_settings() -> Dictionary:
+	return {} if trail_config_path.is_empty() else Cache.trail_settings(trail_config_path)
 
 
 func _exit_tree() -> void:
@@ -157,6 +171,7 @@ func _finish_load(baked: Dictionary) -> void:
 	_index_water(baked.water)
 	_set_recovery_from_network(baked.network.get_data())
 	_build_direction_markers(baked.network.get_data())
+	_build_trail_markers(baked.network.get_data())
 	var bike: BicycleController = get_bike()
 	var spawn: Dictionary = baked.spawn
 	if bike != null and not spawn.is_empty():
@@ -169,6 +184,8 @@ func _finish_load(baked: Dictionary) -> void:
 	var metrics: Dictionary = baked.network.get_metrics()
 	print("REGION_READY source=%s seconds=%.3f seed=%d network_m=%.0f cycles=%d classes=%s excluded=%s" % [source, load_seconds, session_seed, metrics.component_length_m,
 		metrics.cycles, JSON.stringify(metrics.classes), JSON.stringify(baked.manifest.get("r7_excluded", {}))])
+	if baked.manifest.has("trails"):
+		print("REGION_TRAILS ", JSON.stringify(baked.manifest.trails))
 	if _overlay != null:
 		_overlay.queue_free()
 		_overlay = null
@@ -189,6 +206,11 @@ func _show_summary(metrics: Dictionary) -> void:
 	label.add_theme_constant_override("outline_size", 6)
 	label.text = "Mountain River Valley · seed %d · сеть %.1f км · петли %d · %s · загрузка %.0f с (%s)" % [session_seed, metrics.component_length_m / 1000.0, metrics.cycles,
 		", ".join(metrics.classes.keys()), load_seconds, "кэш" if source == "cache" else "генерация"]
+	var trails: Dictionary = products.manifest.get("trails", {})
+	for trail: Dictionary in trails.get("published", []):
+		label.text += "\nтропа %s · %s · %.2f км" % [trail.id, trail.mode, trail.length_m / 1000.0]
+	for trail: Dictionary in trails.get("rejected", []):
+		label.text += "\nтропа %s отклонена: %s" % [str(trail.id), trail.reason_code]
 	layer.add_child(label)
 	add_child(layer)
 	get_tree().create_timer(8.0).timeout.connect(layer.queue_free)
@@ -198,7 +220,7 @@ func _show_summary(metrics: Dictionary) -> void:
 func _fail(reason: String, detail: Variant) -> void:
 	failed = true
 	var record := {"seed": session_seed, "region": [region.x, region.y], "source": source, "reason_code": reason, "elapsed_s": (Time.get_ticks_usec() - _t0) / 1e6,
-		"engine": Engine.get_version_info(), "cache_key": Cache.key(session_seed, region, {}), "created_utc": Time.get_datetime_string_from_system(true),
+		"engine": Engine.get_version_info(), "cache_key": Cache.key(session_seed, region, _cache_settings()), "created_utc": Time.get_datetime_string_from_system(true),
 		"detail": _plain(detail)}
 	var directory: String = "user://regions/failures"
 	DirAccess.make_dir_recursive_absolute(directory)
@@ -256,6 +278,8 @@ class BakeJob extends RefCounted:
 	var region := Vector2i.ZERO
 	var key: String = ""
 	var threads: int = 8
+	var has_trails: bool = false
+	var trail_config: Variant = null
 	var _mutex := Mutex.new()
 	var _stage: String = "bake"
 	var _fraction: float = 0.0
@@ -263,7 +287,10 @@ class BakeJob extends RefCounted:
 	var _cancel: bool = false
 
 	func run() -> void:
-		var baked: Dictionary = JobBake.bake(seed_value, region, {"threads": threads, "cancelled": is_cancelled}, set_progress)
+		var options := {"threads": threads, "cancelled": is_cancelled}
+		if has_trails:
+			options["trail_config"] = trail_config
+		var baked: Dictionary = JobBake.bake(seed_value, region, options, set_progress)
 		if baked.is_valid:
 			set_progress("cache_write", 0.99)
 			JobCache.save(key, baked)
@@ -379,6 +406,13 @@ func _set_recovery_from_network(data: Dictionary) -> void:
 			line.append(Vector3(d.x[k], d.y[k], d.z[k]))
 		paths.append(line)
 		recommended.append(int(piece.info.get("recommended", 0)))
+	# BC1: published trails are riding lines too (final heights, both ways).
+	for trail: Dictionary in data.get("trails", []):
+		var line := PackedVector3Array()
+		for k in range(trail.line.s.size()):
+			line.append(Vector3(trail.line.x[k], trail.line.y[k], trail.line.z[k]))
+		paths.append(line)
+		recommended.append(0)
 	set_recovery_paths(paths, recommended)
 
 
@@ -528,6 +562,41 @@ static func _on_road(bike: BicycleController) -> bool:
 func _release_recover() -> void:
 	await get_tree().process_frame
 	Input.action_release("recover_ride")
+
+
+# --- BC1 trail ends ---
+
+## A wooden post with a yellow board beside each end of every published
+## trail, where it leaves the road (render only).
+func _build_trail_markers(data: Dictionary) -> void:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.42, 0.30, 0.18)
+	material.roughness = 0.9
+	var board_material := StandardMaterial3D.new()
+	board_material.albedo_color = Color(0.93, 0.80, 0.30)
+	board_material.emission_enabled = true
+	board_material.emission = Color(0.35, 0.28, 0.05)
+	for trail: Dictionary in data.get("trails", []):
+		var line: Dictionary = trail.line
+		for join: Dictionary in trail.joins:
+			var k: int = join.leave_index
+			var side := Vector3(-line.tz[k], 0.0, line.tx[k])
+			var base := Vector3(line.x[k], line.y[k], line.z[k]) + side * (trail.half_width_m + 0.9)
+			var post := MeshInstance3D.new()
+			var box := BoxMesh.new()
+			box.size = Vector3(0.12, 1.4, 0.12)
+			post.mesh = box
+			post.material_override = material
+			post.position = base + Vector3(0.0, 0.7, 0.0)
+			add_child(post)
+			var plate := MeshInstance3D.new()
+			var board := BoxMesh.new()
+			board.size = Vector3(0.5, 0.22, 0.04)
+			plate.mesh = board
+			plate.material_override = board_material
+			plate.position = base + Vector3(0.0, 1.25, 0.0)
+			plate.basis = Basis.looking_at(Vector3(line.tx[k], 0.0, line.tz[k]), Vector3.UP)
+			add_child(plate)
 
 
 # --- Descent-preferred direction (Director condition 2) ---

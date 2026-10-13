@@ -4,7 +4,9 @@
 // Gravel for BACKBONE / SECONDARY (half width >= 1 m), packed earth for
 // SINGLETRACK / TECHNICAL; terrain from slope, height and world noise
 // (meadow grass, darker forest floor, rock on steep ground). World-space
-// noise keeps tile seams invisible.
+// noise keeps tile seams invisible. BC1 trails: vertices near a trail band
+// carry UV (lateral, -half width); the band is worn earth with a trodden
+// grass edge, the same edge the collision layers follow.
 shader_type spatial;
 render_mode cull_back, diffuse_burley;
 
@@ -15,6 +17,8 @@ uniform vec3 rock : source_color = vec3(0.46, 0.44, 0.41);
 uniform vec3 gravel : source_color = vec3(0.66, 0.59, 0.47);
 uniform vec3 earth : source_color = vec3(0.47, 0.36, 0.25);
 uniform vec3 shoulder : source_color = vec3(0.50, 0.46, 0.33);
+uniform vec3 trail_earth : source_color = vec3(0.36, 0.27, 0.18);
+uniform vec3 trail_edge : source_color = vec3(0.40, 0.40, 0.24);
 
 varying float lateral;
 varying float half_width;
@@ -53,13 +57,20 @@ void fragment() {
 	terrain *= 0.88 + 0.24 * detail;
 	// Road: inside the riding width, a soft shoulder band to the plane edge.
 	float d = abs(lateral) - half_width;
-	bool is_road = lateral < 50.0;
+	bool is_trail = half_width < 0.0;
+	bool is_road = lateral < 50.0 && !is_trail;
 	vec3 surface = half_width >= 1.0 ? gravel : earth;
 	surface *= 0.86 + 0.28 * fbm(world_pos.xz * 1.7);
 	float ruts = half_width >= 1.0 ? smoothstep(0.15, 0.0, abs(abs(lateral) - half_width * 0.45)) * 0.08 : 0.0;
 	surface *= 1.0 - ruts;
 	vec3 color = terrain;
-	if (is_road) {
+	if (is_trail) {
+		float edge = abs(lateral) + half_width;
+		vec3 dirt = trail_earth * (0.80 + 0.32 * fbm(world_pos.xz * 2.3));
+		float band = 1.0 - smoothstep(-0.10, 0.06, edge + 0.06 * (detail - 0.5));
+		float trodden = 1.0 - smoothstep(0.0, 0.7, edge);
+		color = mix(mix(terrain, trail_edge, trodden * 0.6), dirt, band);
+	} else if (is_road) {
 		float road = 1.0 - smoothstep(-0.08, 0.10, d);
 		float verge = 1.0 - smoothstep(0.1, 0.9, d);
 		color = mix(mix(terrain, shoulder, verge * 0.7), surface, road);

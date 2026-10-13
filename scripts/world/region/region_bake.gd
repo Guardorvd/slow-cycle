@@ -11,7 +11,11 @@ extends RefCounted
 ##              Terrain 4) and 64 m collision-patch id, plus a coarse 16 m LOD;
 ##   bridges    BridgeDeckBuilder decks; water ribbons / lake cells;
 ##   vegetation RegionVegetationPlanner per tile (M5, D9; on FinalSurface);
-##   spawn      a backbone point near the region centre, facing along it.
+##   spawn      a backbone point near the region centre, facing along it;
+##   trails     BC1 (options.trail_config, the parsed TrailRealization
+##              configuration; absent = prototype-off, products unchanged):
+##              realized on the chosen products and published atomically
+##              (_trails) before bridges, water and vegetation.
 ## Output is region-local (x - min_x, z - min_z) so runtime float32 stays
 ## precise anywhere in the int64 world. Tiles may be built on WorkerThreadPool
 ## threads: each tile is independent and its arrays do not depend on order or
@@ -35,6 +39,7 @@ const Bridges = preload("res://scripts/world/region/bridge_deck_builder.gd")
 const Graph = preload("res://scripts/world/region/region_route_graph.gd")
 const Synth = preload("res://scripts/world/region/road_synthesizer.gd")
 const Vegetation = preload("res://scripts/world/region/region_vegetation_planner.gd")
+const Trail = preload("res://scripts/world/region/trail_realization.gd")
 const SCHEMA := "slow_cycle.region_bake/1"
 const TILE_M: int = 512
 const TILES: int = 8
@@ -46,6 +51,8 @@ const LAYER_TERRAIN: int = 4
 const PATCH_LAYERS: Array[int] = [LAYER_TERRAIN, LAYER_ROAD, LAYER_ROUGH]
 ## Bound on surface isolation passes (each excludes at least one piece).
 const MAX_ISOLATION_PASSES: int = 24
+## Bound on BC1 trail border-agreement passes (each adds border points).
+const MAX_SEAM_PASSES: int = 12
 
 
 static func bake(seed_value: int, region: Vector2i, options: Dictionary = {}, progress: Callable = Callable()) -> Dictionary:
@@ -114,6 +121,16 @@ static func _bake(seed_value: int, region: Vector2i, options: Dictionary, progre
 	var surface: RefCounted = chosen.surface
 	var slots: Array = chosen.slots
 	var excluded: Dictionary = chosen.excluded
+	var trail_report: Dictionary = {}
+	if options.has("trail_config"):
+		t = Time.get_ticks_usec()
+		_report(progress, "trails", 0.91)
+		var made: Dictionary = _trails(options.trail_config, seed_value, region, network, surface, field, bounds, slots, threads)
+		network = made.network
+		surface = made.surface
+		slots = made.slots
+		trail_report = made.report
+		timings["trails_s"] = _lap(t)
 	var data: Dictionary = network.get_data()
 	t = Time.get_ticks_usec()
 	_report(progress, "bridges_water", 0.92)
@@ -138,6 +155,8 @@ static func _bake(seed_value: int, region: Vector2i, options: Dictionary, progre
 		"plan_signature": chosen.plan.signature(), "chosen_round": chosen.round, "network_best_round": built.round, "rounds": _round_summaries(built.rounds), "metrics": data.metrics,
 		"tiles": [], "timings_s": timings, "r7_excluded": excluded, "r7_rounds": _r7_summaries(tried),
 		"bridges": bridges.decks.size(), "threads": threads}
+	if options.has("trail_config"):
+		manifest["trails"] = trail_report
 	var vertices: int = 0
 	var triangles: int = 0
 	for slot: Dictionary in slots:
@@ -151,6 +170,129 @@ static func _bake(seed_value: int, region: Vector2i, options: Dictionary, progre
 	_report(progress, "done", 1.0)
 	return {"is_valid": true, "reason_code": "", "manifest": manifest, "network": network, "tiles": slots, "bridges": bridges, "water": water, "spawn": spawn, "vegetation": vegetation,
 		"surface": surface, "terrain": terrain, "hydrology": hydro.plan, "field": field, "plan": plan}
+
+
+## BC1: realize the configured trails on the chosen products and publish them
+## atomically. The tiles their bands reach are refined from their prototype-
+## off arrays on the trail surface (FinalSurfaceTileRenderer.refine_arrays),
+## in passes until the tiles agree on every shared border: each pass forces
+## the border midpoints any tile made, and a tile whose border receives one
+## joins; the other tiles keep their arrays. Final heights come from the
+## published triangles (FinalSurface.with_published), and every trail is
+## checked again on them (TrailRealization.finalize). A trail rejected at any
+## step leaves no trace: the rest are published again without it, and with
+## none left the products stay exactly the prototype-off ones. Returns
+## {network, surface, slots, report: {config_sha256, published, rejected}}.
+static func _trails(config: Variant, seed_value: int, region: Vector2i, network: RefCounted, surface: RefCounted, field: RefCounted, bounds: Dictionary, slots: Array,
+		threads: int) -> Dictionary:
+	var context := {"seed": seed_value, "region": region, "network": network.get_data(), "surface": surface, "field": field}
+	var realized: Dictionary = Trail.realize_all(config, context)
+	var rejected: Array = realized.rejected.duplicate(true)
+	var trails: Array = realized.trails
+	var report := {"config_sha256": JSON.stringify(config, "", true).sha256_text(), "published": [], "rejected": rejected}
+	var unchanged := {"network": network, "surface": surface, "slots": slots, "report": report}
+	var piece_class: Dictionary = {}
+	for piece: Dictionary in network.get_data().pieces:
+		piece_class[piece.id] = piece.info.route_class
+	while not trails.is_empty():
+		var trail_surface: RefCounted = surface.with_trails(trails)
+		var indices: Array = _trail_tiles(trails, slots, bounds)
+		var forced: Dictionary = {}
+		var refined: Array = []
+		var failure: Dictionary = {}
+		var agreed: bool = false
+		for attempt in range(MAX_SEAM_PASSES):
+			refined = _refine_tiles(trail_surface, bounds, piece_class, threads, slots, indices, forced)
+			for slot: Dictionary in refined:
+				if not slot.is_valid:
+					failure = slot
+			if not failure.is_empty():
+				break
+			var grew: bool = false
+			for slot: Dictionary in refined:
+				for point: Vector2 in slot.border_points:
+					if not forced.has(point):
+						forced[point] = true
+						grew = true
+			for point: Vector2 in forced:
+				for k in range(slots.size()):
+					var rect := Rect2(slots[k].tx * TILE_M, slots[k].tz * TILE_M, TILE_M, TILE_M)
+					if not k in indices and rect.grow(0.001).has_point(point) and not rect.grow(-0.001).has_point(point):
+						indices.append(k)
+						grew = true
+			if not grew:
+				agreed = true
+				break
+		if failure.is_empty() and not agreed:
+			failure = {"reason_code": "ERR_TRAIL_TILE", "tx": -1, "tz": -1, "detail": "no border agreement in %d passes" % MAX_SEAM_PASSES}
+		if not failure.is_empty():
+			for trail: Dictionary in trails:
+				rejected.append({"id": trail.id, "reason_code": "ERR_TRAIL_UNRIDEABLE", "detail": {"stage": "published geometry", "reason": failure.get("reason_code", ""),
+					"tile": [failure.tx, failure.tz], "note": str(failure.get("detail", ""))}})
+			return unchanged
+		var published: RefCounted = trail_surface.with_published(refined)
+		var finished: Array = []
+		var kept: Array = []
+		for trail: Dictionary in trails:
+			var made: Dictionary = Trail.finalize(trail, published, context)
+			if made.is_valid:
+				finished.append(made.trail)
+				kept.append(trail)
+			else:
+				rejected.append({"id": made.id, "reason_code": made.reason_code, "detail": made.detail})
+		if kept.size() < trails.size():
+			trails = kept
+			continue
+		var joined: Dictionary = network.with_trails(finished)
+		if not joined.is_valid:
+			for trail: Dictionary in trails:
+				rejected.append({"id": trail.id, "reason_code": joined.reason_code, "detail": {"stage": "network publication"}})
+			return unchanged
+		var out_slots: Array = slots.duplicate()
+		for m in range(indices.size()):
+			refined[m].erase("border_points")
+			out_slots[indices[m]] = refined[m]
+		for trail: Dictionary in finished:
+			report.published.append({"id": trail.id, "mode": trail.mode, "length_m": trail.length_m, "nodes": trail.nodes, "joins": trail.joins, "metrics": trail.metrics,
+				"directions": trail.directions, "tiles": indices.map(func(k: int) -> Array: return [slots[k].tx, slots[k].tz]), "border_points": forced.size()})
+		return {"network": joined.network, "surface": published, "slots": out_slots, "report": report}
+	return unchanged
+
+
+## Indices of the tile slots a trail band may refine (band within the
+## renderer's refinement reach of the tile).
+static func _trail_tiles(trails: Array, slots: Array, bounds: Dictionary) -> Array:
+	var out: Array = []
+	for k in range(slots.size()):
+		var rect := Rect2(slots[k].tx * TILE_M - bounds.min_x, slots[k].tz * TILE_M - bounds.min_z, TILE_M, TILE_M).grow(Renderer.TRAIL_REFINE_M + 1.5)
+		var near: bool = false
+		for trail: Dictionary in trails:
+			var line: Dictionary = trail.line
+			for i in range(line.s.size()):
+				near = near or rect.grow(trail.half_width_m).has_point(Vector2(line.x[i], line.z[i]))
+		if near:
+			out.append(k)
+	return out
+
+
+## Trail refinement of the listed tiles from their slot arrays (threaded like
+## _tiles; each job writes its own slot).
+static func _refine_tiles(surface: RefCounted, bounds: Dictionary, piece_class: Dictionary, threads: int, slots: Array, indices: Array, forced: Dictionary) -> Array:
+	var out: Array = []
+	for k: int in indices:
+		out.append({"tx": slots[k].tx, "tz": slots[k].tz})
+	var job := func(m: int) -> void:
+		var base: Dictionary = slots[indices[m]]
+		var tile: Dictionary = Renderer.refine_arrays(surface, base.arrays, base.tx, base.tz, forced)
+		_finish_slot(surface, bounds, piece_class, out[m], tile, base.coarse)
+		out[m]["border_points"] = tile.get("border_points", [])
+	if threads > 1 and out.size() > 1:
+		var group: int = WorkerThreadPool.add_group_task(job, out.size(), threads, true, "region_bake_trail_tiles")
+		WorkerThreadPool.wait_for_group_task_completion(group)
+	else:
+		for m in range(out.size()):
+			job.call(m)
+	return out
 
 
 ## Pieces FinalSurface cannot construct are isolated (M3): construction checks
@@ -284,6 +426,12 @@ static func _report(progress: Callable, stage: String, fraction: float) -> void:
 ## coarse 16 m LOD arrays, content hash. Writes into `slot` only.
 static func _tile(surface: RefCounted, bounds: Dictionary, piece_class: Dictionary, slot: Dictionary) -> void:
 	var tile: Dictionary = Renderer.tile_arrays(surface, slot.tx, slot.tz)
+	_finish_slot(surface, bounds, piece_class, slot, tile, [])
+
+
+## Slot of built tile arrays: per-triangle layer and patch, origin, coarse
+## LOD (given, or computed when empty), content hash. Writes into `slot` only.
+static func _finish_slot(surface: RefCounted, bounds: Dictionary, piece_class: Dictionary, slot: Dictionary, tile: Dictionary, coarse: Array) -> void:
 	if not tile.is_valid:
 		slot["is_valid"] = false
 		slot["reason_code"] = tile.reason_code
@@ -309,7 +457,8 @@ static func _tile(surface: RefCounted, bounds: Dictionary, piece_class: Dictiona
 			continue
 		var owner: String = surface.road_owner(tile.origin_x_m + centre.x, tile.origin_z_m + centre.z)
 		if owner.is_empty():
-			layers[q] = LAYER_TERRAIN
+			# BC1: a trail band off the road planes is rough ground (SINGLETRACK).
+			layers[q] = LAYER_ROUGH if not surface.trail_owner(tile.origin_x_m + centre.x, tile.origin_z_m + centre.z).is_empty() else LAYER_TERRAIN
 		else:
 			layers[q] = LAYER_ROUGH if piece_class.get(owner, 0) >= Graph.RouteClass.SINGLETRACK else LAYER_ROAD
 	slot["arrays"] = arrays
@@ -319,7 +468,7 @@ static func _tile(surface: RefCounted, bounds: Dictionary, piece_class: Dictiona
 	slot["origin"] = [tile.origin_x_m - bounds.min_x, tile.origin_z_m - bounds.min_z]
 	slot["vertex_count"] = tile.vertex_count
 	slot["triangle_count"] = tile.triangle_count
-	slot["coarse"] = _coarse(surface, tile.origin_x_m, tile.origin_z_m)
+	slot["coarse"] = coarse if not coarse.is_empty() else _coarse(surface, tile.origin_x_m, tile.origin_z_m)
 	var bytes := PackedByteArray()
 	bytes.append_array(vertices.to_byte_array())
 	bytes.append_array(indices.to_byte_array())

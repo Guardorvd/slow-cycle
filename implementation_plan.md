@@ -1,10 +1,10 @@
 TASK: BC1 — первая природная тропа Slow Cycle; ExecPlan v1.0
 DATE: 2026-10-13
-STATUS: PLAN_ONLY — STOP at explicit Game Director approval; implementation NOT_STARTED
+STATUS: IN_PROGRESS — M1 partial, paused by the Director ("сохрани и закончи") before the first fresh bake; NOT PLAYABLE yet; see Progress
 BRANCH: bc1-natural-trail; BASE: final BC0 2a43bc092b503987a9a2845232a3791b0ad69e21
 HEAD AT PLAN DRAFT: a8414ac0a6becc989fef24d060cff40bc8ceb149 (factual errata); submission HEAD/digests in planning manifest
 BASELINE: source/new checkout clean (staged/unstaged/untracked 0/0/0); docs-only planning changes
-APPROVAL: none for BC1 v1.0; Director 2026-10-13 authorizes planning, branch and factual errata only
+APPROVAL: BC1 ExecPlan v1.0 APPROVED by the Director 2026-10-13 at 48d2cea with conditions 1–3 (network integration, NATURAL geometry integrity, Playable First); local commits only, no push/merge
 PREVIOUS: [BC0 COMPLETE](docs/plans/completed/BC0.md); [PR1 SUSPENDED](docs/plans/suspended/PR1.md); roadmap ACCEPTED
 EVIDENCE: C:/Users/Luisa/Documents/Codex/2026-10-13/slow-cycle-bc0-accepted-bc1-planning/outputs/bc1-evidence/ (durable, outside repo)
 
@@ -142,3 +142,43 @@ Approve **BC1 ExecPlan v1.0** including whitelist, one new additive test entry, 
 STOP: [.agent/PLANS.md](.agent/PLANS.md) requires “save one reviewable plan ... and STOP for explicit human approval”; [slow-cycle-worldgen §1](.agents/skills/slow-cycle-worldgen/SKILL.md) requires “STOP until their concrete plan is approved”. No production changes before approval.
 
 Ledger (wall / aggregate hours, ±0.25 h): planning in submission manifest; Implementation/L0/L1/L2/VERIFY/REVIEW/Closeout NOT_STARTED. On execution maintain separate rows and both verification-overhead ratios per Test Strategy §7.6.
+
+## Progress (2026-10-13)
+
+Status: **M0 done, M1 partial. Not PLAYABLE, not REVIEWABLE.** Pause requested by the Director. Evidence: `outputs/bc1-evidence/` (runs/, m0/, m1/); dev tooling (runner, sync, probes) in `work/bc1/`, outside the repo.
+
+**M0 (done).**
+- Prototype-off baseline rebaked from this source: `tiles_digest c94451cf…`, `network_digest 183eef0c…`, equal to PR1 §2 expected values (`runs/m0_baseline_bake`, 382 s, 8 threads). Cached for the unchanged source.
+- Line chosen: `trail:bc1_meadow`, NATURAL, purpose MEADOW_PASSAGE. It leaves edge:4 (BACKBONE) at (2300.4, 2840.6), 137 m from junction 5, and joins edge:7 (SECONDARY) at (2472.8, 3092.0), 158 m from junction 4. It runs across the meadow east of the creek, away from crossings and junction connectors. Spawn is about 130 m away on edge:5.
+- Realized: 335.7 m, climb 13.6 m, max grade 8.5 %, max side slope 6.7 %, min radius 33.8 m, both directions; config `resources/regions/bc1_trail_184729.json`.
+- **Measured query/triangle drift:** off-road FinalSurface queries differ from the published coarse triangles by up to 10.8 cm along the band (176/1011 samples > 5 cm, the retained P2 ground tolerance; `m0/trail_probe2.json`). Smallest solution taken: final queries inside trail zones come from the published triangles (design queries unchanged); general off-road parity stays BC2.
+
+**M1 implementation (code written, partially verified).**
+- `trail_realization.gd` (new, pure): parse, identity, line, connection, rideability, and `finalize` on published heights. Reasons: ERR_TRAIL_INPUT / IDENTITY / CONNECTION / UNRIDEABLE. Declared limits: SINGLETRACK grade 10° and radius 19 m from policy, side slope 0.35, pitch 0.30 per sample, joins ≤ 200 m from the node.
+- `realized_road_network.gd`: `with_trails()` adds trails as their own list (schema /2), never as pieces; without trails the network is byte-identical.
+- `final_surface.gd`: trail index, band ownership, `with_published()` final queries.
+- `final_surface_tile_renderer.gd`: exact refinement of the published tile along the band. It uses longest-edge bisection with midpoints only, clips at the band edge with linear heights, and sets trail UVs. `refine_arrays` takes forced border points.
+- `region_bake.gd`: `_trails` atomic publication. Tiles are refined from their prototype-off arrays, with border-agreement passes, then `with_published`, then `finalize`, then `with_trails`. A rejection keeps the prototype-off products. Trail band triangles go on the RoughRoad layer.
+- `region_vegetation_planner.gd`: trail clearances.
+- `region_bake_cache.gd`: `trail_settings` key.
+- `region_world.gd`: `--trail-config=`, recovery lines, end posts, summary/log.
+- `region_road.gdshader`: trail material.
+
+**Checks run (dev probe `m1_step3` on cached prototype-off products, candidate code; L0/L1-level, not a fresh bake):**
+- Trail published; only tiles (4,5),(4,6) change.
+- Shared border: 121 vertices, 0 mismatches.
+- New vertices on the off triangles: max 0.05 mm (float32).
+- Off vertices missing: 0.
+- Atomic rejection on failure (earlier run): network digest stayed `183eef0c…`.
+- design_parity_max 10.6 cm, now absorbed by the final queries.
+- Layer/query agreement: 19 of 106 656 interior probes disagree. All lie within 0.3 mm of the band edge, on clip slivers decided by float32 rounding (`runs/m1_step4`). The test must state this sub-mm edge tolerance explicitly.
+
+**NOT RUN / remaining before P1.**
+- One fresh bake with `--trail-config` and its cache reload equality.
+- Prototype-off fresh bake equality with the current code.
+- `scripts/test/test_bc1_trail.gd` (not created).
+- Input-driven ride road→trail→road in both directions; P2 rays; vegetation colliders clear.
+- Negatives; Vulkan views; playtest doc and PLAYABLE package.
+- No PASS is claimed; S3 untouched; BicycleController and tests untouched.
+
+Ledger (wall, ±0.25 h): implementation + L0/L1 ≈ 1.5 h; L2/VERIFY/REVIEW/Closeout NOT_STARTED.

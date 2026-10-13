@@ -19,11 +19,17 @@ extends RefCounted
 ## crossings, edges, movements) so RoadTerrainDeformer composes it, plus
 ## topology, recommended directions with their easier return paths, DEGRADE
 ## records and network metrics N1-N7 (N7 diagnostic only).
+## BC1 (additive): with_trails() publishes realized trails (TrailRealization
+## records) as complete connections between two of the network's nodes, in
+## their own `trails` list - never as pieces, so the road deformer and every
+## road rule above ignore them. Such a network carries SCHEMA_TRAILS; one
+## without trails is byte-identical to before.
 
 const Graph = preload("res://scripts/world/region/region_route_graph.gd")
 const Policy = preload("res://scripts/world/region/road_synthesis_policy.gd")
 const Intent = preload("res://scripts/world/region/roadbed_intent.gd")
 const SCHEMA := "slow_cycle.realized_road_network/1"
+const SCHEMA_TRAILS := "slow_cycle.realized_road_network/2"
 ## This script's own path: instances are made from it, never through the
 ## global class_name (registered only by an editor import; a launch from a
 ## stale .godot class cache must still compile - PR1 launch fix).
@@ -453,6 +459,49 @@ func _character() -> Dictionary:
 	return summary
 
 
+## A new network: this one plus `trails` (TrailRealization records, each
+## joining two nodes of this network). Node records name their trails; the
+## road metrics stay as they are and metrics.trails summarizes the trails.
+## Returns {is_valid, network, reason_code}; ERR_TRAIL_CONNECTION when a
+## trail names a node this network does not have or repeats an id.
+func with_trails(trails: Array) -> Dictionary:
+	var data: Dictionary = _data.duplicate(true)
+	var by_node: Dictionary = {}
+	var ids: Dictionary = {}
+	for trail: Dictionary in data.get("trails", []) + trails:
+		if ids.has(trail.id):
+			return {"is_valid": false, "network": null, "reason_code": "ERR_TRAIL_CONNECTION"}
+		ids[trail.id] = true
+		for node_id: int in trail.nodes:
+			if not by_node.has(node_id):
+				by_node[node_id] = []
+			by_node[node_id].append(trail.id)
+	var known: Dictionary = {}
+	for node: Dictionary in data.nodes:
+		known[node.id] = true
+		if by_node.has(node.id):
+			node["trails"] = by_node[node.id]
+	for node_id: int in by_node:
+		if not known.has(node_id):
+			return {"is_valid": false, "network": null, "reason_code": "ERR_TRAIL_CONNECTION"}
+	data["trails"] = data.get("trails", []) + trails.duplicate(true)
+	data["schema"] = SCHEMA_TRAILS
+	data.header["schema"] = SCHEMA_TRAILS
+	var summary := {"count": 0, "length_m": 0.0, "modes": {}}
+	for trail: Dictionary in data.trails:
+		summary.count += 1
+		summary.length_m += trail.length_m
+		summary.modes[trail.mode] = summary.modes.get(trail.mode, 0) + 1
+	data.metrics["trails"] = summary
+	var network = _instance()
+	network._data = data
+	return {"is_valid": true, "network": network, "reason_code": ""}
+
+
+func get_trails() -> Array:
+	return _data.get("trails", []).duplicate(true)
+
+
 func get_data() -> Dictionary:
 	return _data.duplicate(true)
 
@@ -472,7 +521,7 @@ func to_bytes() -> PackedByteArray:
 
 static func from_bytes(bytes: PackedByteArray) -> Dictionary:
 	var value: Variant = bytes_to_var(bytes)
-	if not value is Dictionary or value.get("schema", "") != SCHEMA:
+	if not value is Dictionary or not value.get("schema", "") in [SCHEMA, SCHEMA_TRAILS]:
 		return {"is_valid": false, "network": null, "reason_code": "ERR_NETWORK_SCHEMA"}
 	var network = _instance()
 	network._data = value
