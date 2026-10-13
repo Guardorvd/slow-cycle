@@ -581,7 +581,7 @@ func _build_trail_markers(data: Dictionary) -> void:
 		for join: Dictionary in trail.joins:
 			var k: int = join.leave_index
 			var side := Vector3(-line.tz[k], 0.0, line.tx[k])
-			var base := Vector3(line.x[k], line.y[k], line.z[k]) + side * (trail.half_width_m + 0.9)
+			var base: Vector3 = Vector3(line.x[k], line.y[k], line.z[k]) + side * (trail.half_width_m + 0.9)
 			var post := MeshInstance3D.new()
 			var box := BoxMesh.new()
 			box.size = Vector3(0.12, 1.4, 0.12)

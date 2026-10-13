@@ -47,11 +47,14 @@ const HALF_WIDTH_MIN_M: float = 0.5
 const HALF_WIDTH_MAX_M: float = 1.0
 ## Node layout tolerance of the identity check.
 const NODE_TOLERANCE_M: float = 1.0
-## NATURAL riding limits, declared before implementation (BC1 contract 5):
-## the class pointwise grade over GRADE_WINDOW_M and hard radius over
-## +-RADIUS_WINDOW_M; side slope of the untouched ground across the band
-## (no benching in NATURAL); short pitches over one sample (road shoulders and
-## earthwork the trail crosses at its joins).
+## PROVISIONAL screening limits for the first BC1 line, not NATURAL norms:
+## grade over GRADE_WINDOW_M and radius over +-RADIUS_WINDOW_M reuse the
+## SINGLETRACK/R6 class values (10 deg, 19 m) as conservative stand-ins; side
+## slope of the untouched ground across the band (no benching in NATURAL);
+## short pitches over one sample (road shoulders and earthwork the trail
+## crosses at its joins). Real two-way rideability is established by Input
+## rides of the existing BicycleController (BC1 runtime check), and NATURAL
+## norms are owned by BC2.
 const GRADE_WINDOW_M: float = 4.0
 const RADIUS_WINDOW_M: float = 3.0
 const CROSS_SLOPE_MAX: float = 0.35

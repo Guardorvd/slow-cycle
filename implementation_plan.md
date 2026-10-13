@@ -1,6 +1,6 @@
 TASK: BC1 — первая природная тропа Slow Cycle; ExecPlan v1.0
 DATE: 2026-10-13
-STATUS: IN_PROGRESS — M1 partial, paused by the Director ("сохрани и закончи") before the first fresh bake; NOT PLAYABLE yet; see Progress
+STATUS: P1 PLAYABLE / REVIEWABLE (2026-10-13) — STOP for the Director's human ride and feedback before M2/SHAPED; not a phase PASS, not E7
 BRANCH: bc1-natural-trail; BASE: final BC0 2a43bc092b503987a9a2845232a3791b0ad69e21
 HEAD AT PLAN DRAFT: a8414ac0a6becc989fef24d060cff40bc8ceb149 (factual errata); submission HEAD/digests in planning manifest
 BASELINE: source/new checkout clean (staged/unstaged/untracked 0/0/0); docs-only planning changes
@@ -145,40 +145,50 @@ Ledger (wall / aggregate hours, ±0.25 h): planning in submission manifest; Impl
 
 ## Progress (2026-10-13)
 
-Status: **M0 done, M1 partial. Not PLAYABLE, not REVIEWABLE.** Pause requested by the Director. Evidence: `outputs/bc1-evidence/` (runs/, m0/, m1/); dev tooling (runner, sync, probes) in `work/bc1/`, outside the repo.
+Status: **P1 PLAYABLE / REVIEWABLE. Waiting for the Director's ride and feedback; SHAPED not started.** Evidence: `outputs/bc1-evidence/` (runs/, m0/, m1/); dev tooling in `work/bc1/`, outside the repo. The Director's clarification of 2026-10-13 (four points) is answered below.
 
-**M0 (done).**
-- Prototype-off baseline rebaked from this source: `tiles_digest c94451cf…`, `network_digest 183eef0c…`, equal to PR1 §2 expected values (`runs/m0_baseline_bake`, 382 s, 8 threads). Cached for the unchanged source.
-- Line chosen: `trail:bc1_meadow`, NATURAL, purpose MEADOW_PASSAGE. It leaves edge:4 (BACKBONE) at (2300.4, 2840.6), 137 m from junction 5, and joins edge:7 (SECONDARY) at (2472.8, 3092.0), 158 m from junction 4. It runs across the meadow east of the creek, away from crossings and junction connectors. Spawn is about 130 m away on edge:5.
-- Realized: 335.7 m, climb 13.6 m, max grade 8.5 %, max side slope 6.7 %, min radius 33.8 m, both directions; config `resources/regions/bc1_trail_184729.json`.
-- **Measured query/triangle drift:** off-road FinalSurface queries differ from the published coarse triangles by up to 10.8 cm along the band (176/1011 samples > 5 cm, the retained P2 ground tolerance; `m0/trail_probe2.json`). Smallest solution taken: final queries inside trail zones come from the published triangles (design queries unchanged); general off-road parity stays BC2.
+**M0.**
+- Prototype-off baseline rebaked: `c94451cf…` / `183eef0c…`, equal to the PR1 expected values.
+- Line `trail:bc1_meadow`, NATURAL, purpose MEADOW_PASSAGE. It leaves edge:4 (valley BACKBONE, 137 m east of junction 5) and joins edge:7 (SECONDARY loop, 158 m south of junction 4).
+- Measured query/triangle drift on the band: up to 10.8 cm (> 5 cm P2 ground). Resolved by final queries from the published triangles in trail zones; general off-road parity → BC2.
 
-**M1 implementation (code written, partially verified).**
-- `trail_realization.gd` (new, pure): parse, identity, line, connection, rideability, and `finalize` on published heights. Reasons: ERR_TRAIL_INPUT / IDENTITY / CONNECTION / UNRIDEABLE. Declared limits: SINGLETRACK grade 10° and radius 19 m from policy, side slope 0.35, pitch 0.30 per sample, joins ≤ 200 m from the node.
-- `realized_road_network.gd`: `with_trails()` adds trails as their own list (schema /2), never as pieces; without trails the network is byte-identical.
-- `final_surface.gd`: trail index, band ownership, `with_published()` final queries.
-- `final_surface_tile_renderer.gd`: exact refinement of the published tile along the band. It uses longest-edge bisection with midpoints only, clips at the band edge with linear heights, and sets trail UVs. `refine_arrays` takes forced border points.
-- `region_bake.gd`: `_trails` atomic publication. Tiles are refined from their prototype-off arrays, with border-agreement passes, then `with_published`, then `finalize`, then `with_trails`. A rejection keeps the prototype-off products. Trail band triangles go on the RoughRoad layer.
-- `region_vegetation_planner.gd`: trail clearances.
-- `region_bake_cache.gd`: `trail_settings` key.
-- `region_world.gd`: `--trail-config=`, recovery lines, end posts, summary/log.
-- `region_road.gdshader`: trail material.
+**M1 implementation.**
+- `trail_realization.gd`: pure realize/finalize with reasons INPUT / IDENTITY / CONNECTION / UNRIDEABLE.
+- `realized_road_network.with_trails` (own list, schema /2).
+- FinalSurface trail index and `with_published`.
+- Exact tile refinement: longest-edge bisection, band clipping, trail UV, border agreement in the bake.
+- Atomic `RegionBake._trails`.
+- Vegetation clearance, cache key, RegionWorld opt-in, recovery lines, end posts, shader.
+- `scripts/test/test_bc1_trail.gd` (new, additive).
 
-**Checks run (dev probe `m1_step3` on cached prototype-off products, candidate code; L0/L1-level, not a fresh bake):**
-- Trail published; only tiles (4,5),(4,6) change.
-- Shared border: 121 vertices, 0 mismatches.
-- New vertices on the off triangles: max 0.05 mm (float32).
-- Off vertices missing: 0.
-- Atomic rejection on failure (earlier run): network digest stayed `183eef0c…`.
-- design_parity_max 10.6 cm, now absorbed by the final queries.
-- Layer/query agreement: 19 of 106 656 interior probes disagree. All lie within 0.3 mm of the band edge, on clip slivers decided by float32 rounding (`runs/m1_step4`). The test must state this sub-mm edge tolerance explicitly.
+**P1 evidence (L1; candidate = this commit's sources; all stderr free of errors/warnings/leaks).**
+- **integration 55/0** (`runs/m1_integration2`, 824 s):
+  - fresh off bake equals baseline tiles/network/vegetation;
+  - fresh on bake publishes one trail; roads unchanged (on network minus trail == off network);
+  - only tiles (4,5),(4,6) change; their new vertices lie on the off triangles (≤ 0.05 mm) and no off vertex is lost; 8/8 seams with neighbours equal;
+  - band layer agrees with the material query (19 probes ≤ 1 mm from the band edge counted as float32 rounding);
+  - final queries equal the published triangles (≤ 0.05 mm); vegetation changes only in the trail tiles, closest clearance 1.3 m;
+  - cache reload equals fresh (on and off); stale cache reads ERR_BAKE_STALE; content/seed key identity; atomic rejection keeps the off products.
+- **domain 18/0** (`runs/m1_domain2`): determinism; 13 negatives each with the declared reason, water stopping at water.
+- **runtime 23/0** (`runs/m1_runtime4`, Vulkan, cache load 1.9 s):
+  - Input rides road→trail→road both ways: finished, 0 stalls, wheels always grounded;
+  - lateral ≤ 0.31 m forward / 0.75 m reverse; rough collider under wheels 100 % / 99.4 %;
+  - P2: 1011 rays, 0 misses, ≤ 0.04 mm (mouth rule: road or trail within 2 m of a join);
+  - recovery lands on the trail line, 0.45 m above loaded ground;
+  - 4 bicycle-camera views saved and read (`m1/runtime/bc1_view_*.png`).
+- **Default baseline smoke:** existing `test_region_ride --target=region --tour-m=1500` 7/0, cache, no trail (`runs/m1_baseline_smoke`).
+- **Launch** in this worktree from cache with the trail: `runs/m1_launch_worktree`.
 
-**NOT RUN / remaining before P1.**
-- One fresh bake with `--trail-config` and its cache reload equality.
-- Prototype-off fresh bake equality with the current code.
-- `scripts/test/test_bc1_trail.gd` (not created).
-- Input-driven ride road→trail→road in both directions; P2 rays; vegetation colliders clear.
-- Negatives; Vulkan views; playtest doc and PLAYABLE package.
-- No PASS is claimed; S3 untouched; BicycleController and tests untouched.
+**Director clarification (2026-10-13).**
+1. **Limits.** 10° grade and 19 m radius are PROVISIONAL screening values reused from SINGLETRACK/R6, marked as such in code. NATURAL norms → BC2. The line itself stays far below them (8.5 %, 34 m). Two-way rideability is shown by the Input rides with the real BicycleController. Observed: on the 8.5 % section of the rough layer the bot slows to 1.7 m/s (2 sprint taps), a question for the human ride.
+2. **Cost.** Region vertices 1,381,359 → 1,399,547 (+18,188, +1.32 %); triangles 2,750,439 → 2,786,755 (+1.32 %).
+   - Per tile: (4,5) +9.9 % vertices, (4,6) +16.7 %.
+   - Bake +30 s (trails step) of 409 s.
+   - Cause: the band zone (half width + 1 m, ~1,100 m²) is refined to 0.5 m edges so the band edge, layer and shading follow the line exactly. That is ~54 vertices per trail metre, plus grading back to the 16 m cells and the clip points.
+   - Runtime GPU/memory cost not measured (L2). No optimisation started.
+3. **Layer probes.** All 19 disagreements lie ≤ 0.3 mm from the band edge on clip slivers (float32). Recorded as an explicit ≤ 1 mm edge tolerance in the test; no algorithm growth; P2 and other mandatory checks unchanged.
+4. **Geography.** See the playtest instruction, section BC1 P1: a meadow shortcut from the valley road by the river to the SECONDARY loop toward the southern range, bypassing junction 4. Gentle and short: a first technical segment whose interest is to be judged by the ride.
 
-Ledger (wall, ±0.25 h): implementation + L0/L1 ≈ 1.5 h; L2/VERIFY/REVIEW/Closeout NOT_STARTED.
+**NOT RUN (L2/acceptance, after the playtests).** G suite, GPU 20-min ride, 1-vs-N bake determinism, holdout, mutants, P3 off-road ≥ 150 m, R6/R7 regression subset, VERIFY, REVIEW. S3 untouched (OPEN / KNOWN FAILURE).
+
+Ledger (wall, ±0.25 h): implementation + L0/L1 ≈ 4 h, M0 included; L2/VERIFY/REVIEW/Closeout NOT_STARTED.
