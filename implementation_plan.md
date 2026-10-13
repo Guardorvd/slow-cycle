@@ -1,6 +1,6 @@
 TASK: BC1 — первая природная тропа Slow Cycle; ExecPlan v1.0
 DATE: 2026-10-13
-STATUS: M4 IN PROGRESS — P2 ACCEPTED (Director, 2026-10-13); formal L2, G, VERIFY and independent REVIEW authorized; no further trail shape changes without a confirmed defect
+STATUS: M4 L2 IN PROGRESS — paused by the Director ("сохрани и закончим сегодня"); L2 candidate 980adf7; one pre-existing FAIL under investigation (test_region_ride --target=r7_fixture); VERIFY/REVIEW not started
 BRANCH: bc1-natural-trail; BASE: final BC0 2a43bc092b503987a9a2845232a3791b0ad69e21
 HEAD AT PLAN DRAFT: a8414ac0a6becc989fef24d060cff40bc8ceb149 (factual errata); submission HEAD/digests in planning manifest
 BASELINE: source/new checkout clean (staged/unstaged/untracked 0/0/0); docs-only planning changes
@@ -193,6 +193,60 @@ Authority: Director decision "BC1 — P1 Human Feedback Accepted / Proceed to SH
 - **Out of scope.** Other operations, jumps, obstacles, a general sculpting tool. Changing files, protected contracts or adding operations needs separate approval.
 
 **Product observations (for BC3–BC5, no BC1 work).** Landscape variety, visual content and overall expressiveness of the region; the meadow terrain is smooth.
+
+## M4 L2 progress (2026-10-13, paused)
+
+**Candidate.** `980adf73511e1e689bdc33d75b9e843463a94491`; tracked-file manifest `f60ef0ff…` (`outputs/bc1-evidence/l2/candidate_manifest.txt`, 475 files); non-md diff vs `48d2cea`: `95bdd3cd…` (`l2/candidate.diff`).
+- The engine copy `work/bc1/cand` is byte-identical to the candidate.
+- Raw runs: `outputs/bc1-evidence/runs/l2_*`; reports: `outputs/bc1-evidence/l2/`.
+
+**Added before freezing (test entry and an in-memory bake field only).**
+- `test_bc1_trail`: handoff assertions for the consumed ENGINEERED pieces edge:4/edge:7. These close BC1's share of the PR1 D10 T2.4 protection gap; the R6 oracle is unchanged.
+- `test_bc1_trail`: P3 off-road excursion (grid A*, ≥ 150 m on grass); views in both directions; `--group=soak` (E6).
+- `region_bake`: the selected R5 graph in the in-memory result.
+
+**Reference audit** (`l2/ref_audit.json`, non-impact proofs `l2/non_impact.md`):
+- run: region entries, the R7 fixture guard, `test_ride_envelope`, the G gates;
+- NI-1: 21 domain entries reach only an unexecuted FinalSurface branch;
+- NI-2: 76 entries reach region code only through the menu Region button, which they never press;
+- 39 entries unreachable;
+- PR1 mutants not impacted (no R5/R6 code changed).
+
+**L2 results so far.**
+
+| Check | Run | Result |
+|---|---|---|
+| E0 import + parse of touched scripts | `l2_e0_import`, `l2_e0_parse` | PASS (0 errors) |
+| test_bc1_trail integration (fresh off/on bakes, handoff, shape, seams, cache, negatives) | `l2_integration` | 67/0, 842 s; cold bake off 384 s / on 408 s (≤ 600 s) |
+| test_bc1_trail domain | `l2_domain` | 25/0 |
+| test_final_surface --source=fixture (contracts/surface/collision, D10 T2.4/T2.5) | `l2_r7_fixture` | 424259 assertions / 0 failures, release delta 0 (= PR1 L1 count) |
+| test_ride_envelope | `l2_ride_envelope` | 204/0 |
+| test_region_ride --target=region (trail off, 4.47 km tour) | `l2_region_ride_region` | 7/0 |
+| **test_region_ride --target=r7_fixture** | `l2_region_ride_fixture` | **FAIL 11/6** — see below |
+| Determinism: fresh on-bake 8 vs 1 thread (separate processes) | `l2_det_on_t8`, `l2_det_on_t1` | equal: tiles `7802b6971d9f…`, network `c89164f2f545…` (vegetation t8 `896ee72f6176…`; compare with t1 and the integration cache) |
+| Seed 2024 / holdout 3628391 (3,−2), trail off | `l2_2024_cand`, `l2_holdout_cand` | candidate baked: 2024 tiles `a13d40f36faa…` / network `8ad106698826…`; holdout tiles `b22c3e1103c5…` / network `c52c45f619b8…`. **Baseline comparison pending:** the first base runs failed on a tool parse error (`bake_probe` called `trail_settings`, absent in the baseline); fixed with a dynamic call, queued as `jobs_l2b.json` (`l2_2024_base_b`, `l2_holdout_base_b`). |
+| Mutants (scratch copies `work/bc1/mut_1..5`, `mutants.py`) | `l2_mutant_*` | shape_movement: test exit 1 (caught; failing checks still to be read). stale_config, bench_out_of_footprint, partial_publication, split_collision: running or queued at pause. |
+| G gates (seed_diversity, monotony, virtual_rider, capture_visual_vulkan via `tools/verify/sc_verify.py`) | — | NOT RUN |
+| runtime group (Vulkan, P3, views), capture_region_world, soak on/off 20 min (`--disable-vsync`) | — | NOT RUN on the candidate. Dry runs on the same code: runtime 35/0 (P3 164.6 m on grass), 2-min soak p50 6.4 ms / p99 8.7 ms / max 46.9 ms, memory −0.5 %, release object delta 31 (to compare with the off soak). |
+
+**Open FAIL — `test_region_ride --target=r7_fixture` (existing protected test, in the impact set).**
+- **Observation.** The bike never moves: distance 0, stall at the start, no road collider under the wheels.
+  - The log shows `REGION_SESSION … mode=random`: the target passes no `--seed`.
+  - `region_world.tscn` has `auto_bake = true`, so the scene bakes a random region and keeps the bicycle disabled for the bake, which outlasts the ride timeout.
+- **History.** This target last passed at PR1 M1 (`m1_ride_r7_dev3`, 11/0), before PR1 M4 introduced the scene's own bake. PR1 never re-ran it afterwards.
+- **Assessment.** A pre-existing PR1 M4 interaction, not a BC1 regression. To be proven by the same run on the baseline copy (`l2_region_ride_fixture_base`, queued).
+- **Rule.** No formal PASS while it stands.
+- **Options for the Director:**
+  - (a) approve a one-line test change: the fixture target sets `scene.auto_bake = false` before adding the scene, as `region_world.gd` documents for harnesses;
+  - (b) a production rule in `region_world.gd`: content attached before `_ready` means harness mode (whitelisted file, but it fixes a PR1 defect through production code);
+  - (c) classify it as a known failure with an owner phase.
+- **Recommendation:** (a).
+
+**Resume.**
+1. Read `queue_*.log`, `runs/l2_mutant_*` and `jobs_l2b.json` results (`python queue.py jobs_l2b.json 3` if not run).
+2. Compare base/candidate digests.
+3. Run the Vulkan set (runtime, capture_region_world, G harness from the worktree, soak on/off).
+4. Present the r7_fixture decision; then VERIFY and REVIEW in fresh contexts.
 
 ## Director decision after P2 (2026-10-13)
 
