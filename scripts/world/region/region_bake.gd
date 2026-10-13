@@ -169,7 +169,7 @@ static func _bake(seed_value: int, region: Vector2i, options: Dictionary, progre
 	manifest["vegetation"] = _vegetation_summary(vegetation)
 	_report(progress, "done", 1.0)
 	return {"is_valid": true, "reason_code": "", "manifest": manifest, "network": network, "tiles": slots, "bridges": bridges, "water": water, "spawn": spawn, "vegetation": vegetation,
-		"surface": surface, "terrain": terrain, "hydrology": hydro.plan, "field": field, "plan": plan}
+		"surface": surface, "terrain": terrain, "hydrology": hydro.plan, "field": field, "plan": plan, "graph": chosen.graph}
 
 
 ## BC1: realize the configured trails on the chosen products and publish them

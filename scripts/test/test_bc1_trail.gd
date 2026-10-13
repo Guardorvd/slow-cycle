@@ -13,8 +13,15 @@ extends SceneTree
 ##   --group=domain       realization contract and negatives on the cached
 ##                        prototype-off products (run integration first)
 ##   --group=runtime      region scene with the trail (cached): Input rides
-##                        road -> trail -> road both ways, P2 rays, recovery,
+##                        road -> trail -> road both ways, P3 off-road loop
+##                        (>= 150 m on grass and back), P2 rays, recovery,
 ##                        bicycle-camera views (needs Vulkan, not --headless)
+##   --group=soak         E6: ~20 min Vulkan Input ride along the trail ride
+##                        path, back and forth (frame-time distribution,
+##                        static memory growth, object count create/release);
+##                        without --trail-config the same line is ridden on the
+##                        prototype-off products (equivalent workload)
+##   --minutes=M (soak, default 20)
 ##   --seed=N (184729)  --config=res://... (bc1_trail_184729.json)  --out=DIR
 ## Output: BC1_CHECK lines for failures, DIR/bc1_trail_<group>.json, and
 ## BC1_SUMMARY group=.. checks=.. failures=.. completed=true.
@@ -23,6 +30,11 @@ const Cache = preload("res://scripts/world/region_bake_cache.gd")
 const Trail = preload("res://scripts/world/region/trail_realization.gd")
 const Network = preload("res://scripts/world/region/realized_road_network.gd")
 const Renderer = preload("res://scripts/world/region/final_surface_tile_renderer.gd")
+const Plan = preload("res://scripts/world/region/road_synthesis_plan.gd")
+const Oracle = preload("res://scripts/test/road_synthesis_oracle.gd")
+const Context = preload("res://scripts/world/region/environment_context.gd")
+const Biome = preload("res://scripts/world/region/biome_field.gd")
+const Ride = preload("res://scripts/world/region/rideability_field.gd")
 const Vegetation = preload("res://scripts/world/region/region_vegetation_planner.gd")
 const Gen = preload("res://scripts/world/region/region_generator.gd")
 const Terrain = preload("res://scripts/world/region/terrain_field.gd")
@@ -62,6 +74,7 @@ var _out: String = ""
 var _group: String = ""
 var _seed: int = 184729
 var _config_path: String = "res://resources/regions/bc1_trail_184729.json"
+var _minutes: float = 20.0
 
 
 func _initialize() -> void:
@@ -85,11 +98,13 @@ func _run() -> void:
 			_seed = arg.substr(7).to_int()
 		elif arg.begins_with("--config="):
 			_config_path = arg.substr(9)
+		elif arg.begins_with("--minutes="):
+			_minutes = arg.substr(10).to_float()
 		elif arg.begins_with("--trail-config=") or arg.begins_with("--region="):
 			pass
 		else:
 			_group = "!invalid"
-	if _out.is_empty() or not _group in ["integration", "domain", "runtime"]:
+	if _out.is_empty() or not _group in ["integration", "domain", "runtime", "soak"]:
 		print("BC1_CHECK FAIL ERR_BC1_CLI")
 		quit(2)
 		return
@@ -100,6 +115,8 @@ func _run() -> void:
 		report.merge(Synth.off_main_thread(_integration))
 	elif _group == "domain":
 		report.merge(Synth.off_main_thread(_domain))
+	elif _group == "soak":
+		report.merge(await _soak())
 	else:
 		report.merge(await _runtime())
 	report.merge({"checks": _checks, "failures": _failures, "duration_s": (Time.get_ticks_usec() - t0) / 1e6,
@@ -148,6 +165,7 @@ func _integration() -> Dictionary:
 		return out
 	var trail: Dictionary = published[0]
 	_network_checks(off, on, trail)
+	out["handoff"] = _handoff_checks(on, trail)
 	out["tiles"] = _tile_checks(off, on, trail)
 	out["vegetation"] = _vegetation_checks(off, on, trail)
 	out["final_queries"] = _query_checks(on, trail)
@@ -210,6 +228,74 @@ func _network_checks(off: Dictionary, on: Dictionary, trail: Dictionary) -> void
 		_check(op.kind == "BENCH" and op.s1_m - op.s0_m <= Trail.BENCH_MAX_LENGTH_M and op.metrics.volume_m3 <= Trail.BENCH_MAX_VOLUME_M3 and
 			op.metrics.max_displacement_m <= Trail.BENCH_MAX_DISPLACEMENT_M and op.metrics.cross_after_max <= Trail.BENCH_CROSS_MAX, "bench within its budgets", op.metrics)
 	_check(trail.metrics.design_parity_max_m >= 0.0 and trail.metrics.max_grade <= Trail.Policy.grade_hard(Trail.TRAIL_CLASS), "metrics recorded", trail.metrics)
+
+
+## The ENGINEERED pieces the trail consumes (its joins' edges), with the
+## transferred PR1 D10 T2.4 handoff assertions (additive; the R6 oracle is
+## used unchanged): actual R5 graph signature, READY without reasons, R6 path
+## contract, corridor band containment, R4 barrier on both road edges, no
+## body water and the planned channel order, seams <= 1 mm with the network.
+func _handoff_checks(on: Dictionary, trail: Dictionary) -> Dictionary:
+	var data: Dictionary = on.network.get_data()
+	var graph: RefCounted = on.graph
+	var bounds: Dictionary = on.terrain.get_bounds_m()
+	_check(graph != null and data.header.graph_signature == graph.signature() and on.manifest.graph_signature == graph.signature(), "actual R5 graph signature")
+	var context: RefCounted = Context.create(on.plan, on.terrain, on.hydrology).context
+	var ride: RefCounted = Ride.create(context, Biome.create(context).field).field
+	var pieces: Dictionary = {}
+	for piece: Dictionary in data.pieces:
+		pieces[piece.id] = piece
+	var records: Dictionary = {}
+	for e: Dictionary in data.edges:
+		records[e.piece_id] = e
+	var ends: Array = []
+	for piece: Dictionary in data.pieces:
+		var d: Dictionary = piece.design
+		ends.append([piece.id, Vector2(d.x[0], d.z[0])])
+		ends.append([piece.id, Vector2(d.x[d.s.size() - 1], d.z[d.s.size() - 1])])
+	var out: Dictionary = {}
+	for join: Dictionary in trail.joins:
+		var id: String = join.piece
+		if out.has(id) or not records.has(id):
+			_check(records.has(id), "consumed piece is an edge of the network", id)
+			continue
+		var record: Dictionary = records[id]
+		var p: Dictionary = pieces[id]
+		_check(record.status == "READY" and record.reasons.is_empty(), "consumed edge READY without reasons", id)
+		var path: RefCounted = Plan.export_path(p.design, false)
+		var contract: Dictionary = Oracle.path_checks(path, p.info.route_class, false)
+		_check(contract.failures.is_empty(), "independent R6 path contract", [id, contract.failures])
+		var bad_band: int = 0
+		var blocked: int = 0
+		for k in range(path.points.size()):
+			var point: Vector3 = path.points[k]
+			if Oracle.band_clearance(graph.get_corridor(record.edge_id), 0, 0, point.x, point.z) < path.road_widths[k] / 2.0:
+				bad_band += 1
+			for side: float in [-1.0, 1.0]:
+				var lateral: float = side * path.road_widths[k] / 2.0
+				var sample: Dictionary = ride.sample(bounds.min_x + p.design.x[k] - p.design.tz[k] * lateral, bounds.min_z + p.design.z[k] + p.design.tx[k] * lateral)
+				if not sample.is_valid or sample.blocked:
+					blocked += 1
+		_check(bad_band == 0, "edge band containment", [id, bad_band])
+		_check(blocked == 0, "both road edges barrier valid/unblocked", [id, blocked])
+		var water: Dictionary = Oracle.channel_hits(path, on.hydrology)
+		_check(water.bodies.is_empty(), "no unplanned body water", [id, water.bodies])
+		var planned: Array = []
+		var crossings: Array = data.crossings.filter(func(c: Dictionary) -> bool: return c.edge_id == record.edge_id)
+		crossings.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.get("index", 0) < b.get("index", 0))
+		for c: Dictionary in crossings:
+			planned.append(c.get("channel_id", -1))
+		var hits: Array = water.hits.map(func(h: Dictionary) -> int: return h.channel_id)
+		_check(hits == planned, "channel identity and travel order", [id, hits, planned])
+		var seams: int = 0
+		for end: Vector2 in [Vector2(p.design.x[0], p.design.z[0]), Vector2(p.design.x[p.design.s.size() - 1], p.design.z[p.design.s.size() - 1])]:
+			var met: bool = false
+			for other: Array in ends:
+				met = met or (other[0] != id and other[1].distance_to(end) <= 0.001)
+			seams += 1 if met else 0
+		_check(seams == 2, "piece seams <= 1 mm with the network at both ends", [id, seams])
+		out[id] = {"edge": record.edge_id, "class": p.info.route_class, "points": path.points.size(), "channels": hits, "measured": contract.get("measured", {})}
+	return out
 
 
 ## Changed tiles only near the band; their new vertices on the off triangles;
@@ -525,13 +611,14 @@ func _runtime() -> Dictionary:
 			points.reverse()
 			var total: float = Bot.polyline_length(points)
 			window = Vector2(total - path.trail_window.y, total - path.trail_window.x)
-		var run: Dictionary = await _ride(scene, points, window, direction, captures and direction == "forward", trail)
+		var run: Dictionary = await _ride(scene, points, window, direction, captures, trail)
 		out[direction] = run
 		_check(run.finished, "ride finished " + direction, run)
 		_check(run.stalls == 0, "no stalls " + direction, run.stall_at)
 		_check(not run.off_path and run.trail_max_lateral_m <= trail.half_width_m + 0.35, "stays on the trail " + direction, run.trail_max_lateral_m)
 		_check(run.trail_rough_share >= 0.9, "trail collider under wheels " + direction, run.trail_rough_share)
 		_check(run.trail_ungrounded_share <= 0.05, "wheels grounded on the trail " + direction, run.trail_ungrounded_share)
+	out["offroad"] = await _offroad(scene, trail, captures)
 	_check(scene.water_recoveries == 0, "no deep-water recovery", scene.water_recoveries)
 	# Rays and recovery query the loaded collision around a probe the streamer
 	# tracks instead of the parked bicycle (its own load/free lifecycle).
@@ -609,14 +696,16 @@ func _ride(scene: Node3D, points: PackedVector3Array, window: Vector2, label: St
 	var ungrounded: int = 0
 	var max_lateral: float = 0.0
 	var shots: Array = []
-	var to_path: float = window.x - trail.joins[0].leave_s_m
-	var targets: Array = [["join_a", window.x + 6.0], ["middle", (window.x + window.y) * 0.5], ["join_b", window.y - 6.0]]
+	# Path distance of trail station s (forward: window.x is the first leave
+	# station; reverse: the path runs backwards).
+	var at := func(s: float) -> float: return window.x + (s - trail.joins[0].leave_s_m) if label == "forward" else window.y - (s - trail.joins[0].leave_s_m)
+	var targets: Array = [["join_a", at.call(trail.joins[0].leave_s_m + 6.0)], ["middle", (window.x + window.y) * 0.5], ["join_b", at.call(trail.joins[1].leave_s_m - 6.0)]]
 	for op: Dictionary in trail.operations:
-		targets.append(["bench", to_path + 0.5 * (op.s0_m + op.s1_m)])
-		targets.append(["bench_entry", to_path + op.s0_m - 4.0])
+		targets.append(["bench", at.call(0.5 * (op.s0_m + op.s1_m))])
+		targets.append(["bench_entry", at.call(op.s0_m - 4.0 if label == "forward" else op.s1_m + 4.0)])
 	for k in range(trail.line.s.size() - 1):
 		if floorf(trail.line.z[k] / 512.0) != floorf(trail.line.z[k + 1] / 512.0) or floorf(trail.line.x[k] / 512.0) != floorf(trail.line.x[k + 1] / 512.0):
-			targets.append(["tile_border", to_path + trail.line.s[k]])
+			targets.append(["tile_border", at.call(trail.line.s[k])])
 	var max_frames: int = int(60.0 * (60.0 + bot.total_m / 2.0))
 	while frames < max_frames and not bot.stats.finished:
 		bot.step(bike)
@@ -637,7 +726,7 @@ func _ride(scene: Node3D, points: PackedVector3Array, window: Vector2, label: St
 					shots.append(target[0])
 					await process_frame
 					var image: Image = root.get_viewport().get_texture().get_image()
-					var file: String = _out.path_join("bc1_view_%s.png" % target[0])
+					var file: String = _out.path_join("bc1_view_%s_%s.png" % [label, target[0]])
 					image.save_png(file)
 					var back := Image.load_from_file(file)
 					var spread: float = 0.0
@@ -661,6 +750,336 @@ func _ride(scene: Node3D, points: PackedVector3Array, window: Vector2, label: St
 	for i in range(60):
 		await physics_frame
 	return summary
+
+
+## P3: off the trail into the meadow and back. The excursion is planned by
+## a deterministic 1 m grid A* (first station / side in fixed order): from
+## the trail at s0 out to a point 80 m from the line and back to the trail at
+## s0 + 40 m, avoiding trunk and rock colliders (radius + OFFROAD_CLEAR_M),
+## water, road planes and the band (except at its two ends) and published
+## grade above OFFROAD_GRADE_MAX; it qualifies with >= 150 m off the band.
+## Input ride trail -> meadow -> trail; grass collider under the wheels for
+## >= 150 m.
+func _offroad(scene: Node3D, trail: Dictionary, capture: bool) -> Dictionary:
+	var line: Dictionary = trail.line
+	var tiles: Array = scene.products.tiles
+	var grids: Dictionary = {}
+	var colliders: Array = []
+	for tile: Dictionary in scene.products.vegetation:
+		for kind: String in Vegetation.TRUNK_RADIUS:
+			var values: PackedFloat32Array = tile[kind]
+			for q in range(values.size() / 5):
+				colliders.append(Vector3(values[5 * q], Vegetation.TRUNK_RADIUS[kind] * values[5 * q + 4], values[5 * q + 2]))
+	var chosen := PackedVector3Array()
+	var start_s: float = -1.0
+	var rejected: Dictionary = {}
+	var lo: float = trail.joins[0].leave_s_m + 40.0
+	var hi: float = trail.joins[1].leave_s_m - 80.0
+	for s0 in range(int(lo), int(hi), 20):
+		for side: float in [1.0, -1.0]:
+			var plan: Dictionary = _offroad_plan(scene, trail, float(s0), side, colliders, tiles, grids)
+			if not plan.is_valid:
+				rejected[plan.reason] = rejected.get(plan.reason, 0) + 1
+				continue
+			chosen = plan.points
+			start_s = float(s0)
+			break
+		if start_s >= 0.0:
+			break
+	_check(start_s >= 0.0, "P3 off-road excursion planned by the fixed preconditions", [lo, hi, rejected])
+	if start_s < 0.0:
+		return {}
+	var points := PackedVector3Array()
+	for k in range(line.s.size()):
+		if line.s[k] >= start_s - 30.0 and line.s[k] < start_s:
+			points.append(Vector3(line.x[k], line.y[k], line.z[k]))
+	points.append_array(chosen)
+	for k in range(line.s.size()):
+		if line.s[k] > start_s + 40.0 and line.s[k] <= start_s + 70.0:
+			points.append(Vector3(line.x[k], line.y[k], line.z[k]))
+	var bike: BicycleController = scene.get_bike()
+	scene.streamer.ensure_around(points[0])
+	scene.spawn_bike(points[0], points[1] - points[0])
+	for i in range(30):
+		await physics_frame
+	var bot: RefCounted = Bot.new().setup(points, 4.0)
+	var frames: int = 0
+	var grass_m: float = 0.0
+	var last: Vector3 = bike.global_position
+	var shot: bool = false
+	while frames < int(60.0 * (90.0 + bot.total_m / 1.2)) and not bot.stats.finished:
+		bot.step(bike)
+		await physics_frame
+		frames += 1
+		var grass: bool = true
+		for ray: RayCast3D in [bike.front_ray, bike.rear_ray]:
+			var collider: Object = ray.get_collider() if ray.is_colliding() else null
+			grass = grass and collider is CollisionObject3D and (collider.collision_layer & 4) != 0
+		var moved: float = Vector2(bike.global_position.x - last.x, bike.global_position.z - last.z).length()
+		last = bike.global_position
+		grass_m += moved if grass else 0.0
+		if capture and not shot and grass_m >= 70.0:
+			shot = true
+			await process_frame
+			var file: String = _out.path_join("bc1_view_offroad_meadow.png")
+			root.get_viewport().get_texture().get_image().save_png(file)
+			var back := Image.load_from_file(file)
+			_check(back != null and not back.is_empty(), "view saved and read offroad_meadow", file)
+	bot.release_inputs()
+	var run: Dictionary = bot.summary()
+	run["grass_m"] = grass_m
+	run["start_s_m"] = start_s
+	run["excursion_m"] = Bot.polyline_length(chosen)
+	_check(run.finished, "P3 off-road ride finished and back on the trail", run)
+	_check(run.stalls == 0, "P3 no stalls", run.stall_at)
+	_check(grass_m >= 150.0, "P3 >= 150 m on the grass collider", grass_m)
+	for i in range(60):
+		await physics_frame
+	return run
+
+
+const OFFROAD_CELL_M: float = 1.0
+const OFFROAD_CLEAR_M: float = 2.0
+const OFFROAD_GRADE_MAX: float = 0.12
+const OFFROAD_OUT_M: float = 80.0
+
+
+## {is_valid, points (region-local, published heights), reason}.
+func _offroad_plan(scene: Node3D, trail: Dictionary, s0: float, side: float, colliders: Array, tiles: Array, grids: Dictionary) -> Dictionary:
+	var line: Dictionary = trail.line
+	var k0: int = line.s.bsearch(s0)
+	var k1: int = line.s.bsearch(s0 + 40.0)
+	if k1 >= line.s.size():
+		return {"is_valid": false, "reason": "line end"}
+	var a := Vector2(line.x[k0], line.z[k0])
+	var b := Vector2(line.x[k1], line.z[k1])
+	var along: Vector2 = (b - a).normalized()
+	var target: Vector2 = (a + b) * 0.5 + Vector2(-along.y, along.x) * side * OFFROAD_OUT_M
+	var origin: Vector2 = Vector2(minf(a.x, minf(b.x, target.x)), minf(a.y, minf(b.y, target.y))) - Vector2(40.0, 40.0)
+	var size: Vector2i = Vector2i(Vector2(maxf(a.x, maxf(b.x, target.x)), maxf(a.y, maxf(b.y, target.y))) - origin + Vector2(40.0, 40.0)) / int(OFFROAD_CELL_M)
+	var heights := PackedFloat32Array()
+	var blocked := PackedByteArray()
+	heights.resize(size.x * size.y)
+	blocked.resize(size.x * size.y)
+	for j in range(size.y):
+		for i in range(size.x):
+			var p: Vector2 = origin + (Vector2(i, j) + Vector2(0.5, 0.5)) * OFFROAD_CELL_M
+			var h: float = _region_height(tiles, grids, p)
+			heights[j * size.x + i] = h
+			var near_end: bool = p.distance_to(a) < 3.0 or p.distance_to(b) < 3.0
+			var bad: bool = is_nan(h) or not is_nan(scene.water_surface_at(Vector3(p.x, 0.0, p.y)))
+			if not bad and not near_end:
+				bad = _region_layer(tiles, grids, p) != Bake.LAYER_TERRAIN or _line_distance(line, p) <= trail.half_width_m + 1.0
+			blocked[j * size.x + i] = 1 if bad else 0
+	for c: Vector3 in colliders:
+		var r: float = c.y + OFFROAD_CLEAR_M
+		for j in range(int(floor((c.z - r - origin.y) / OFFROAD_CELL_M)), int(ceil((c.z + r - origin.y) / OFFROAD_CELL_M)) + 1):
+			for i in range(int(floor((c.x - r - origin.x) / OFFROAD_CELL_M)), int(ceil((c.x + r - origin.x) / OFFROAD_CELL_M)) + 1):
+				if i >= 0 and j >= 0 and i < size.x and j < size.y and (origin + (Vector2(i, j) + Vector2(0.5, 0.5)) * OFFROAD_CELL_M).distance_to(Vector2(c.x, c.z)) <= r:
+					blocked[j * size.x + i] = 1
+	var cell := func(p: Vector2) -> Vector2i: return Vector2i(((p - origin) / OFFROAD_CELL_M).floor())
+	var out_leg: Array = _astar(cell.call(a), cell.call(target), size, heights, blocked)
+	if out_leg.is_empty():
+		return {"is_valid": false, "reason": "no way out"}
+	var back_leg: Array = _astar(cell.call(target), cell.call(b), size, heights, blocked)
+	if back_leg.is_empty():
+		return {"is_valid": false, "reason": "no way back"}
+	var points := PackedVector3Array()
+	var off_band: float = 0.0
+	var previous := Vector2(INF, INF)
+	for c: Vector2i in out_leg + back_leg.slice(1):
+		var p: Vector2 = origin + (Vector2(c) + Vector2(0.5, 0.5)) * OFFROAD_CELL_M
+		if previous.x != INF and _line_distance(line, p) > trail.half_width_m + 1.0:
+			off_band += p.distance_to(previous)
+		previous = p
+		points.append(Vector3(p.x, heights[c.y * size.x + c.x], p.y))
+	if off_band < 150.0:
+		return {"is_valid": false, "reason": "short"}
+	return {"is_valid": true, "points": points, "off_band_m": off_band, "reason": ""}
+
+
+## 8-connected grid A* with step-grade limit; [] when unreachable.
+func _astar(from: Vector2i, to: Vector2i, size: Vector2i, heights: PackedFloat32Array, blocked: PackedByteArray) -> Array:
+	var inside := func(c: Vector2i) -> bool: return c.x >= 0 and c.y >= 0 and c.x < size.x and c.y < size.y
+	if not inside.call(from) or not inside.call(to):
+		return []
+	var cost := {from: 0.0}
+	var back := {from: from}
+	var heap: Array = [[Vector2(from).distance_to(Vector2(to)), from]]
+	var steps: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1)]
+	while not heap.is_empty():
+		var top: Array = _heap_pop(heap)
+		var current: Vector2i = top[1]
+		if top[0] - Vector2(current).distance_to(Vector2(to)) > cost[current] + 1e-6:
+			continue
+		if current == to:
+			var path: Array = [to]
+			while path[0] != from:
+				path.push_front(back[path[0]])
+			return path
+		for step: Vector2i in steps:
+			var next: Vector2i = current + step
+			if not inside.call(next) or blocked[next.y * size.x + next.x] == 1:
+				continue
+			var run: float = Vector2(step).length() * OFFROAD_CELL_M
+			if absf(heights[next.y * size.x + next.x] - heights[current.y * size.x + current.x]) / run > OFFROAD_GRADE_MAX:
+				continue
+			var g: float = cost[current] + run
+			if g < cost.get(next, INF):
+				cost[next] = g
+				back[next] = current
+				_heap_push(heap, [g + Vector2(next).distance_to(Vector2(to)), next])
+	return []
+
+
+func _heap_push(heap: Array, item: Array) -> void:
+	heap.append(item)
+	var i: int = heap.size() - 1
+	while i > 0:
+		var parent: int = (i - 1) / 2
+		if heap[parent][0] <= heap[i][0]:
+			break
+		var swap: Array = heap[parent]
+		heap[parent] = heap[i]
+		heap[i] = swap
+		i = parent
+
+
+func _heap_pop(heap: Array) -> Array:
+	var top: Array = heap[0]
+	var last: Array = heap.pop_back()
+	if not heap.is_empty():
+		heap[0] = last
+		var i: int = 0
+		while true:
+			var l: int = 2 * i + 1
+			var r: int = l + 1
+			var m: int = i
+			if l < heap.size() and heap[l][0] < heap[m][0]:
+				m = l
+			if r < heap.size() and heap[r][0] < heap[m][0]:
+				m = r
+			if m == i:
+				break
+			var swap: Array = heap[m]
+			heap[m] = heap[i]
+			heap[i] = swap
+			i = m
+	return top
+
+
+## Layer of the published triangle under a region-local point (-1 off tiles).
+func _region_layer(tiles: Array, grids: Dictionary, p: Vector2) -> int:
+	for k in range(tiles.size()):
+		var o := Vector2(tiles[k].origin[0], tiles[k].origin[1])
+		var l: Vector2 = p - o
+		if l.x < 0.0 or l.y < 0.0 or l.x > 512.0 or l.y > 512.0:
+			continue
+		if not grids.has(k):
+			grids[k] = _grid(tiles[k])
+		var v: PackedVector3Array = tiles[k].arrays[Mesh.ARRAY_VERTEX]
+		var idx: PackedInt32Array = tiles[k].arrays[Mesh.ARRAY_INDEX]
+		for t: int in grids[k].get(Vector2i(int(floor(l.x / 4.0)), int(floor(l.y / 4.0))), PackedInt32Array()):
+			if Geometry2D.point_is_inside_triangle(l, Vector2(v[idx[t]].x, v[idx[t]].z), Vector2(v[idx[t + 1]].x, v[idx[t + 1]].z), Vector2(v[idx[t + 2]].x, v[idx[t + 2]].z)):
+				return tiles[k].layers[t / 3]
+	return -1
+
+
+# --- soak (E6) ---
+
+## ~_minutes of Vulkan Input riding along the trail ride path, forward and
+## back. Frame times are wall-clock deltas between rendered frames after a
+## 10 s settle; static memory and object counts before/after; create/release
+## object delta after the scene is freed.
+func _soak() -> Dictionary:
+	var out: Dictionary = {"minutes": _minutes, "trail": not _trail_arg().is_empty(), "display": DisplayServer.get_name(), "adapter": RenderingServer.get_video_adapter_name(),
+		"driver": RenderingServer.get_video_adapter_api_version()}
+	_check(DisplayServer.get_name() != "headless", "soak runs on Vulkan (not headless)", DisplayServer.get_name())
+	var objects_before: int = int(Performance.get_monitor(Performance.OBJECT_COUNT))
+	var scene: Node3D = WorldScene.instantiate()
+	root.add_child(scene)
+	var t0: int = Time.get_ticks_usec()
+	while not scene.is_ready_to_ride() and not scene.failed and (Time.get_ticks_usec() - t0) / 1e6 < 1500.0:
+		await process_frame
+	_check(scene.is_ready_to_ride(), "soak scene ready", scene.failure.get("reason_code", ""))
+	if not scene.is_ready_to_ride():
+		return out
+	# The ride line: the published trail (with --trail-config) or, for the
+	# equivalent off workload, the same line read from the trail products.
+	var trail: Dictionary = {}
+	var designs: Dictionary = {}
+	for piece: Dictionary in scene.products.network.get_data().pieces:
+		designs[piece.id] = piece.design
+	var trails: Array = scene.products.network.get_trails()
+	if trails.is_empty():
+		var on: Dictionary = Cache.load_products(Cache.key(_seed, Vector2i.ZERO, Cache.trail_settings(_config_path)))
+		_check(on.is_valid, "trail products available for the equivalent off line", on.get("reason_code"))
+		if not on.is_valid:
+			return out
+		trails = on.network.get_trails()
+	trail = trails[0]
+	var path: Dictionary = _ride_path(trail, designs)
+	var bike: BicycleController = scene.get_bike()
+	var frames := PackedFloat64Array()
+	var settled: bool = false
+	var settle_until: int = Time.get_ticks_usec() + 10000000
+	var end_at: int = Time.get_ticks_usec() + int(_minutes * 60.0 * 1e6)
+	var memory_start: int = 0
+	var objects_start: int = 0
+	var laps: int = 0
+	var distance: float = 0.0
+	var stalls: int = 0
+	var last_frame: int = Time.get_ticks_usec()
+	while Time.get_ticks_usec() < end_at:
+		var points: PackedVector3Array = path.points.duplicate()
+		if laps % 2 == 1:
+			points.reverse()
+		scene.streamer.ensure_around(points[0])
+		scene.spawn_bike(points[0], points[1] - points[0])
+		var bot: RefCounted = Bot.new().setup(points, 6.0)
+		while not bot.stats.finished and Time.get_ticks_usec() < end_at:
+			bot.step(bike)
+			await process_frame
+			var now: int = Time.get_ticks_usec()
+			if not settled and now >= settle_until:
+				settled = true
+				memory_start = int(Performance.get_monitor(Performance.MEMORY_STATIC))
+				objects_start = int(Performance.get_monitor(Performance.OBJECT_COUNT))
+			elif settled:
+				frames.append((now - last_frame) / 1000.0)
+			last_frame = now
+		bot.release_inputs()
+		distance += bot.stats.distance_m
+		stalls += bot.stats.stalls
+		laps += 1
+	var memory_end: int = int(Performance.get_monitor(Performance.MEMORY_STATIC))
+	var objects_end: int = int(Performance.get_monitor(Performance.OBJECT_COUNT))
+	var sorted: PackedFloat64Array = frames.duplicate()
+	sorted.sort()
+	var pick := func(q: float) -> float: return sorted[clampi(int(q * (sorted.size() - 1)), 0, sorted.size() - 1)] if not sorted.is_empty() else NAN
+	out.merge({"frames": frames.size(), "laps": laps, "distance_m": distance, "stalls": stalls, "frame_ms_p50": pick.call(0.5), "frame_ms_p99": pick.call(0.99),
+		"frame_ms_max": pick.call(1.0), "fps_p50": 1000.0 / maxf(pick.call(0.5), 1e-9), "memory_static_start": memory_start, "memory_static_end": memory_end,
+		"memory_growth": float(memory_end - memory_start) / maxf(memory_start, 1.0), "objects_start": objects_start, "objects_end": objects_end,
+		"streamer": scene.streamer.stats.duplicate()}, true)
+	scene.queue_free()
+	for i in range(10):
+		await process_frame
+	scene = null
+	out["release_object_delta"] = int(Performance.get_monitor(Performance.OBJECT_COUNT)) - objects_before
+	print("BC1_SOAK ", JSON.stringify(out))
+	_check(frames.size() > 0 and stalls == 0, "soak ridden without stalls", [frames.size(), stalls])
+	_check(out.frame_ms_max <= 100.0, "max frame after load <= 100 ms", out.frame_ms_max)
+	_check(out.frame_ms_p99 <= 33.0, "p99 frame <= 33 ms", out.frame_ms_p99)
+	_check(out.fps_p50 >= 60.0, "p50 >= 60 FPS", out.fps_p50)
+	_check(out.memory_growth <= 0.05, "static memory growth <= 5 %", out.memory_growth)
+	return out
+
+
+func _trail_arg() -> String:
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with("--trail-config="):
+			return arg.substr(15)
+	return ""
 
 
 ## P2 rays on the loaded collision: centre and both band edges every metre.
