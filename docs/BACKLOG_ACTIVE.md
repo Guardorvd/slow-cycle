@@ -8,7 +8,7 @@ STATUS: CURRENT (D3 Fast Cycle, 2026-10-14). One line per item; remove an item w
 |---|---|---|---|
 | N-4 | player presentation, 184729 TECHNICAL 23 % pitch | In the first-person view on a steep descent a dark slab (bike body) fills the lower screen; observed in placement captures only — owner: player, not changed | BC2 c2 captures |
 | N-5 | 184729 `trail:tech_9_6_…` (BC3 — world / terrain quality) | TECHNICAL descent: naturalness "more or less, acceptable" (Director ride c2); turns are S-bends — true switchbacks would need turn platforms (terrain shaping) | BC2 c2 playtest |
-| N-6 | 2024 (0,0), 3628391 (3,−2) | No SINGLETRACK (and on 2024 no trail at all): road topology gives no natural alternative (0 / 1 road loops); decision D-C3 pending | BC2 c3 |
+| N-6 | 2024 (0,0), 3628391 (3,−2) (BC3 / road generator) | No SINGLETRACK (and on 2024 no trail at all): road topology gives no natural alternative (0 / 1 road loops); accepted as is by the Director (BC2 D-C3 = A) | BC2 c3 |
 | N-3 | 184729 `trail:st_6_9_…` | Procedural SINGLETRACK rides fine but is not especially interesting, relief hardly felt (Director ride, c1 ACCEPTED); known limit of the region's valley floor — not to be tuned per trail | BC2 c1 playtest |
 
 ## DEEP checks NOT RUN (owed, never PASS)
@@ -21,9 +21,9 @@ Run at the next DEEP trigger, release milestone or Director decision ([Test Stra
 | D-2 | 20-min soak trail on/off (E6 frame-time distribution, memory growth) | region runtime | [BC1 §3–4](plans/completed/BC1.md) |
 | D-3 | Re-run `capture_region_world --target=r7_fixture` after the closeout fix | capture tool | [BC1 §3](plans/completed/BC1.md) |
 | D-4 | VERIFY + independent REVIEW of the region runtime | PR1/BC1 runtime | [BC1 §4](plans/completed/BC1.md), [PR1](plans/suspended/PR1.md) |
-| D-5 | Procedural trail bake determinism 1 vs N threads; fast path (`tools/dev/fast_trail.gd`) vs fresh bake parity beyond the one 184729 comparison | BC2 checkpoint 1 planner + `_procedural_trails` | [BC2 plan](../implementation_plan.md) |
-| D-6 | Input rides of the procedural SINGLETRACK both ways and the TECHNICAL descent (existing BC1 runtime harness) — the checkpoints rely on the Director's rides | BC2 checkpoints 1–2 | [BC2 plan](../implementation_plan.md) |
-| D-7 | Default trail network vs runtime suites: `test_region_ride --target=region`, `capture_region_world --target=region` and the BC1 soak off-arm launch `region_world` without arguments, which now bakes the procedural network (off = `--trails=off`); not re-run. A test that means "no trails" needs the explicit flag — a test-setup change for the Director, not made | BC2 checkpoint 3 | [BC2 plan](../implementation_plan.md) |
+| D-5 | Procedural trail bake determinism 1 vs N threads; fast path (`tools/dev/fast_trail.gd`) vs fresh bake parity beyond the one 184729 comparison | BC2 checkpoint 1 planner + `_procedural_trails` | [BC2 record](plans/completed/BC2.md) |
+| D-6 | Input rides of the procedural SINGLETRACK both ways and the TECHNICAL descent (existing BC1 runtime harness) — the checkpoints rely on the Director's rides | BC2 checkpoints 1–2 | [BC2 record](plans/completed/BC2.md) |
+| D-7 | Default trail network vs runtime suites: `test_region_ride --target=region`, `capture_region_world --target=region` and the BC1 soak off-arm launch `region_world` without arguments, which now bakes the procedural network (off = `--trails=off`); not re-run. A test that means "no trails" needs the explicit flag — a test-setup change for the Director, not made | BC2 checkpoint 3 | [BC2 record](plans/completed/BC2.md) |
 
 ## Known failures (visible, not waived)
 
