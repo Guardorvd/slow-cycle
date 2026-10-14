@@ -208,9 +208,14 @@ func _show_summary(metrics: Dictionary) -> void:
 		", ".join(metrics.classes.keys()), load_seconds, "кэш" if source == "cache" else "генерация"]
 	var trails: Dictionary = products.manifest.get("trails", {})
 	for trail: Dictionary in trails.get("published", []):
-		label.text += "\nтропа %s · %s · %.2f км" % [trail.id, trail.mode, trail.length_m / 1000.0]
-	for trail: Dictionary in trails.get("rejected", []):
-		label.text += "\nтропа %s отклонена: %s" % [str(trail.id), trail.reason_code]
+		# BC2: procedural trails also name their class and why they exist.
+		var origin: String = "" if not trail.has("class") else " · %s · %s" % [trail.class, String(trail.purpose).get_slice(":", 0)]
+		label.text += "\nтропа %s · %s%s · %.2f км" % [trail.id, trail.mode, origin, trail.length_m / 1000.0]
+	if trails.get("procedural", false):
+		label.text += "\nпланировщик троп: вариантов отклонено %d (причины в логе REGION_TRAILS)" % trails.get("rejected", []).size()
+	else:
+		for trail: Dictionary in trails.get("rejected", []):
+			label.text += "\nтропа %s отклонена: %s" % [str(trail.id), trail.reason_code]
 	layer.add_child(label)
 	add_child(layer)
 	get_tree().create_timer(8.0).timeout.connect(layer.queue_free)

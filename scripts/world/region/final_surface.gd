@@ -20,6 +20,8 @@ const TRAIL_CELL_M: float = 4.0
 const TRAIL_REACH_M: float = 4.0
 const PUBLISHED_REACH_M: float = 3.0
 const PUBLISHED_CELL_M: float = 2.0
+## Bake tile size (m) for published_ground().
+const TILE_SIZE_M: float = 512.0
 var _natural: RefCounted
 var _deformer: RefCounted
 var _bounds: Dictionary
@@ -101,6 +103,96 @@ func with_published(tiles: Array) -> RefCounted:
 						out._published[key] = PackedInt32Array()
 					out._published[key].append(start)
 	return out
+
+## BC2: the published ground of a region before any trail - heights of the
+## tile triangles themselves (`tiles`: bake slots {arrays, origin}, region-
+## local) on a lattice of `cell_m` (node (i, j) at region-local (i, j) *
+## cell_m), NAN where no triangle covers a node. This is the query of the
+## published tiles, kept apart from the design evaluation (sample_height):
+## off the fine road cells the tiles interpolate the design over 16 m cells,
+## which differs from it by metres in gullies. Each tile fills its own nodes
+## (threads: WorkerThreadPool group); shared border nodes agree.
+## Returns {cell_m, nx, nz, heights: PackedFloat32Array (row-major, nx * nz)}.
+static func published_ground(tiles: Array, bounds: Dictionary, cell_m: float, threads: int = 1) -> Dictionary:
+	var nx: int = int(round((bounds.max_x - bounds.min_x) / cell_m)) + 1
+	var nz: int = int(round((bounds.max_z - bounds.min_z) / cell_m)) + 1
+	var parts: Array = []
+	parts.resize(tiles.size())
+	var job := func(k: int) -> void:
+		parts[k] = _ground_part(tiles[k], cell_m, nx, nz)
+	if threads > 1 and tiles.size() > 1:
+		var group: int = WorkerThreadPool.add_group_task(job, tiles.size(), threads, true, "final_surface_ground")
+		WorkerThreadPool.wait_for_group_task_completion(group)
+	else:
+		for k in range(tiles.size()):
+			job.call(k)
+	var heights := PackedFloat32Array()
+	heights.resize(nx * nz)
+	heights.fill(NAN)
+	for part: Dictionary in parts:
+		for j in range(part.nz):
+			for i in range(part.nx):
+				var h: float = part.heights[j * part.nx + i]
+				if not is_nan(h):
+					heights[(part.j0 + j) * nx + part.i0 + i] = h
+	return {"cell_m": cell_m, "nx": nx, "nz": nz, "heights": heights}
+
+static func _ground_part(slot: Dictionary, cell_m: float, nx: int, nz: int) -> Dictionary:
+	var ox: float = slot.origin[0]
+	var oz: float = slot.origin[1]
+	var vertices: PackedVector3Array = slot.arrays[Mesh.ARRAY_VERTEX]
+	var indices: PackedInt32Array = slot.arrays[Mesh.ARRAY_INDEX]
+	var i0: int = int(ceil(ox / cell_m - 1e-6))
+	var j0: int = int(ceil(oz / cell_m - 1e-6))
+	var i1: int = mini(nx - 1, int(floor((ox + TILE_SIZE_M) / cell_m + 1e-6)))
+	var j1: int = mini(nz - 1, int(floor((oz + TILE_SIZE_M) / cell_m + 1e-6)))
+	var pnx: int = i1 - i0 + 1
+	var pnz: int = j1 - j0 + 1
+	var heights := PackedFloat32Array()
+	heights.resize(pnx * pnz)
+	heights.fill(NAN)
+	for q in range(0, indices.size(), 3):
+		var a: Vector3 = vertices[indices[q]]
+		var b: Vector3 = vertices[indices[q + 1]]
+		var c: Vector3 = vertices[indices[q + 2]]
+		var lo_i: int = maxi(i0, int(ceil((ox + minf(a.x, minf(b.x, c.x))) / cell_m - 1e-6)))
+		var hi_i: int = mini(i1, int(floor((ox + maxf(a.x, maxf(b.x, c.x))) / cell_m + 1e-6)))
+		if lo_i > hi_i:
+			continue
+		var lo_j: int = maxi(j0, int(ceil((oz + minf(a.z, minf(b.z, c.z))) / cell_m - 1e-6)))
+		var hi_j: int = mini(j1, int(floor((oz + maxf(a.z, maxf(b.z, c.z))) / cell_m + 1e-6)))
+		if lo_j > hi_j:
+			continue
+		var v0 := Vector2(b.x - a.x, b.z - a.z)
+		var v1 := Vector2(c.x - a.x, c.z - a.z)
+		var den: float = v0.x * v1.y - v1.x * v0.y
+		if absf(den) < 1e-12:
+			continue
+		for j in range(lo_j, hi_j + 1):
+			for i in range(lo_i, hi_i + 1):
+				var px: float = i * cell_m - ox - a.x
+				var pz: float = j * cell_m - oz - a.z
+				var v: float = (px * v1.y - v1.x * pz) / den
+				var w: float = (v0.x * pz - px * v0.y) / den
+				if v >= -1e-6 and w >= -1e-6 and v + w <= 1.0 + 1e-6:
+					heights[(j - j0) * pnx + i - i0] = a.y + v * (b.y - a.y) + w * (c.y - a.y)
+	return {"i0": i0, "j0": j0, "nx": pnx, "nz": pnz, "heights": heights}
+
+## Bilinear height of a published_ground() raster at a region-local point
+## (NAN outside it or next to an uncovered node).
+static func ground_height(ground: Dictionary, lx: float, lz: float) -> float:
+	var u: float = lx / ground.cell_m
+	var v: float = lz / ground.cell_m
+	# The last lattice line belongs to the cell before it.
+	var i: int = mini(int(floor(u)), ground.nx - 2) if u <= ground.nx - 1 else ground.nx
+	var j: int = mini(int(floor(v)), ground.nz - 2) if v <= ground.nz - 1 else ground.nz
+	if u < 0.0 or v < 0.0 or i >= ground.nx - 1 or j >= ground.nz - 1:
+		return NAN
+	var fu: float = u - i
+	var fv: float = v - j
+	var row: int = j * ground.nx + i
+	var h: PackedFloat32Array = ground.heights
+	return lerpf(lerpf(h[row], h[row + 1], fu), lerpf(h[row + ground.nx], h[row + ground.nx + 1], fu), fv)
 
 func _copy() -> FinalSurface:
 	var out := FinalSurface.new()

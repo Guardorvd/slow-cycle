@@ -40,6 +40,8 @@ const Graph = preload("res://scripts/world/region/region_route_graph.gd")
 const Synth = preload("res://scripts/world/region/road_synthesizer.gd")
 const Vegetation = preload("res://scripts/world/region/region_vegetation_planner.gd")
 const Trail = preload("res://scripts/world/region/trail_realization.gd")
+const TrailPolicy = preload("res://scripts/world/region/trail_policy.gd")
+const Planner = preload("res://scripts/world/region/trail_network_planner.gd")
 const SCHEMA := "slow_cycle.region_bake/1"
 const TILE_M: int = 512
 const TILES: int = 8
@@ -53,6 +55,8 @@ const PATCH_LAYERS: Array[int] = [LAYER_TERRAIN, LAYER_ROAD, LAYER_ROUGH]
 const MAX_ISOLATION_PASSES: int = 24
 ## Bound on BC1 trail border-agreement passes (each adds border points).
 const MAX_SEAM_PASSES: int = 12
+## BC2: procedural proposals tried at publication before giving up a slot.
+const MAX_PUBLISH_ATTEMPTS: int = 3
 
 
 static func bake(seed_value: int, region: Vector2i, options: Dictionary = {}, progress: Callable = Callable()) -> Dictionary:
@@ -186,10 +190,65 @@ static func _bake(seed_value: int, region: Vector2i, options: Dictionary, progre
 static func _trails(config: Variant, seed_value: int, region: Vector2i, network: RefCounted, surface: RefCounted, field: RefCounted, bounds: Dictionary, slots: Array,
 		threads: int) -> Dictionary:
 	var context := {"seed": seed_value, "region": region, "network": network.get_data(), "surface": surface, "field": field}
+	if TrailPolicy.is_procedural(config):
+		return _procedural_trails(config, context, network, surface, bounds, slots, threads)
 	var realized: Dictionary = Trail.realize_all(config, context)
-	var rejected: Array = realized.rejected.duplicate(true)
-	var trails: Array = realized.trails
-	var report := {"config_sha256": JSON.stringify(config, "", true).sha256_text(), "published": [], "rejected": rejected}
+	var report := {"config_sha256": JSON.stringify(config, "", true).sha256_text(), "published": [], "rejected": realized.rejected.duplicate(true)}
+	return _publish_trails(realized.trails, report, context, network, surface, bounds, slots, threads)
+
+
+## BC2: trails proposed by TrailNetworkPlanner (configuration TrailPolicy) on
+## the published ground of the off tiles, each already realized on the
+## published triangles of its zone. They are published best first; a
+## proposal rejected at publication gives way to the next one (at most
+## MAX_PUBLISH_ATTEMPTS), the rest stay unpublished alternates in the report.
+static func _procedural_trails(config: Variant, context: Dictionary, network: RefCounted, surface: RefCounted, bounds: Dictionary, slots: Array, threads: int) -> Dictionary:
+	var report := {"config_sha256": JSON.stringify(config, "", true).sha256_text(), "procedural": true, "published": [], "rejected": []}
+	var unchanged := {"network": network, "surface": surface, "slots": slots, "report": report}
+	var parsed: Dictionary = TrailPolicy.parse(config)
+	if not parsed.is_valid:
+		report.rejected.append({"id": "", "reason_code": parsed.reason_code, "detail": parsed.detail})
+		return unchanged
+	var t: int = Time.get_ticks_usec()
+	var planning := context.duplicate()
+	planning["ground"] = Surface.published_ground(slots, bounds, TrailPolicy.GROUND_CELL_M, threads)
+	planning["slots"] = slots
+	var ground_s: float = _lap(t)
+	var planned: Dictionary = Planner.plan(parsed.config, planning)
+	report["planner"] = planned.report
+	report.planner["ground_s"] = ground_s
+	report.rejected.append_array(planned.rejected)
+	var wanted: int = int(parsed.config.get("max_trails", 1))
+	var products: Dictionary = unchanged
+	var chosen: Array = []
+	var attempts: int = 0
+	for trail: Dictionary in planned.trails:
+		if chosen.size() >= wanted or attempts >= MAX_PUBLISH_ATTEMPTS:
+			break
+		attempts += 1
+		var trial := {"published": [], "rejected": []}
+		var made: Dictionary = _publish_trails(chosen + [trail], trial, context, network, surface, bounds, slots, threads)
+		if made.report.published.size() == chosen.size() + 1:
+			chosen.append(trail)
+			products = made
+		report.rejected.append_array(made.report.rejected)
+	var ids: Array = chosen.map(func(trail: Dictionary) -> String: return trail.id)
+	report.published = products.report.published if not chosen.is_empty() else []
+	for entry: Dictionary in report.published:
+		var trail: Dictionary = chosen[ids.find(entry.id)]
+		entry["origin"] = trail.origin
+		entry["class"] = trail.class_name
+		entry["purpose"] = trail.purpose
+		entry["planner"] = {"score": trail.planner.score, "road_m": trail.planner.road_m, "gain_m": trail.planner.gain_m, "ports": trail.planner.ports}
+	report["alternates"] = planned.trails.map(func(trail: Dictionary) -> String: return trail.id).filter(func(id: String) -> bool: return not id in ids)
+	return {"network": products.network, "surface": products.surface, "slots": products.slots, "report": report}
+
+
+## Publication of realized trails (BC1): shaped, tiles refined, finalized on
+## the published triangles, joined to the network; see _trails.
+static func _publish_trails(trails: Array, report: Dictionary, context: Dictionary, network: RefCounted, surface: RefCounted, bounds: Dictionary, slots: Array,
+		threads: int) -> Dictionary:
+	var rejected: Array = report.rejected
 	var unchanged := {"network": network, "surface": surface, "slots": slots, "report": report}
 	var piece_class: Dictionary = {}
 	for piece: Dictionary in network.get_data().pieces:
