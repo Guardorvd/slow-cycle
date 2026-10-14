@@ -10,11 +10,35 @@ Q1 navigation (2026-10-03, COMPLETE): внешний [bounded verification harne
 
 BC0 navigation (2026-10-12): Playable First, playtest checkpoints, defect criticality, applicability of existing contracts to B+C route realization and the PR1 lifecycle — §8. No test, assertion, threshold, category or gate changed.
 
+D3 navigation (2026-10-14, Game Director): **Fast Cycle — §0 is the default verification order and overrides any contrary cadence in §§5–8.** No test, assertion, threshold, Q0 category, TEST_MATRIX row, Q1 suite or E-level definition changed; what changed is *when* checks run.
+
+## 0. Fast Cycle: FAST → PLAYTEST → DEEP (D3)
+
+Решение Game Director 2026-10-14. Многочасовая инженерная приёмка больше не обязательна после игрового спринта. Три режима:
+
+| Режим | Когда | Содержание |
+|---|---|---|
+| **FAST** (по умолчанию) | после каждой разработки/правки игровой функции | E0 parse изменённых скриптов + несколько непосредственно связанных быстрых тестов/групп. Ориентир ≈ 10–15 с автоматических проверок. Большие батареи, G gates, мутанты, holdout, soak, длинные Input rides **не запускаются автоматически**. Тест, которому нужен cold bake региона или длинный проезд, не FAST. |
+| **PLAYTEST** (основная оценка игровой функции) | функция готова к показу | Готовый регион (cache или уже собранные продукты); 3–5 информативных Vulkan-снимков из разных точек; лог без критических ошибок; команда запуска, revision, seed/регион, known issues → человек проезжает. |
+| **DEEP** (по необходимости) | только по отдельному решению Director, при подтверждённом существенном риске или на релизном рубеже | Длительные проезды, широкие seed-проверки, G gates, мутанты, L2/L3 (§7), VERIFY и независимый REVIEW, soak/E6. |
+
+**Снимки для PLAYTEST.** Камера ставится в нужную точку и снимает изображение; бот не проезжает километры ради снимков. Такой снимок — E5 visual, **не** E4 и не проверка физической езды; в отчёте он помечается как placement capture. Физическую езду подтверждает человек на плейтесте или Input ride в DEEP. Сейчас `scripts/test/capture_region_world.gd` снимает только во время проезда бота (до 3000 м) — режим постановки камеры записан в [backlog](BACKLOG_ACTIVE.md) (T1); до его появления допустим короткий dev-скрипт вне `scripts/test`, который грузит cache-регион и ставит камеру, без выдачи результата за ride.
+
+**DEEP-триггеры (подтверждённый существенный риск):** повреждение или несогласованность данных (cache ≠ fresh, сломанная identity/формат cache); недетерминизм генерации; изменение публичного контракта/схемы/seed purpose, от которого зависят другие системы; задача по player/физике/камере (её отдельный план называет регрессию); необъяснимый межсистемный сбой; замер производительности, на который опирается решение. Релизные рубежи: Vertical Slice (BC5/R18, с E7), R19 hardening, любая сборка, которую Director объявит релизом. Перед DEEP агент называет конкретный риск и состав проверок; запуск без триггера — только по решению Director.
+
+**Завершение игрового спринта:** FAST пройден (падения названы, не скрыты) → критические дефекты (§8.2) исправлены → PLAYTEST-пакет передан → человек проехал и принял результат (или дал правки) → некритические дефекты и невыполненные DEEP-проверки записаны в [короткий backlog](BACKLOG_ACTIVE.md) → короткая заметка спринта в плане фазы. VERIFY/REVIEW/L2/ledger для этого не нужны. Спринт или фаза, закрытые так, имеют статус COMPLETE (playtest-accepted), **не** FORMALLY ACCEPTED; это различие пишется честно.
+
+**Честность без изменений:** ничего не подделывать, не ослаблять assertions/пороги, не записывать NOT RUN как PASS, не выдавать placement capture за ride. Невыполненная проверка = NOT RUN. Известные падения остаются видимыми.
+
+**Тестовый setup.** Агент сам исправляет очевидную ошибку тестового setup с доказанной причиной (неверный путь/аргумент, порядок инициализации сцены, флаг fixture, timeout запуска), если не меняются assertions, пороги, покрытие и проверяемое поведение; причина и diff — в заметке спринта. Изменение смыслового тестового контракта по-прежнему согласуется с человеком ([test-integrity](../.antigravity/rules/test-integrity.md) §4).
+
+Разделы §§5–8 ниже остаются определениями и инструментарием DEEP (уровни L0–L3, impact selection, reuse, hygiene, бюджеты). Их требования «обязательно на каждой фазе/перед закрытием» действуют только для DEEP-кампании, когда она назначена.
+
 ## 1. Product authority и test integrity
 
 Blueprint/Master определяют целевую игру и архитектуру; assertions защищают своё согласованное требование/реализованную систему. Старый DAG test не вправе заставлять будущий RegionRouteGraph отказаться от loops. Это не разрешение менять тест либо игнорировать падение текущего RoadGraph: conflict сначала записывается с requirement/owner/evidence, затем конкретная reclassification/mutation согласуется человеком.
 
-Текущие tests, assertions, thresholds, coverage и mandatory generation gates неизменны. [Frozen test-integrity](../.antigravity/rules/test-integrity.md) не изменён байт-в-байт. Его универсальная test-as-product-source формулировка отмечена D0-C10: целевая authority установлена уже сейчас, полный governance rewrite — D1, suite authority map — Q0. Нельзя считать старые тесты автоматически retired только из-за этой стратегии.
+Текущие tests, assertions, thresholds и coverage неизменны; generation gates сохранены как DEEP-проверки (§0). [Test-integrity](../.antigravity/rules/test-integrity.md) был frozen до D3; D3 (2026-10-14, по прямому разрешению Director) согласовал в нём authority-формулировку и правило тестового setup, anti-gaming не ослаблен. Нельзя считать старые тесты автоматически retired только из-за этой стратегии.
 
 ## 2. Категории Master — определения, не выполненная классификация
 
@@ -56,7 +80,7 @@ Expected negative fixture проверяет точный failure/reason чер�
 - [Legacy test commands/results](../TEST_PLAN.md), [sprint reports](history/README.md) сохраняют свои даты/revisions/limitations. Старые 125 expected checks, 70% rider coverage и 100% claims не сертифицируют новый мир.
 - D1: согласованные root/scoped instructions/skills/protocol; Q0: authority map; Q1: bounded harness; Q2: frozen runtime baseline и отдельная ObjectDB investigation. Все — отдельные планы.
 - Code/geometry changes потом требуют соответствующих targeted/negative/integration/determinism checks; generation gates AGENTS действуют в своей области, applicability — по §7 (D2), дальнейшие изменения только через явный approval.
-- Collision/ride tasks требуют real physics, visual world tasks — настоящий Vulkan capture, product slice — E7. Новая surface не «принимается» контрольной регрессией старой main.
+- Collision/ride: в спринте физическую езду оценивает человек на плейтесте, real-physics Input ride — DEEP; visual world — настоящий Vulkan capture (placement допустим, §0); product slice — E7. Новая surface не «принимается» контрольной регрессией старой main.
 
 ## 6. Что проверено в D0
 
@@ -64,7 +88,7 @@ D0 проверяет только links/anchors, authority consistency, archiva
 
 ## 7. Verification levels L0–L3 and impact selection (D2)
 
-Introduced by D2 under the Game Director's approval with conditions C1–C7 (2026-10-10); implementation additions are disclosed in the [completed record](plans/completed/D2.md). This section decides **when and how often** checks run. It changes no test, assertion, threshold, Q0 category, TEST_MATRIX row, Q1 suite, frozen test-integrity rule, E-level definition or product requirement. It applies to plans approved after the D2 merge; an already approved plan adopts it only through its own approved amendment.
+Introduced by D2 under the Game Director's approval with conditions C1–C7 (2026-10-10); implementation additions are disclosed in the [completed record](plans/completed/D2.md). **D3 (2026-10-14): L2, L3, VERIFY and REVIEW are DEEP (§0) — they run only when the Director decides, on a confirmed significant risk or at a release milestone; they are not an automatic condition for closing a sprint or a phase. L0 ≈ FAST; L1 is optional inside a sprint.** When a DEEP campaign is scheduled, this section decides how it is selected and run. It changes no test, assertion, threshold, Q0 category, TEST_MATRIX row, Q1 suite, frozen test-integrity rule, E-level definition or product requirement. It applies to plans approved after the D2 merge; an already approved plan adopts it only through its own approved amendment.
 
 | Level | When | Content |
 |---|---|---|
@@ -109,7 +133,7 @@ A local failure triggers focused diagnosis and its relevant dependent checks, no
 - **Concurrency:** at most 4 concurrent Godot processes, at most 1 Vulkan; timings only from isolated runs; record concurrency.
 - **L3 launch sets:** deduplicate overlapping Q1 sets so no G gate runs twice for the same identity.
 - **Documents:** phase plan target ≤ 15 KB, small fix ≤ 3 KB. Completed records keep identities, verdicts, findings, DEBT, the ledger and a short summary of each VERIFY/REVIEW report; full reports are kept permanently in a durable evidence root (never a temporary directory) and cited by SHA-256, or embedded in the record.
-- **Docs-only closeout:** edits that only transcribe already-verified results (identities, verdicts, findings, ledger, navigation, status established by the reports) into the completed record, root plan slot, `docs/CURRENT_PROJECT_STATE.md` or status text of `TEST_PLAN.md`/`ARCHITECTURE.md`, with the verified code manifest unchanged, need link, scope and hash checks only. A new claim, a changed known-failure classification or C10/C12 status, or any edit to governance or authority documents (AGENTS, skills, PLANS, this strategy, TEST_MATRIX, test-integrity, Blueprint, Master, target architecture, migration matrix) needs verification of its impact set.
+- **Docs-only closeout:** edits that only transcribe already-verified results (identities, verdicts, findings, ledger, navigation, status established by the reports) into the completed record, root plan slot, `docs/CURRENT_PROJECT_STATE.md` or status text of `TEST_PLAN.md`/`ARCHITECTURE.md`, with the verified code manifest unchanged, need link, scope and hash checks only. A new claim, a changed known-failure classification or C10/C12 status needs verification of its impact set. An edit to governance or authority documents (AGENTS, skills, PLANS, this strategy, TEST_MATRIX, test-integrity, Blueprint, Master, target architecture, migration matrix) needs a consistency check (links, contradictions between the edited rules); VERIFY/REVIEW only if the Director asks (D3).
 
 ### 7.5 Independence
 
@@ -124,9 +148,9 @@ VERIFY audits identities, scope and the authentic stored raw evidence (harness r
 | Runtime/physics integration (R8+) | ≤ 1 h | ≤ 5 h including G | ≤ 2 h | ≤ 1.5 h |
 | L3 checkpoint | own plan and budget | | | |
 
-Budgets are targets: an overrun is recorded with its cause, never removes a required check and never changes a verdict; a critical failure stays FAIL/INCOMPLETE. Two consecutive overruns lead to a process proposal to the Director.
+These budgets apply to a scheduled DEEP campaign (§0). Budgets are targets: an overrun is recorded with its cause, never removes a required check and never changes a verdict; a critical failure stays FAIL/INCOMPLETE. Two consecutive overruns lead to a process proposal to the Director.
 
-Each execution record keeps one ledger table (±0.25 h) with rows Implementation, L0, L1, L2, VERIFY, REVIEW (Planning and Closeout shown separately) and two columns: elapsed wall-clock hours and aggregate agent/process hours (they differ when work overlaps). Verification overhead = (L0 + L1 + L2 + VERIFY + REVIEW) / (Implementation + those), reported for both columns. Target ≤ 20 % rolling over three phases; no tracking tool.
+A DEEP campaign record keeps one ledger table (±0.25 h); a FAST/PLAYTEST sprint does not need one with rows Implementation, L0, L1, L2, VERIFY, REVIEW (Planning and Closeout shown separately) and two columns: elapsed wall-clock hours and aggregate agent/process hours (they differ when work overlaps). Verification overhead = (L0 + L1 + L2 + VERIFY + REVIEW) / (Implementation + those), reported for both columns. Target ≤ 20 % rolling over three phases; no tracking tool.
 
 ## 8. Playable First, playtests and contract applicability (BC0)
 
@@ -137,15 +161,16 @@ Introduced by BC0 under the Game Director's approval (2026-10-12) of the [B+C ro
 | State | Meaning | Requires |
 |---|---|---|
 | **PLAYABLE / REVIEWABLE** | A feature works, has no critical defect and can be given to a human | Recorded launch command; fixed revision (commit or source digest); seed and region; L0/L1 of touched contracts passed; known-issues list; short playtest note |
-| **FORMALLY ACCEPTED** | The phase met its approved requirements | L2 on the exact final candidate, VERIFY PASS, independent REVIEW PASS, E7 where required, Director decision |
+| **COMPLETE (playtest-accepted)** | Sprint/phase closed by the Director after FAST + PLAYTEST (§0) | FAST passed or failures named; critical defects fixed; human playtest accepted; backlog updated; no VERIFY/REVIEW claimed |
+| **FORMALLY ACCEPTED** | The phase met its approved requirements under a DEEP campaign | L2 on the exact final candidate, VERIFY PASS, independent REVIEW PASS, E7 where required, Director decision — only when DEEP is scheduled (§0) |
 
-A PLAYABLE checkpoint is a point **inside** a task, declared in its ExecPlan field «Playtest checkpoints» ([PLANS](../.agent/PLANS.md)). It does not wait for L2, is not acceptance and never replaces L2, VERIFY, REVIEW or E7. Precedent: PR1 Director condition 1 («playable build after M5, not an acceptance»). A human playtest is decision data; it is E7 only when the human declares it so.
+A PLAYABLE checkpoint is a point inside a task. Since D3 (§0) the human playtest is the main evaluation of a game feature and closes a sprint; it is still not FORMALLY ACCEPTED and becomes E7 only when the human declares it so. Precedent: PR1 Director condition 1 («playable build after M5, not an acceptance»). A human playtest is decision data; it is E7 only when the human declares it so.
 
 ### 8.2 Defect criticality before a playtest
 
 - **Critical** (blocks a playtest): crash or hang; falling through the world or a collision gap on an intended line; a trap without recovery; corrupt or inconsistent data (cache ≠ fresh bake); regression of the playable baseline.
 - **Non-critical** (visual artefacts, roughness, a suboptimal line): recorded with a reproduction place (seed, region, coordinates) and handled **after** the playtest by its results.
-- Before the first playtest of a phase only critical defects are fixed. All L2 obligations stay.
+- Before a playtest only critical defects are fixed; non-critical ones go to the [short backlog](BACKLOG_ACTIVE.md). DEEP checks not run stay listed there as NOT RUN, never as PASS (D3).
 
 ### 8.3 Repeated failures and escalation
 
@@ -168,4 +193,4 @@ PR1 is [SUSPENDED](plans/suspended/PR1.md), not COMPLETE or PASS. Its evidence i
 
 ### 8.6 L3 checkpoints in the B+C order
 
-The L3 after R8 was not run (PR1 suspended). The first L3 follows BC2 and covers the R8 + R13 scope; then after BC5 (R18 Vertical Slice) and R19 (BC6), plus any checkpoint the Director schedules ([Master XII-B](MASTER_IMPLEMENTATION_PLAN.md#xii-b-amendment-bc-2026-10-12)).
+The L3 after R8 was not run (PR1 suspended). D3: L3 is a release-milestone DEEP campaign — BC5 (R18 Vertical Slice, with E7) and R19 (BC6), plus any checkpoint the Director schedules; the L3 after BC2 is no longer automatic ([Master XII-C](MASTER_IMPLEMENTATION_PLAN.md#xii-c-amendment-fast-cycle-2026-10-14)).

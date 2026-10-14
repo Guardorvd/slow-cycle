@@ -4,6 +4,8 @@ STATUS: CURRENT
 
 **Актуально на 2026-10-14:** BC1 **COMPLETE по решению Game Director** ([record](plans/completed/BC1.md)): природная тропа с одной SHAPED-полкой на 184729, два принятых плейтеста; формальная L2 не завершена, G / soak / VERIFY / REVIEW не проводились и перенесены в формальную L2 BC2. PR1 [SUSPENDED](plans/suspended/PR1.md); B+C принято ([BC0](plans/completed/BC0.md)). Следующая фаза — BC2 после компактного ExecPlan и approval. Раздел «BC1 — закрыт» ниже.
 
+**D3 Fast Cycle (2026-10-14, Game Director, governance only):** порядок проверки FAST → PLAYTEST → DEEP ([Test Strategy §0](TEST_STRATEGY.md#0-fast-cycle-fast--playtest--deep-d3), [Master XII-C](MASTER_IMPLEMENTATION_PLAN.md#xii-c-amendment-fast-cycle-2026-10-14)); спринт закрывается FAST + плейтестом Director; L2/L3, G, VERIFY/REVIEW — только DEEP. Обязательства BC1 (G, soak, VERIFY/REVIEW) — NOT RUN в [коротком backlog](BACKLOG_ACTIVE.md), не PASS. Тесты, assertions, пороги, категории не менялись; Godot не запускался.
+
 Дата governance: 03.10.2026. Scope: D0 documentation reset + завершённая локальная D1 governance implementation; runtime/source baseline `ed7d1322da1a5700a8c64425708e1c813213c7f6`, никаких игровых изменений в D0. Runtime evidence ниже датировано 01.10 или ранее и в D0 заново не запускалось. Точную текущую docs revision/branch определять через `git log -1`/`git status`; это не новый runtime baseline Q2.
 
 ## 1. Authority и ближайшая работа

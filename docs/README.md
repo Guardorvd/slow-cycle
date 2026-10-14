@@ -14,7 +14,8 @@ Scope: навигация после D0/D1 и Q0 authority approval. Решен�
 | В каком порядке переходим? | [MASTER_IMPLEMENTATION_PLAN](MASTER_IMPLEMENTATION_PLAN.md) | D0 → D1 → Q0 → Q1 → Q2 → R0…R21 |
 | Какие target владельцы и границы? | [TARGET_ARCHITECTURE](TARGET_ARCHITECTURE.md) | Производная будущая архитектура |
 | Что сохраняем/адаптируем/заменяем? | [LEGACY_MIGRATION_MATRIX](LEGACY_MIGRATION_MATRIX.md) | Future migration decisions и parity gates |
-| Какие доказательства нужны? | [TEST_STRATEGY](TEST_STRATEGY.md) | Категории/уровни evidence; без reclassification suites в D0 |
+| Какие доказательства нужны? | [TEST_STRATEGY](TEST_STRATEGY.md) | §0 Fast Cycle (FAST → PLAYTEST → DEEP, D3) — порядок по умолчанию; категории/уровни evidence |
+| Что отложено и что не запускалось? | [BACKLOG_ACTIVE](BACKLOG_ACTIVE.md) | Некритические дефекты, DEEP NOT RUN, known failures |
 | Что реально проверяет каждый test/tool? | [TEST_MATRIX](TEST_MATRIX.md) | Accepted Q0 authority/capability map; C10/C12 OPEN, runtime NOT_RUN |
 | Чем bounded-запускать существующие tests и получать PASS/FAIL/INCOMPLETE? | [tools/verify](../tools/verify/README.md) | Q1 harness (COMPLETE: VERIFY PASS + independent REVIEW PASS); pilot-результаты не являются baseline, acceptance или Q2 |
 | Что фактически работает сейчас? | [CURRENT_PROJECT_STATE](CURRENT_PROJECT_STATE.md), [ARCHITECTURE](../ARCHITECTURE.md) | Датированное состояние/as-is runtime |

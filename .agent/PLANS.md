@@ -1,64 +1,59 @@
-# Slow Cycle ExecPlans
+# Slow Cycle — plans, sprint cards and records
 
-Use an ExecPlan for phase/sprint transitions, architectural/new-subsystem or multi-system changes, multi-file features, significant migration and long implementation. Start with native Codex Plan Mode where available, then save one reviewable plan in `implementation_plan.md` and STOP for explicit human approval. Mode switching alone is not approval.
+Fast Cycle (D3, Game Director 2026-10-14): verification order FAST → PLAYTEST → DEEP, [Test Strategy §0](../docs/TEST_STRATEGY.md#0-fast-cycle-fast--playtest--deep-d3).
 
-A small local fix without ownership/contract/gate/phase change needs only goal, exact files, protected boundaries and targeted evidence, unless the user requests a plan. A one-file architectural change still requires this format. Keep fields concise (target ≤ 15 KB per phase plan, ≤ 3 KB per small fix); N/A needs a scope-specific reason, not a waiver of existing gates.
+## Which document
 
-## Header
+| Work | Document | Approval |
+|---|---|---|
+| Small game feature, tuning, sprint inside an approved phase | **Sprint card** (below), in the phase plan's progress section or in chat | Director request naming the feature/scope, or the approved phase plan |
+| Small local fix (no ownership/contract/phase change) | Goal, files, FAST check — a few lines | Request itself |
+| New phase, new subsystem, architectural/multi-system change, significant migration | **Compact ExecPlan** in `implementation_plan.md` (target ≤ 8 KB) | Save it and STOP for explicit approval of that task/version/scope |
+| DEEP campaign (Director decision, confirmed risk, release milestone) | DEEP section of the plan: named risk, checks, seeds, time limit | Director |
 
-TASK; date; status (PLAN_ONLY / APPROVED / IMPLEMENTING / VERIFYING / REVIEWING / COMPLETE / SUSPENDED); branch/base/HEAD; staged/unstaged/untracked baseline; approval source/date and approved version or digest. Record result source/diff digests for dirty results: HEAD alone is insufficient.
+## Sprint card (≈ 10 lines)
 
-## Required task fields
+Goal (what the rider will notice) · files to touch · FAST checks (parse + 1–3 related fast tests, ≈ 10–15 s) · playtest: seed/region, launch command, 3–5 capture points · known issues/risks · protected systems touched (normally none; if any, stop for approval).
+
+Sprint note at the end (≈ 5 lines): revision, FAST result, captures, critical defects fixed, backlog items added, Director verdict.
+
+## Compact ExecPlan
+
+Header: TASK; date; status (PLAN_ONLY / APPROVED / IMPLEMENTING / COMPLETE / SUSPENDED); branch/base/HEAD; approval source/date.
+
+Fields (one short paragraph or table row each; omit a field that does not apply):
 
 | Field | Content |
 |---|---|
-| Goal | One concrete user/engineering outcome |
-| Observed current state | Read sources, measured facts, unknowns and previous evidence limitations |
-| Target behaviour | Expected outcome and exclusions; future responsibilities are not implemented APIs |
-| KEEP / ADAPT / REPLACE / RETIRE decisions | Disposition of affected legacy owners; EXTEND/DEFER when justified |
-| System ownership | Single owner of each state/lifecycle and composition boundary |
-| Public contracts | Inputs/outputs/queries, failure reasons and compatibility boundaries |
-| Dependency direction | One-way flow and pure-domain → runtime adapter separation |
-| Allowed files | Exact create/modify/delete whitelist with responsibility |
-| Forbidden files | Stable neighbors, tests/gates/config and explicit exclusions |
-| Migration path | Small milestones, adapter/parity/retirement gates and stop points |
-| Risks | Coupling, determinism, scope, performance and legacy assumptions with mitigations |
-| Verification plan | L0/L1 per milestone and one L2 campaign selected by impact ([Test Strategy §7](../docs/TEST_STRATEGY.md)): checks/E-levels, reuse with closure proof, holdout/visual/performance scope, commands/seeds/time limits/concurrency, expected/actual assertions, coverage, completion; L3 items named, not run |
-| Negative verification | Meaningful invalid/boundary cases and exact expected reasons; justify omissions |
-| Runtime/visual/physics requirements | Real scene integration, Vulkan/collision/Input/ride as applicable; N/A with reason |
-| Performance evidence | Required workload/environment/before-after frame stalls, distributions, memory/lifecycle; no unsupported optimization claim |
-| Rollback boundary | Reversible task edits, compatibility/data impacts, preservation of other people's work/history |
-| Legacy impact | Protected behavior, pending conflicts/known failures and next dependency |
-| Documentation changes | Exact owner documents and evidence updates within whitelist |
-| Definition of Done | Scope compliance, required actual evidence, VERIFY PASS, independent REVIEW PASS, documentation and limitations |
-| Playtest checkpoints | Where applicable: PLAYABLE / REVIEWABLE points inside the task (Test Strategy §8) — what a human rides, entry criteria, critical-defect list; never acceptance and never a substitute for L2/VERIFY/REVIEW/E7 |
+| Goal | One concrete player/engineering outcome |
+| Current state | Read sources, measured facts, unknowns |
+| Target behaviour | Expected outcome and exclusions |
+| Ownership and contracts | Owner of each new state; public inputs/outputs; dependency direction; KEEP / ADAPT / REPLACE / RETIRE of affected legacy owners |
+| Files | Allowed files; protected neighbours not to touch |
+| Sprints | Ordered sprint cards with their playtest points |
+| Risks | Determinism, data integrity, performance, coupling — and which, if confirmed, triggers DEEP |
+| Checks | FAST set per sprint; DEEP only if a named risk or the Director requires it |
+| Done | Director playtest acceptance + backlog updated; FORMALLY ACCEPTED only if a DEEP campaign is scheduled |
 
 ## Approval and execution
 
-- Approval is for this task/version/scope. Record new user conditions alongside the approval; preserve the original approved plan for traceability. Do not infer authorization for tests/player/gates from a broad feature approval.
-- Execute agreed steps autonomously after approval. Material file/contract/gate scope expansion requires an amendment and approval before dependent changes. Keep progress/decisions/evidence and the time ledger (Test Strategy §7.6) for this task, not a mixed backlog/history.
-- Use `slow-cycle-worldgen` when its domain trigger applies; `slow-cycle-verify` after implementation; `slow-cycle-review` in a fresh independent context after verification. Natural-language skill invocation is valid; a literal `$` token is not an acceptance requirement.
-- Verifier/reviewer are read-only for feature/tests. Findings return to the implementation owner; fixes require fresh reports for the changed result. Missing independent reviewer means INCOMPLETE, never author self-certified PASS.
+- Approval is for this task/version/scope. Record new Director conditions with the approval. Do not infer authorization for semantic test changes or player/physics/camera changes from a feature approval.
+- After approval, execute sprints autonomously. Material file/contract/protected-system expansion needs an amendment and approval first.
+- Use `slow-cycle-worldgen` when its domain trigger applies. `slow-cycle-verify` and `slow-cycle-review` run only in a scheduled DEEP campaign.
 
-## Verification report
+## DEEP reports (only when DEEP runs)
 
-TASK; approved plan version; base/result revision plus dirty/source/diff digests; result PASS / FAIL / INCOMPLETE; reason; audited files; required/actual coverage and completion; commands/seeds/durations/environment; actual assertions and negative reasons; errors/warnings/leaks/timeouts; E-level evidence or justified N/A; reused evidence (`REUSED` run id + closure proof); artifacts; tests changed/reclassified with approval reference; known failures/limitations.
-
-FAIL means a demonstrated requirement violation; INCOMPLETE means missing/uncompleted required evidence. When both occur, FAIL with missing coverage listed. PASS requires all declared checks, scope, coverage and completion satisfied with no unexpected errors/leaks. Existing runtime failures do not become repaired by documentation PASS.
-
-## Independent review report
-
-Reviewer/context identity; approved plan + resulting diff + verification report identities; risk-targeted, no rerun of the verification campaign; result PASS / REJECT; reason/evidence; actionable findings with source/file/line or plan item, impact and required correction. Missing inputs/independence/required evidence → REJECT. Verification FAIL/INCOMPLETE blocks final acceptance even if review has no other findings; green tests do not prevent REJECT.
+- Verification: TASK; plan version; base/result revision and diff identity; PASS / FAIL / INCOMPLETE with reason; commands/seeds/durations/environment; actual assertions and completion; errors/leaks/timeouts; reused evidence with closure proof (Test Strategy §7.2); artifacts; known failures. FAIL = demonstrated violation; INCOMPLETE = missing required evidence.
+- Independent review: reviewer/context identity; plan + diff + verification report identities; PASS / REJECT with actionable findings. Verification FAIL/INCOMPLETE blocks FORMALLY ACCEPTED.
 
 ## Completion lifecycle
 
-- Only after VERIFY PASS + independent REVIEW PASS: archive the approved plan, approval/progress, final scope, evidence/reports/limitations in `docs/plans/completed/<TASK-ID>.md` (full reports may stay in a durable evidence root cited by SHA-256, Test Strategy §7.4); replace root `implementation_plan.md` with NO_ACTIVE_PLAN and a link to the completed record.
-- Check final archival/navigation changes. Closeout edits that only transcribe already-verified results into the record, plan slot and state docs (Test Strategy §7.4), with the verified code manifest unchanged, need link/scope/hash checks only; any other late change needs fresh verification/review of its impact set. Bind reports to immutable content digests; the final commit SHA may be reported externally to avoid a self-referential digest.
-- At FAIL/INCOMPLETE/REJECT keep the active plan and honest status; do not create a completed record. Local commit/handoff follows user authorization and an audited exact stage scope; never start the next phase automatically.
+- **Sprint:** closes on the Director's playtest acceptance (Test Strategy §0); sprint note + backlog update.
+- **Phase:** when its sprints are accepted, write a short `docs/plans/completed/<TASK-ID>.md` (goal, result, revisions, playtest verdicts, checks run, NOT RUN list, open backlog items, limitations; the plan verbatim or by SHA-256) and set root `implementation_plan.md` to NO_ACTIVE_PLAN. Status COMPLETE (playtest-accepted); FORMALLY ACCEPTED only after a DEEP campaign with VERIFY PASS + independent REVIEW PASS.
+- Never write NOT RUN as PASS. Local commit follows user authorization and an audited stage scope; never start the next phase automatically.
 
 ## Suspension lifecycle
 
-- SUSPENDED stops an unfinished task by explicit human decision (for example, its method is superseded). It is never COMPLETE or PASS, closes no obligation, and needs no VERIFY/REVIEW of the unfinished scope.
-- Before the root slot changes, create `docs/plans/suspended/<TASK-ID>.md`: decision source/date and reason; status of every milestone (done / not done / not run); the plan and execution record verbatim, with the SHA-256 of the root file it was copied from; retained evidence with its limitations; known failures; a reproducible baseline (revision or tag, engine, seed/configuration, launch command, cache/evidence location); every open obligation with its new owner task/phase or its explicit cancellation by the decision.
-- Then replace the root `implementation_plan.md` with NO_ACTIVE_PLAN or the next approved plan, linking the record. Keep the task branch and published history; no force-push or rewrite.
-- Resuming needs a new approved plan or amendment. Obligations move only as the decision names them.
+- SUSPENDED stops an unfinished task by explicit human decision. It is never COMPLETE or PASS and closes no obligation.
+- Before the root slot changes, create `docs/plans/suspended/<TASK-ID>.md`: decision source/date and reason; status of every milestone (done / not done / not run); the plan and execution record verbatim with the SHA-256 of the root file; retained evidence and limitations; known failures; a reproducible baseline (revision, engine, seed/configuration, launch command, cache location); open obligations with their new owner or explicit cancellation.
+- Then replace root `implementation_plan.md` with NO_ACTIVE_PLAN or the next approved plan, linking the record. Keep branches and published history; no force-push. Resuming needs a new approved plan or amendment.

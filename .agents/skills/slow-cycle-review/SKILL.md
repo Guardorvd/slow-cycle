@@ -1,17 +1,16 @@
 ---
 name: slow-cycle-review
-description: Independently critique an approved Slow Cycle plan, resulting diff and verification report. Return PASS or REJECT even when tests are green; excludes implementation fixes and replacing verification.
+description: DEEP only — independently critique a Slow Cycle plan, resulting diff and verification report when the Game Director schedules a DEEP campaign, a confirmed significant risk requires it, or at a release milestone. Returns PASS or REJECT; not part of closing an ordinary game sprint.
 ---
 
-# Independent critical review
+# Independent critical review (DEEP)
 
-Use an approved ExecPlan, resulting diff and verification report in a fresh independent reviewer context or with an independent human. “Use the slow-cycle-review skill” and a named skill mention both select this workflow. Reading this body in the author's implementation session does not establish independence.
+Use only inside a scheduled DEEP campaign ([Test Strategy §0](../../../docs/TEST_STRATEGY.md#0-fast-cycle-fast--playtest--deep-d3)), after `slow-cycle-verify`, in a fresh independent context or with an independent human. An ordinary game sprint closes by FAST + PLAYTEST without this skill. Reading this body in the author's session does not establish independence.
 
-1. Read applicable root/scoped instructions and `.agent/PLANS.md` report format. Check all three input identities/version/digests, specific scope approval and report freshness. Record reviewer/context identity; missing inputs/independence/required evidence → REJECT. Reports may be saved only in an authorized evidence location; implementation/tests/scope stay read-only. Focus on architecture, risks and evidence integrity; do not repeat the verification campaign. At most one focused probe (read-only hash/grep/diff inspection is not a probe) may settle a specific doubtful claim; otherwise return the question to the verifier.
-2. Seek scope creep/unrelated cleanup, duplicated responsibilities, hidden coupling, God objects, public contract breaches, wrong dependency direction, renderer/road-relative world authority and scene-tree access in domain/worker logic.
-3. Inspect hidden fallback/object deletion, stale legacy assumptions, unnecessary compatibility layers and claims of implemented target owners inferred from names/types.
-4. Seek test gaming, skips/suppression/test-only hooks, fake coverage, omitted assertions/completion, lowered thresholds/gates, unapproved reclassification and missing meaningful negative tests. Tests cannot redefine product architecture, and target design cannot excuse current test mutation/failure.
-5. Seek unbounded allocations/caches, mutable cross-system state, heavy main-thread work without profiling/justification, unsupported optimization claims and global RNG/time/unstable identity determinism risks.
-6. Compare claims with runtime/physics/Vulkan/performance/human evidence actually required by the task. Preserve known failures/limitations/coverage; green legacy tests do not certify a region, and documentation PASS does not close runtime INCOMPLETE.
-7. Return **PASS / REJECT** with reason/evidence and actionable findings (source/file/line or plan item, impact, required correction). PASS covers only the declared task, never approval of a new phase. Green tests can still receive REJECT; verification FAIL/INCOMPLETE blocks acceptance independently.
-8. Return defects to the implementation owner. After fixes require fresh verify + independent review of the changed diff; do not quietly fix the feature, approve expanded scope or self-certify the author's work.
+1. Check the three inputs (plan, diff, verification report) and their identities; record reviewer/context identity. Missing inputs/independence → REJECT. Implementation/tests stay read-only. Do not repeat the verification campaign; at most one focused probe settles a specific doubt (hash/grep/diff inspection is not a probe).
+2. Seek scope creep, duplicated responsibilities, hidden coupling, God objects, contract breaches, wrong dependency direction, renderer/road-relative world authority, scene-tree access in domain/worker logic, hidden fallback/object deletion.
+3. Seek test gaming: skips/suppression, test-only hooks, fake coverage, lowered thresholds/gates, unapproved semantic test changes, NOT RUN reported as PASS, placement captures presented as rides.
+4. Seek unbounded allocations/caches, shared mutable state, heavy main-thread work without measurement, global RNG/time/unstable identity.
+5. Compare claims with the evidence the DEEP scope actually required; preserve known failures and limitations.
+
+Return **PASS / REJECT** with reason and actionable findings (file/line or plan item, impact, required correction). PASS covers only the declared scope. Verification FAIL/INCOMPLETE blocks FORMALLY ACCEPTED. Return defects to the implementation owner; do not fix them or self-certify.

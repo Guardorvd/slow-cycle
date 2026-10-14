@@ -1,19 +1,27 @@
 # Slow Cycle — repository operating protocol
 
-STATUS: CURRENT
+STATUS: CURRENT (Fast Cycle, D3 — Game Director 2026-10-14)
 
 ## Authority and focused reading
 
 - [Blueprint](docs/TARGET_GAME_BLUEPRINT.md) owns product requirements; [Master](docs/MASTER_IMPLEMENTATION_PLAN.md) owns migration and phase order. Consult relevant [target architecture](docs/TARGET_ARCHITECTURE.md), [migration matrix](docs/LEGACY_MIGRATION_MATRIX.md), [test strategy](docs/TEST_STRATEGY.md) and [current state](docs/CURRENT_PROJECT_STATE.md). Code/history describe facts.
 - Record branch/HEAD/status and staged/unstaged/untracked paths. Preserve others' edits and published history; one logical branch/commit series per task; no unrelated cleanup.
-- Read each participating scope before work: [world](scripts/world/AGENTS.md), [player](scripts/player/AGENTS.md), [test](scripts/test/AGENTS.md). Root-start may not load sibling scopes. Read relevant scopes/sources. For another task, read only the active-plan header before the first `---` (max 12 lines); no whole-file reads/searches. Read its full plan only for that approved task's execution/verify/review.
+- Read each participating scope before work: [world](scripts/world/AGENTS.md), [player](scripts/player/AGENTS.md), [test](scripts/test/AGENTS.md). Root-start may not load sibling scopes. Read relevant scopes/sources. For another task, read only the active-plan header before the first `---` (max 12 lines); no whole-file reads/searches. Read its full plan only for that approved task's execution.
+
+## Verification order: FAST → PLAYTEST → DEEP
+
+Full rules: [Test Strategy §0](docs/TEST_STRATEGY.md#0-fast-cycle-fast--playtest--deep-d3).
+
+- **FAST (default).** After developing or changing a game feature: parse the changed scripts plus a few directly related fast tests, target ≈ 10–15 s of automated checks. Do not launch large batteries, G gates, mutants, holdout, soak or long Input rides automatically.
+- **PLAYTEST (main evaluation of a game feature).** Ready region (cache), 3–5 informative Vulkan screenshots from different points with the camera placed there, a log free of critical errors, then a launch command so the Director can ride. Never drive a bot for kilometres just to get screenshots; never present a placement capture as a physical ride check.
+- **DEEP (only when needed).** Long rides, wide seed checks, G gates, mutants, L2/L3, VERIFY and independent REVIEW run only by a separate Director decision, on a confirmed significant risk named before the run, or at a release milestone. They are not an automatic condition for closing a game sprint or starting the next one.
+- **A game sprint ends** when FAST passed (failures named), critical defects (crash/hang, falling through the world, trap without recovery, corrupt/inconsistent data, launch failure, baseline regression) are fixed, the playtest package was delivered and the Director rode and accepted it. Non-critical defects and DEEP checks not run go to the [short backlog](docs/BACKLOG_ACTIVE.md). Status: COMPLETE (playtest-accepted), not FORMALLY ACCEPTED.
 
 ## Planning and scope
 
-- Phase/sprint transitions, new subsystems, architectural changes, multi-file features, multi-system changes, significant migrations and long implementations require one ExecPlan in [implementation_plan.md](implementation_plan.md), using [.agent/PLANS.md](.agent/PLANS.md).
-- Use native Codex Plan Mode for preliminary investigation where available; it does not itself authorize implementation. Save the concrete plan and STOP for explicit human approval of that task/version/scope. A missing Plan Mode is not a reason to create a planning skill.
-- A small local fix with no ownership, contract, gate or phase change needs only concise scope and targeted verification, unless the user requires a plan. A one-file architectural change still needs an ExecPlan.
-- Once approved, execute the agreed scope autonomously. File/contract/protected-system/gate expansion needs a concrete approved amendment; prior approval does not authorize another task/phase.
+- **Small game feature or sprint:** a sprint card (goal, files, FAST checks, playtest points, known issues; [.agent/PLANS.md](.agent/PLANS.md)). A Director request naming the feature and scope approves it; inside an approved phase plan, sprints run without new approval. No long ExecPlan per sprint.
+- **ExecPlan** in [implementation_plan.md](implementation_plan.md) (compact, [.agent/PLANS.md](.agent/PLANS.md)) for a new phase, a new subsystem, an architectural or multi-system change or a significant migration. Save it and STOP for explicit human approval of that task/version/scope. Plan Mode alone does not authorize implementation.
+- Once approved, execute autonomously. File/contract/protected-system expansion needs an approved amendment; prior approval does not authorize another task/phase.
 - Prefer minimal changes and justified dependencies. Do not introduce gears, stamina, stunts, inventory, score or other gameplay mechanics without explicit instruction.
 
 ## System boundaries
@@ -24,17 +32,15 @@ STATUS: CURRENT
 
 ## Integrity and evidence
 
-- Existing tests, assertions, thresholds, coverage and mandatory gates remain protected. Test mutation/reclassification needs explicit human approval of the specific change; general feature approval is insufficient.
-- Tests cannot silently redefine the approved product architecture. Preserve current regression protection while escalating a precise legacy-test/target conflict with owner, requirement and evidence; do not change tests, ignore failures or revert the target by inference.
-- Read the frozen [test-integrity rule](.antigravity/rules/test-integrity.md) for test-related work/conflicts. Its anti-gaming and escalation protections remain; universal test-as-product-authority wording is limited by the accepted D0 authority distinction. No silent skips, suppression, fake PASS, test-specific production behavior or weakened assertions.
-- [World instructions](scripts/world/AGENTS.md) retain the existing legacy geometry limits, Watchdog/Vulkan generation gates and local foliage culling. Simplifying root instructions does not relax them.
-- Select checks by L0–L3 and impact ([Test Strategy §7](docs/TEST_STRATEGY.md)); reuse needs closure proof. Report actual coverage, assertions, completion, seeds, source/diff identity, errors/leaks and artifacts. Exit 0, budgets or stale reports never suffice; missing evidence blocks completion. E7 requires a human ride.
+- Never fake, weaken or hide: no lowered assertions/thresholds/coverage, silent skips, suppression, test-specific production behavior, fake PASS, or NOT RUN reported as PASS. Known failures stay visible. Read [test-integrity](.antigravity/rules/test-integrity.md) for test-related work.
+- Agents may fix an obvious test-setup error with a proven cause (wrong path/argument, scene init order, fixture flag, launch timeout) when assertions, thresholds, coverage and checked behavior stay unchanged; record cause and diff. Changing a semantic test contract or reclassifying a test needs explicit human approval of that change.
+- Tests cannot silently redefine the approved product architecture. Escalate a precise legacy-test/target conflict with owner, requirement and evidence; do not change tests, ignore failures or revert the target by inference.
+- [World instructions](scripts/world/AGENTS.md) retain the legacy geometry limits and local foliage culling; their G gates are DEEP checks.
+- Report what actually ran: commands, seeds, results, errors, artifacts; what did not run is NOT RUN. Exit 0 alone is not a PASS. E7 requires a human ride.
 
 ## Workflow and documentation
 
-- Worldgen design/implementation uses `slow-cycle-worldgen`; result verification uses `slow-cycle-verify`; independent criticism uses `slow-cycle-review`. Load the relevant body when that workflow starts, only as needed.
-- Invoke required verify/review explicitly by name or natural language (for example, “Use the slow-cycle-verify skill”). `$skill-name` is a convenience, not the sole activation or acceptance mechanism. Implicit matching alone does not prove a gate ran.
-- Verification is read-only for implementation/tests and returns PASS / FAIL / INCOMPLETE with reason/evidence. Review reads approved plan + diff + verification report in a fresh independent context, reruns no campaign and returns PASS / REJECT. Green tests do not guarantee review PASS; author self-review is not independent.
-- Fixes return to the implementation owner inside approved scope, followed by fresh verification/review of the changed impact set. Completion requires both VERIFY PASS and independent REVIEW PASS.
-- Update owned current documentation and the task record within the whitelist; distinguish implemented, planned, not-run and known failures. Keep one active plan; archive successful tasks in `docs/plans/completed/<TASK-ID>.md`, then clear the root slot to NO_ACTIVE_PLAN. An unfinished task stops only by explicit human decision as SUSPENDED under [.agent/PLANS.md](.agent/PLANS.md), never as COMPLETE. Never start the next phase automatically.
-- Scoped instructions, skills and an ExecPlan specialize these rules; they may not silently weaken approval, stable-system or integrity boundaries. Record unresolved conflicts and stop the affected work for a human decision.
+- Worldgen design/implementation uses `slow-cycle-worldgen`. `slow-cycle-verify` and `slow-cycle-review` belong to DEEP only: invoke them when a DEEP campaign is scheduled, explicitly by name or natural language.
+- In DEEP, verification is read-only and returns PASS / FAIL / INCOMPLETE; review runs in a fresh independent context and returns PASS / REJECT; FORMALLY ACCEPTED needs both. Author self-review is not independent.
+- Keep docs short: update the owned current docs, the sprint note and the backlog; distinguish implemented, planned, not run and known failures. Keep one active plan; archive a finished phase in `docs/plans/completed/<TASK-ID>.md` (short record), then set the root slot to NO_ACTIVE_PLAN. An unfinished task stops only by explicit human decision as SUSPENDED under [.agent/PLANS.md](.agent/PLANS.md). Never start the next phase automatically.
+- Do not rewrite historical reports or results. Scoped instructions, skills and plans specialize these rules; they may not silently weaken approval, stable-system or integrity boundaries. Record unresolved conflicts and stop the affected work for a human decision.
