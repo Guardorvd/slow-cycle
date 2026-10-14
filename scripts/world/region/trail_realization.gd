@@ -51,7 +51,17 @@ extends RefCounted
 ##     "nodes": [{"id": int, "x_m": float, "z_m": float}, {...}]   (region-local),
 ##     "half_width_m": float, "control_points": [[x_m, z_m], ...]  (region-local),
 ##     "operations": [{"kind": "BENCH", "from": [x_m, z_m], "to": [x_m, z_m],
-##                     "daylight_m": float, "taper_m": float}]      (optional)}]}
+##                     "daylight_m": float, "taper_m": float}]      (optional),
+##     "class": "SINGLETRACK" | "TECHNICAL"   (optional, BC2; default SINGLETRACK),
+##     "join_max_m": float                    (optional, BC2; default JOIN_MAX_M)}]}
+##
+## BC2 classes (limits()): SINGLETRACK as above, rideable both ways.
+## TECHNICAL is a descent from its first node to its second (directions
+## FORWARD only; the road is the way back up): descents up to the class
+## grade of RoadSynthesisPolicy (15 deg, measured descent hold of the
+## bicycle), forward climbs only up to FORWARD_CLIMB_TECHNICAL, turns down to
+## RADIUS_MIN_TECHNICAL_M. A configuration without "class" is realized exactly
+## as before.
 
 const Graph = preload("res://scripts/world/region/region_route_graph.gd")
 const Policy = preload("res://scripts/world/region/road_synthesis_policy.gd")
@@ -91,6 +101,15 @@ const BENCH_MAX_VOLUME_M3: float = 30.0
 const BENCH_CROSS_MAX: float = 0.06
 const BENCH_CLEARANCE_M: float = 1.5
 const BENCH_BORDER_M: float = 2.0
+## BC2 TECHNICAL: the comfortable lateral load of the measured riding envelope
+## (2.45 m/s^2, RoadSynthesisPolicy.MEASUREMENT) at 3.8 m/s (13.8 km/h, reached
+## by braking on the descent) turns on 6 m; the bicycle's full-lock radius at
+## that speed is ~3 m. Forward climbs on a descent stay below the measured
+## sustained climb on rough ground (5.6 deg).
+const RADIUS_MIN_TECHNICAL_M: float = 6.0
+const FORWARD_CLIMB_TECHNICAL: float = 0.095
+## Upper bound of a configured join_max_m (a join anywhere on an incident edge).
+const JOIN_MAX_EDGE_M: float = 3000.0
 const TILE_M: float = 512.0
 
 
@@ -131,8 +150,31 @@ static func realize_all(value: Variant, context: Dictionary) -> Dictionary:
 	return {"trails": trails, "rejected": rejected}
 
 
+## Riding limits of a trail class name ({} for an unknown class).
+static func limits(class_name_value: String) -> Dictionary:
+	if class_name_value == "SINGLETRACK":
+		return {"class": Graph.RouteClass.SINGLETRACK, "grade": Policy.grade_hard(Graph.RouteClass.SINGLETRACK), "radius": RADIUS_MIN_M, "climb": INF,
+			"directions": ["FORWARD", "REVERSE"]}
+	if class_name_value == "TECHNICAL":
+		return {"class": Graph.RouteClass.TECHNICAL, "grade": Policy.grade_hard(Graph.RouteClass.TECHNICAL), "radius": RADIUS_MIN_TECHNICAL_M,
+			"climb": FORWARD_CLIMB_TECHNICAL, "directions": ["FORWARD"]}
+	return {}
+
+
+static func _limits_of(record: Dictionary) -> Dictionary:
+	return limits("TECHNICAL" if int(record.get("class", TRAIL_CLASS)) == Graph.RouteClass.TECHNICAL else "SINGLETRACK")
+
+
 static func realize(trail: Dictionary, config: Dictionary, context: Dictionary) -> Dictionary:
 	var id: String = trail.id
+	var class_limits: Dictionary = limits(str(trail.get("class", "SINGLETRACK")))
+	if class_limits.is_empty():
+		return _reject(id, "ERR_TRAIL_INPUT", {"stage": "class", "value": str(trail.get("class"))})
+	var join_max: float = JOIN_MAX_M
+	if trail.has("join_max_m"):
+		if not _number(trail.join_max_m) or float(trail.join_max_m) <= 0.0 or float(trail.join_max_m) > JOIN_MAX_EDGE_M:
+			return _reject(id, "ERR_TRAIL_INPUT", {"stage": "join_max_m", "value": str(trail.join_max_m)})
+		join_max = float(trail.join_max_m)
 	var bounds: Dictionary = context.surface.get_bounds_m()
 	var size_x: float = bounds.max_x - bounds.min_x
 	var size_z: float = bounds.max_z - bounds.min_z
@@ -206,7 +248,7 @@ static func realize(trail: Dictionary, config: Dictionary, context: Dictionary) 
 				return _reject(id, "ERR_TRAIL_CONNECTION", {"stage": "join on a foreign piece", "node": node.id, "s_m": line.s[k], "piece": owners[k]})
 		var k_end: int = 0 if end == 0 else n - 1
 		var distance: float = Vector2(line.x[k_end] - node.x_m, line.z[k_end] - node.z_m).length()
-		if distance > JOIN_MAX_M:
+		if distance > join_max:
 			return _reject(id, "ERR_TRAIL_CONNECTION", {"stage": "join too far from its node", "node": node.id, "distance_m": distance})
 		var k_edge: int = first_off if end == 0 else last_off
 		joins.append({"node": node.id, "piece": owners[k_end], "end_s_m": line.s[k_end], "leave_s_m": line.s[k_edge], "leave_index": k_edge, "x_m": line.x[k_end],
@@ -217,7 +259,7 @@ static func realize(trail: Dictionary, config: Dictionary, context: Dictionary) 
 	if not shaped.is_valid:
 		return _reject(id, shaped.reason_code, shaped.detail)
 	# Rideability on the existing surface.
-	var check: Dictionary = _rideability(line, float(half), first_off, last_off, context, bounds, _bench(shaped.operations), INF)
+	var check: Dictionary = _rideability(line, float(half), first_off, last_off, context, bounds, _bench(shaped.operations), INF, class_limits)
 	if not check.is_valid:
 		return _reject(id, "ERR_TRAIL_UNRIDEABLE", check.detail)
 	var metrics: Dictionary = check.metrics
@@ -225,9 +267,9 @@ static func realize(trail: Dictionary, config: Dictionary, context: Dictionary) 
 	for op: Dictionary in shaped.operations:
 		metrics.shaped_length_m += op.s1_m - op.s0_m
 	metrics["shaped_fraction"] = metrics.shaped_length_m / line.s[n - 1]
-	var record := {"id": id, "mode": trail.mode, "class": TRAIL_CLASS, "purpose": str(trail.get("purpose", "")), "nodes": node_ids.duplicate(), "half_width_m": float(half),
+	var record := {"id": id, "mode": trail.mode, "class": class_limits["class"], "purpose": str(trail.get("purpose", "")), "nodes": node_ids.duplicate(), "half_width_m": float(half),
 		"line": {"s": line.s, "x": line.x, "y": line.y, "z": line.z, "tx": line.tx, "tz": line.tz}, "length_m": line.s[n - 1], "joins": joins,
-		"directions": ["FORWARD", "REVERSE"], "metrics": metrics, "operations": shaped.operations, "config_sha256": JSON.stringify(trail, "", true).sha256_text()}
+		"directions": class_limits.directions.duplicate(), "metrics": metrics, "operations": shaped.operations, "config_sha256": JSON.stringify(trail, "", true).sha256_text()}
 	return {"is_valid": true, "id": id, "reason_code": "", "detail": {}, "trail": record}
 
 
@@ -383,7 +425,8 @@ static func finalize(trail: Dictionary, published: RefCounted, context: Dictiona
 	line.y = heights
 	var checked := context.duplicate()
 	checked.surface = published
-	var check: Dictionary = _rideability(line, record.half_width_m, record.joins[0].leave_index, record.joins[1].leave_index, checked, bounds, _bench(record.operations), BENCH_CROSS_MAX)
+	var check: Dictionary = _rideability(line, record.half_width_m, record.joins[0].leave_index, record.joins[1].leave_index, checked, bounds, _bench(record.operations), BENCH_CROSS_MAX,
+		_limits_of(record))
 	if not check.is_valid:
 		var detail: Dictionary = check.detail.duplicate()
 		detail.stage = "published " + str(detail.get("stage", ""))
@@ -472,13 +515,20 @@ static func _line(points: Array[Vector2], half: float, surface: RefCounted, boun
 ## Where `bench` (an operation, {} for none) is fully formed (taper 1) the side
 ## slope limit is `bench_limit` (INF before shaping, BENCH_CROSS_MAX on the
 ## published bench); its tapers keep the NATURAL limit.
+## `class_limits` (limits(); SINGLETRACK when empty): a class with a finite
+## climb is checked in its forward direction - rises over the grade window
+## above it and a line that does not end lower than it starts are rejected.
 static func _rideability(line: Dictionary, half: float, first_off: int, last_off: int, context: Dictionary, bounds: Dictionary, bench: Dictionary = {},
-		bench_limit: float = INF) -> Dictionary:
+		bench_limit: float = INF, class_limits: Dictionary = {}) -> Dictionary:
 	var surface: RefCounted = context.surface
 	var field: RefCounted = context.field
 	var n: int = line.s.size()
-	var grade_max: float = Policy.grade_hard(TRAIL_CLASS)
-	var radius_min: float = RADIUS_MIN_M
+	var chosen: Dictionary = class_limits if not class_limits.is_empty() else limits("SINGLETRACK")
+	var grade_max: float = chosen.grade
+	var radius_min: float = chosen.radius
+	var climb_max: float = chosen.climb
+	if is_finite(climb_max) and line.y[n - 1] >= line.y[0]:
+		return {"is_valid": false, "detail": {"stage": "direction", "rise_m": line.y[n - 1] - line.y[0]}}
 	var decks: Array = _deck_lines(context.network)
 	var metrics := {"max_grade": 0.0, "max_pitch_grade": 0.0, "max_cross_slope": 0.0, "min_radius_m": INF, "climb_m": 0.0, "descent_m": 0.0}
 	var bench_cross: float = 0.0
@@ -511,6 +561,11 @@ static func _rideability(line: Dictionary, half: float, first_off: int, last_off
 			metrics.max_grade = maxf(metrics.max_grade, grade)
 			if grade > grade_max:
 				return {"is_valid": false, "detail": {"stage": "grade", "s_m": line.s[k], "grade": grade, "limit": grade_max}}
+			if is_finite(climb_max):
+				var climb: float = (line.y[b] - line.y[a]) / (line.s[b] - line.s[a])
+				metrics["max_forward_climb"] = maxf(metrics.get("max_forward_climb", 0.0), climb)
+				if climb > climb_max and k >= first_off and k <= last_off:
+					return {"is_valid": false, "detail": {"stage": "forward climb", "s_m": line.s[k], "grade": climb, "limit": climb_max}}
 		if k >= first_off and k <= last_off:
 			var g: Dictionary = surface.sample_gradient(bounds.min_x + p.x, bounds.min_z + p.y)
 			if not g.is_valid:

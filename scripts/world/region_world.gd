@@ -581,9 +581,19 @@ func _build_trail_markers(data: Dictionary) -> void:
 	board_material.albedo_color = Color(0.93, 0.80, 0.30)
 	board_material.emission_enabled = true
 	board_material.emission = Color(0.35, 0.28, 0.05)
+	# BC2: a TECHNICAL trail has dark red boards; it is a descent, so the board
+	# at its lower end (the exit) carries a white bar - not an entry.
+	var technical_material := StandardMaterial3D.new()
+	technical_material.albedo_color = Color(0.62, 0.10, 0.08)
+	technical_material.emission_enabled = true
+	technical_material.emission = Color(0.25, 0.03, 0.02)
+	var bar_material := StandardMaterial3D.new()
+	bar_material.albedo_color = Color(0.95, 0.95, 0.95)
 	for trail: Dictionary in data.get("trails", []):
 		var line: Dictionary = trail.line
-		for join: Dictionary in trail.joins:
+		var technical: bool = trail.get("class_name", "") == "TECHNICAL"
+		for end in range(trail.joins.size()):
+			var join: Dictionary = trail.joins[end]
 			var k: int = join.leave_index
 			var side := Vector3(-line.tz[k], 0.0, line.tx[k])
 			var base: Vector3 = Vector3(line.x[k], line.y[k], line.z[k]) + side * (trail.half_width_m + 0.9)
@@ -598,10 +608,19 @@ func _build_trail_markers(data: Dictionary) -> void:
 			var board := BoxMesh.new()
 			board.size = Vector3(0.5, 0.22, 0.04)
 			plate.mesh = board
-			plate.material_override = board_material
+			plate.material_override = technical_material if technical else board_material
 			plate.position = base + Vector3(0.0, 1.25, 0.0)
 			plate.basis = Basis.looking_at(Vector3(line.tx[k], 0.0, line.tz[k]), Vector3.UP)
 			add_child(plate)
+			if technical and not "REVERSE" in trail.directions and end == trail.joins.size() - 1:
+				var bar := MeshInstance3D.new()
+				var strip := BoxMesh.new()
+				strip.size = Vector3(0.38, 0.06, 0.05)
+				bar.mesh = strip
+				bar.material_override = bar_material
+				bar.position = plate.position
+				bar.basis = plate.basis
+				add_child(bar)
 
 
 # --- Descent-preferred direction (Director condition 2) ---

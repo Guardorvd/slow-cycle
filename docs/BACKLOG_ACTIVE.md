@@ -7,7 +7,7 @@ STATUS: CURRENT (D3 Fast Cycle, 2026-10-14). One line per item; remove an item w
 | ID | Where (seed, region, coordinates) | Defect | Found |
 |---|---|---|---|
 | N-1 | 184729 (0,0), region HUD | The top summary label is cut at the right edge at 1280 × 720 (long trail id makes it longer) | BC2 c1 captures |
-| N-2 | `tools/dev/capture_bc2.gd` | Bike placement shots stay in the first-person view (toggle not applied); views are still usable | BC2 c1 captures |
+| N-4 | player presentation, 184729 TECHNICAL 23 % pitch | In the first-person view on a steep descent a dark slab (bike body) fills the lower screen; observed in placement captures only — owner: player, not changed | BC2 c2 captures |
 | N-3 | 184729 `trail:st_6_9_…` | Procedural SINGLETRACK rides fine but is not especially interesting, relief hardly felt (Director ride, c1 ACCEPTED); known limit of the region's valley floor — not to be tuned per trail | BC2 c1 playtest |
 
 ## DEEP checks NOT RUN (owed, never PASS)
@@ -21,7 +21,7 @@ Run at the next DEEP trigger, release milestone or Director decision ([Test Stra
 | D-3 | Re-run `capture_region_world --target=r7_fixture` after the closeout fix | capture tool | [BC1 §3](plans/completed/BC1.md) |
 | D-4 | VERIFY + independent REVIEW of the region runtime | PR1/BC1 runtime | [BC1 §4](plans/completed/BC1.md), [PR1](plans/suspended/PR1.md) |
 | D-5 | Procedural trail bake determinism 1 vs N threads; fast path (`tools/dev/fast_trail.gd`) vs fresh bake parity beyond the one 184729 comparison | BC2 checkpoint 1 planner + `_procedural_trails` | [BC2 plan](../implementation_plan.md) |
-| D-6 | Input rides of the procedural SINGLETRACK both ways (existing BC1 runtime harness) — the checkpoint relies on the Director's ride | BC2 checkpoint 1 | [BC2 plan](../implementation_plan.md) |
+| D-6 | Input rides of the procedural SINGLETRACK both ways and the TECHNICAL descent (existing BC1 runtime harness) — the checkpoints rely on the Director's rides | BC2 checkpoints 1–2 | [BC2 plan](../implementation_plan.md) |
 
 ## Known failures (visible, not waived)
 
@@ -33,5 +33,5 @@ Run at the next DEEP trigger, release milestone or Director decision ([Test Stra
 | ID | State | Note |
 |---|---|---|
 | T1 | IMPLEMENTED as dev tool `tools/dev/capture_bc2.gd` (BC2 checkpoint 1) | Placement captures of every published trail (overview, join from the road, steepest point, middle, towards the second join); receipts tagged `PLACEMENT`. Not ride evidence. `capture_region_world.gd` unchanged. |
-| T2 | OPEN — evaluated in BC2 checkpoint 2 | Dev-key snapshot of fast-path products + explicit dev-load in the region scene; production key never written by the fast path. |
+| T2 | NOT BUILT (evaluated in BC2 c2: fast path ~2.5 min + production bake ~8 min sufficed; parity shown twice) | Dev-key snapshot of fast-path products + explicit dev-load in the region scene; production key never written by the fast path. |
 | T3 | IMPLEMENTED as `tools/dev/fast_trail.gd --off-key=` (verified: off bake, same seed/region, region + hydrology signatures recomputed) | `test_bc1_trail.gd` untouched. Older-closure off products are valid only for edits that do not reach upstream/network/tiles — printed as `FAST_OFF_KEY current_closure=false`. |

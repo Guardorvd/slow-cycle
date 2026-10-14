@@ -199,9 +199,11 @@ static func _trails(config: Variant, seed_value: int, region: Vector2i, network:
 
 ## BC2: trails proposed by TrailNetworkPlanner (configuration TrailPolicy) on
 ## the published ground of the off tiles, each already realized on the
-## published triangles of its zone. They are published best first; a
-## proposal rejected at publication gives way to the next one (at most
-## MAX_PUBLISH_ATTEMPTS), the rest stay unpublished alternates in the report.
+## published triangles of its zone. The planner's selection is published in
+## its order, each trail together with those already published; one rejected
+## at publication gives way to an alternate of its class (at most
+## MAX_PUBLISH_ATTEMPTS per selected trail), the rest stay unpublished
+## alternates in the report.
 static func _procedural_trails(config: Variant, context: Dictionary, network: RefCounted, surface: RefCounted, bounds: Dictionary, slots: Array, threads: int) -> Dictionary:
 	var report := {"config_sha256": JSON.stringify(config, "", true).sha256_text(), "procedural": true, "published": [], "rejected": []}
 	var unchanged := {"network": network, "surface": surface, "slots": slots, "report": report}
@@ -218,20 +220,24 @@ static func _procedural_trails(config: Variant, context: Dictionary, network: Re
 	report["planner"] = planned.report
 	report.planner["ground_s"] = ground_s
 	report.rejected.append_array(planned.rejected)
-	var wanted: int = int(parsed.config.get("max_trails", 1))
 	var products: Dictionary = unchanged
 	var chosen: Array = []
-	var attempts: int = 0
 	for trail: Dictionary in planned.trails:
-		if chosen.size() >= wanted or attempts >= MAX_PUBLISH_ATTEMPTS:
-			break
-		attempts += 1
-		var trial := {"published": [], "rejected": []}
-		var made: Dictionary = _publish_trails(chosen + [trail], trial, context, network, surface, bounds, slots, threads)
-		if made.report.published.size() == chosen.size() + 1:
-			chosen.append(trail)
-			products = made
-		report.rejected.append_array(made.report.rejected)
+		var options: Array = [trail] + planned.alternates.filter(func(other: Dictionary) -> bool: return other.class_name == trail.class_name)
+		var attempts: int = 0
+		for option: Dictionary in options:
+			if attempts >= MAX_PUBLISH_ATTEMPTS:
+				break
+			if chosen.any(func(done: Dictionary) -> bool: return done.id == option.id):
+				continue
+			attempts += 1
+			var trial := {"published": [], "rejected": []}
+			var made: Dictionary = _publish_trails(chosen + [option], trial, context, network, surface, bounds, slots, threads)
+			report.rejected.append_array(made.report.rejected)
+			if made.report.published.size() == chosen.size() + 1:
+				chosen.append(option)
+				products = made
+				break
 	var ids: Array = chosen.map(func(trail: Dictionary) -> String: return trail.id)
 	report.published = products.report.published if not chosen.is_empty() else []
 	for entry: Dictionary in report.published:
@@ -240,7 +246,10 @@ static func _procedural_trails(config: Variant, context: Dictionary, network: Re
 		entry["class"] = trail.class_name
 		entry["purpose"] = trail.purpose
 		entry["planner"] = {"score": trail.planner.score, "road_m": trail.planner.road_m, "gain_m": trail.planner.gain_m, "ports": trail.planner.ports}
-	report["alternates"] = planned.trails.map(func(trail: Dictionary) -> String: return trail.id).filter(func(id: String) -> bool: return not id in ids)
+		for key: String in ["drop_m", "turns", "steep_share", "return", "shape"]:
+			if trail.planner.has(key):
+				entry.planner[key] = trail.planner[key]
+	report["alternates"] = (planned.trails + planned.alternates).map(func(trail: Dictionary) -> String: return trail.id).filter(func(id: String) -> bool: return not id in ids)
 	return {"network": products.network, "surface": products.surface, "slots": products.slots, "report": report}
 
 

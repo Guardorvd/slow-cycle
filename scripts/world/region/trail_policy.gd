@@ -10,13 +10,13 @@ extends RefCounted
 ##
 ## Configuration (JSON object, e.g. res://resources/regions/bc2_trails.json):
 ##   {"schema": SCHEMA, "mode": "PROCEDURAL", "classes": ["SINGLETRACK"],
-##    "max_trails": int}
+##    "max_trails": int}   (per class, planned in the listed order)
 ## The configuration is seed-independent: the region (seed, geography and its
 ## published road network) decides where trails go.
 
 const Graph = preload("res://scripts/world/region/region_route_graph.gd")
 const SCHEMA := "slow_cycle.trail_network/1"
-const CLASSES: Array[String] = ["SINGLETRACK"]
+const CLASSES: Array[String] = ["SINGLETRACK", "TECHNICAL"]
 const MAX_TRAILS_LIMIT: int = 8
 
 ## Ports: stations on an edge piece at these distances (m) from one of its
@@ -32,6 +32,21 @@ const LEAD_M: float = 10.0
 const LEAD_SKEW: float = 0.7
 ## Extra corner-cutting passes tried while only the radius fails.
 const EXTRA_SMOOTHING: int = 2
+## TECHNICAL ports: every ALONG_STEP_M along a whole edge.
+const ALONG_STEP_M: float = 40.0
+## Clearance (m) a later search keeps from an already selected trail.
+const TRAIL_CLEAR_M: float = 10.0
+## TECHNICAL linked turns: (wavelength, amplitude) of the sideways offset of
+## the corridor, tried in this order; turn radius ~ wavelength^2 / (4 pi^2
+## amplitude) - 14.8 m (54, 5) down to 6.8 m (40, 6); the screen decides.
+const TURN_SHAPES: Array[Vector2] = [Vector2(54.0, 5.0), Vector2(54.0, 8.0), Vector2(46.0, 5.0), Vector2(46.0, 7.0), Vector2(40.0, 4.0), Vector2(40.0, 6.0), Vector2(34.0, 4.0)]
+## Offsets fade in / out over this distance (m) from the lead-outs.
+const TURN_FADE_M: float = 14.0
+## A turn: heading change of at least TURN_MIN_DEG over TURN_WINDOW_M.
+const TURN_WINDOW_M: float = 12.0
+const TURN_MIN_DEG: float = 25.0
+## Descent counted as steep (rise over run, 4 m windows).
+const STEEP_DESCENT: float = 0.12
 ## Largest ground slope from the road edge to the port (shoulder / earthwork).
 const PORT_SHOULDER_MAX: float = 0.22
 
@@ -55,7 +70,7 @@ const ROAD_NEAR_M: float = 18.0
 ## distances in m; detour = road distance / straight distance between ports.
 const PROFILES := {
 	"SINGLETRACK": {
-		"route_class": Graph.RouteClass.SINGLETRACK,
+		"route_class": Graph.RouteClass.SINGLETRACK, "directed": false, "id_prefix": "st",
 		"half_width_m": 0.65,
 		"grade_pref": 0.07, "grade_hard": 0.135,
 		"cross_pref": 0.12, "cross_hard": 0.28,
@@ -64,6 +79,21 @@ const PROFILES := {
 		"detour_min": 1.45, "gain_min_m": 120.0,
 		"length_min_m": 180.0, "length_max_m": 900.0,
 		"control_spacing_m": 14.0, "simplify_m": 1.5, "chaikin": 2,
+	},
+	## A descent (directed): from a high port to a low one, forward climbs
+	## above climb_hard impassable, cost around descent_target; pairs need
+	## drop_min_m and drop_ratio_min and a way back by road detour_min times
+	## longer than the straight distance.
+	"TECHNICAL": {
+		"route_class": Graph.RouteClass.TECHNICAL, "directed": true, "id_prefix": "tech",
+		"half_width_m": 0.5,
+		"grade_pref": 0.10, "grade_hard": 0.23, "climb_hard": 0.06,
+		"descent_target": 0.15, "descent_band": 0.08,
+		"cross_pref": 0.15, "cross_hard": 0.31,
+		"w_grade": 1.0, "w_cross": 0.5, "w_road_near": 0.6,
+		"straight_min_m": 70.0, "straight_max_m": 320.0,
+		"drop_min_m": 12.0, "drop_ratio_min": 0.09, "detour_min": 1.3,
+		"control_spacing_m": 7.0, "simplify_m": 1.5, "chaikin": 1,
 	},
 }
 

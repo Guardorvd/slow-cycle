@@ -6,7 +6,7 @@ extends SceneTree
 ## and their neighbours, spawn); water from the cache. Writes nothing to the
 ## cache: products of this path are not a bake and never answer a key.
 ##   --seed=S --region=X,Z --config=res://... [--off-key=K] [--plan-only]
-##   [--map=ABS.png [--window=x0,z0,size_m]] [--out=ABS.json]
+##   [--map=ABS.png [--window=x0,z0,size_m] [--contour=M]] [--out=ABS.json]
 ## --off-key: the off products to start from (default: the key of the current
 ## source closure). They are verified before use: a prototype-off bake (no
 ## trails, no dev marker) of the same seed and region whose region and
@@ -27,6 +27,8 @@ const Bridges = preload("res://scripts/world/region/bridge_deck_builder.gd")
 const Vegetation = preload("res://scripts/world/region/region_vegetation_planner.gd")
 const TrailPolicy = preload("res://scripts/world/region/trail_policy.gd")
 const Planner = preload("res://scripts/world/region/trail_network_planner.gd")
+
+var _contour: float = 10.0
 
 
 func _initialize() -> void:
@@ -54,6 +56,8 @@ func _initialize() -> void:
 			map_path = arg.substr(6)
 		elif arg.begins_with("--out="):
 			out_path = arg.substr(6)
+		elif arg.begins_with("--contour="):
+			_contour = arg.substr(10).to_float()
 		elif arg.begins_with("--window="):
 			var p: PackedStringArray = arg.substr(9).split(",")
 			window = [float(p[0]), float(p[1]), float(p[2])]
@@ -173,7 +177,7 @@ func _map(path: String, window: Array, made: Dictionary, loaded: Dictionary) -> 
 			var grade: float = Vector2(hx, hz).length() / (2.0 * step)
 			var c: Color = Color(0.35, 0.65, 0.3) if grade < 0.06 else (Color(0.65, 0.75, 0.3) if grade < 0.10 else (Color(0.85, 0.7, 0.3) if grade < 0.15 else (Color(0.8, 0.45, 0.25) if grade < 0.25 else Color(0.55, 0.3, 0.3))))
 			c = c * clampf(0.75 + 0.5 * (-hx - hz) / (2.0 * step), 0.4, 1.0)
-			if int(floor(h / 10.0)) != int(floor(Surface.ground_height(ground, x + step, z) / 10.0)):
+			if int(floor(h / _contour)) != int(floor(Surface.ground_height(ground, x + step, z) / _contour)) or int(floor(h / _contour)) != int(floor(Surface.ground_height(ground, x, z + step) / _contour)):
 				c = c.darkened(0.35)
 			image.set_pixel(i, j, c)
 	var data: Dictionary = loaded.network.get_data()

@@ -138,12 +138,15 @@ func _bike_shot(trail: Dictionary, view: String, k: int, at: Callable, along: Ca
 	var bike: Node3D = _scene.get_bike()
 	var rig: Node = bike.get_node_or_null("CameraRig")
 	if rig != null and bool(rig.get("is_first_person")):
-		Input.action_press("toggle_camera")
-		await process_frame
-		Input.action_release("toggle_camera")
-	for _settle in range(90):
+		# The view the player's V key selects (state of the rig, not its code).
+		rig.set("is_first_person", false)
+		rig.call("_apply_camera_mode")
+	# Brake held while the bike settles: on a steep descent it rolls away.
+	Input.action_press("brake")
+	for _settle in range(45):
 		await physics_frame
 	await _shot(trail, view, k, root.get_viewport().get_camera_3d())
+	Input.action_release("brake")
 
 
 func _shot(trail: Dictionary, view: String, k: int, camera: Camera3D) -> void:

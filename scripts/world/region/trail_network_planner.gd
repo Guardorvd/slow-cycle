@@ -22,11 +22,22 @@ extends RefCounted
 ##  5. Screen on the raster (grade, pitch, side slope, radius, water), then the
 ##     exact check: TrailRealization.realize on the published triangles of the
 ##     line's zone (FinalSurface.with_trails().with_published()).
+## Checkpoint 2, TECHNICAL (profile "directed"): ports along whole edges; a
+## pair is a high and a low port with a real drop between them and a longer
+## way back by road; the search descends from the high port (forward climbs
+## and too-steep descents impassable, cost around a steady target descent);
+## the line is then given linked turns - a few sine offsets of the searched
+## corridor (wavelength, amplitude) are screened and the most turning one
+## that meets the TECHNICAL limits is kept (the plain corridor when no other
+## passes). Trails are descents, ridden FORWARD; the road is the way back.
+## Classes are planned in configuration order; the trails selected for one
+## class block their surroundings (TRAIL_CLEAR_M) for every later search.
 ## Every rejection keeps its reason. Order is stable (sorted ids, fixed
 ## loops); the seed enters only through a derived tie-break, so the same
 ## seed, region and configuration give the same proposals.
 ##
-## Returns {trails: [TrailRealization record, best first], rejected: [{id,
+## Returns {trails: [selected TrailRealization records, in class order],
+## alternates: [records that passed but were not selected], rejected: [{id,
 ## reason_code, detail}], report: {...}}.
 
 const Trail = preload("res://scripts/world/region/trail_realization.gd")
@@ -44,18 +55,48 @@ const STEPS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1),
 ## off tiles)}.
 static func plan(config: Dictionary, context: Dictionary) -> Dictionary:
 	var t0: int = Time.get_ticks_usec()
-	var profile: Dictionary = TrailPolicy.PROFILES[config.classes[0]]
 	var bounds: Dictionary = context.surface.get_bounds_m()
 	var state := _State.new()
 	state.context = context
 	state.bounds = bounds
-	state.profile = profile
 	state.size = Vector2(bounds.max_x - bounds.min_x, bounds.max_z - bounds.min_z)
 	state.lattice = Vector2i(int(state.size.x / TrailPolicy.CELL_M) + 1, int(state.size.y / TrailPolicy.CELL_M) + 1)
 	state.water.resize(state.lattice.x * state.lattice.y)
+	state.blocked.resize(state.lattice.x * state.lattice.y)
 	state.road = _road_distance(context.network, state)
+	var wanted: int = int(config.get("max_trails", 1))
+	var selected: Array = []
+	var alternates: Array = []
+	var rejected: Array = []
+	var classes: Array = []
+	for class_name_value: String in config.classes:
+		state.profile = TrailPolicy.PROFILES[class_name_value]
+		state.class_name_value = class_name_value
+		state.limits = Trail.limits(class_name_value)
+		var made: Dictionary = _plan_class(state, wanted)
+		rejected.append_array(made.rejected)
+		var chosen: int = 0
+		for trail: Dictionary in made.passed:
+			if chosen < wanted and not _near_selected(trail, state):
+				selected.append(trail)
+				_stamp(trail, state)
+				chosen += 1
+			else:
+				alternates.append(trail)
+		made.report["selected"] = chosen
+		classes.append(made.report)
+	var report := {"planner": "trail_network/2", "classes": classes, "seconds": (Time.get_ticks_usec() - t0) / 1e6,
+		"proposed": (selected + alternates).map(func(t: Dictionary) -> Dictionary: return {"id": t.id, "class": t.class_name, "score": t.planner.score, "purpose": t.purpose,
+			"length_m": t.length_m})}
+	return {"trails": selected, "alternates": alternates, "rejected": rejected, "report": report}
+
+
+## Proposals of the state's class, best first.
+static func _plan_class(state: _State, wanted: int) -> Dictionary:
+	var profile: Dictionary = state.profile
+	var context: Dictionary = state.context
 	var ports: Array = _ports(context.network, state)
-	var pairs: Array = _pairs(ports, context.network, state, int(context.seed))
+	var pairs: Array = _descent_pairs(ports, context.network, state, int(context.seed)) if profile.directed else _pairs(ports, context.network, state, int(context.seed))
 	var rejected: Array = []
 	var passed: Array = []
 	var searches: int = 0
@@ -75,30 +116,68 @@ static func plan(config: Dictionary, context: Dictionary) -> Dictionary:
 		if not found.is_valid:
 			rejected.append({"id": pair.id, "reason_code": "ERR_TRAIL_SEARCH", "detail": {"stage": found.stage, "expanded": found.expanded}})
 			continue
-		# More corner cutting only while the radius is what fails.
-		var points: Array[Vector2] = []
-		var screened: Dictionary = {}
-		for extra in range(TrailPolicy.EXTRA_SMOOTHING + 1):
-			points = _control_points(pair, found.path, state, int(profile.chaikin) + extra)
-			screened = _screen(points, state)
-			if screened.is_valid or screened.detail.get("stage", "") != "radius":
-				break
-		if not screened.is_valid:
-			rejected.append({"id": pair.id, "reason_code": "ERR_TRAIL_SCREEN", "detail": screened.detail})
+		var variants: Array = _variants(pair, found.path, state)
+		if variants.is_empty():
+			rejected.append({"id": pair.id, "reason_code": "ERR_TRAIL_SCREEN", "detail": state.last_screen})
 			continue
-		checks += 1
-		var made: Dictionary = _realize(pair, points, screened, state)
+		var made: Dictionary = {}
+		for variant: Dictionary in variants.slice(0, 3):
+			checks += 1
+			made = _realize(pair, variant.points, variant.screened, state)
+			if made.is_valid:
+				made.trail.planner["shape"] = variant.shape
+				break
 		if not made.is_valid:
 			rejected.append({"id": pair.id, "reason_code": made.reason_code, "detail": made.detail})
 			continue
 		passed.append(made.trail)
-		if passed.size() >= int(config.get("max_trails", 1)) + 2:
+		if passed.size() >= wanted + 2:
 			break
 	passed.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.planner.score > b.planner.score or (a.planner.score == b.planner.score and a.id < b.id))
-	var report := {"planner": "trail_network/1", "class": config.classes[0], "ports": ports.size(), "pairs": pairs.size(), "searches": searches, "checks": checks,
-		"expanded": expanded, "proposed": passed.map(func(t: Dictionary) -> Dictionary: return {"id": t.id, "score": t.planner.score, "purpose": t.purpose, "length_m": t.length_m}),
-		"seconds": (Time.get_ticks_usec() - t0) / 1e6}
-	return {"trails": passed, "rejected": rejected, "report": report}
+	var report := {"class": state.class_name_value, "ports": ports.size(), "pairs": pairs.size(), "searches": searches, "checks": checks, "expanded": expanded,
+		"passed": passed.size()}
+	return {"passed": passed, "rejected": rejected, "report": report}
+
+
+## Line variants that pass the raster screen, best first. SINGLETRACK: the
+## corridor, with more corner cutting while only the radius fails.
+## TECHNICAL: the corridor with linked turns (TrailPolicy.TURN_SHAPES), the
+## most technical first, the plain corridor among them.
+static func _variants(pair: Dictionary, path: Array[Vector2], state: _State) -> Array:
+	var profile: Dictionary = state.profile
+	if not profile.directed:
+		for extra in range(TrailPolicy.EXTRA_SMOOTHING + 1):
+			var points: Array[Vector2] = _control_points(pair, path, state, int(profile.chaikin) + extra, Vector2.ZERO)
+			var screened: Dictionary = _screen(points, state)
+			state.last_screen = screened.get("detail", {})
+			if screened.is_valid:
+				return [{"points": points, "screened": screened, "shape": {"chaikin": int(profile.chaikin) + extra}}]
+			if screened.detail.get("stage", "") != "radius":
+				return []
+		return []
+	var out: Array = []
+	var shapes: Array[Vector2] = [Vector2.ZERO]
+	shapes.append_array(TrailPolicy.TURN_SHAPES)
+	for shape: Vector2 in shapes:
+		var points: Array[Vector2] = _control_points(pair, path, state, int(profile.chaikin), shape)
+		var screened: Dictionary = _screen(points, state)
+		if not screened.is_valid:
+			if shape == Vector2.ZERO:
+				state.last_screen = screened.detail
+			continue
+		out.append({"points": points, "screened": screened, "shape": {"wavelength_m": shape.x, "amplitude_m": shape.y}, "value": _technical_value(screened)})
+	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.value > b.value or (a.value == b.value and a.shape.amplitude_m < b.shape.amplitude_m))
+	return out
+
+
+## How technical a screened line rides: its mean descent and the share of it
+## descending at STEEP_DESCENT or more first (braking), then linked turns per
+## 100 m (heading changes of at least TURN_MIN_DEG within TURN_WINDOW_M, one
+## per turn, capped) - a long gentle line does not win by length.
+static func _technical_value(screened: Dictionary) -> float:
+	var m: Dictionary = screened.metrics
+	var length: float = screened.line.s[screened.line.s.size() - 1]
+	return 20.0 * (m.descent_m - m.climb_m) / length + 10.0 * m.steep_share + minf(100.0 * m.turns / length, 4.0)
 
 
 class _State:
@@ -106,6 +185,11 @@ class _State:
 	var context: Dictionary
 	var bounds: Dictionary
 	var profile: Dictionary
+	var class_name_value: String
+	var limits: Dictionary
+	var last_screen: Dictionary = {}
+	## Lattice nodes near already selected trails (1 = blocked).
+	var blocked := PackedByteArray()
 	var size: Vector2
 	var lattice: Vector2i
 	## Distance (m) from each lattice node to the nearest road plane edge
@@ -145,7 +229,18 @@ static func _ports(data: Dictionary, state: _State) -> Array:
 		for end_node: int in [edge.a, edge.b]:
 			var node: Dictionary = nodes[end_node]
 			var from_start: bool = (end_node == edge.a) == a_at_start
-			for distance: float in TrailPolicy.PORT_STATIONS_M:
+			var stations: Array = TrailPolicy.PORT_STATIONS_M
+			if state.profile.directed:
+				# Along the whole edge, once (listed from its first node).
+				if end_node != edge.a:
+					continue
+				stations = []
+				var along: float = TrailPolicy.PORT_END_CLEAR_M + 10.0
+				while along < length - TrailPolicy.PORT_END_CLEAR_M - 10.0:
+					stations.append(along)
+					along += TrailPolicy.ALONG_STEP_M
+				from_start = true
+			for distance: float in stations:
 				var s: float = distance if from_start else length - distance
 				if s < TrailPolicy.PORT_END_CLEAR_M or s > length - TrailPolicy.PORT_END_CLEAR_M:
 					continue
@@ -157,7 +252,7 @@ static func _ports(data: Dictionary, state: _State) -> Array:
 				var k: int = clampi(d.s.bsearch(s) - 1, 0, n - 2)
 				var u: float = clampf((s - d.s[k]) / maxf(d.s[k + 1] - d.s[k], 1e-9), 0.0, 1.0)
 				var p := Vector2(lerpf(d.x[k], d.x[k + 1], u), lerpf(d.z[k], d.z[k + 1], u))
-				if p.distance_to(Vector2(node.x_m, node.z_m)) > Trail.JOIN_MAX_M - 15.0:
+				if not state.profile.directed and p.distance_to(Vector2(node.x_m, node.z_m)) > Trail.JOIN_MAX_M - 15.0:
 					continue
 				var tangent := Vector2(d.x[k + 1] - d.x[k], d.z[k + 1] - d.z[k]).normalized()
 				var normal := Vector2(-tangent.y, tangent.x)
@@ -165,7 +260,10 @@ static func _ports(data: Dictionary, state: _State) -> Array:
 				for side: float in [-1.0, 1.0]:
 					var q: Vector2 = p + normal * side * (half + TrailPolicy.PORT_OFFSET_M)
 					var port := {"id": "%s@%d%s" % [edge.piece_id, int(round(s)), "L" if side > 0.0 else "R"], "node": end_node, "edge": edge.edge_id, "piece": edge.piece_id,
-						"s": s, "road": p + normal * side * half * 0.4, "q": q, "half": half, "normal": normal * side, "tangent": tangent}
+						"s": s, "road": p + normal * side * half * 0.4, "q": q, "half": half, "normal": normal * side, "tangent": tangent,
+						"ends": [[edge.a, p.distance_to(Vector2(nodes[edge.a].x_m, nodes[edge.a].z_m))], [edge.b, p.distance_to(Vector2(nodes[edge.b].x_m, nodes[edge.b].z_m))]]}
+					if state.profile.directed:
+						port.node = edge.a if port.ends[0][1] <= port.ends[1][1] else edge.b
 					if _port_ok(port, p + normal * side * half, state):
 						out.append(port)
 	return out
@@ -229,6 +327,96 @@ static func _pairs(ports: Array, data: Dictionary, state: _State, seed_value: in
 	return out
 
 
+## TECHNICAL pairs: a high port and a low port (in that order) with a real
+## drop, ground worth descending between them and a longer way back by road.
+## The two ends get distinct incident nodes (the nearest such choice).
+## Ranked by drop, ground steepness and the length of the way back; one per
+## pair of edge stretches.
+static func _descent_pairs(ports: Array, data: Dictionary, state: _State, seed_value: int) -> Array:
+	var profile: Dictionary = state.profile
+	var dist: Dictionary = _node_distances(data)
+	var lengths: Dictionary = {}
+	var ends: Dictionary = {}
+	for edge: Dictionary in data.edges:
+		lengths[edge.edge_id] = edge.length_m
+		ends[edge.edge_id] = [edge.a, edge.b]
+	var ground: Dictionary = state.context.ground
+	var heights: Array = ports.map(func(p: Dictionary) -> float: return Surface.ground_height(ground, p.q.x, p.q.y))
+	var best: Dictionary = {}
+	for i in range(ports.size()):
+		for j in range(ports.size()):
+			if i == j or not heights[i] - heights[j] >= profile.drop_min_m:
+				continue
+			var hi: Dictionary = ports[i]
+			var lo: Dictionary = ports[j]
+			var straight: float = hi.q.distance_to(lo.q)
+			var drop: float = heights[i] - heights[j]
+			if straight < profile.straight_min_m or straight > profile.straight_max_m or drop / straight < profile.drop_ratio_min:
+				continue
+			var road: float = _road_between(hi, lo, dist, lengths, ends, data)
+			if road < profile.detour_min * straight:
+				continue
+			var nodes: Array = _distinct_nodes(hi, lo)
+			if nodes.is_empty():
+				continue
+			var slope: float = 0.0
+			for m in range(1, 10):
+				var g: Vector2 = _ground_gradient(ground, lerpf(hi.q.x, lo.q.x, m / 10.0), lerpf(hi.q.y, lo.q.y, m / 10.0))
+				slope += minf(g.length(), 0.6) / 9.0
+			var score: float = minf(drop, 40.0) / 20.0 + 4.0 * minf(slope, 0.3) + minf(road / straight, 4.0) / 4.0
+			var group: String = "%d.%d-%d.%d" % [hi.edge, int(hi.s / 120.0), lo.edge, int(lo.s / 120.0)]
+			var tie: int = ("%d|%s|%s" % [seed_value, hi.id, lo.id]).hash()
+			var entry := {"id": "pair:%s~%s" % [hi.id, lo.id], "a": hi, "b": lo, "nodes": nodes, "straight_m": straight, "road_m": road, "drop_m": drop, "ground_slope": slope,
+				"score": score, "tie": tie, "group": group}
+			if not best.has(group) or _better(entry, best[group]):
+				best[group] = entry
+	var out: Array = best.values()
+	out.sort_custom(_better)
+	return out
+
+
+## [high node, low node, high join distance, low join distance]: distinct
+## incident nodes of the two ports' edges, nearest first ([] when none).
+static func _distinct_nodes(hi: Dictionary, lo: Dictionary) -> Array:
+	var options: Array = []
+	for x: Array in hi.ends:
+		for y: Array in lo.ends:
+			if x[0] != y[0]:
+				options.append([x[1] + y[1], x[0], y[0], x[1], y[1]])
+	if options.is_empty():
+		return []
+	options.sort()
+	return options[0].slice(1)
+
+
+## Lattice nodes within TRAIL_CLEAR_M of a selected trail block later searches.
+static func _stamp(trail: Dictionary, state: _State) -> void:
+	var cell: float = TrailPolicy.CELL_M
+	var r: float = TrailPolicy.TRAIL_CLEAR_M
+	var line: Dictionary = trail.line
+	for k in range(0, line.s.size(), 2):
+		var c := Vector2(line.x[k], line.z[k])
+		for j in range(maxi(0, int(floor((c.y - r) / cell))), mini(state.lattice.y - 1, int(ceil((c.y + r) / cell))) + 1):
+			for i in range(maxi(0, int(floor((c.x - r) / cell))), mini(state.lattice.x - 1, int(ceil((c.x + r) / cell))) + 1):
+				if Vector2(i * cell, j * cell).distance_to(c) <= r:
+					state.blocked[j * state.lattice.x + i] = 1
+
+
+## A passed proposal running into an already selected trail's clearance.
+static func _near_selected(trail: Dictionary, state: _State) -> bool:
+	var line: Dictionary = trail.line
+	for k in range(0, line.s.size(), 2):
+		if _blocked_at(state, Vector2(line.x[k], line.z[k])):
+			return true
+	return false
+
+
+static func _blocked_at(state: _State, p: Vector2) -> bool:
+	var i: int = int(round(p.x / TrailPolicy.CELL_M))
+	var j: int = int(round(p.y / TrailPolicy.CELL_M))
+	return i >= 0 and j >= 0 and i < state.lattice.x and j < state.lattice.y and state.blocked[j * state.lattice.x + i] == 1
+
+
 static func _better(a: Dictionary, b: Dictionary) -> bool:
 	if a.score != b.score:
 		return a.score > b.score
@@ -239,9 +427,10 @@ static func _better(a: Dictionary, b: Dictionary) -> bool:
 
 ## A pair that repeats an accepted proposal's node pair or crosses its line.
 static func _conflicts(pair: Dictionary, passed: Array) -> bool:
+	var ends: Array = pair.nodes.slice(0, 2) if pair.has("nodes") else [pair.a.node, pair.b.node]
 	for trail: Dictionary in passed:
 		var nodes: Array = trail.nodes
-		if (nodes[0] == pair.a.node and nodes[1] == pair.b.node) or (nodes[0] == pair.b.node and nodes[1] == pair.a.node):
+		if (nodes[0] == ends[0] and nodes[1] == ends[1]) or (nodes[0] == ends[1] and nodes[1] == ends[0]):
 			return true
 	return false
 
@@ -446,7 +635,15 @@ static func _search(pair: Dictionary, state: _State) -> Dictionary:
 				continue
 			var road_d: float = state.road[nj * state.lattice.x + ni]
 			var near: float = clampf(1.0 - (road_d - TrailPolicy.ROAD_CLEAR_M) / (TrailPolicy.ROAD_NEAR_M - TrailPolicy.ROAD_CLEAR_M), 0.0, 1.0)
-			var cost: float = length * (1.0 + profile.w_grade * pow(grade / profile.grade_pref, 2.0) + profile.w_cross * pow(cross / profile.cross_pref, 2.0) + profile.w_road_near * near)
+			var shape_cost: float = profile.w_grade * pow(grade / profile.grade_pref, 2.0)
+			if profile.directed:
+				# Forward: a climb above climb_hard is impassable; a descent
+				# costs its distance from the target descent.
+				var descent: float = (hc - hn) / length
+				if -descent > profile.climb_hard:
+					continue
+				shape_cost = profile.w_grade * pow((descent - profile.descent_target) / profile.descent_band, 2.0)
+			var cost: float = length * (1.0 + shape_cost + profile.w_cross * pow(cross / profile.cross_pref, 2.0) + profile.w_road_near * near)
 			var candidate: float = g[current] + cost
 			if candidate < g[n_index]:
 				g[n_index] = candidate
@@ -475,6 +672,8 @@ static func _passable(state: _State, i: int, j: int, ends: Array[Vector2]) -> bo
 	if road_d < 0.0:
 		return false
 	if road_d < TrailPolicy.ROAD_CLEAR_M and p.distance_to(ends[0]) > 2.0 * TrailPolicy.ROAD_CLEAR_M and p.distance_to(ends[1]) > 2.0 * TrailPolicy.ROAD_CLEAR_M:
+		return false
+	if state.blocked[j * state.lattice.x + i] == 1:
 		return false
 	return not _wet(p, state)
 
@@ -577,13 +776,19 @@ static func _leads(pair: Dictionary, state: _State) -> bool:
 ## Control points: road point, port and lead-out of each end around the
 ## searched path simplified and resampled at control_spacing_m; `passes`
 ## corner cuts between the two ports (the road points and ports stay).
-static func _control_points(pair: Dictionary, path: Array[Vector2], state: _State, passes: int) -> Array[Vector2]:
+## `turns` (wavelength, amplitude; ZERO for none): linked turns - the
+## corridor, smoothed, is offset sideways by amplitude * sin(2 pi s /
+## wavelength), faded in and out over TURN_FADE_M at the lead-outs.
+static func _control_points(pair: Dictionary, path: Array[Vector2], state: _State, passes: int, turns: Vector2) -> Array[Vector2]:
 	var profile: Dictionary = state.profile
 	var inner: Array[Vector2] = [pair.leads[0]]
 	inner.append_array(path.slice(1, path.size() - 1))
 	inner.append(pair.leads[1])
+	var corridor: Array[Vector2] = _simplify(inner, profile.simplify_m)
+	if turns != Vector2.ZERO:
+		corridor = _linked_turns(corridor, turns.x, turns.y)
 	var middle: Array[Vector2] = [pair.exits[0]]
-	middle.append_array(_resample(_simplify(inner, profile.simplify_m), profile.control_spacing_m))
+	middle.append_array(_resample(corridor, profile.control_spacing_m))
 	middle.append(pair.exits[1])
 	for pass_index in range(passes):
 		middle = _chaikin(middle)
@@ -594,6 +799,24 @@ static func _control_points(pair: Dictionary, path: Array[Vector2], state: _Stat
 	if out[out.size() - 1].distance_to(pair.b.road) < 2.0:
 		out.remove_at(out.size() - 1)
 	out.append(pair.b.road)
+	return out
+
+
+static func _linked_turns(corridor: Array[Vector2], wavelength: float, amplitude: float) -> Array[Vector2]:
+	var smooth: Array[Vector2] = corridor
+	for pass_index in range(3):
+		smooth = _chaikin(smooth)
+	var dense: Array[Vector2] = _resample(smooth, 2.0)
+	var n: int = dense.size()
+	var s := PackedFloat64Array([0.0])
+	for k in range(1, n):
+		s.append(s[k - 1] + dense[k].distance_to(dense[k - 1]))
+	var total: float = s[n - 1]
+	var out: Array[Vector2] = []
+	for k in range(n):
+		var direction: Vector2 = (dense[mini(n - 1, k + 3)] - dense[maxi(0, k - 3)]).normalized()
+		var fade: float = smoothstep(0.0, TrailPolicy.TURN_FADE_M, s[k]) * smoothstep(0.0, TrailPolicy.TURN_FADE_M, total - s[k])
+		out.append(dense[k] + Vector2(-direction.y, direction.x) * amplitude * fade * sin(TAU * s[k] / wavelength))
 	return out
 
 
@@ -669,16 +892,23 @@ static func _screen(points: Array[Vector2], state: _State) -> Dictionary:
 		if is_nan(h):
 			return {"is_valid": false, "detail": {"stage": "ground", "s_m": made.s[k]}}
 		heights.append(h)
-	var metrics := {"max_grade": 0.0, "max_cross_slope": 0.0, "climb_m": 0.0, "descent_m": 0.0, "water_near_m": 0.0, "min_radius_m": INF}
+	var metrics := {"max_grade": 0.0, "max_cross_slope": 0.0, "climb_m": 0.0, "descent_m": 0.0, "water_near_m": 0.0, "min_radius_m": INF, "turns": 0, "steep_share": 0.0}
 	var w: int = int(round(Trail.GRADE_WINDOW_M / Trail.SAMPLE_M / 2.0))
 	var r: int = int(round(Trail.RADIUS_WINDOW_M / Trail.SAMPLE_M))
-	var grade_limit: float = tan(deg_to_rad(10.0)) * 0.97
+	var limits: Dictionary = state.limits
+	var grade_limit: float = limits.grade * 0.97
+	var climb_limit: float = limits.climb * 0.95
+	if is_finite(limits.climb) and heights[n - 1] >= heights[0]:
+		return {"is_valid": false, "detail": {"stage": "direction"}}
+	var steep: float = 0.0
 	for k in range(n):
 		var p := Vector2(made.x[k], made.z[k])
 		var road_d: float = _road_at(state, p)
 		var on_road: bool = road_d < 0.0
 		if not on_road and _wet(p, state):
 			return {"is_valid": false, "detail": {"stage": "water", "s_m": made.s[k]}}
+		if not on_road and _blocked_at(state, p):
+			return {"is_valid": false, "detail": {"stage": "trail clearance", "s_m": made.s[k]}}
 		if k > 0:
 			var rise: float = heights[k] - heights[k - 1]
 			metrics.climb_m += maxf(rise, 0.0)
@@ -692,6 +922,11 @@ static func _screen(points: Array[Vector2], state: _State) -> Dictionary:
 			metrics.max_grade = maxf(metrics.max_grade, grade)
 			if grade > grade_limit:
 				return {"is_valid": false, "detail": {"stage": "grade", "s_m": made.s[k], "grade": grade}}
+			var descent: float = (heights[a] - heights[b]) / (made.s[b] - made.s[a])
+			if -descent > climb_limit and not on_road:
+				return {"is_valid": false, "detail": {"stage": "forward climb", "s_m": made.s[k], "grade": -descent}}
+			if descent >= TrailPolicy.STEEP_DESCENT and k > 0:
+				steep += made.s[k] - made.s[k - 1]
 		if not on_road:
 			var gradient: Vector2 = _ground_gradient(ground, p.x, p.y)
 			var cross: float = absf(gradient.dot(Vector2(-made.tz[k], made.tx[k])))
@@ -704,7 +939,7 @@ static func _screen(points: Array[Vector2], state: _State) -> Dictionary:
 			var area: float = (p - pa).cross(pc - pa)
 			var radius: float = pa.distance_to(p) * p.distance_to(pc) * pa.distance_to(pc) / maxf(2.0 * absf(area), 1e-12)
 			metrics.min_radius_m = minf(metrics.min_radius_m, radius)
-			if radius < Trail.RADIUS_MIN_M * 1.1:
+			if radius < limits.radius * 1.1:
 				return {"is_valid": false, "detail": {"stage": "radius", "s_m": made.s[k], "radius_m": radius}}
 		if k > 0 and not on_road:
 			var near_water: bool = false
@@ -713,22 +948,50 @@ static func _screen(points: Array[Vector2], state: _State) -> Dictionary:
 				near_water = near_water or _wet(p + normal * probe, state)
 			if near_water:
 				metrics.water_near_m += made.s[k] - made.s[k - 1]
+	metrics.steep_share = steep / made.s[n - 1]
+	metrics.turns = _turns(made)
 	return {"is_valid": true, "line": made, "metrics": metrics}
+
+
+## Linked turns of a line: maximal runs where the heading changes by at least
+## TURN_MIN_DEG over TURN_WINDOW_M, one per run and alternating side counted
+## once each.
+static func _turns(line: Dictionary) -> int:
+	var n: int = line.s.size()
+	var h: int = int(round(TrailPolicy.TURN_WINDOW_M / Trail.SAMPLE_M / 2.0))
+	var count: int = 0
+	var inside: int = 0
+	for k in range(h, n - h):
+		var a := Vector2(line.tx[k - h], line.tz[k - h])
+		var b := Vector2(line.tx[k + h], line.tz[k + h])
+		var turn: float = rad_to_deg(a.angle_to(b))
+		var side: int = 0 if absf(turn) < TrailPolicy.TURN_MIN_DEG else (1 if turn > 0.0 else -1)
+		if side != 0 and side != inside:
+			count += 1
+		inside = side
+	return count
 
 
 ## TrailRealization on the published triangles of the line's zone.
 static func _realize(pair: Dictionary, points: Array[Vector2], screened: Dictionary, state: _State) -> Dictionary:
 	var context: Dictionary = state.context
 	var profile: Dictionary = state.profile
-	var node_a: Dictionary = _node(context.network, pair.a.node)
-	var node_b: Dictionary = _node(context.network, pair.b.node)
-	var purpose: String = _purpose(pair, screened)
-	var id: String = "trail:st_%d_%d_%s_%s" % [pair.a.node, pair.b.node, String(pair.a.id).replace("edge:", "e").replace("@", "_"), String(pair.b.id).replace("edge:", "e").replace("@", "_")]
+	var directed: bool = profile.directed
+	var ends: Array = pair.nodes if directed else [pair.a.node, pair.b.node]
+	var node_a: Dictionary = _node(context.network, ends[0])
+	var node_b: Dictionary = _node(context.network, ends[1])
+	var purpose: String = _purpose(pair, screened, directed)
+	var id: String = "trail:%s_%d_%d_%s_%s" % [profile.id_prefix, ends[0], ends[1], String(pair.a.id).replace("edge:", "e").replace("@", "_"),
+		String(pair.b.id).replace("edge:", "e").replace("@", "_")]
 	var control: Array = []
 	for p: Vector2 in points:
 		control.append([snappedf(p.x, 0.01), snappedf(p.y, 0.01)])
 	var trail := {"id": id, "mode": "NATURAL", "purpose": purpose, "nodes": [{"id": node_a.id, "x_m": node_a.x_m, "z_m": node_a.z_m}, {"id": node_b.id, "x_m": node_b.x_m, "z_m": node_b.z_m}],
 		"half_width_m": profile.half_width_m, "control_points": control, "operations": []}
+	if directed:
+		# Joins anywhere on the ports' edges (a node of each edge, see _distinct_nodes).
+		trail["class"] = state.class_name_value
+		trail["join_max_m"] = snappedf(maxf(pair.nodes[2], pair.nodes[3]) + 20.0, 1.0)
 	var config := {"schema": Trail.SCHEMA, "seed": context.seed, "region": [context.region.x, context.region.y], "trails": [trail]}
 	var line: Dictionary = screened.line
 	var zone := {"id": id, "half_width_m": profile.half_width_m, "operations": [], "line": {"s": line.s, "x": line.x, "y": line.y, "z": line.z, "tx": line.tx, "tz": line.tz}}
@@ -742,10 +1005,15 @@ static func _realize(pair: Dictionary, points: Array[Vector2], screened: Diction
 	var gain: float = pair.road_m - record.length_m
 	var relief: float = record.metrics.climb_m + record.metrics.descent_m
 	var score: float = minf(pair.road_m / record.length_m, 3.0) + 0.02 * minf(relief, 30.0) + 0.5 * minf(screened.metrics.water_near_m / record.length_m, 0.5)
-	record["class_name"] = "SINGLETRACK"
+	if directed:
+		score = _technical_value(screened) + minf(pair.drop_m, 40.0) / 20.0
+	record["class_name"] = state.class_name_value
 	record["origin"] = "PROCEDURAL"
 	record["planner"] = {"pair": pair.id, "ports": [pair.a.id, pair.b.id], "road_m": pair.road_m, "straight_m": pair.straight_m, "gain_m": gain, "score": score,
 		"water_near_m": screened.metrics.water_near_m, "config": trail}
+	if directed:
+		record.planner.merge({"drop_m": pair.drop_m, "ground_slope": pair.ground_slope, "turns": screened.metrics.turns, "steep_share": screened.metrics.steep_share,
+			"return": {"via": "road", "road_m": pair.road_m}})
 	return {"is_valid": true, "trail": record}
 
 
@@ -757,9 +1025,12 @@ static func _node(data: Dictionary, id: int) -> Dictionary:
 
 
 ## Why the trail exists, from what its line meets.
-static func _purpose(pair: Dictionary, screened: Dictionary) -> String:
+static func _purpose(pair: Dictionary, screened: Dictionary, directed: bool) -> String:
 	var m: Dictionary = screened.metrics
 	var length: float = screened.line.s[screened.line.s.size() - 1]
+	if directed:
+		return "%s: drops %d m from %s down the %s to %s in %d linked turns over %d m; back up by road %d m" % ["SCARP_DESCENT" if pair.ground_slope >= 0.15 else "SLOPE_DESCENT",
+			int(round(pair.drop_m)), pair.a.piece, "terrace scarp" if pair.ground_slope >= 0.15 else "slope", pair.b.piece, m.turns, int(round(length)), int(round(pair.road_m))]
 	var kind: String = "MEADOW_SHORTCUT"
 	if m.water_near_m >= 0.15 * length:
 		kind = "CREEK_PASSAGE"

@@ -8,6 +8,11 @@ extends SceneTree
 ##                    deterministic; a creek across the whole meadow must leave
 ##                    no trail (refusal with reasons, nothing published); the
 ##                    raster query, heap and line helpers keep their contracts.
+##                    TECHNICAL: on a terrace scarp a descent is proposed - one-
+##                    way, within its limits, with linked turns, both ends on
+##                    the road and the road as the way back; a climbing or
+##                    unknown-class line is refused; the 24.5 % fall line is
+##                    TECHNICAL, not SINGLETRACK.
 ## The analytic surface and water are stand-ins for FinalSurface and
 ## HydrologyField (the external inputs of the planner, not the planning
 ## math); the region products are exercised by the cached bake and the
@@ -20,6 +25,10 @@ const Trail = preload("res://scripts/world/region/trail_realization.gd")
 const Surface = preload("res://scripts/world/region/final_surface.gd")
 const SIZE_M: float = 1024.0
 const ROAD_HALF_M: float = 3.0
+## Scarp world: upper terrace road at z 350, lower at z 620, the scarp
+## between (cosine profile, steepest 25 pi / 320 = 0.245).
+const SCARP_Z := Vector2(420.0, 580.0)
+const SCARP_DROP_M: float = 25.0
 
 var _checks: int = 0
 var _failures: Array = []
@@ -28,11 +37,16 @@ var _failures: Array = []
 class AnalyticSurface:
 	extends RefCounted
 	var road: PackedVector2Array
+	## false: gentle hills; true: a terrace scarp (SCARP_DROP_M over SCARP_Z).
+	var scarp: bool = false
 
 	func get_bounds_m() -> Dictionary:
 		return {"min_x": 0.0, "min_z": 0.0, "max_x": SIZE_M, "max_z": SIZE_M}
 
-	static func height(x: float, z: float) -> float:
+	func height(x: float, z: float) -> float:
+		if scarp:
+			var u: float = clampf((z - SCARP_Z.x) / (SCARP_Z.y - SCARP_Z.x), 0.0, 1.0)
+			return 100.0 - SCARP_DROP_M * 0.5 * (1.0 - cos(PI * u)) + 0.5 * sin(x / 40.0)
 		return 100.0 + 6.0 * sin(x / 90.0) * cos(z / 110.0) + 0.01 * z
 
 	func sample_height(x: float, z: float) -> Dictionary:
@@ -41,9 +55,8 @@ class AnalyticSurface:
 		return {"is_valid": true, "height_m": height(x, z), "reason_code": "", "kind": "TERRAIN"}
 
 	func sample_gradient(x: float, z: float) -> Dictionary:
-		var gx: float = 6.0 / 90.0 * cos(x / 90.0) * cos(z / 110.0)
-		var gz: float = -6.0 / 110.0 * sin(x / 90.0) * sin(z / 110.0) + 0.01
-		return {"is_valid": true, "gradient": Vector2(gx, gz), "reason_code": ""}
+		var e: float = 0.25
+		return {"is_valid": true, "gradient": Vector2(height(x + e, z) - height(x - e, z), height(x, z + e) - height(x, z - e)) / (2.0 * e), "reason_code": ""}
 
 	func road_owner(x: float, z: float) -> String:
 		var p := Vector2(x, z)
@@ -105,9 +118,15 @@ func _run() -> void:
 
 
 ## A road from node 0 (300, 200) south round a loop to node 1 (700, 200):
-## 300 m apart in a straight line, ~1.3 km by road.
-func _world(creek: Rect2) -> Dictionary:
+## 300 m apart in a straight line, ~1.3 km by road. With scarp: a road from
+## node 0 (200, 350) east along the upper terrace, down a ramp at x 800 and
+## back west below the scarp to node 1 (200, 620).
+func _world(creek: Rect2, scarp: bool = false) -> Dictionary:
+	var surface := AnalyticSurface.new()
+	surface.scarp = scarp
 	var corners: Array[Vector2] = [Vector2(300, 200), Vector2(300, 700), Vector2(700, 700), Vector2(700, 200)]
+	if scarp:
+		corners = [Vector2(200, 350), Vector2(800, 350), Vector2(800, 620), Vector2(200, 620)]
 	var d := {"s": PackedFloat64Array(), "x": PackedFloat64Array(), "y": PackedFloat64Array(), "z": PackedFloat64Array(), "tx": PackedFloat64Array(), "tz": PackedFloat64Array(),
 		"width": PackedFloat64Array()}
 	var road := PackedVector2Array()
@@ -124,16 +143,15 @@ func _world(creek: Rect2) -> Dictionary:
 			d.s.append(s)
 			d.x.append(p.x)
 			d.z.append(p.y)
-			d.y.append(AnalyticSurface.height(p.x, p.y))
+			d.y.append(surface.height(p.x, p.y))
 			var t: Vector2 = (b - a).normalized()
 			d.tx.append(t.x)
 			d.tz.append(t.y)
 			d.width.append(2.0 * ROAD_HALF_M)
-	var surface := AnalyticSurface.new()
 	surface.road = road
 	var water := AnalyticWater.new()
 	water.creek = creek
-	var network := {"nodes": [{"id": 0, "x_m": 300.0, "z_m": 200.0, "kind": "JUNCTION"}, {"id": 1, "x_m": 700.0, "z_m": 200.0, "kind": "JUNCTION"}],
+	var network := {"nodes": [{"id": 0, "x_m": corners[0].x, "z_m": corners[0].y, "kind": "JUNCTION"}, {"id": 1, "x_m": corners[3].x, "z_m": corners[3].y, "kind": "JUNCTION"}],
 		"edges": [{"edge_id": 0, "a": 0, "b": 1, "piece_id": "edge:0", "length_m": s}],
 		"pieces": [{"id": "edge:0", "design": d, "info": {"route_class": 1}}], "movements": [], "crossings": []}
 	var cell: float = TrailPolicy.GROUND_CELL_M
@@ -141,7 +159,7 @@ func _world(creek: Rect2) -> Dictionary:
 	var heights := PackedFloat32Array()
 	for j in range(n):
 		for i in range(n):
-			heights.append(AnalyticSurface.height(i * cell, j * cell))
+			heights.append(surface.height(i * cell, j * cell))
 	return {"seed": 4242, "region": Vector2i(0, 0), "network": network, "surface": surface, "field": water, "slots": [],
 		"ground": {"cell_m": cell, "nx": n, "nz": n, "heights": heights}}
 
@@ -197,7 +215,44 @@ func _domain() -> Dictionary:
 	_check(is_equal_approx(Surface.ground_height(ground, 0.0, 0.0), 10.0) and is_equal_approx(Surface.ground_height(ground, 512.0, 512.0), 30.0), "raster corners")
 	_check(absf(Surface.ground_height(ground, 256.0, 100.0) - (10.0 + 20.0 * 256.0 / 512.0)) < 1e-3, "raster plane interpolation", Surface.ground_height(ground, 256.0, 100.0))
 	_check(is_nan(Surface.ground_height(ground, 600.0, 10.0)), "outside the raster is NAN")
-	# 6. Heap order and line helpers.
+	# 6. TECHNICAL on a terrace scarp (both classes planned, SINGLETRACK first).
+	var both: Dictionary = TrailPolicy.parse({"schema": TrailPolicy.SCHEMA, "mode": "PROCEDURAL", "classes": ["SINGLETRACK", "TECHNICAL"], "max_trails": 1}).config
+	var scarp_world: Dictionary = _world(Rect2(), true)
+	var scarp_plan: Dictionary = Planner.plan(both, scarp_world)
+	var techs: Array = scarp_plan.trails.filter(func(t: Dictionary) -> bool: return t.class_name == "TECHNICAL")
+	report["technical"] = scarp_plan.report
+	_check(techs.size() == 1, "one TECHNICAL descent proposed on the scarp", scarp_plan.rejected.slice(0, 4))
+	if not techs.is_empty():
+		var tech: Dictionary = techs[0]
+		var line: Dictionary = tech.line
+		var n: int = line.s.size()
+		_check(tech.class == Trail.Graph.RouteClass.TECHNICAL and tech.directions == ["FORWARD"], "TECHNICAL is one-way (FORWARD)", [tech.class, tech.directions])
+		_check(line.y[0] - line.y[n - 1] > 15.0, "it descends from its first end to its second", [line.y[0], line.y[n - 1]])
+		_check(tech.metrics.max_forward_climb <= Trail.FORWARD_CLIMB_TECHNICAL and tech.metrics.min_radius_m >= Trail.RADIUS_MIN_TECHNICAL_M
+			and tech.metrics.max_grade <= Trail.Policy.grade_hard(Trail.Graph.RouteClass.TECHNICAL), "within the TECHNICAL limits", tech.metrics)
+		_check(tech.planner.turns >= 2 and tech.planner.steep_share > 0.2, "linked turns and steep descent", [tech.planner.turns, tech.planner.steep_share])
+		_check(not scarp_world.surface.road_owner(line.x[0], line.z[0]).is_empty() and not scarp_world.surface.road_owner(line.x[n - 1], line.z[n - 1]).is_empty()
+			and is_finite(tech.planner.return.road_m) and tech.planner.return.road_m > tech.length_m, "no trap: entry and exit on the road, a way back by road", tech.planner.get("return"))
+		report["technical_trail"] = {"id": tech.id, "length_m": tech.length_m, "metrics": tech.metrics, "turns": tech.planner.turns, "purpose": tech.purpose}
+	# 7. Realization contract of the classes on one fall line down the scarp.
+	var fall := {"id": "trail:fall", "mode": "NATURAL", "class": "TECHNICAL", "half_width_m": 0.5, "control_points": [[300.0, 350.0], [300.0, 380.0], [300.0, 500.0], [300.0, 600.0], [300.0, 620.0]],
+		"nodes": [{"id": 0, "x_m": 200.0, "z_m": 350.0}, {"id": 1, "x_m": 200.0, "z_m": 620.0}], "operations": []}
+	var fall_config := {"schema": Trail.SCHEMA, "seed": 4242, "region": [0, 0], "trails": [fall]}
+	var as_tech: Dictionary = Trail.realize(fall, fall_config, scarp_world)
+	_check(as_tech.is_valid, "TECHNICAL accepts the 24.5 % fall line", as_tech.get("detail"))
+	var as_st: Dictionary = fall.duplicate(true)
+	as_st.erase("class")
+	var st_made: Dictionary = Trail.realize(as_st, fall_config, scarp_world)
+	_check(not st_made.is_valid and st_made.reason_code == "ERR_TRAIL_UNRIDEABLE" and st_made.detail.stage == "grade", "SINGLETRACK refuses it (grade)", st_made.get("detail"))
+	var up: Dictionary = fall.duplicate(true)
+	up.control_points.reverse()
+	up.nodes.reverse()
+	var up_made: Dictionary = Trail.realize(up, fall_config, scarp_world)
+	_check(not up_made.is_valid and up_made.detail.get("stage", "") == "direction", "a TECHNICAL line that climbs is refused", up_made.get("detail"))
+	var bad_class: Dictionary = fall.duplicate(true)
+	bad_class["class"] = "DOWNHILL"
+	_check(Trail.realize(bad_class, fall_config, scarp_world).reason_code == "ERR_TRAIL_INPUT", "unknown class refused")
+	# 8. Heap order and line helpers.
 	var heap := Planner._Heap.new()
 	for v: int in [5, 1, 4, 2, 3, 0]:
 		heap.push(float(v), v)
