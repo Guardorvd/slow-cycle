@@ -2,7 +2,7 @@
 
 STATUS: CURRENT
 
-**Актуально на 2026-10-12:** PR1 [SUSPENDED](plans/suspended/PR1.md); направление B+C принято ([roadmap](ROADMAP_B_C_ROUTE_REALIZATION.md) ACCEPTED при закрытии BC0 — [record](plans/completed/BC0.md), [Master XII-B](MASTER_IMPLEMENTATION_PLAN.md#xii-b-amendment-bc-2026-10-12)); следующая исполнимая фаза — BC1 после отдельного ExecPlan и approval. Подробно — раздел «PR1 и переход на B+C» ниже.
+**Актуально на 2026-10-14:** BC1 **COMPLETE по решению Game Director** ([record](plans/completed/BC1.md)): природная тропа с одной SHAPED-полкой на 184729, два принятых плейтеста; формальная L2 не завершена, G / soak / VERIFY / REVIEW не проводились и перенесены в формальную L2 BC2. PR1 [SUSPENDED](plans/suspended/PR1.md); B+C принято ([BC0](plans/completed/BC0.md)). Следующая фаза — BC2 после компактного ExecPlan и approval. Раздел «BC1 — закрыт» ниже.
 
 Дата governance: 03.10.2026. Scope: D0 documentation reset + завершённая локальная D1 governance implementation; runtime/source baseline `ed7d1322da1a5700a8c64425708e1c813213c7f6`, никаких игровых изменений в D0. Runtime evidence ниже датировано 01.10 или ранее и в D0 заново не запускалось. Точную текущую docs revision/branch определять через `git log -1`/`git status`; это не новый runtime baseline Q2.
 
@@ -80,28 +80,15 @@ Three tiles: 174,623 vertices / 348,564 triangles / approximately56-57 s build /
 - **Направление B+C:** одна маршрутная сеть; участки ENGINEERED (R5/R6 для основных дорог, пока оправдано), NATURAL и SHAPED; единая FinalSurface (принципы S1–S7); осмысленные тупики без ловушек; приёмка законченных связей; PLAYABLE отдельно от FORMALLY ACCEPTED ([Test Strategy §8](TEST_STRATEGY.md)).
 - **Следующая фаза:** BC1 — первая проезжаемая NATURAL-тропа на 184729, плейтест, затем первая операция SHAPED. Требует отдельного ExecPlan и approval. BC0 — COMPLETE ([completed record](plans/completed/BC0.md)).
 
-## BC1 — P2 (2026-10-13, в работе)
+## BC1 — первая природная тропа: закрыт (2026-10-14)
 
-- **P1 ACCEPTED** as PLAYABLE / REVIEWABLE по человеческому плейтесту Director. Контроль: тег `bc1-p1`. Поправка A1: линия меняется данными плюс одна SHAPED-операция BENCH. Достигнут **P2 PLAYABLE**: ждём второй плейтест, L2 не начата.
-- **P2:** 453 м, +14,6 / −3,6 м. Уклон до 12,7 %, минимальный радиус 27 м. Полка 57 м: поперечный уклон 19,5 % → 0,2 %, смещение до 12,7 см, 14 м³. Стоимость +1,8 % вершин региона.
-- **Проверки (L1, `scripts/test/test_bc1_trail.gd`):** integration 52/0, domain 25/0, runtime 24/0. Существующий `test_region_ride` без тропы 7/0. Off-bake по-прежнему равен baseline.
-- **Наблюдение:** итоговая поверхность вне дорог (ячейки 16 м) не передаёт мелкие формы рельефа. Промоина ручья в данных глубиной 3 м отличается от опубликованной до 3,6 м. Это для BC2/BC3; в BC1 не исправляется.
-
-## BC1 — первая природная тропа (2026-10-13, в работе)
-
-- ExecPlan v1.0 **утверждён** 2026-10-13. Ветка `bc1-natural-trail`. Достигнут **P1 PLAYABLE** (не PASS фазы, не E7). Ждём человеческий плейтест; SHAPED не начат.
-- **Реализовано.**
-  - NATURAL-тропа `trail:bc1_meadow` (184729, 336 м) включается флагом `--trail-config=res://resources/regions/bc1_trail_184729.json`.
-  - Тропа публикуется в RealizedRoadNetwork отдельным списком `trails` (схема /2), не как piece R6.
-  - Тайлы уточняются точно по полосе, без изменения формы. Новые вершины лежат на прежних треугольниках, границы тайлов согласованы.
-  - Итоговые запросы FinalSurface в зоне тропы берутся из опубликованных треугольников.
-  - Добавлены слой RoughRoad на полосе, отступ растительности, ключ кэша, восстановление на тропу и материал тропы.
-- **Проверено (L1, `scripts/test/test_bc1_trail.gd`).**
-  - integration: 55/0. Off-bake равен baseline `c94451cf…` / `183eef0c…`. Дороги не изменены. Тайлы: отклонение формы ≤ 0,05 мм, 8 швов совпадают. Кэш при перезагрузке равен свежему. Устаревший кэш, ключи и атомарный отказ проверены.
-  - domain: 18/0, все отрицательные случаи с объявленными причинами.
-  - runtime (Vulkan): 23/0. Input-проезд в обе стороны; P2 — 1011 лучей, 0 промахов, ≤ 0,04 мм; восстановление; 4 вида.
-  - Существующий `test_region_ride --target=region` без тропы: 7/0.
-- **Не запускалось:** L2, G, GPU-поездка 20 мин, полный 1-vs-N bake, VERIFY и REVIEW. Пределы проходимости (10°, 19 м) — временные проверочные значения из SINGLETRACK, нормативы NATURAL определит BC2. S3 остаётся OPEN / KNOWN FAILURE.
+- **Статус:** COMPLETE по решению Game Director 2026-10-14; не FORMALLY ACCEPTED ([Test Strategy §8.1](TEST_STRATEGY.md)): VERIFY и независимый REVIEW не проводились. [Запись](plans/completed/BC1.md).
+- **Реализовано:** NATURAL-тропа `trail:bc1_meadow` (184729, 453 м, joins edge:4 / edge:7) с одной SHAPED-операцией BENCH (57 м). Включается флагом `--trail-config=res://resources/regions/bc1_trail_184729.json`; по умолчанию регион без изменений. Тропа публикуется в RealizedRoadNetwork списком `trails` (схема /2). Тайлы уточняются по полосе; итоговые запросы в зоне тропы — по опубликованным треугольникам. Слой RoughRoad, отступ растительности, ключ кэша, восстановление на тропу.
+- **Плейтесты:** P1 и P2 приняты Director как PLAYABLE / REVIEWABLE (теги `bc1-p1`, `bc1-p2`). E7 не объявлен.
+- **Проверено на кандидате L2:** integration 67/0, domain 25/0, runtime (Vulkan) 35/0, R7 fixture 424259/0, ride_envelope 204/0, region ride 7/0, r7_fixture ride 11/0 (после одобренной правки теста), детерминизм 1 vs 8 потоков, 2024 и holdout без тропы равны baseline, 5/5 мутантов пойманы, смок-разбор финального дерева 13/13.
+- **Исправлено в тестах (одобрено Director):** цели `r7_fixture` в `test_region_ride.gd` и `capture_region_world.gd` отключают собственный bake сцены (`auto_bake = false`) — унаследованный дефект PR1 M4, подтверждён на `beacc9c`. Assertions и пороги не менялись.
+- **Не проводилось (отменено Director):** G-гейты, 20-минутный soak с тропой и без, повтор capture `r7_fixture`, VERIFY, REVIEW → формальная L2 BC2.
+- **Известное:** S3 OPEN / KNOWN FAILURE (тропу не затрагивает). Поверхность вне дорог (ячейки 16 м) отличается от аналитической до 3,6 м — исследование в начале BC2. Пределы 10° / 0,35 — временные.
 
 ## 2. Что фактически есть
 

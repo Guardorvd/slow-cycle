@@ -53,6 +53,7 @@ func _run() -> void:
 	var path: PackedVector3Array = Bot.route_polyline(source.route.get_data())
 	scene.set_recovery_paths([path])
 	scene.spawn_bike(path[0], path[1] - path[0])
+	scene.auto_bake = false
 	root.add_child(scene)
 	var bike: BicycleController = scene.get_bike()
 	var bot: RefCounted = Bot.new().setup(path, 7.5)
