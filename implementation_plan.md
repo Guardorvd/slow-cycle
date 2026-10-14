@@ -1,6 +1,6 @@
 TASK: BC1 — первая природная тропа Slow Cycle; ExecPlan v1.0
 DATE: 2026-10-13
-STATUS: M4 L2 IN PROGRESS — paused by the Director ("сохрани и закончим сегодня"); L2 candidate 980adf7; one pre-existing FAIL under investigation (test_region_ride --target=r7_fixture); VERIFY/REVIEW not started
+STATUS: M4 L2 IN PROGRESS — paused by the Director 2026-10-14 ("заканчивай все. сохрани"); L2 candidate 5e097a9 (980adf7 + Director-approved r7_fixture test fix); open: capture_region_world r7_fixture (same inherited defect, decision needed), G, soak on/off; VERIFY/REVIEW not started
 BRANCH: bc1-natural-trail; BASE: final BC0 2a43bc092b503987a9a2845232a3791b0ad69e21
 HEAD AT PLAN DRAFT: a8414ac0a6becc989fef24d060cff40bc8ceb149 (factual errata); submission HEAD/digests in planning manifest
 BASELINE: source/new checkout clean (staged/unstaged/untracked 0/0/0); docs-only planning changes
@@ -247,6 +247,37 @@ Authority: Director decision "BC1 — P1 Human Feedback Accepted / Proceed to SH
 2. Compare base/candidate digests.
 3. Run the Vulkan set (runtime, capture_region_world, G harness from the worktree, soak on/off).
 4. Present the r7_fixture decision; then VERIFY and REVIEW in fresh contexts.
+
+## M4 L2 resume (2026-10-14, paused again)
+
+**Director decisions 2026-10-14.**
+1. r7_fixture option (a) approved: one line `scene.auto_bake = false` before `root.add_child(scene)` in `_r7_fixture()` of `scripts/test/test_region_ride.gd`; this file joins the BC1 whitelist. Condition: baseline proof first; no assertion/threshold/production change.
+2. The `_soak()` remark is withdrawn: `last_frame = now` runs outside the if/elif on every frame, so the first frame after the settle is measured correctly.
+3. BC2: one compact ExecPlan, three playable sprints with Director playtests, one formal L2 at BC2 closure; no separate BC2.0.
+
+**Candidate.** `5e097a9` = `980adf7` + the one test line. `test_region_ride.gd` is an entry point outside every other check's closure, so the `980adf7` results below are reused by byte identity of their closures (§7.2).
+
+**Results.**
+
+| Check | Run | Result |
+|---|---|---|
+| r7_fixture on PR1 baseline `beacc9c` (copy equals `beacc9c` after EOL normalization) | `l2_region_ride_fixture_base` | FAIL 11/7, `REGION_SESSION mode=random`, forward 0 m, road share 0. Inherited defect confirmed |
+| r7_fixture on `5e097a9` | `l2_region_ride_fixture_fix` | **11/0** |
+| Mutants | `l2_mutant_*` (`*_r2` reruns of the three killed at the pause) | all 5 caught: shape_movement (new vertices / queries), stale_config (cache key), bench_out_of_footprint (displacement outside the footprint), partial_publication (trail tiles, rough layer, queries), split_collision (P2 rays 10 cm) |
+| Default-off 2024 and holdout 3628391 (3,−2), base vs candidate | `l2_2024_base_c`, `l2_holdout_base_c` vs `*_cand` | equal tiles / network / vegetation (`a13d40f3…`/`8ad10669…`/`41a7dd30…`; `b22c3e11…`/`c52c45f6…`/`3f8c8f5b…`). The first base runs failed on a dev-tool parse error in `bake_probe` (fixed, outside the repo) |
+| runtime group (Vulkan, trail) | `l2_runtime` | 35/0 |
+| capture_region_world `--target=region --seed=184729` | `l2_capture_region` | 6/6 captures, stderr clean |
+| **capture_region_world `--target=r7_fixture`** | `l2_capture_fixture` | **stopped at the pause** after `REGION_SESSION mode=random`: the same inherited defect (content attached, `auto_bake` left true). Fix (same one line) needs Director approval; baseline proof to run first |
+| S3 applicability | `p2/net.json` | the S3 movements nearest the trail joins (`move:4:3-7`, `move:4:4-7` at 79.8 m from the edge:7 join; `move:5:4-10` at 72.7 m from the edge:4 join) are neither consumed nor changed by the trail. Not implicated; S3 stays OPEN / KNOWN FAILURE |
+
+**Not run yet:** G via `tools/verify/sc_verify.py` from this worktree; soak with and without the trail (20 min, `--disable-vsync`, isolated); VERIFY; REVIEW.
+
+**BC2 iteration-speed probe (dev tool outside the repo, `work/bc1/tools/fast_trail.gd`).**
+- The tool builds trail-on products from the cached prototype-off products. It runs the same `RegionBake._trails`, bridges and vegetation; vegetation is planned for the changed tiles and their neighbours only.
+- Result: 51 s instead of ~500 s for a full bake.
+- Its tiles, network and vegetation digests equal the fresh trail-on bake (`7802b697…`/`c89164f2…`/`896ee72f…`).
+- No production change, no cache write in the probe.
+- Proposal for the BC2 plan.
 
 ## Director decision after P2 (2026-10-13)
 
