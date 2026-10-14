@@ -1,6 +1,6 @@
 TASK: BC2 — Procedural Natural Trail Network; ExecPlan v1.0
 DATE: 2026-10-14
-STATUS: APPROVED — checkpoint 1 (SINGLETRACK) PLAYABLE, waiting for the Director's ride
+STATUS: APPROVED — checkpoint 1 ACCEPTED (playtest); checkpoint 2 (TECHNICAL) IN PROGRESS
 BRANCH: bc2-procedural-trails; BASE/HEAD: 36bf54f085b95be46b91a86d01e30f32dd4821d6 (D3)
 WORKTREE: work/slow-cycle (текущий чат)
 APPROVAL: v1.0 APPROVED by the Game Director 2026-10-14, conditions 1–6 (Progress §); autonomous until the first full game checkpoint.
@@ -65,3 +65,7 @@ FAST: parse + 1–3 теста production-логики, цель 10–15 с; з�
 - PLAYTEST package (checkpoint 1): launch from this worktree hits the cache (`REGION_READY source=cache seconds=2.091`, key `aa78f20a…`). 5/5 Vulkan PLACEMENT captures, stderr empty: `outputs/bc2-evidence/c1/captures/` (overview, join from the road, steepest point 9 %, middle, towards the second join) — not ride evidence. Input rides both ways NOT RUN (D-6): the Director rides.
 - Known (non-critical, backlog): the line is gentle and fairly straight — the cost model prefers the easiest ground; character (linked turns, profile changes) is the TECHNICAL checkpoint's work. HUD text cut at 1280 px. The capture tool's bike views stayed first-person.
 - STOP: Director playtest of checkpoint 1.
+
+**Checkpoint 1 — ACCEPTED (PLAYTEST), Game Director 2026-10-14** (commits `979192d`, dev spawn launcher `aea8288`). Ride notes: joins to the road network convenient; the trail looks natural; riding is fine but not especially interesting; relief is hardly felt; sometimes there is a wish to take the trail instead of the road. Accepted at this stage; this trail is not to be reworked for a higher subjective score. Flat relief on SINGLETRACK is a known limitation of the current region, not a blocker for TECHNICAL.
+
+**Checkpoint 2 (TECHNICAL) — Director brief 2026-10-14.** A genuinely different riding character (not width, surface or formal limits): find the most suitable place in the existing region, use real relief, turns, longitudinal and side slopes and natural features; rideable entry/exit, accessible return, calm Slow Cycle character, no bike park. If geography limits quality, use the best existing place; no global terrain rework, no BC3 work — evidence and options if the main task cannot be met.

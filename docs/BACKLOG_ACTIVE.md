@@ -8,7 +8,7 @@ STATUS: CURRENT (D3 Fast Cycle, 2026-10-14). One line per item; remove an item w
 |---|---|---|---|
 | N-1 | 184729 (0,0), region HUD | The top summary label is cut at the right edge at 1280 × 720 (long trail id makes it longer) | BC2 c1 captures |
 | N-2 | `tools/dev/capture_bc2.gd` | Bike placement shots stay in the first-person view (toggle not applied); views are still usable | BC2 c1 captures |
-| N-3 | 184729 `trail:st_6_9_…` | Procedural SINGLETRACK is gentle and fairly straight (cost prefers easy ground); character expected from TECHNICAL / network checkpoints, revisit after the ride | BC2 c1 |
+| N-3 | 184729 `trail:st_6_9_…` | Procedural SINGLETRACK rides fine but is not especially interesting, relief hardly felt (Director ride, c1 ACCEPTED); known limit of the region's valley floor — not to be tuned per trail | BC2 c1 playtest |
 
 ## DEEP checks NOT RUN (owed, never PASS)
 
