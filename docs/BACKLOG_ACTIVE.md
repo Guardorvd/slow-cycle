@@ -8,6 +8,7 @@ STATUS: CURRENT (D3 Fast Cycle, 2026-10-14). One line per item; remove an item w
 |---|---|---|---|
 | N-1 | 184729 (0,0), region HUD | The top summary label is cut at the right edge at 1280 × 720 (long trail id makes it longer) | BC2 c1 captures |
 | N-4 | player presentation, 184729 TECHNICAL 23 % pitch | In the first-person view on a steep descent a dark slab (bike body) fills the lower screen; observed in placement captures only — owner: player, not changed | BC2 c2 captures |
+| N-5 | 184729 `trail:tech_9_6_…` (BC3 — world / terrain quality) | TECHNICAL descent: naturalness "more or less, acceptable" (Director ride c2); turns are S-bends — true switchbacks would need turn platforms (terrain shaping) | BC2 c2 playtest |
 | N-3 | 184729 `trail:st_6_9_…` | Procedural SINGLETRACK rides fine but is not especially interesting, relief hardly felt (Director ride, c1 ACCEPTED); known limit of the region's valley floor — not to be tuned per trail | BC2 c1 playtest |
 
 ## DEEP checks NOT RUN (owed, never PASS)

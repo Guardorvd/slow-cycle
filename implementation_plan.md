@@ -1,6 +1,6 @@
 TASK: BC2 — Procedural Natural Trail Network; ExecPlan v1.0
 DATE: 2026-10-14
-STATUS: APPROVED — checkpoint 1 ACCEPTED; checkpoint 2 (TECHNICAL) PLAYABLE, waiting for the Director's ride
+STATUS: APPROVED — checkpoints 1–2 ACCEPTED (playtest); checkpoint 3 (NETWORK) IN PROGRESS
 BRANCH: bc2-procedural-trails; BASE/HEAD: 36bf54f085b95be46b91a86d01e30f32dd4821d6 (D3)
 WORKTREE: work/slow-cycle (текущий чат)
 APPROVAL: v1.0 APPROVED by the Game Director 2026-10-14, conditions 1–6 (Progress §); autonomous until the first full game checkpoint.
@@ -81,3 +81,7 @@ FAST: parse + 1–3 теста production-логики, цель 10–15 с; з�
 - Bakes: fast path 144 s; fresh production bake 490 s (trails 112 s); both trails published first attempt; digests tiles `92ecb9bf…`, network `dcf12436…`, vegetation `72a8c863…` **equal** fast path vs fresh (second case).
 - PLAYTEST package: cache key `f5356229…`, load 2.0 s from the worktree; 5/5 Vulkan PLACEMENT captures `outputs/bc2-evidence/c2/captures2/` (overview, top join from the road, steepest 23 %, middle, towards the exit), stderr empty — not ride evidence. Input rides NOT RUN (D-6).
 - STOP: Director playtest of checkpoint 2. T2 (dev-key snapshot) not built: the fast path + unchanged production bake kept iteration at ~2.5 min / ~8 min without a runtime dev-load; recorded as not needed so far.
+
+**Checkpoint 2 — ACCEPTED (PLAYTEST), Game Director 2026-10-14** (commit `6cb6856`, tag `bc2-c2`). Ride notes: TECHNICAL really demands control, braking and line choice — yes; riding interest already better than SINGLETRACK; naturalness more or less, acceptable at this stage; road visibility good, nothing blocking. This descent is not to be reworked for visual perfection; non-critical remarks go to the backlog of their future phases.
+
+**Checkpoint 3 (NETWORK) — Director brief 2026-10-14.** A finished procedural network, not single good routes: SINGLETRACK and TECHNICAL integrated with BACKBONE/SECONDARY — real forks, alternatives, loops, accessible return, directed passability, no traps — on 184729, 2024, 3628391; generation from world data only, no per-seed tuning. Judge variety over the network as a whole (not every SINGLETRACK hard, not every TECHNICAL extreme). The procedural network becomes standard game functionality, not a dev configuration; the accepted BC1 / BC2 checkpoints stay reproducible for diagnostics. D3; repeated generation refusals: find the concrete cause, evaluate options, bring an architectural obstacle to the Director as a short decision. After checkpoint 3 BC2 should be closable (next: BC3).
