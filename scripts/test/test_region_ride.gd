@@ -87,6 +87,7 @@ func _r7_fixture() -> Dictionary:
 	var path: PackedVector3Array = Bot.route_polyline(source.route.get_data())
 	scene.set_recovery_paths([path])
 	scene.spawn_bike(path[0], path[1] - path[0])
+	scene.auto_bake = false
 	root.add_child(scene)
 	var result := {"mesh": slice.metrics.duplicate(), "route_m": Bot.polyline_length(path)}
 	for direction: String in ["forward", "reverse"]:
