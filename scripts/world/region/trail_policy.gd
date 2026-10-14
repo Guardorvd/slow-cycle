@@ -10,7 +10,8 @@ extends RefCounted
 ##
 ## Configuration (JSON object, e.g. res://resources/regions/bc2_trails.json):
 ##   {"schema": SCHEMA, "mode": "PROCEDURAL", "classes": ["SINGLETRACK"],
-##    "max_trails": int}   (per class, planned in the listed order)
+##    "max_trails": int | {class: int}}   (per class; classes planned in the
+##    listed order, a later class keeps clear of the earlier selections)
 ## The configuration is seed-independent: the region (seed, geography and its
 ## published road network) decides where trails go.
 
@@ -34,8 +35,15 @@ const LEAD_SKEW: float = 0.7
 const EXTRA_SMOOTHING: int = 2
 ## TECHNICAL ports: every ALONG_STEP_M along a whole edge.
 const ALONG_STEP_M: float = 40.0
-## Clearance (m) a later search keeps from an already selected trail.
+## Band (m) around a selected trail: later trails cross it at no less than
+## CROSS_SEARCH_DEG (search steps) / CROSS_SCREEN_DEG (the smoothed line),
+## each crossing costing W_CROSSING per metre in the band, at most
+## MAX_CROSSINGS per trail; they never run along it.
 const TRAIL_CLEAR_M: float = 10.0
+const CROSS_SEARCH_DEG: float = 45.0
+const CROSS_SCREEN_DEG: float = 40.0
+const W_CROSSING: float = 1.0
+const MAX_CROSSINGS: int = 2
 ## TECHNICAL linked turns: (wavelength, amplitude) of the sideways offset of
 ## the corridor, tried in this order; turn radius ~ wavelength^2 / (4 pi^2
 ## amplitude) - 14.8 m (54, 5) down to 6.8 m (40, 6); the screen decides.
@@ -47,6 +55,26 @@ const TURN_WINDOW_M: float = 12.0
 const TURN_MIN_DEG: float = 25.0
 ## Descent counted as steep (rise over run, 4 m windows).
 const STEEP_DESCENT: float = 0.12
+## SINGLETRACK pairs along edges: one per pair of STRETCH_M edge stretches.
+const STRETCH_M: float = 150.0
+## Destinations (TrailNetworkPlanner._destinations): lattice step, top
+## radius, prominence ring, minimum prominence, gentle top, how many, and
+## the reach of a port (min, max) and apex angle (min, max, deg) of a loop;
+## SINGLETRACK loops rise at least DEST_RISE_MIN_M and climb at most
+## DEST_CLIMB on average.
+const DEST_STEP_M: float = 24.0
+const DEST_TOP_M: float = 24.0
+const DEST_RING_M: float = 72.0
+const DEST_PROMINENCE_M: float = 5.0
+const DEST_TOP_RISE_M: float = 1.5
+const DEST_OPEN_SHARE: float = 0.25
+const DEST_TOP_SLOPE: float = 0.12
+const DEST_MAX: int = 24
+const DEST_REACH_M := Vector2(90.0, 420.0)
+const DEST_APEX_DEG := Vector2(55.0, 150.0)
+const DEST_RISE_MIN_M: float = 4.0
+const DEST_CLIMB: float = 0.09
+const DEST_RISE_MAX_M: float = 40.0
 ## Largest ground slope from the road edge to the port (shoulder / earthwork).
 const PORT_SHOULDER_MAX: float = 0.22
 
@@ -58,6 +86,8 @@ const SEARCH_BUDGET: int = 90000
 ## Pairs searched / exactly checked per bake (work budget).
 const MAX_SEARCHES: int = 40
 const MAX_CHECKS: int = 8
+## Destination pairs searched per class (their own budget).
+const DEST_MAX_SEARCHES: int = 16
 ## Clearance (m) from water and from road planes (except at the ports).
 const WATER_CLEAR_M: float = 3.0
 const ROAD_CLEAR_M: float = 6.0
@@ -65,18 +95,21 @@ const ROAD_CLEAR_M: float = 6.0
 ## road shoulder).
 const ROAD_NEAR_M: float = 18.0
 
-## Class profiles. grade_* are rise over run on the published ground between
+## Class profiles. SINGLETRACK climb_mean_max: the average grade a two-way
+## pair may need along its straight line - the measured sustained climb on
+## rough ground (5.6 deg, RoadSynthesisPolicy.MEASUREMENT).
+## grade_* are rise over run on the published ground between
 ## search cells; cross_* the side slope across the step; length / straight
 ## distances in m; detour = road distance / straight distance between ports.
 const PROFILES := {
 	"SINGLETRACK": {
-		"route_class": Graph.RouteClass.SINGLETRACK, "directed": false, "id_prefix": "st",
+		"route_class": Graph.RouteClass.SINGLETRACK, "directed": false, "along": false, "id_prefix": "st",
 		"half_width_m": 0.65,
 		"grade_pref": 0.07, "grade_hard": 0.135,
 		"cross_pref": 0.12, "cross_hard": 0.28,
 		"w_grade": 1.2, "w_cross": 0.8, "w_road_near": 0.6,
 		"straight_min_m": 140.0, "straight_max_m": 520.0,
-		"detour_min": 1.45, "gain_min_m": 120.0,
+		"detour_min": 1.45, "gain_min_m": 120.0, "climb_mean_max": 0.098,
 		"length_min_m": 180.0, "length_max_m": 900.0,
 		"control_spacing_m": 14.0, "simplify_m": 1.5, "chaikin": 2,
 	},
@@ -85,7 +118,7 @@ const PROFILES := {
 	## drop_min_m and drop_ratio_min and a way back by road detour_min times
 	## longer than the straight distance.
 	"TECHNICAL": {
-		"route_class": Graph.RouteClass.TECHNICAL, "directed": true, "id_prefix": "tech",
+		"route_class": Graph.RouteClass.TECHNICAL, "directed": true, "along": true, "id_prefix": "tech",
 		"half_width_m": 0.5,
 		"grade_pref": 0.10, "grade_hard": 0.23, "climb_hard": 0.06,
 		"descent_target": 0.15, "descent_band": 0.08,
@@ -108,10 +141,19 @@ static func parse(value: Variant) -> Dictionary:
 	for name: Variant in classes:
 		if not name is String or not CLASSES.has(name):
 			return {"is_valid": false, "reason_code": "ERR_TRAIL_INPUT", "detail": {"stage": "class", "value": str(name)}}
-	var count: Variant = value.get("max_trails", 1)
-	if not (count is int or (count is float and count == floorf(count))) or int(count) < 1 or int(count) > MAX_TRAILS_LIMIT:
-		return {"is_valid": false, "reason_code": "ERR_TRAIL_INPUT", "detail": {"stage": "max_trails", "value": str(count)}}
+	var limit: Variant = value.get("max_trails", 1)
+	for name: String in classes:
+		var count: Variant = limit.get(name, 0) if limit is Dictionary else limit
+		if not (count is int or (count is float and count == floorf(count))) or int(count) < 1 or int(count) > MAX_TRAILS_LIMIT:
+			return {"is_valid": false, "reason_code": "ERR_TRAIL_INPUT", "detail": {"stage": "max_trails", "class": name, "value": str(count)}}
 	return {"is_valid": true, "reason_code": "", "config": value}
+
+
+## Trails wanted of a class: max_trails as one number for every class or
+## {class: number} (a parsed configuration).
+static func wanted(config: Dictionary, class_name_value: String) -> int:
+	var limit: Variant = config.get("max_trails", 1)
+	return int(limit.get(class_name_value, 0) if limit is Dictionary else limit)
 
 
 static func is_procedural(value: Variant) -> bool:

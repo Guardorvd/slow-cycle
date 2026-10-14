@@ -498,6 +498,237 @@ func with_trails(trails: Array) -> Dictionary:
 	return {"is_valid": true, "network": network, "reason_code": ""}
 
 
+## BC2: the directed riding graph of a network's data (get_data()) with its
+## trails, and what it offers (pure; not stored in the data, so a network's
+## bytes do not change). Vertices: the road nodes and every trail join; each
+## edge piece is split at the stations of the joins on it into road arcs
+## ridden both ways (a join on a junction movement is its node). A trail is
+## an arc between its two joins - split where it crosses another trail into
+## pieces meeting at a crossing vertex (a fork off the road) - both ways or
+## FORWARD only by its
+## directions. Returns {vertices, arcs, strongly_connected, traps: [vertex
+## ids not mutually reachable with the rest], cycles_road, cycles (both
+## undirected cyclomatic numbers), trail_loops, forks (joins and crossings),
+## crossings, trails:
+## [{id, class, directions, length_m, road_m (shortest road-only way between
+## its joins), return_m (shortest directed way back from its exit to its
+## entry, INF when there is none)}], classes: {class: count}}.
+static func trail_graph(data: Dictionary) -> Dictionary:
+	var designs: Dictionary = {}
+	for piece: Dictionary in data.pieces:
+		designs[piece.id] = piece.design
+	var vertices: Dictionary = {}
+	for node: Dictionary in data.nodes:
+		vertices["n%d" % node.id] = true
+	# Join vertices on edge pieces, by station.
+	var splits: Dictionary = {}
+	var join_vertex: Dictionary = {}
+	for trail: Dictionary in data.get("trails", []):
+		for end in range(trail.joins.size()):
+			var join: Dictionary = trail.joins[end]
+			var vertex: String = ""
+			var piece: String = str(join.piece)
+			if piece.begins_with("edge:") and designs.has(piece):
+				var station: float = _station_of(designs[piece], Vector2(join.x_m, join.z_m))
+				vertex = "j:%s:%d" % [trail.id, end]
+				if not splits.has(piece):
+					splits[piece] = []
+				splits[piece].append([station, vertex])
+			else:
+				vertex = "n%d" % int(trail.nodes[end])
+			vertices[vertex] = true
+			join_vertex["%s:%d" % [trail.id, end]] = vertex
+	var arcs: Array = []
+	var road_arcs: Array = []
+	for edge: Dictionary in data.edges:
+		var d: Dictionary = designs.get(edge.piece_id, {})
+		var length: float = edge.length_m
+		var a_first: bool = true
+		if not d.is_empty():
+			length = d.s[d.s.size() - 1]
+			var start := Vector2(d.x[0], d.z[0])
+			a_first = _node_distance(data, edge.a, start) <= _node_distance(data, edge.b, start)
+		var chain: Array = [[0.0, "n%d" % edge.a]]
+		for split: Array in splits.get(edge.piece_id, []):
+			chain.append([split[0] if a_first else length - split[0], split[1]])
+		chain.sort_custom(func(p: Array, q: Array) -> bool: return p[0] < q[0] or (p[0] == q[0] and p[1] < q[1]))
+		chain.append([length, "n%d" % edge.b])
+		for k in range(chain.size() - 1):
+			road_arcs.append([chain[k][1], chain[k + 1][1], maxf(chain[k + 1][0] - chain[k][0], 0.0)])
+	for arc: Array in road_arcs:
+		arcs.append(arc)
+		arcs.append([arc[1], arc[0], arc[2]])
+	var both_ways: Array = arcs.duplicate()
+	var road_ids: Array = vertices.keys()
+	# Trail crossings: a vertex on both trails, splitting each.
+	var stops: Dictionary = {}
+	var list: Array = data.get("trails", [])
+	var crossings: int = 0
+	for i in range(list.size()):
+		for j in range(i + 1, list.size()):
+			for hit: Array in _line_crossings(list[i].line, list[j].line):
+				var vertex: String = "x:%s:%s:%d" % [list[i].id, list[j].id, crossings]
+				crossings += 1
+				vertices[vertex] = true
+				for side: Array in [[list[i].id, hit[0]], [list[j].id, hit[1]]]:
+					if not stops.has(side[0]):
+						stops[side[0]] = []
+					stops[side[0]].append([side[1], vertex])
+	var classes: Dictionary = {}
+	var undirected: Array = road_arcs.duplicate()
+	for trail: Dictionary in list:
+		var chain: Array = [[0.0, join_vertex["%s:0" % trail.id]]]
+		chain.append_array(stops.get(trail.id, []))
+		chain.sort_custom(func(p: Array, q: Array) -> bool: return p[0] < q[0])
+		chain.append([trail.length_m, join_vertex["%s:1" % trail.id]])
+		for k in range(chain.size() - 1):
+			var piece_m: float = maxf(chain[k + 1][0] - chain[k][0], 0.0)
+			arcs.append([chain[k][1], chain[k + 1][1], piece_m])
+			if "REVERSE" in trail.directions:
+				arcs.append([chain[k + 1][1], chain[k][1], piece_m])
+			undirected.append([chain[k][1], chain[k + 1][1], piece_m])
+		var name: String = trail.get("class_name", "SINGLETRACK")
+		classes[name] = classes.get(name, 0) + 1
+	var trails: Array = []
+	for trail: Dictionary in data.get("trails", []):
+		var entry: String = join_vertex["%s:0" % trail.id]
+		var exit: String = join_vertex["%s:1" % trail.id]
+		trails.append({"id": trail.id, "class": trail.get("class_name", "SINGLETRACK"), "directions": trail.directions.duplicate(), "length_m": trail.length_m,
+			"road_m": _shortest(both_ways, entry).get(exit, INF), "return_m": _shortest(arcs, exit).get(entry, INF)})
+	var ids: Array = vertices.keys()
+	ids.sort()
+	var forward: Dictionary = _reach(arcs, ids[0], false)
+	var backward: Dictionary = _reach(arcs, ids[0], true)
+	var traps: Array = ids.filter(func(v: String) -> bool: return not forward.has(v) or not backward.has(v))
+	# Road vertices: the nodes and the join splits (crossings lie off the road).
+	var cycles_road: int = road_arcs.size() - road_ids.size() + _components(road_arcs, road_ids)
+	var cycles: int = undirected.size() - ids.size() + _components(undirected, ids)
+	return {"vertices": ids.size(), "arcs": arcs.size(), "strongly_connected": traps.is_empty(), "traps": traps, "cycles_road": cycles_road, "cycles": cycles,
+		"trail_loops": cycles - cycles_road, "forks": join_vertex.size() + crossings, "crossings": crossings, "trails": trails, "classes": classes}
+
+
+## Crossings of two trail lines: [[station on a, station on b]], in order
+## along a (segments culled by chunk bounds).
+static func _line_crossings(a: Dictionary, b: Dictionary) -> Array:
+	var out: Array = []
+	var chunk: int = 16
+	var boxes: Array = []
+	for j0 in range(0, b.s.size() - 1, chunk):
+		var box := Rect2(Vector2(b.x[j0], b.z[j0]), Vector2.ZERO)
+		for j in range(j0, mini(j0 + chunk, b.s.size() - 1) + 1):
+			box = box.expand(Vector2(b.x[j], b.z[j]))
+		boxes.append([j0, box.grow(0.01)])
+	for i0 in range(0, a.s.size() - 1, chunk):
+		var box_a := Rect2(Vector2(a.x[i0], a.z[i0]), Vector2.ZERO)
+		for i in range(i0, mini(i0 + chunk, a.s.size() - 1) + 1):
+			box_a = box_a.expand(Vector2(a.x[i], a.z[i]))
+		for entry: Array in boxes:
+			if not box_a.grow(0.01).intersects(entry[1]):
+				continue
+			for i in range(i0, mini(i0 + chunk, a.s.size() - 1)):
+				var p := Vector2(a.x[i], a.z[i])
+				var q := Vector2(a.x[i + 1], a.z[i + 1])
+				for j in range(entry[0], mini(entry[0] + chunk, b.s.size() - 1)):
+					var r := Vector2(b.x[j], b.z[j])
+					var t := Vector2(b.x[j + 1], b.z[j + 1])
+					var hit: Variant = Geometry2D.segment_intersects_segment(p, q, r, t)
+					if hit != null:
+						out.append([a.s[i] + p.distance_to(hit), b.s[j] + r.distance_to(hit)])
+	out.sort_custom(func(m: Array, n: Array) -> bool: return m[0] < n[0])
+	# A hit on a shared sample is found by both adjacent segments: one crossing.
+	var merged: Array = []
+	for hit: Array in out:
+		if merged.is_empty() or absf(hit[0] - merged[-1][0]) > 1.0 or absf(hit[1] - merged[-1][1]) > 1.0:
+			merged.append(hit)
+	return merged
+
+
+static func _station_of(d: Dictionary, p: Vector2) -> float:
+	var best: float = INF
+	var station: float = 0.0
+	for k in range(d.s.size() - 1):
+		var a := Vector2(d.x[k], d.z[k])
+		var b := Vector2(d.x[k + 1], d.z[k + 1])
+		var q: Vector2 = Geometry2D.get_closest_point_to_segment(p, a, b)
+		if q.distance_to(p) < best:
+			best = q.distance_to(p)
+			station = d.s[k] + a.distance_to(q)
+	return station
+
+
+static func _node_distance(data: Dictionary, id: int, p: Vector2) -> float:
+	for node: Dictionary in data.nodes:
+		if node.id == id:
+			return Vector2(node.x_m, node.z_m).distance_to(p)
+	return INF
+
+
+## Vertices reachable from `source` along arcs [from, to, length]
+## (`reverse`: against them).
+static func _reach(arcs: Array, source: String, reverse: bool) -> Dictionary:
+	var out: Dictionary = {}
+	for arc: Array in arcs:
+		var a: String = arc[1] if reverse else arc[0]
+		if not out.has(a):
+			out[a] = []
+		out[a].append(arc[0] if reverse else arc[1])
+	var seen: Dictionary = {source: true}
+	var stack: Array = [source]
+	while not stack.is_empty():
+		for next: String in out.get(stack.pop_back(), []):
+			if not seen.has(next):
+				seen[next] = true
+				stack.append(next)
+	return seen
+
+
+## Shortest directed distances from `source` (Dijkstra; small graphs).
+static func _shortest(arcs: Array, source: String) -> Dictionary:
+	var out: Dictionary = {}
+	for arc: Array in arcs:
+		if not out.has(arc[0]):
+			out[arc[0]] = []
+		out[arc[0]].append(arc)
+	var best: Dictionary = {source: 0.0}
+	var open: Array = [source]
+	while not open.is_empty():
+		var k: int = 0
+		for m in range(1, open.size()):
+			if best[open[m]] < best[open[k]]:
+				k = m
+		var vertex: String = open[k]
+		open.remove_at(k)
+		for arc: Array in out.get(vertex, []):
+			var d: float = best[vertex] + arc[2]
+			if not best.has(arc[1]) or d < best[arc[1]]:
+				if not best.has(arc[1]):
+					open.append(arc[1])
+				best[arc[1]] = d
+	return best
+
+
+## Connected components of `vertices` under undirected arcs.
+static func _components(arcs: Array, vertices: Array) -> int:
+	var parent: Dictionary = {}
+	for v: String in vertices:
+		parent[v] = v
+	var find := func(v: String) -> String:
+		while parent[v] != v:
+			v = parent[v]
+		return v
+	for arc: Array in arcs:
+		if not parent.has(arc[0]) or not parent.has(arc[1]):
+			continue
+		var a: String = find.call(arc[0])
+		var b: String = find.call(arc[1])
+		if a != b:
+			parent[a] = b
+	var roots: Dictionary = {}
+	for v: String in vertices:
+		roots[find.call(v)] = true
+	return roots.size()
+
+
 func get_trails() -> Array:
 	return _data.get("trails", []).duplicate(true)
 

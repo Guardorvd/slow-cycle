@@ -46,6 +46,9 @@ func _run() -> void:
 			break
 	if chosen.is_empty():
 		print("RIDE_TRAIL none published (", trails.size(), " trails) - normal spawn kept")
+		if not shot.is_empty():
+			await _save(shot)
+			quit(0)
 		return
 	var line: Dictionary = chosen.line
 	var n: int = line.s.size()
@@ -68,11 +71,15 @@ func _run() -> void:
 	print("RIDE_TRAIL spawn trail=%s from=%d s=%.1f point=%s" % [chosen.id, from_end, line.s[k], str(p)])
 	if shot.is_empty():
 		return
-	for _wait in range(120):
-		await physics_frame
-	await RenderingServer.frame_post_draw
-	var image: Image = root.get_viewport().get_texture().get_image()
-	image.save_png(shot)
+	await _save(shot)
 	var bike: Node3D = scene.get_bike()
 	print("RIDE_TRAIL shot=%s bike=%s ground_drift_m=%.2f" % [shot, str(bike.global_position), bike.global_position.distance_to(p)])
 	quit(0)
+
+
+func _save(shot: String) -> void:
+	for _wait in range(120):
+		await physics_frame
+	await RenderingServer.frame_post_draw
+	root.get_viewport().get_texture().get_image().save_png(shot)
+	print("RIDE_TRAIL shot=", shot)

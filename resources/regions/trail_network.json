@@ -1,0 +1,6 @@
+{
+	"schema": "slow_cycle.trail_network/1",
+	"mode": "PROCEDURAL",
+	"classes": ["TECHNICAL", "SINGLETRACK"],
+	"max_trails": {"TECHNICAL": 2, "SINGLETRACK": 3}
+}

@@ -14,10 +14,14 @@ extends Node3D
 ## transform the controller itself requests.
 ##   --seed=N (int64; default: random, logged)   --region=X,Z (default 0,0)
 ##   --bake-threads=N (default 8)
-##   --trail-config=res://... (BC1 opt-in: a TrailRealization configuration
-##   baked with the region and keyed in the cache; default off). Published
-##   trails join recovery and get a post at each end; a rejected trail leaves
-##   the region as without it and is named on screen and in the log.
+##   Trails (BC2): by default the procedural trail network
+##   (DEFAULT_TRAIL_CONFIG, TrailNetworkPlanner) is baked with the region and
+##   keyed in the cache; --trail-config=res://... bakes another configuration
+##   instead (BC1 bc1_trail_184729.json, the BC2 checkpoint configurations -
+##   diagnostics); --trails=off bakes the region without trails (the
+##   prototype-off products). Published trails join recovery and get a post
+##   at each end; a rejected trail leaves the region as without it and is
+##   named in the log.
 ## A region that cannot be generated (bake failure, crashed bake, empty
 ## network) is a recorded result, not a script failure: the screen names the
 ## seed and reason, the diagnostics are saved under user://regions/failures/
@@ -30,6 +34,8 @@ const RoadShader = preload("res://assets/shaders/region_road.gdshader")
 const SPAWN_CLEARANCE_M: float = 0.45
 const RECOVERY_BACKOFF_M: float = 20.0
 const FORD_DEPTH_M: float = 0.35
+## BC2: the standard procedural trail network.
+const DEFAULT_TRAIL_CONFIG := "res://resources/regions/trail_network.json"
 
 @export var bike_path: NodePath = NodePath("Bicycle")
 @export var auto_bake: bool = true
@@ -80,6 +86,7 @@ func _ready() -> void:
 	var threads: int = 8
 	session_seed = 0
 	var seeded: bool = false
+	trail_config_path = DEFAULT_TRAIL_CONFIG
 	for arg: String in OS.get_cmdline_user_args():
 		if arg.begins_with("--seed=") and not force_random_next:
 			session_seed = arg.substr(7).to_int()
@@ -92,6 +99,8 @@ func _ready() -> void:
 			threads = maxi(1, arg.substr(15).to_int())
 		elif arg.begins_with("--trail-config="):
 			trail_config_path = arg.substr(15)
+		elif arg == "--trails=off":
+			trail_config_path = ""
 	force_random_next = false
 	if not seeded:
 		var rng := RandomNumberGenerator.new()
@@ -198,7 +207,8 @@ func _show_summary(metrics: Dictionary) -> void:
 	var layer := CanvasLayer.new()
 	layer.layer = 19
 	var label := Label.new()
-	label.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	# Full width, centred text: long lines stay on screen (BC2 backlog N-1).
+	label.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	label.position.y = 24.0
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.add_theme_font_size_override("font_size", 20)
@@ -207,13 +217,20 @@ func _show_summary(metrics: Dictionary) -> void:
 	label.text = "Mountain River Valley · seed %d · сеть %.1f км · петли %d · %s · загрузка %.0f с (%s)" % [session_seed, metrics.component_length_m / 1000.0, metrics.cycles,
 		", ".join(metrics.classes.keys()), load_seconds, "кэш" if source == "cache" else "генерация"]
 	var trails: Dictionary = products.manifest.get("trails", {})
-	for trail: Dictionary in trails.get("published", []):
-		# BC2: procedural trails also name their class and why they exist.
-		var origin: String = "" if not trail.has("class") else " · %s · %s" % [trail.class, String(trail.purpose).get_slice(":", 0)]
-		label.text += "\nтропа %s · %s%s · %.2f км" % [trail.id, trail.mode, origin, trail.length_m / 1000.0]
 	if trails.get("procedural", false):
-		label.text += "\nпланировщик троп: вариантов отклонено %d (причины в логе REGION_TRAILS)" % trails.get("rejected", []).size()
+		# BC2: the trail network in one line - classes, length, new loops, forks.
+		var counts: Dictionary = {}
+		var length: float = 0.0
+		for trail: Dictionary in trails.get("published", []):
+			counts[trail.get("class", "SINGLETRACK")] = counts.get(trail.get("class", "SINGLETRACK"), 0) + 1
+			length += trail.length_m
+		var graph: Dictionary = trails.get("network", {})
+		var classes: Array = counts.keys().map(func(name: String) -> String: return "%s %d" % [name, counts[name]])
+		label.text += "\nтропы: %s · %.1f км · новых петель %d · развилок %d%s" % [", ".join(classes) if not classes.is_empty() else "нет", length / 1000.0,
+			graph.get("trail_loops", 0), graph.get("forks", 0), "" if graph.get("strongly_connected", true) else " · ЛОВУШКИ"]
 	else:
+		for trail: Dictionary in trails.get("published", []):
+			label.text += "\nтропа %s · %s · %.2f км" % [trail.id, trail.mode, trail.length_m / 1000.0]
 		for trail: Dictionary in trails.get("rejected", []):
 			label.text += "\nтропа %s отклонена: %s" % [str(trail.id), trail.reason_code]
 	layer.add_child(label)

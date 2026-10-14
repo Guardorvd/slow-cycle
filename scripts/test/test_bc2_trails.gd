@@ -215,8 +215,8 @@ func _domain() -> Dictionary:
 	_check(is_equal_approx(Surface.ground_height(ground, 0.0, 0.0), 10.0) and is_equal_approx(Surface.ground_height(ground, 512.0, 512.0), 30.0), "raster corners")
 	_check(absf(Surface.ground_height(ground, 256.0, 100.0) - (10.0 + 20.0 * 256.0 / 512.0)) < 1e-3, "raster plane interpolation", Surface.ground_height(ground, 256.0, 100.0))
 	_check(is_nan(Surface.ground_height(ground, 600.0, 10.0)), "outside the raster is NAN")
-	# 6. TECHNICAL on a terrace scarp (both classes planned, SINGLETRACK first).
-	var both: Dictionary = TrailPolicy.parse({"schema": TrailPolicy.SCHEMA, "mode": "PROCEDURAL", "classes": ["SINGLETRACK", "TECHNICAL"], "max_trails": 1}).config
+	# 6. TECHNICAL on a terrace scarp (class interplay: test_region_network).
+	var both: Dictionary = TrailPolicy.parse({"schema": TrailPolicy.SCHEMA, "mode": "PROCEDURAL", "classes": ["TECHNICAL"], "max_trails": 1}).config
 	var scarp_world: Dictionary = _world(Rect2(), true)
 	var scarp_plan: Dictionary = Planner.plan(both, scarp_world)
 	var techs: Array = scarp_plan.trails.filter(func(t: Dictionary) -> bool: return t.class_name == "TECHNICAL")

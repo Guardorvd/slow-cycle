@@ -9,10 +9,12 @@ extends SceneTree
 ## is saved, reloaded and printed as a CAPTURE receipt.
 ##   godot --path . --script res://tools/dev/capture_bc2.gd -- --seed=S
 ##       --trail-config=res://... --out=ABS_DIR [--trail=ID]
+##       [--views=overview,join1_from_road,steepest,middle,toward_join2]
 const WorldScene = preload("res://scenes/region/region_world.tscn")
 
 var _out: String = ""
 var _only: String = ""
+var _views: Array = ["overview", "join1_from_road", "steepest", "middle", "toward_join2"]
 var _count: int = 0
 var _scene: Node3D
 
@@ -27,6 +29,8 @@ func _run() -> void:
 			_out = arg.substr(6).replace("\\", "/")
 		elif arg.begins_with("--trail="):
 			_only = arg.substr(8)
+		elif arg.begins_with("--views="):
+			_views = Array(arg.substr(8).split(","))
 	if _out.is_empty():
 		push_error("CAPTURE_FAIL ERR_CAPTURE_CLI")
 		quit(2)
@@ -47,7 +51,7 @@ func _run() -> void:
 	for trail: Dictionary in trails:
 		if not _only.is_empty() and trail.id != _only:
 			continue
-		expected += 5
+		expected += _views.size()
 		await _trail_shots(trail)
 	print("CAPTURE_SUMMARY captures=%d expected=%d" % [_count, expected])
 	quit(0 if _count == expected and expected > 0 else 1)
@@ -86,7 +90,8 @@ func _trail_shots(trail: Dictionary) -> void:
 	camera.look_at(middle, Vector3.UP)
 	var previous: Camera3D = root.get_viewport().get_camera_3d()
 	camera.make_current()
-	await _shot(trail, "overview", n / 2, camera)
+	if "overview" in _views:
+		await _shot(trail, "overview", n / 2, camera)
 	# Join 1 seen from the road, 18 m before the trail leaves it, looking at it.
 	var join1: Vector3 = at.call(first)
 	var road_dir: Vector3 = _road_tangent(trail.joins[0])
@@ -97,14 +102,18 @@ func _trail_shots(trail: Dictionary) -> void:
 	var stand_y: float = _ground(stand)
 	camera.global_position = Vector3(stand.x, (line.y[0] if is_nan(stand_y) else stand_y) + 1.7, stand.z)
 	camera.look_at(at.call(mini(first + 12, n - 1)) + Vector3(0.0, 0.8, 0.0), Vector3.UP)
-	await _shot(trail, "join1_from_road", first, camera)
+	if "join1_from_road" in _views:
+		await _shot(trail, "join1_from_road", first, camera)
 	if previous != null:
 		previous.make_current()
 	camera.queue_free()
 	# Bike placed on the trail, third-person camera of the bike itself.
-	await _bike_shot(trail, "steepest_%.0fpct" % (steep_grade * 100.0), steep, at, along, 1.0)
-	await _bike_shot(trail, "middle", (first + last) / 2, at, along, 1.0)
-	await _bike_shot(trail, "toward_join2", maxi(first, last - 25), at, along, 1.0)
+	if "steepest" in _views:
+		await _bike_shot(trail, "steepest_%.0fpct" % (steep_grade * 100.0), steep, at, along, 1.0)
+	if "middle" in _views:
+		await _bike_shot(trail, "middle", (first + last) / 2, at, along, 1.0)
+	if "toward_join2" in _views:
+		await _bike_shot(trail, "toward_join2", maxi(first, last - 25), at, along, 1.0)
 
 
 func _road_tangent(join: Dictionary) -> Vector3:

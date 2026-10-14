@@ -199,11 +199,11 @@ static func _trails(config: Variant, seed_value: int, region: Vector2i, network:
 
 ## BC2: trails proposed by TrailNetworkPlanner (configuration TrailPolicy) on
 ## the published ground of the off tiles, each already realized on the
-## published triangles of its zone. The planner's selection is published in
-## its order, each trail together with those already published; one rejected
-## at publication gives way to an alternate of its class (at most
-## MAX_PUBLISH_ATTEMPTS per selected trail), the rest stay unpublished
-## alternates in the report.
+## published triangles of its zone. The planner's selection is published at
+## once; a trail rejected there gives way to an alternate of its class clear
+## of the published ones (at most MAX_PUBLISH_ATTEMPTS each). The published
+## network must leave no trap (RealizedRoadNetwork.trail_graph strongly
+## connected; ERR_TRAIL_TRAP otherwise); report.network is that graph.
 static func _procedural_trails(config: Variant, context: Dictionary, network: RefCounted, surface: RefCounted, bounds: Dictionary, slots: Array, threads: int) -> Dictionary:
 	var report := {"config_sha256": JSON.stringify(config, "", true).sha256_text(), "procedural": true, "published": [], "rejected": []}
 	var unchanged := {"network": network, "surface": surface, "slots": slots, "report": report}
@@ -221,23 +221,42 @@ static func _procedural_trails(config: Variant, context: Dictionary, network: Re
 	report.planner["ground_s"] = ground_s
 	report.rejected.append_array(planned.rejected)
 	var products: Dictionary = unchanged
-	var chosen: Array = []
+	# The whole selection at once (_publish_trails drops a trail that fails and
+	# publishes the rest again without it).
+	var made: Dictionary = _publish_trails(planned.trails, {"published": [], "rejected": []}, context, network, surface, bounds, slots, threads)
+	report.rejected.append_array(made.report.rejected)
+	var done: Array = made.report.published.map(func(entry: Dictionary) -> String: return entry.id)
+	var chosen: Array = planned.trails.filter(func(trail: Dictionary) -> bool: return trail.id in done)
+	if not chosen.is_empty():
+		products = made
+	# A selected trail that failed gives way to an alternate of its class clear
+	# of the published ones.
 	for trail: Dictionary in planned.trails:
-		var options: Array = [trail] + planned.alternates.filter(func(other: Dictionary) -> bool: return other.class_name == trail.class_name)
+		if trail.id in done:
+			continue
 		var attempts: int = 0
-		for option: Dictionary in options:
+		for option: Dictionary in planned.alternates:
 			if attempts >= MAX_PUBLISH_ATTEMPTS:
 				break
-			if chosen.any(func(done: Dictionary) -> bool: return done.id == option.id):
+			if option.class_name != trail.class_name or chosen.any(func(other: Dictionary) -> bool: return other.id == option.id or not _clear_of(option, other)):
 				continue
 			attempts += 1
-			var trial := {"published": [], "rejected": []}
-			var made: Dictionary = _publish_trails(chosen + [option], trial, context, network, surface, bounds, slots, threads)
-			report.rejected.append_array(made.report.rejected)
-			if made.report.published.size() == chosen.size() + 1:
+			var again: Dictionary = _publish_trails(chosen + [option], {"published": [], "rejected": []}, context, network, surface, bounds, slots, threads)
+			report.rejected.append_array(again.report.rejected)
+			if again.report.published.size() == chosen.size() + 1:
 				chosen.append(option)
-				products = made
+				products = again
 				break
+	# No traps: every place of the riding graph reaches every other; trails
+	# are given up from the last one until it holds (atomic: the rest are
+	# published again without them).
+	var graph: Dictionary = Network.trail_graph(products.network.get_data())
+	while not graph.strongly_connected and not chosen.is_empty():
+		var dropped: Dictionary = chosen.pop_back()
+		report.rejected.append({"id": dropped.id, "reason_code": "ERR_TRAIL_TRAP", "detail": {"stage": "network", "traps": graph.traps}})
+		products = unchanged if chosen.is_empty() else _publish_trails(chosen, {"published": [], "rejected": []}, context, network, surface, bounds, slots, threads)
+		graph = Network.trail_graph(products.network.get_data())
+	report["network"] = graph
 	var ids: Array = chosen.map(func(trail: Dictionary) -> String: return trail.id)
 	report.published = products.report.published if not chosen.is_empty() else []
 	for entry: Dictionary in report.published:
@@ -251,6 +270,16 @@ static func _procedural_trails(config: Variant, context: Dictionary, network: Re
 				entry.planner[key] = trail.planner[key]
 	report["alternates"] = (planned.trails + planned.alternates).map(func(trail: Dictionary) -> String: return trail.id).filter(func(id: String) -> bool: return not id in ids)
 	return {"network": products.network, "surface": products.surface, "slots": products.slots, "report": report}
+
+
+## Two trail lines keep TrailPolicy.TRAIL_CLEAR_M apart (sampled).
+static func _clear_of(a: Dictionary, b: Dictionary) -> bool:
+	for i in range(0, a.line.s.size(), 3):
+		var p := Vector2(a.line.x[i], a.line.z[i])
+		for j in range(0, b.line.s.size(), 3):
+			if p.distance_to(Vector2(b.line.x[j], b.line.z[j])) < TrailPolicy.TRAIL_CLEAR_M:
+				return false
+	return true
 
 
 ## Publication of realized trails (BC1): shaped, tiles refined, finalized on
