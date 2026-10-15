@@ -90,7 +90,8 @@ static func _build(region_plan: RefCounted, terrain_field: RefCounted, hydrology
 			edges_ready += 1 if record.status == "READY" else 0
 		rounds.append({"round": round_index, "status": "OK", "hints": hints.size(), "score": score, "metrics": metrics, "graph_signature": routes.graph.signature(),
 			"plan_signature": synth.plan.signature(), "r6_status": synth.status, "edges": routes.graph.get_edge_count(), "edges_ready": edges_ready,
-			"seconds": {"r5": (t1 - t0) / 1e6, "r6": (t2 - t1) / 1e6, "network": (t3 - t2) / 1e6}, "r6_timings": synth.diagnostics.get("timings_s", {})})
+			"seconds": {"r5": (t1 - t0) / 1e6, "r6": (t2 - t1) / 1e6, "network": (t3 - t2) / 1e6}, "r6_timings": synth.diagnostics.get("timings_s", {}),
+			"r6_edge_work": synth.diagnostics.get("edge_work", {}), "r5_work": _r5_work(routes.diagnostics), "r6_reasons": synth.plan.get_data().reason_codes})
 		var candidate := {"score": score, "network": realized.network, "graph": routes.graph, "plan": synth.plan, "round": round_index}
 		candidates.append(candidate)
 		if best.is_empty() or score > best.score:
@@ -111,6 +112,14 @@ static func _build(region_plan: RefCounted, terrain_field: RefCounted, hydrology
 	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.score > b.score or (a.score == b.score and a.round < b.round))
 	return {"is_valid": true, "reason_code": "", "network": best.network, "graph": best.graph, "plan": best.plan, "round": best.round, "rounds": rounds, "hints": hints,
 		"candidates": candidates}
+
+
+## R5 search work and round outcomes of one plan (diagnostics only).
+static func _r5_work(diagnostics: Dictionary) -> Dictionary:
+	var m: Dictionary = diagnostics.get("metrics", {})
+	var rounds: Array = diagnostics.get("rounds", []).map(func(r: Dictionary) -> Dictionary: return {"round": r.round, "generated": r.generated, "accepted": r.accepted})
+	return {"searches": m.get("searches", 0), "expanded": m.get("expanded", 0), "regenerations": m.get("regenerations", 0), "replans": m.get("replans", 0), "rounds": rounds,
+		"composition": diagnostics.get("composition", {}), "degrade_codes": diagnostics.get("degrade_codes", [])}
 
 
 ## Lexicographic network score (higher is better).

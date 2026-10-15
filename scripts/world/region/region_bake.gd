@@ -728,5 +728,6 @@ static func _round_summaries(rounds: Array) -> Array:
 	for r: Dictionary in rounds:
 		var m: Dictionary = r.get("metrics", {})
 		out.append({"round": r.round, "status": r.status, "hints": r.get("hints", 0), "score": r.get("score", []), "edges": r.get("edges", 0), "edges_ready": r.get("edges_ready", 0),
-			"seconds": r.get("seconds", {}), "component_length_m": m.get("component_length_m", 0.0), "cycles": m.get("cycles", 0), "classes": m.get("classes", {})})
+			"seconds": r.get("seconds", {}), "r6_timings": r.get("r6_timings", {}), "r6_edge_work": r.get("r6_edge_work", {}), "r5_work": r.get("r5_work", {}),
+			"r6_reasons": r.get("r6_reasons", []), "component_length_m": m.get("component_length_m", 0.0), "cycles": m.get("cycles", 0), "classes": m.get("classes", {})})
 	return out
