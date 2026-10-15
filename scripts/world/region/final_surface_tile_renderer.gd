@@ -40,6 +40,10 @@ var _inside: Dictionary = {}
 var _border_made: Dictionary = {}
 ## Bench displacement applied to each vertex (step 2b; 0 elsewhere).
 var _shift: Dictionary = {}
+## Trail index blocks (TRAIL_BLOCK cells a side) holding at least one indexed
+## cell: a triangle whose cell range touches none of them has no trail gap.
+var _trail_blocks: Dictionary = {}
+const TRAIL_BLOCK: int = 16
 
 static func tile_arrays(surface: RefCounted, tx: int, tz: int) -> Dictionary:
 	var builder := FinalSurfaceTileRenderer.new()
@@ -68,6 +72,16 @@ static func refine_arrays(surface: RefCounted, arrays: Array, tx: int, tz: int, 
 	builder._indices = arrays[Mesh.ARRAY_INDEX].duplicate()
 	builder._normals.resize(builder._vertices.size())
 	return builder._finish(tx, tz, forced)
+
+## The `forced` points on the border of the tile at `origin` (world), in
+## `forced` order: the only part of `forced` its refinement depends on.
+static func forced_on_border(origin: Vector2, forced: Dictionary) -> Array:
+	var tile := Rect2(origin, Vector2(TILE_SIZE_M, TILE_SIZE_M))
+	var mine: Array = []
+	for point: Vector2 in forced:
+		if tile.grow(0.001).has_point(point) and not tile.grow(-0.001).has_point(point):
+			mine.append(point)
+	return mine
 
 ## Trail refinement (surfaces with trails), then normals and arrays.
 func _finish(tx: int, tz: int, forced: Dictionary) -> Dictionary:
@@ -249,11 +263,7 @@ func _refine_trails(forced: Dictionary) -> void:
 		var line: Dictionary = trail.line
 		for k in range(line.s.size()):
 			near = near or reach.grow(trail.half_width_m).has_point(Vector2(line.x[k], line.z[k]))
-	var tile := Rect2(_origin, Vector2(TILE_SIZE_M, TILE_SIZE_M))
-	var mine: Array = []
-	for point: Vector2 in forced:
-		if tile.grow(0.001).has_point(point) and not tile.grow(-0.001).has_point(point):
-			mine.append(point)
+	var mine: Array = forced_on_border(_origin, forced)
 	if not near and mine.is_empty():
 		return
 	_tri = _indices.duplicate()
@@ -285,11 +295,16 @@ func _refine_trails(forced: Dictionary) -> void:
 				_fail_trail("forced point %s on no border edge" % str(point))
 				return
 	# 2. Longest-edge refinement near the bands.
+	_trail_blocks.clear()
+	for cell: Vector2i in _surface._trail_index:
+		if not (_surface._trail_index[cell] as PackedInt32Array).is_empty():
+			_trail_blocks[Vector2i(floori(cell.x / float(TRAIL_BLOCK)), floori(cell.y / float(TRAIL_BLOCK)))] = true
 	var t: int = 0
 	while t < _tri.size() / 3:
 		if _tri[3 * t] >= 0 and _edge_length(_longest(t)) > TRAIL_EDGE_M:
 			var corners: Array[Vector2] = [_world(_tri[3 * t]), _world(_tri[3 * t + 1]), _world(_tri[3 * t + 2])]
-			if _surface.trail_triangle_gap(corners[0], corners[1], corners[2]) <= TRAIL_REFINE_M or _surface.trail_bench_gap(corners[0], corners[1], corners[2]) <= TRAIL_EDGE_M:
+			if _trail_cells(corners[0], corners[1], corners[2]) and (_surface.trail_triangle_gap(corners[0], corners[1], corners[2]) <= TRAIL_REFINE_M \
+					or _surface.trail_bench_gap(corners[0], corners[1], corners[2]) <= TRAIL_EDGE_M):
 				_lepp(t, bad, 0)
 				if not _reason.is_empty():
 					return
@@ -303,15 +318,27 @@ func _refine_trails(forced: Dictionary) -> void:
 			moved.y += d
 			_vertices[v] = moved
 			_shift[v] = d
-	# 3. Clip at the band edges.
+	# 3. Clip at the band edges (band state per existing vertex: 0 unknown,
+	# 1 outside, 2 inside; corners of these triangles all exist already).
 	var count: int = _tri.size() / 3
+	var state := PackedByteArray()
+	state.resize(_vertices.size())
 	for q in range(count):
-		if _tri[3 * q] < 0:
+		var c0: int = _tri[3 * q]
+		if c0 < 0:
 			continue
-		var corners: Array[int] = [_tri[3 * q], _tri[3 * q + 1], _tri[3 * q + 2]]
-		var inside: Array[bool] = [_in_band(corners[0]), _in_band(corners[1]), _in_band(corners[2])]
-		if inside[0] == inside[1] and inside[1] == inside[2]:
+		var c1: int = _tri[3 * q + 1]
+		var c2: int = _tri[3 * q + 2]
+		if state[c0] == 0:
+			state[c0] = 2 if _in_band(c0) else 1
+		if state[c1] == 0:
+			state[c1] = 2 if _in_band(c1) else 1
+		if state[c2] == 0:
+			state[c2] = 2 if _in_band(c2) else 1
+		if state[c0] == state[c1] and state[c1] == state[c2]:
 			continue
+		var corners: Array[int] = [c0, c1, c2]
+		var inside: Array[bool] = [state[c0] == 2, state[c1] == 2, state[c2] == 2]
 		var band: Array[int] = []
 		var rest: Array[int] = []
 		for k in range(3):
@@ -342,6 +369,25 @@ func _refine_trails(forced: Dictionary) -> void:
 			_emit(_tri[3 * q], _tri[3 * q + 1], _tri[3 * q + 2])
 	_normals = PackedVector3Array()
 	_normals.resize(_vertices.size())
+
+## False when the trail-index cell range of the world triangle (the cells
+## FinalSurface.trail_triangle_gap visits) lies in blocks without any indexed
+## cell: then both trail gaps are INF.
+func _trail_cells(a: Vector2, b: Vector2, c: Vector2) -> bool:
+	var o := Vector2(_surface._bounds.min_x, _surface._bounds.min_z)
+	var la: Vector2 = a - o
+	var lb: Vector2 = b - o
+	var lc: Vector2 = c - o
+	var cell: float = _surface.TRAIL_CELL_M
+	var i0: int = floori(int(floor(minf(la.x, minf(lb.x, lc.x)) / cell)) / float(TRAIL_BLOCK))
+	var i1: int = floori(int(floor(maxf(la.x, maxf(lb.x, lc.x)) / cell)) / float(TRAIL_BLOCK))
+	var j0: int = floori(int(floor(minf(la.y, minf(lb.y, lc.y)) / cell)) / float(TRAIL_BLOCK))
+	var j1: int = floori(int(floor(maxf(la.y, maxf(lb.y, lc.y)) / cell)) / float(TRAIL_BLOCK))
+	for j in range(j0, j1 + 1):
+		for i in range(i0, i1 + 1):
+			if _trail_blocks.has(Vector2i(i, j)):
+				return true
+	return false
 
 func _is_vertex_on_border(point: Vector2) -> bool:
 	var local: Vector2 = point - _origin
@@ -501,8 +547,7 @@ func _in_band(v: int) -> bool:
 	if _inside.has(v):
 		return _inside[v]
 	var world: Vector2 = _world(v)
-	var nearest: Dictionary = _surface.trail_near(world.x, world.y)
-	var inside: bool = not nearest.is_empty() and nearest.distance <= nearest.half_width
+	var inside: bool = _surface.trail_inside(world.x, world.y)
 	_inside[v] = inside
 	return inside
 
@@ -530,8 +575,7 @@ func _band_point(a: int, b: int) -> int:
 		var mid: float = 0.5 * (lo + hi)
 		var x: float = pa.x + (pb.x - pa.x) * mid
 		var z: float = pa.y + (pb.y - pa.y) * mid
-		var nearest: Dictionary = _surface.trail_near(x, z)
-		var inside: bool = not nearest.is_empty() and nearest.distance <= nearest.half_width
+		var inside: bool = _surface.trail_inside(x, z)
 		if inside == start_inside:
 			lo = mid
 		else:

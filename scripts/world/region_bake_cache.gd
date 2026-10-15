@@ -42,7 +42,7 @@ static func _collect(directory: String, paths: Array[String]) -> void:
 	if dir == null:
 		return
 	for file: String in dir.get_files():
-		if file.get_extension() in ["gd", "gdshader", "tres", "res", "json", "cfg", "csv"]:
+		if file.get_extension() in ["gd", "cs", "gdshader", "tres", "res", "json", "cfg", "csv"]:
 			paths.append(directory.path_join(file))
 	for sub: String in dir.get_directories():
 		_collect(directory.path_join(sub), paths)
@@ -53,12 +53,14 @@ static func trail_settings(path: String) -> Dictionary:
 	return {"trail_config": path, "trail_sha256": FileAccess.get_sha256(path)}
 
 
-static func directory_of(cache_key: String) -> String:
-	return ROOT.path_join(cache_key)
+## `root`: ROOT for production; RegionStageCache.DEV_ROOT for dev stage-reuse
+## products (never read by a normal launch).
+static func directory_of(cache_key: String, root: String = ROOT) -> String:
+	return root.path_join(cache_key)
 
 
-static func save(cache_key: String, baked: Dictionary) -> Dictionary:
-	var dir: String = directory_of(cache_key)
+static func save(cache_key: String, baked: Dictionary, root: String = ROOT) -> Dictionary:
+	var dir: String = directory_of(cache_key, root)
 	DirAccess.make_dir_recursive_absolute(dir)
 	var files: Dictionary = {}
 	var network_bytes: PackedByteArray = baked.network.to_bytes()
@@ -122,13 +124,16 @@ static func _sha(bytes: PackedByteArray) -> String:
 ## Returns the bake products ({manifest, network, tiles, bridges, water, spawn,
 ## vegetation})
 ## or {is_valid: false, reason_code: ERR_BAKE_STALE}.
-static func load_products(cache_key: String) -> Dictionary:
+static func load_products(cache_key: String, root: String = ROOT) -> Dictionary:
 	var stale := {"is_valid": false, "reason_code": "ERR_BAKE_STALE"}
-	var dir: String = directory_of(cache_key)
+	var dir: String = directory_of(cache_key, root)
 	if not FileAccess.file_exists(dir.path_join("manifest.json")):
 		return stale
 	var manifest: Variant = JSON.parse_string(FileAccess.get_file_as_string(dir.path_join("manifest.json")))
 	if not manifest is Dictionary or manifest.get("cache_key", "") != cache_key or manifest.get("schema", "") != Bake.SCHEMA:
+		return stale
+	# Dev stage-reuse products answer only a dev read, never a production one.
+	if manifest.has("dev_stage_reuse") != (root != ROOT):
 		return stale
 	var files: Dictionary = manifest.get("files", {})
 	var network_bytes: Variant = null

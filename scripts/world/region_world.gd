@@ -22,6 +22,9 @@ extends Node3D
 ##   prototype-off products). Published trails join recovery and get a post
 ##   at each end; a rejected trail leaves the region as without it and is
 ##   named in the log.
+##   --dev-cache: when the production cache misses, load the dev stage-reuse
+##   products of the same key (tools/dev/dev_bake.gd; never written by a
+##   normal launch, never read without this flag).
 ## A region that cannot be generated (bake failure, crashed bake, empty
 ## network) is a recorded result, not a script failure: the screen names the
 ## seed and reason, the diagnostics are saved under user://regions/failures/
@@ -29,6 +32,7 @@ extends Node3D
 
 const Bake = preload("res://scripts/world/region/region_bake.gd")
 const Cache = preload("res://scripts/world/region_bake_cache.gd")
+const StageCache = preload("res://scripts/world/region_stage_cache.gd")
 const Streamer = preload("res://scripts/world/region_streamer.gd")
 const RoadShader = preload("res://assets/shaders/region_road.gdshader")
 const SPAWN_CLEARANCE_M: float = 0.45
@@ -86,6 +90,7 @@ func _ready() -> void:
 	var threads: int = 8
 	session_seed = 0
 	var seeded: bool = false
+	var dev_cache: bool = false
 	trail_config_path = DEFAULT_TRAIL_CONFIG
 	for arg: String in OS.get_cmdline_user_args():
 		if arg.begins_with("--seed=") and not force_random_next:
@@ -101,6 +106,8 @@ func _ready() -> void:
 			trail_config_path = arg.substr(15)
 		elif arg == "--trails=off":
 			trail_config_path = ""
+		elif arg == "--dev-cache":
+			dev_cache = true
 	force_random_next = false
 	if not seeded:
 		var rng := RandomNumberGenerator.new()
@@ -115,6 +122,13 @@ func _ready() -> void:
 		source = "cache"
 		_finish_load(cached)
 		return
+	if dev_cache:
+		cached = Cache.load_products(key, StageCache.DEV_ROOT)
+		if cached.is_valid:
+			source = "dev-cache"
+			print("REGION_DEV_CACHE key=%s stages=%s" % [key, JSON.stringify(cached.manifest.dev_stage_reuse.get("stages", {}))])
+			_finish_load(cached)
+			return
 	source = "bake"
 	_job = BakeJob.new()
 	_job.seed_value = session_seed
@@ -227,7 +241,7 @@ func _show_summary(metrics: Dictionary) -> void:
 	label.add_theme_color_override("font_outline_color", Color.BLACK)
 	label.add_theme_constant_override("outline_size", 6)
 	label.text = "Mountain River Valley · seed %d · сеть %.1f км · петли %d · %s · загрузка %.0f с (%s)" % [session_seed, metrics.component_length_m / 1000.0, metrics.cycles,
-		", ".join(metrics.classes.keys()), load_seconds, "кэш" if source == "cache" else "генерация"]
+		", ".join(metrics.classes.keys()), load_seconds, "кэш" if source == "cache" else ("dev-кэш (stage reuse)" if source == "dev-cache" else "генерация")]
 	var trails: Dictionary = products.manifest.get("trails", {})
 	if trails.get("procedural", false):
 		# BC2: the trail network in one line - classes, length, new loops, forks.

@@ -3,6 +3,7 @@ DATE: 2026-10-15
 STATUS: PLAN_ONLY — awaiting Game Director approval (AGENTS.md: new phase → compact ExecPlan, STOP)
 BRANCH/BASE: bc2-stabilization-perf (post-BC2 A + B1) on master e7730ca
 PREVIOUS: [BC2](docs/plans/completed/BC2.md) COMPLETE (playtest-accepted); post-BC2 stabilization A1–A6 + B1 counters; ENGINEERED-only experiment not adopted ([record](docs/investigations/POST_BC2_PERF.md)).
+ALSO PLAN_ONLY (2026-10-15): PERF-P2 natural route intents, at the end of this file (PERFORMANCE FIRST part 2; answers D4 below). Branch `perf-first`.
 
 ---
 
@@ -55,3 +56,58 @@ Director playtest acceptance of S1–S4 (S5 decision recorded); backlog updated;
 - **D2** Relief placement: meso upstream (re-rolls existing seeds incl. 184729) + micro in FinalSurface on a refined riding zone (recommended), or micro only (keeps routes, less relief).
 - **D3** Accept vegetation/tile digest changes and a bake-time budget for relief (proposal: ≤ +20 % bake, no frame-time regression).
 - **D4** ENGINEERED-only R5/R6: not adopted (record); confirm, or fund a road-model change as its own task.
+
+---
+
+TASK: PERF-P2 — Natural route intents: R5 keeps them, R6 does not design them, trails realize them
+DATE: 2026-10-15
+STATUS: PLAN_ONLY — awaiting Game Director approval (PERFORMANCE FIRST part 2: substantial R5 → R6 → BC2 interaction change)
+BRANCH/BASE: `perf-first` (stage reuse, C# terrain kernel, ROADS stop rule; [record](docs/investigations/PERF_FIRST.md))
+
+## Goal
+
+Cold bakes of rugged regions stop paying for R6 designs of SINGLETRACK / TECHNICAL road edges that fail, while every natural route R5 finds can still become a published trail, and none appears as a road it is not.
+
+## Current state (measured, Linux, 4 threads, `perf-first`)
+
+- 3628391 (3,−2): network 347 s of a 553 s bake; R6 102 / 100 / 71 s per round, mostly natural edges that end REPLAN_REQUIRED (B1: SINGLETRACK 426 CPU-s, 94 % failed; TECHNICAL 90 CPU-s, 100 % failed). The ROADS stop rule does not help: only round 2 meets N1–N6.
+- 184729: natural edges are cheap (≈ 3 s per round); the ROADS stop rule already removed the useless third round (network 109 → 62 s, same result).
+- No chosen production network contains a READY SINGLETRACK / TECHNICAL road edge; all natural riding is BC2 trails (`TrailNetworkPlanner` pairs ports on the road network by detour / gain / descent filters, `TrailRealization` publishes).
+- Coupling (R6_ENGINEERED experiment): skipping those designs changes round hints and junction outcomes, so later rounds differ; 184729 lost two trails. A speed-up that re-rolls accepted regions is not acceptable silently.
+
+## Target behaviour and exclusions
+
+- R5 plans every class as today. R6 records SINGLETRACK / TECHNICAL edges as `INTENT` (never READY, never pieces, never in the road network, collision or render) with the R5 polyline, class, end nodes and the reason `NATURAL_INTENT`.
+- Round hints: intents produce none (their failures were the noise that re-rolled layouts); the replan loop judges roads only (ROADS rule).
+- `TrailNetworkPlanner` takes the intents of the chosen round as first candidates of their class: ports near both intent ends, the R5 polyline as the search corridor bias; the detour / gain filters are waived for an intent pair (R5 already judged the route), every physical check stays (TrailRealization screening, publication, trap check). An intent the realization rejects is reported (`ERR_TRAIL_*` with the intent id), not published.
+- Out: changing R6 limits, road classes, R7, the vegetation model; faking READY edges or passability.
+
+## Ownership and contracts
+
+R5 owns intents (unchanged graph schema); R6 owns the INTENT record status (ADAPT `RoadSynthesizer`: skip design of natural classes); `RegionNetworkBuilder` owns the stop rule (ROADS, already on the branch); `TrailNetworkPlanner` owns turning intents into trail candidates (ADAPT: one new pair source); `RealizedRoadNetwork` exposes `intents` read-only. One-way dependencies kept: R5 → R6 → network → trails.
+
+## Files
+
+`road_synthesizer.gd`, `region_network_builder.gd`, `realized_road_network.gd` (intents passthrough), `trail_network_planner.gd`, `region_bake_trails.gd` (report), new FAST test cases in `test_bc2_trails.gd` / `test_region_network.gd` (new cases only; existing assertions unchanged). Protected: BicycleController, camera, controls, R7, renderer contracts, existing tests.
+
+## Sprints
+
+1. **S1 intents (R6/builder):** INTENT records, no hints from them. FAST + 3-seed bake table (time, roads, loops). Playtest: none (roads only).
+2. **S2 intent pairs (BC2):** intent candidates first; publish report lists intent → trail / rejection. Playtest: 184729 (0,0) and 3628391 (3,−2), 3–5 placement captures each of new / changed trails, launch command; Director ride decides.
+3. **S3 decision:** keep S1+S2 as production only if 184729 keeps ≥ TECHNICAL 2 + SINGLETRACK 2 with alternatives and loops, 3628391 keeps its TECHNICAL descent, 2024 not worse; otherwise revert to `perf-first` without S1/S2.
+
+## Risks
+
+Layout re-roll on every seed (accepted regions change; their caches re-bake); intent pairs could publish dull trails (playtest judges); 2024 N-7 stays (backbone loss is R7 / R6 BACKBONE, not intents). Confirmed trap or missing road after S2 → DEEP ride check on that seed.
+
+## Checks
+
+FAST: parse, `test_perf_dev_cache`, `test_region_stabilization`, `test_region_network --group=domain`, `test_bc2_trails --group=domain` + new intent cases. Bakes: 184729, 3628391, 2024 cold, same machine, old vs new. DEEP: none unless a risk above is confirmed.
+
+## Done
+
+Director rides 184729 and 3628391 and accepts; backlog updated; record in `docs/investigations/PERF_FIRST.md`.
+
+## Decision for the Director
+
+- **P2-1** Approve PERF-P2 S1–S3 (layouts of existing seeds may change; acceptance by ride), or keep `perf-first` as is (ROADS stop rule only; 3628391-type regions keep their R6 cost).

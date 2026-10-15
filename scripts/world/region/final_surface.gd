@@ -245,6 +245,34 @@ func _trail_near_local(lx: float, lz: float, reach: float) -> Dictionary:
 		best = {"id": trail.id, "index": pairs[m], "lateral": side * distance, "half_width": trail.half_width_m, "s": lerpf(line.s[k], line.s[k + 1], u), "distance": distance}
 	return best
 
+## trail_near(x, z) is a hit inside its band (distance <= half width), without
+## building the record: true when any indexed segment of the point's cell
+## holds the point within its band (the same candidates and arithmetic).
+func trail_inside(x: float, z: float) -> bool:
+	if _trails.is_empty():
+		return false
+	var lx: float = x - _bounds.min_x
+	var lz: float = z - _bounds.min_z
+	var pairs: Variant = _trail_index.get(Vector2i(int(floor(lx / TRAIL_CELL_M)), int(floor(lz / TRAIL_CELL_M))))
+	if pairs == null:
+		return false
+	var p := Vector2(lx, lz)
+	for m in range(0, pairs.size(), 2):
+		var trail: Dictionary = _trails[pairs[m]]
+		var line: Dictionary = trail.line
+		var k: int = pairs[m + 1]
+		var a := Vector2(line.x[k], line.z[k])
+		var b := Vector2(line.x[k + 1], line.z[k + 1])
+		var ab: Vector2 = b - a
+		var u: float = (p - a).dot(ab) / maxf(ab.length_squared(), 1e-12)
+		if (u < 0.0 and k == 0) or (u > 1.0 and k == line.s.size() - 2):
+			continue
+		u = clampf(u, 0.0, 1.0)
+		var closest: Vector2 = a + ab * u
+		if closest.distance_to(p) <= trail.half_width_m:
+			return true
+	return false
+
 ## BENCH displacement (m) of the published surface at a world point (0 off
 ## every bench footprint; amendment A1 formula in TrailRealization).
 func trail_displacement(x: float, z: float) -> float:

@@ -23,6 +23,15 @@ const Network = preload("res://scripts/world/region/realized_road_network.gd")
 const Graph = preload("res://scripts/world/region/region_route_graph.gd")
 const MAX_REPLANS: int = 2
 const MODEL := "network_builder/1;replans=2;wall=close:64,penalty:6:96;crossing=penalty:8:48;other=penalty:5:96;junction=close:48;descent=penalty:3:160"
+## Replan stop rules: ROADS (default) ends the rounds at the first road
+## network meeting N1-N6 without SINGLETRACK / TECHNICAL road edges - the
+## published natural classes are BC2 trails (roadmap T4: N4 is judged on the
+## published network), and R6 practically never makes those classes READY,
+## so demanding them only forced every region through all rounds;
+## ALL_CLASSES is the earlier rule (also demands READY SINGLETRACK and
+## TECHNICAL road edges), kept for comparison runs.
+const STOP_ROADS := "ROADS"
+const STOP_ALL_CLASSES := "ALL_CLASSES"
 const WALL_REASONS: Array[String] = ["ERR_R6_EARTHWORK", "ERR_R6_NATURAL_BARRIER", "ERR_R6_CORRIDOR_CLEARANCE"]
 
 
@@ -32,13 +41,17 @@ const WALL_REASONS: Array[String] = ["ERR_R6_EARTHWORK", "ERR_R6_NATURAL_BARRIER
 ## options.progress (optional Callable(stage: String, fraction: float in 0..1))
 ## is called from the building thread at every R5 / R6 step; options.cancelled
 ## (optional Callable() -> bool) is polled there and stops the build with
-## ERR_BAKE_CANCELLED (never a network).
+## ERR_BAKE_CANCELLED (never a network). options.stop_rule: STOP_ROADS
+## (default) or STOP_ALL_CLASSES.
 static func build(region_plan: RefCounted, terrain_field: RefCounted, hydrology_plan: RefCounted, options: Dictionary = {}) -> Dictionary:
 	return Synth.off_main_thread(func() -> Dictionary: return _build(region_plan, terrain_field, hydrology_plan, options))
 
 
 static func _build(region_plan: RefCounted, terrain_field: RefCounted, hydrology_plan: RefCounted, options: Dictionary) -> Dictionary:
-	var spec := {"seed": options.get("seed", 0), "region": options.get("region", Vector2i.ZERO), "model": MODEL}
+	var stop_rule: String = options.get("stop_rule", STOP_ROADS)
+	if not stop_rule in [STOP_ROADS, STOP_ALL_CLASSES]:
+		return {"is_valid": false, "reason_code": "ERR_NETWORK_STOP_RULE", "network": null, "rounds": []}
+	var spec := {"seed": options.get("seed", 0), "region": options.get("region", Vector2i.ZERO), "model": MODEL + (";stop=roads" if stop_rule == STOP_ROADS else "")}
 	var hints: Array = []
 	var hint_keys: Dictionary = {}
 	var raster: Variant = null
@@ -96,7 +109,7 @@ static func _build(region_plan: RefCounted, terrain_field: RefCounted, hydrology
 		candidates.append(candidate)
 		if best.is_empty() or score > best.score:
 			best = candidate
-		if complete(metrics) or round_index == max_replans:
+		if (complete(metrics) if stop_rule == STOP_ROADS else complete_all_classes(metrics)) or round_index == max_replans:
 			break
 		var fresh: Array = hints_from(realized.analysis, routes.graph)
 		var added: int = 0
@@ -129,10 +142,17 @@ static func score_of(m: Dictionary) -> Array:
 	return [1 if m.backbone_continuous else 0, 1 if m.blocked_nodes == 0 and m.dead_ends_not_terminus == 0 else 0, mix, mini(m.cycles, 2), snappedf(m.component_length_m, 1.0)]
 
 
-## N1-N6 (TECHNICAL optional here; the acceptance decides per region kind).
+## N1-N6 of the road network (STOP_ROADS): continuous backbone, >= 8 km
+## component, >= 2 loops, SECONDARY, no blocked node, no stray dead end.
 static func complete(m: Dictionary) -> bool:
-	return m.backbone_continuous and m.component_length_m >= 8000.0 and m.cycles >= 2 and m.classes.has("SECONDARY") and m.classes.has("SINGLETRACK") \
-		and m.classes.has("TECHNICAL") and m.blocked_nodes == 0 and m.dead_ends_not_terminus == 0
+	return m.backbone_continuous and m.component_length_m >= 8000.0 and m.cycles >= 2 and m.classes.has("SECONDARY") and m.blocked_nodes == 0 \
+		and m.dead_ends_not_terminus == 0
+
+
+## The earlier stop rule (STOP_ALL_CLASSES): complete() plus READY
+## SINGLETRACK and TECHNICAL road edges.
+static func complete_all_classes(m: Dictionary) -> bool:
+	return complete(m) and m.classes.has("SINGLETRACK") and m.classes.has("TECHNICAL")
 
 
 ## Additive R5 hints from one round's diagnosis (region-local metres).

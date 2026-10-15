@@ -25,38 +25,29 @@ extends RefCounted
 ## `progress` (optional Callable(stage: String, fraction: float)) is called
 ## from the baking thread; options.cancelled (optional Callable() -> bool) is
 ## polled between stages and ends the bake with ERR_BAKE_CANCELLED.
+## Stages (each its own script, so each has its own source closure for dev
+## stage reuse, RegionStageCache): RegionBakeGround (upstream, network, R7,
+## tiles) -> RegionBakeTrails (trail publication) -> finish() here (bridges,
+## water, vegetation, spawn, manifest). A full bake runs them in sequence.
 
-const Gen = preload("res://scripts/world/region/region_generator.gd")
-const Terrain = preload("res://scripts/world/region/terrain_field.gd")
-const HGen = preload("res://scripts/world/region/hydrology_generator.gd")
-const HField = preload("res://scripts/world/region/hydrology_field.gd")
-const Builder = preload("res://scripts/world/region/region_network_builder.gd")
+const Ground = preload("res://scripts/world/region/region_bake_ground.gd")
+const Trails = preload("res://scripts/world/region/region_bake_trails.gd")
 const Network = preload("res://scripts/world/region/realized_road_network.gd")
-const Deformer = preload("res://scripts/world/region/road_terrain_deformer.gd")
-const Surface = preload("res://scripts/world/region/final_surface.gd")
-const Renderer = preload("res://scripts/world/region/final_surface_tile_renderer.gd")
 const Bridges = preload("res://scripts/world/region/bridge_deck_builder.gd")
-const Graph = preload("res://scripts/world/region/region_route_graph.gd")
 const Synth = preload("res://scripts/world/region/road_synthesizer.gd")
 const Vegetation = preload("res://scripts/world/region/region_vegetation_planner.gd")
-const Trail = preload("res://scripts/world/region/trail_realization.gd")
 const TrailPolicy = preload("res://scripts/world/region/trail_policy.gd")
-const Planner = preload("res://scripts/world/region/trail_network_planner.gd")
+const Graph = preload("res://scripts/world/region/region_route_graph.gd")
+const Eval = preload("res://scripts/world/region/macro_terrain_evaluator.gd")
 const SCHEMA := "slow_cycle.region_bake/1"
-const TILE_M: int = 512
-const TILES: int = 8
-const PATCH_M: float = 64.0
-const LAYER_ROAD: int = 2
-const LAYER_ROUGH: int = 2 | 16
-const LAYER_TERRAIN: int = 4
+const TILE_M: int = Ground.TILE_M
+const TILES: int = Ground.TILES
+const PATCH_M: float = Ground.PATCH_M
+const LAYER_ROAD: int = Ground.LAYER_ROAD
+const LAYER_ROUGH: int = Ground.LAYER_ROUGH
+const LAYER_TERRAIN: int = Ground.LAYER_TERRAIN
 ## Bucket order of triangles inside a collision patch (runtime patch bodies).
 const PATCH_LAYERS: Array[int] = [LAYER_TERRAIN, LAYER_ROAD, LAYER_ROUGH]
-## Bound on surface isolation passes (each excludes at least one piece).
-const MAX_ISOLATION_PASSES: int = 24
-## Bound on BC1 trail border-agreement passes (each adds border points).
-const MAX_SEAM_PASSES: int = 12
-## BC2: procedural proposals tried at publication before giving up a slot.
-const MAX_PUBLISH_ATTEMPTS: int = 3
 
 
 static func bake(seed_value: int, region: Vector2i, options: Dictionary = {}, progress: Callable = Callable()) -> Dictionary:
@@ -67,107 +58,93 @@ static func _bake(seed_value: int, region: Vector2i, options: Dictionary, progre
 	var timings: Dictionary = {}
 	var t: int = Time.get_ticks_usec()
 	_report(progress, "upstream", 0.0)
-	var plan: RefCounted = Gen.build(seed_value, region)
-	var terrain: RefCounted = Terrain.create(plan).field
-	var hydro: Dictionary = HGen.build(plan, terrain)
-	var field: RefCounted = HField.create(hydro.plan, terrain).field
+	var up: Dictionary = Ground.upstream(seed_value, region)
 	timings["upstream_s"] = _lap(t)
 	var cancelled: Callable = options.get("cancelled", Callable())
 	var stopped := {"is_valid": false, "reason_code": "ERR_BAKE_CANCELLED"}
 	if cancelled.is_valid() and cancelled.call():
 		return stopped
-	t = Time.get_ticks_usec()
-	_report(progress, "network", 0.03)
-	var network_progress := func(stage: String, fraction: float) -> void: _report(progress, stage, 0.03 + 0.42 * fraction)
-	var built: Dictionary = Builder.build(plan, terrain, hydro.plan, {"seed": seed_value, "region": region, "max_replans": options.get("max_replans", Builder.MAX_REPLANS),
-		"threads": int(options.get("threads", 1)), "progress": network_progress, "cancelled": cancelled})
-	timings["network_s"] = _lap(t)
-	if not built.is_valid:
-		return {"is_valid": false, "reason_code": built.reason_code, "rounds": built.get("rounds", [])}
-	var bounds: Dictionary = terrain.get_bounds_m()
-	var threads: int = int(options.get("threads", 1))
-	timings["deformer_s"] = 0.0
-	timings["tiles_s"] = 0.0
-	# The round is chosen with R7 constructibility: candidates in network score
-	# order; each is isolated (below) and scored again. A further candidate is
-	# tried only while its score before isolation exceeds the best score after
-	# isolation (isolation only removes pieces), so a round R7 would collapse
-	# does not hide a round that constructs.
-	var candidates: Array = built.get("candidates", [])
-	var chosen: Dictionary = {}
-	var first_failure: Dictionary = {}
-	var tried: Array = []
-	for candidate: Dictionary in candidates:
-		if not chosen.is_empty() and not candidate.score > chosen.score:
-			break
-		var made: Dictionary = _isolated(candidate, terrain, field, bounds, threads, progress, cancelled, timings)
-		if made.get("reason_code", "") == "ERR_BAKE_CANCELLED":
-			return stopped
-		var entry := {"round": candidate.round, "score_before": candidate.score, "is_valid": made.is_valid, "reason_code": made.reason_code, "r7_excluded": made.get("excluded", {})}
-		if made.is_valid:
-			made["score"] = Builder.score_of(made.network.get_metrics())
-			made["round"] = candidate.round
-			made["plan"] = candidate.plan
-			made["graph"] = candidate.graph
-			entry["score_after"] = made.score
-			if chosen.is_empty() or made.score > chosen.score:
-				chosen = made
-		elif first_failure.is_empty():
-			first_failure = made
-		tried.append(entry)
-	if chosen.is_empty():
-		var failure: Dictionary = {"is_valid": false, "reason_code": first_failure.get("reason_code", "ERR_BAKE_ISOLATION"), "rounds": built.rounds, "r7_rounds": tried}
-		for key: String in ["detail", "tile"]:
-			if first_failure.has(key):
-				failure[key] = first_failure[key]
-		return failure
-	var network: RefCounted = chosen.network
-	var surface: RefCounted = chosen.surface
-	var slots: Array = chosen.slots
-	var excluded: Dictionary = chosen.excluded
-	var trail_report: Dictionary = {}
+	var ground: Dictionary = ground_stage(seed_value, region, up, options, progress, timings)
+	if not ground.is_valid:
+		return ground
 	if cancelled.is_valid() and cancelled.call():
 		return stopped
+	var trailed: Dictionary = trail_stage(seed_value, region, up, ground, options, progress, timings)
+	return finish(seed_value, region, up, ground, trailed, options, progress, timings)
+
+
+## Ground stage products: {is_valid, network, surface, slots (prototype-off),
+## meta (plain record for the manifest), graph, route_plan (objects; absent
+## after a stage reload)} or the failure record of RegionBakeGround.build.
+static func ground_stage(seed_value: int, region: Vector2i, up: Dictionary, options: Dictionary, progress: Callable, timings: Dictionary) -> Dictionary:
+	var made: Dictionary = Ground.build(seed_value, region, up, options, progress, timings)
+	if not made.is_valid:
+		return made
+	var chosen: Dictionary = made.chosen
+	var meta := {"graph_signature": chosen.graph.signature(), "plan_signature": chosen.plan.signature(), "chosen_round": chosen.round, "network_best_round": made.built.round,
+		"rounds": _round_summaries(made.built.rounds), "r7_excluded": chosen.excluded, "r7_rounds": _r7_summaries(made.tried)}
+	return {"is_valid": true, "reason_code": "", "network": chosen.network, "surface": chosen.surface, "slots": chosen.slots, "meta": meta, "graph": chosen.graph,
+		"route_plan": chosen.plan, "rounds_raw": made.built.rounds}
+
+
+## Trail stage products on the ground stage: {network, surface, slots, report
+## (the manifest "trails" record; {} without options.trail_config),
+## surface_trails, refined}.
+static func trail_stage(seed_value: int, region: Vector2i, up: Dictionary, ground: Dictionary, options: Dictionary, progress: Callable, timings: Dictionary) -> Dictionary:
+	var network: RefCounted = ground.network
+	var unchanged := {"network": network, "surface": ground.surface, "slots": ground.slots, "report": {}, "surface_trails": [], "refined": []}
 	if options.has("trail_config") and network.get_data().pieces.is_empty():
 		# No road to join: trails are not planned; the empty network stays the
 		# recorded result (the runtime reports ERR_REGION_NO_NETWORK).
-		trail_report = {"config_sha256": JSON.stringify(options.trail_config, "", true).sha256_text(), "procedural": TrailPolicy.is_procedural(options.trail_config),
+		unchanged.report = {"config_sha256": JSON.stringify(options.trail_config, "", true).sha256_text(), "procedural": TrailPolicy.is_procedural(options.trail_config),
 			"published": [], "rejected": [{"id": "", "reason_code": "ERR_REGION_NO_NETWORK", "detail": {"stage": "network"}}]}
-	elif options.has("trail_config"):
-		t = Time.get_ticks_usec()
-		_report(progress, "trails", 0.91)
-		var made: Dictionary = _trails(options.trail_config, seed_value, region, network, surface, field, bounds, slots, threads)
-		network = made.network
-		surface = made.surface
-		slots = made.slots
-		trail_report = made.report
-		timings["trails_s"] = _lap(t)
+		return unchanged
+	if not options.has("trail_config"):
+		return unchanged
+	var t: int = Time.get_ticks_usec()
+	_report(progress, "trails", 0.91)
+	var made: Dictionary = Trails.publish(options.trail_config, seed_value, region, network, ground.surface, up.field, up.bounds, ground.slots, int(options.get("threads", 1)))
+	timings["trails_s"] = _lap(t)
+	return made
+
+
+## Bridges, water, vegetation, spawn and the manifest on the trail stage.
+static func finish(seed_value: int, region: Vector2i, up: Dictionary, ground: Dictionary, trailed: Dictionary, options: Dictionary, progress: Callable,
+		timings: Dictionary) -> Dictionary:
+	var cancelled: Callable = options.get("cancelled", Callable())
+	var stopped := {"is_valid": false, "reason_code": "ERR_BAKE_CANCELLED"}
+	var threads: int = int(options.get("threads", 1))
+	var bounds: Dictionary = up.bounds
+	var network: RefCounted = trailed.network
+	var surface: RefCounted = trailed.surface
+	var slots: Array = trailed.slots
 	var data: Dictionary = network.get_data()
-	t = Time.get_ticks_usec()
+	var t: int = Time.get_ticks_usec()
 	_report(progress, "bridges_water", 0.92)
-	var ground := func(x: float, z: float) -> float:
+	var ground_height := func(x: float, z: float) -> float:
 		var h: Dictionary = surface.sample_height(x + bounds.min_x, z + bounds.min_z)
 		return h.height_m if h.is_valid else NAN
-	var bridges: Dictionary = Bridges.build(data, ground)
-	var water: Dictionary = _water(hydro.plan)
+	var bridges: Dictionary = Bridges.build(data, ground_height)
+	var water: Dictionary = _water(up.hydro.plan)
 	timings["bridges_water_s"] = _lap(t)
 	if cancelled.is_valid() and cancelled.call():
 		return stopped
 	t = Time.get_ticks_usec()
 	_report(progress, "vegetation", 0.94)
-	var flora: Dictionary = Vegetation.create(plan, terrain, hydro.plan, surface)
+	var flora: Dictionary = Vegetation.create(up.plan, up.terrain, up.hydro.plan, surface)
 	if not flora.is_valid:
-		return {"is_valid": false, "reason_code": flora.reason_code, "rounds": built.rounds}
+		return {"is_valid": false, "reason_code": flora.reason_code, "rounds": ground.get("rounds_raw", ground.meta.rounds)}
 	var vegetation: Array = _vegetation(flora.planner, slots, threads)
 	timings["vegetation_s"] = _lap(t)
 	var spawn: Dictionary = _spawn(data)
+	var meta: Dictionary = ground.meta
 	var manifest: Dictionary = {"schema": SCHEMA, "seed": seed_value, "region": [region.x, region.y], "origin": [bounds.min_x, bounds.min_z],
-		"region_signature": plan.signature(), "hydrology_signature": hydro.plan.signature(), "network_digest": network.digest(), "graph_signature": chosen.graph.signature(),
-		"plan_signature": chosen.plan.signature(), "chosen_round": chosen.round, "network_best_round": built.round, "rounds": _round_summaries(built.rounds), "metrics": data.metrics,
-		"tiles": [], "timings_s": timings, "r7_excluded": excluded, "r7_rounds": _r7_summaries(tried),
-		"bridges": bridges.decks.size(), "threads": threads}
+		"region_signature": up.plan.signature(), "hydrology_signature": up.hydro.plan.signature(), "network_digest": network.digest(), "graph_signature": meta.graph_signature,
+		"plan_signature": meta.plan_signature, "chosen_round": meta.chosen_round, "network_best_round": meta.network_best_round, "rounds": meta.rounds, "metrics": data.metrics,
+		"tiles": [], "timings_s": timings, "r7_excluded": meta.r7_excluded, "r7_rounds": meta.r7_rounds,
+		"bridges": bridges.decks.size(), "threads": threads, "terrain_kernel": "csharp" if Eval.kernel_active() else "gdscript"}
 	if options.has("trail_config"):
-		manifest["trails"] = trail_report
+		manifest["trails"] = trailed.report
 	var vertices: int = 0
 	var triangles: int = 0
 	for slot: Dictionary in slots:
@@ -180,288 +157,18 @@ static func _bake(seed_value: int, region: Vector2i, options: Dictionary, progre
 	manifest["vegetation"] = _vegetation_summary(vegetation)
 	_report(progress, "done", 1.0)
 	return {"is_valid": true, "reason_code": "", "manifest": manifest, "network": network, "tiles": slots, "bridges": bridges, "water": water, "spawn": spawn, "vegetation": vegetation,
-		"surface": surface, "terrain": terrain, "hydrology": hydro.plan, "field": field, "plan": plan, "graph": chosen.graph}
+		"surface": surface, "terrain": up.terrain, "hydrology": up.hydro.plan, "field": up.field, "plan": up.plan, "graph": ground.get("graph")}
 
 
-## BC1: realize the configured trails on the chosen products and publish them
-## atomically. The tiles their bands reach are refined from their prototype-
-## off arrays on the trail surface (FinalSurfaceTileRenderer.refine_arrays),
-## in passes until the tiles agree on every shared border: each pass forces
-## the border midpoints any tile made, and a tile whose border receives one
-## joins; the other tiles keep their arrays. Final heights come from the
-## published triangles (FinalSurface.with_published), and every trail is
-## checked again on them (TrailRealization.finalize). A trail rejected at any
-## step leaves no trace: the rest are published again without it, and with
-## none left the products stay exactly the prototype-off ones. Returns
-## {network, surface, slots, report: {config_sha256, published, rejected}}.
+## BC1 / BC2 trail publication (RegionBakeTrails.publish; kept for callers).
 static func _trails(config: Variant, seed_value: int, region: Vector2i, network: RefCounted, surface: RefCounted, field: RefCounted, bounds: Dictionary, slots: Array,
 		threads: int) -> Dictionary:
-	var context := {"seed": seed_value, "region": region, "network": network.get_data(), "surface": surface, "field": field}
-	if TrailPolicy.is_procedural(config):
-		return _procedural_trails(config, context, network, surface, bounds, slots, threads)
-	var realized: Dictionary = Trail.realize_all(config, context)
-	var report := {"config_sha256": JSON.stringify(config, "", true).sha256_text(), "published": [], "rejected": realized.rejected.duplicate(true)}
-	return _publish_trails(realized.trails, report, context, network, surface, bounds, slots, threads)
+	return Trails.publish(config, seed_value, region, network, surface, field, bounds, slots, threads)
 
 
-## BC2: trails proposed by TrailNetworkPlanner (configuration TrailPolicy) on
-## the published ground of the off tiles, each already realized on the
-## published triangles of its zone. The planner's selection is published at
-## once; a trail rejected there gives way to an alternate of its class clear
-## of the published ones (at most MAX_PUBLISH_ATTEMPTS each). The published
-## network must leave no trap (RealizedRoadNetwork.trail_graph strongly
-## connected; ERR_TRAIL_TRAP otherwise); report.network is that graph.
-static func _procedural_trails(config: Variant, context: Dictionary, network: RefCounted, surface: RefCounted, bounds: Dictionary, slots: Array, threads: int) -> Dictionary:
-	var report := {"config_sha256": JSON.stringify(config, "", true).sha256_text(), "procedural": true, "published": [], "rejected": []}
-	var unchanged := {"network": network, "surface": surface, "slots": slots, "report": report}
-	var parsed: Dictionary = TrailPolicy.parse(config)
-	if not parsed.is_valid:
-		report.rejected.append({"id": "", "reason_code": parsed.reason_code, "detail": parsed.detail})
-		return unchanged
-	var t: int = Time.get_ticks_usec()
-	var planning := context.duplicate()
-	planning["ground"] = Surface.published_ground(slots, bounds, TrailPolicy.GROUND_CELL_M, threads)
-	planning["slots"] = slots
-	var ground_s: float = _lap(t)
-	var planned: Dictionary = Planner.plan(parsed.config, planning)
-	report["planner"] = planned.report
-	report.planner["ground_s"] = ground_s
-	report.rejected.append_array(planned.rejected)
-	var products: Dictionary = unchanged
-	# The whole selection at once (_publish_trails drops a trail that fails and
-	# publishes the rest again without it).
-	var made: Dictionary = _publish_trails(planned.trails, {"published": [], "rejected": []}, context, network, surface, bounds, slots, threads)
-	report.rejected.append_array(made.report.rejected)
-	var done: Array = made.report.published.map(func(entry: Dictionary) -> String: return entry.id)
-	var chosen: Array = planned.trails.filter(func(trail: Dictionary) -> bool: return trail.id in done)
-	if not chosen.is_empty():
-		products = made
-	# A selected trail that failed gives way to an alternate of its class clear
-	# of the published ones.
-	for trail: Dictionary in planned.trails:
-		if trail.id in done:
-			continue
-		var attempts: int = 0
-		for option: Dictionary in planned.alternates:
-			if attempts >= MAX_PUBLISH_ATTEMPTS:
-				break
-			if option.class_name != trail.class_name or chosen.any(func(other: Dictionary) -> bool: return other.id == option.id or not _clear_of(option, other)):
-				continue
-			attempts += 1
-			var again: Dictionary = _publish_trails(chosen + [option], {"published": [], "rejected": []}, context, network, surface, bounds, slots, threads)
-			report.rejected.append_array(again.report.rejected)
-			if again.report.published.size() == chosen.size() + 1:
-				chosen.append(option)
-				products = again
-				break
-	# No traps: every place of the riding graph reaches every other; trails
-	# are given up from the last one until it holds (atomic: the rest are
-	# published again without them).
-	var graph: Dictionary = Network.trail_graph(products.network.get_data())
-	while not graph.strongly_connected and not chosen.is_empty():
-		var dropped: Dictionary = chosen.pop_back()
-		report.rejected.append({"id": dropped.id, "reason_code": "ERR_TRAIL_TRAP", "detail": {"stage": "network", "traps": graph.traps}})
-		products = unchanged if chosen.is_empty() else _publish_trails(chosen, {"published": [], "rejected": []}, context, network, surface, bounds, slots, threads)
-		graph = Network.trail_graph(products.network.get_data())
-	report["network"] = graph
-	var ids: Array = chosen.map(func(trail: Dictionary) -> String: return trail.id)
-	report.published = products.report.published if not chosen.is_empty() else []
-	for entry: Dictionary in report.published:
-		var trail: Dictionary = chosen[ids.find(entry.id)]
-		entry["origin"] = trail.origin
-		entry["class"] = trail.class_name
-		entry["purpose"] = trail.purpose
-		entry["planner"] = {"score": trail.planner.score, "road_m": trail.planner.road_m, "gain_m": trail.planner.gain_m, "ports": trail.planner.ports}
-		for key: String in ["drop_m", "turns", "steep_share", "return", "shape"]:
-			if trail.planner.has(key):
-				entry.planner[key] = trail.planner[key]
-	report["alternates"] = (planned.trails + planned.alternates).map(func(trail: Dictionary) -> String: return trail.id).filter(func(id: String) -> bool: return not id in ids)
-	return {"network": products.network, "surface": products.surface, "slots": products.slots, "report": report}
-
-
-## Two trail lines keep TrailPolicy.TRAIL_CLEAR_M apart (sampled).
-static func _clear_of(a: Dictionary, b: Dictionary) -> bool:
-	for i in range(0, a.line.s.size(), 3):
-		var p := Vector2(a.line.x[i], a.line.z[i])
-		for j in range(0, b.line.s.size(), 3):
-			if p.distance_to(Vector2(b.line.x[j], b.line.z[j])) < TrailPolicy.TRAIL_CLEAR_M:
-				return false
-	return true
-
-
-## Publication of realized trails (BC1): shaped, tiles refined, finalized on
-## the published triangles, joined to the network; see _trails.
-static func _publish_trails(trails: Array, report: Dictionary, context: Dictionary, network: RefCounted, surface: RefCounted, bounds: Dictionary, slots: Array,
-		threads: int) -> Dictionary:
-	var rejected: Array = report.rejected
-	var unchanged := {"network": network, "surface": surface, "slots": slots, "report": report}
-	var piece_class: Dictionary = {}
-	for piece: Dictionary in network.get_data().pieces:
-		piece_class[piece.id] = piece.info.route_class
-	while not trails.is_empty():
-		var indices: Array = _trail_tiles(trails, slots, bounds)
-		# Benches are measured on the published pre-bench surface of their zone.
-		var pre: RefCounted = surface.with_trails(trails).with_published(indices.map(func(k: int) -> Dictionary: return slots[k]))
-		var shaped: Array = []
-		for trail: Dictionary in trails:
-			var made: Dictionary = Trail.shape(trail, pre)
-			if made.is_valid:
-				shaped.append(made.trail)
-			else:
-				rejected.append({"id": made.id, "reason_code": made.reason_code, "detail": made.detail})
-		if shaped.size() < trails.size():
-			trails = shaped
-			continue
-		trails = shaped
-		var trail_surface: RefCounted = surface.with_trails(trails)
-		var forced: Dictionary = {}
-		var refined: Array = []
-		var failure: Dictionary = {}
-		var agreed: bool = false
-		for attempt in range(MAX_SEAM_PASSES):
-			refined = _refine_tiles(trail_surface, bounds, piece_class, threads, slots, indices, forced)
-			for slot: Dictionary in refined:
-				if not slot.is_valid:
-					failure = slot
-			if not failure.is_empty():
-				break
-			var grew: bool = false
-			for slot: Dictionary in refined:
-				for point: Vector2 in slot.border_points:
-					if not forced.has(point):
-						forced[point] = true
-						grew = true
-			for point: Vector2 in forced:
-				for k in range(slots.size()):
-					var rect := Rect2(slots[k].tx * TILE_M, slots[k].tz * TILE_M, TILE_M, TILE_M)
-					if not k in indices and rect.grow(0.001).has_point(point) and not rect.grow(-0.001).has_point(point):
-						indices.append(k)
-						grew = true
-			if not grew:
-				agreed = true
-				break
-		if failure.is_empty() and not agreed:
-			failure = {"reason_code": "ERR_TRAIL_TILE", "tx": -1, "tz": -1, "detail": "no border agreement in %d passes" % MAX_SEAM_PASSES}
-		if not failure.is_empty():
-			for trail: Dictionary in trails:
-				rejected.append({"id": trail.id, "reason_code": "ERR_TRAIL_UNRIDEABLE", "detail": {"stage": "published geometry", "reason": failure.get("reason_code", ""),
-					"tile": [failure.tx, failure.tz], "note": str(failure.get("detail", ""))}})
-			return unchanged
-		var published: RefCounted = trail_surface.with_published(refined)
-		var finished: Array = []
-		var kept: Array = []
-		for trail: Dictionary in trails:
-			var made: Dictionary = Trail.finalize(trail, published, context)
-			if made.is_valid:
-				finished.append(made.trail)
-				kept.append(trail)
-			else:
-				rejected.append({"id": made.id, "reason_code": made.reason_code, "detail": made.detail})
-		if kept.size() < trails.size():
-			trails = kept
-			continue
-		var joined: Dictionary = network.with_trails(finished)
-		if not joined.is_valid:
-			for trail: Dictionary in trails:
-				rejected.append({"id": trail.id, "reason_code": joined.reason_code, "detail": {"stage": "network publication"}})
-			return unchanged
-		var out_slots: Array = slots.duplicate()
-		for m in range(indices.size()):
-			refined[m].erase("border_points")
-			out_slots[indices[m]] = refined[m]
-		for trail: Dictionary in finished:
-			report.published.append({"id": trail.id, "mode": trail.mode, "length_m": trail.length_m, "nodes": trail.nodes, "joins": trail.joins, "metrics": trail.metrics,
-				"directions": trail.directions, "tiles": indices.map(func(k: int) -> Array: return [slots[k].tx, slots[k].tz]), "border_points": forced.size(),
-				"operations": trail.operations.map(func(op: Dictionary) -> Dictionary: return {"kind": op.kind, "mode": op.mode, "s0_m": op.s0_m, "s1_m": op.s1_m,
-					"daylight_m": op.daylight_m, "taper_m": op.taper_m, "metrics": op.metrics})})
-		return {"network": joined.network, "surface": published, "slots": out_slots, "report": report}
-	return unchanged
-
-
-## Indices of the tile slots a trail band may refine (band within the
-## renderer's refinement reach of the tile).
-static func _trail_tiles(trails: Array, slots: Array, bounds: Dictionary) -> Array:
-	var out: Array = []
-	for k in range(slots.size()):
-		var rect := Rect2(slots[k].tx * TILE_M - bounds.min_x, slots[k].tz * TILE_M - bounds.min_z, TILE_M, TILE_M).grow(Renderer.TRAIL_REFINE_M + 1.5)
-		var near: bool = false
-		for trail: Dictionary in trails:
-			var line: Dictionary = trail.line
-			for i in range(line.s.size()):
-				near = near or rect.grow(trail.half_width_m).has_point(Vector2(line.x[i], line.z[i]))
-		if near:
-			out.append(k)
-	return out
-
-
-## Trail refinement of the listed tiles from their slot arrays (threaded like
-## _tiles; each job writes its own slot).
-static func _refine_tiles(surface: RefCounted, bounds: Dictionary, piece_class: Dictionary, threads: int, slots: Array, indices: Array, forced: Dictionary) -> Array:
-	var out: Array = []
-	for k: int in indices:
-		out.append({"tx": slots[k].tx, "tz": slots[k].tz})
-	var job := func(m: int) -> void:
-		var base: Dictionary = slots[indices[m]]
-		var tile: Dictionary = Renderer.refine_arrays(surface, base.arrays, base.tx, base.tz, forced)
-		_finish_slot(surface, bounds, piece_class, out[m], tile, base.coarse)
-		out[m]["border_points"] = tile.get("border_points", [])
-	if threads > 1 and out.size() > 1:
-		var group: int = WorkerThreadPool.add_group_task(job, out.size(), threads, true, "region_bake_trail_tiles")
-		WorkerThreadPool.wait_for_group_task_completion(group)
-	else:
-		for m in range(out.size()):
-			job.call(m)
-	return out
-
-
-## Pieces FinalSurface cannot construct are isolated (M3): construction checks
-## of the deformer, then failed tile samples naming their owning pieces. The
-## candidate's network is realized again without them (DEGRADE "R7_<reason>"),
-## in a fixed order, until the surface and every tile build. Returns {is_valid,
-## reason_code, network, surface, slots, excluded} (detail / tile on failure).
-static func _isolated(candidate: Dictionary, terrain: RefCounted, field: RefCounted, bounds: Dictionary, threads: int, progress: Callable, cancelled: Callable, timings: Dictionary) -> Dictionary:
-	var network: RefCounted = candidate.network
-	var checks: Dictionary = {}
-	var excluded: Dictionary = {}
-	for attempt in range(MAX_ISOLATION_PASSES):
-		if cancelled.is_valid() and cancelled.call():
-			return {"is_valid": false, "reason_code": "ERR_BAKE_CANCELLED"}
-		var t: int = Time.get_ticks_usec()
-		_report(progress, "surface (round %d)" % candidate.round, 0.45)
-		var blamed: Dictionary = {}
-		var deformer: Dictionary = Deformer.create(network, field, {"collect_failures": true, "check_cache": checks})
-		timings.deformer_s += _lap(t)
-		if not deformer.is_valid:
-			if deformer.reason_code != "ERR_R7_PIECE_FAILURES":
-				return {"is_valid": false, "reason_code": deformer.reason_code, "detail": deformer.get("detail", {}), "excluded": excluded}
-			for failure: Dictionary in deformer.failures:
-				blamed[failure.piece_id] = failure.reason_code
-		else:
-			var surface: RefCounted = Surface.create(terrain, field, deformer.deformer).surface
-			t = Time.get_ticks_usec()
-			var slots: Array = _tiles(surface, bounds, network.get_data(), threads, progress, cancelled)
-			timings.tiles_s += _lap(t)
-			if cancelled.is_valid() and cancelled.call():
-				return {"is_valid": false, "reason_code": "ERR_BAKE_CANCELLED"}
-			var failed: Dictionary = {}
-			for slot: Dictionary in slots:
-				if not slot.get("is_valid", false):
-					failed = slot
-					for id: String in slot.get("owners", []):
-						blamed[id] = slot.get("reason_code", "ERR_BAKE_TILE")
-			if failed.is_empty():
-				return {"is_valid": true, "reason_code": "", "network": network, "surface": surface, "slots": slots, "excluded": excluded}
-			if blamed.is_empty():
-				return {"is_valid": false, "reason_code": failed.get("reason_code", "ERR_BAKE_TILE"), "tile": [failed.tx, failed.tz], "excluded": excluded}
-		var ids: Array = blamed.keys()
-		ids.sort()
-		for id: String in ids:
-			excluded[id] = blamed[id]
-		var again: Dictionary = Network.from_plan(candidate.plan, candidate.graph, candidate.network.get_data().spec, excluded)
-		if not again.is_valid:
-			return {"is_valid": false, "reason_code": again.reason_code, "excluded": excluded}
-		network = again.network
-	return {"is_valid": false, "reason_code": "ERR_BAKE_ISOLATION", "detail": excluded, "excluded": excluded}
+## Patch order of a tile slot (RegionBakeGround.patch_order; kept for callers).
+static func _patch_order(slot: Dictionary) -> void:
+	Ground.patch_order(slot)
 
 
 static func _r7_summaries(tried: Array) -> Array:
@@ -472,34 +179,6 @@ static func _r7_summaries(tried: Array) -> Array:
 		out.append({"round": entry.round, "is_valid": entry.is_valid, "reason_code": entry.reason_code, "score_before": entry.score_before,
 			"score_after": entry.get("score_after", []), "r7_excluded": ids})
 	return out
-
-
-## Every tile of the region (optionally threaded; each result lands in its own
-## slot dictionary, so order and thread count do not matter).
-static func _tiles(surface: RefCounted, bounds: Dictionary, data: Dictionary, threads: int, progress: Callable, cancelled: Callable = Callable()) -> Array:
-	var piece_class: Dictionary = {}
-	for piece: Dictionary in data.pieces:
-		piece_class[piece.id] = piece.info.route_class
-	var tile_x0: int = int(bounds.min_x) / TILE_M
-	var tile_z0: int = int(bounds.min_z) / TILE_M
-	var slots: Array = []
-	for k in range(TILES * TILES):
-		slots.append({"tx": tile_x0 + k % TILES, "tz": tile_z0 + k / TILES})
-	var job := func(k: int) -> void:
-		if cancelled.is_valid() and cancelled.call():
-			slots[k]["is_valid"] = false
-			slots[k]["reason_code"] = "ERR_BAKE_CANCELLED"
-			return
-		_tile(surface, bounds, piece_class, slots[k])
-	if threads > 1:
-		_report(progress, "tiles", 0.5)
-		var group: int = WorkerThreadPool.add_group_task(job, slots.size(), threads, true, "region_bake_tiles")
-		WorkerThreadPool.wait_for_group_task_completion(group)
-	else:
-		for k in range(slots.size()):
-			job.call(k)
-			_report(progress, "tiles", 0.5 + 0.4 * float(k + 1) / slots.size())
-	return slots
 
 
 ## Vegetation of every tile, in tile order (each job writes its own slot).
@@ -539,124 +218,6 @@ static func _lap(t0: int) -> float:
 static func _report(progress: Callable, stage: String, fraction: float) -> void:
 	if progress.is_valid():
 		progress.call(stage, fraction)
-
-
-## One tile: fine arrays (region-local origin), per-triangle layer and patch,
-## coarse 16 m LOD arrays, content hash. Writes into `slot` only.
-static func _tile(surface: RefCounted, bounds: Dictionary, piece_class: Dictionary, slot: Dictionary) -> void:
-	var tile: Dictionary = Renderer.tile_arrays(surface, slot.tx, slot.tz)
-	_finish_slot(surface, bounds, piece_class, slot, tile, [])
-
-
-## Slot of built tile arrays: per-triangle layer and patch, origin, coarse
-## LOD (given, or computed when empty), content hash. Writes into `slot` only.
-static func _finish_slot(surface: RefCounted, bounds: Dictionary, piece_class: Dictionary, slot: Dictionary, tile: Dictionary, coarse: Array) -> void:
-	if not tile.is_valid:
-		slot["is_valid"] = false
-		slot["reason_code"] = tile.reason_code
-		slot["owners"] = tile.get("owners", [])
-		return
-	var arrays: Array = tile.arrays
-	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-	var uv: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
-	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
-	var layers := PackedByteArray()
-	var patches := PackedByteArray()
-	var count: int = indices.size() / 3
-	layers.resize(count)
-	patches.resize(count)
-	for q in range(count):
-		var a: int = indices[3 * q]
-		var b: int = indices[3 * q + 1]
-		var c: int = indices[3 * q + 2]
-		var centre: Vector3 = (vertices[a] + vertices[b] + vertices[c]) / 3.0
-		patches[q] = clampi(int(centre.x / PATCH_M), 0, 7) + 8 * clampi(int(centre.z / PATCH_M), 0, 7)
-		if uv[a].x == 100.0 and uv[b].x == 100.0 and uv[c].x == 100.0:
-			layers[q] = LAYER_TERRAIN
-			continue
-		var owner: String = surface.road_owner(tile.origin_x_m + centre.x, tile.origin_z_m + centre.z)
-		if owner.is_empty():
-			# BC1: a trail band off the road planes is rough ground (SINGLETRACK).
-			layers[q] = LAYER_ROUGH if not surface.trail_owner(tile.origin_x_m + centre.x, tile.origin_z_m + centre.z).is_empty() else LAYER_TERRAIN
-		else:
-			layers[q] = LAYER_ROUGH if piece_class.get(owner, 0) >= Graph.RouteClass.SINGLETRACK else LAYER_ROAD
-	slot["arrays"] = arrays
-	slot["layers"] = layers
-	slot["patches"] = patches
-	_patch_order(slot)
-	slot["origin"] = [tile.origin_x_m - bounds.min_x, tile.origin_z_m - bounds.min_z]
-	slot["vertex_count"] = tile.vertex_count
-	slot["triangle_count"] = tile.triangle_count
-	slot["coarse"] = coarse if not coarse.is_empty() else _coarse(surface, tile.origin_x_m, tile.origin_z_m)
-	var bytes := PackedByteArray()
-	bytes.append_array(vertices.to_byte_array())
-	bytes.append_array(indices.to_byte_array())
-	bytes.append_array(layers)
-	slot["sha256"] = _sha(bytes)
-	slot["is_valid"] = true
-
-
-## Triangles counting-sorted by (patch, PATCH_LAYERS index): patch_order lists
-## triangle indices, patch_offsets[b] .. patch_offsets[b + 1] is bucket b
-## (b = patch * PATCH_LAYERS.size() + layer index). Writes into `slot` only.
-static func _patch_order(slot: Dictionary) -> void:
-	var layers: PackedByteArray = slot.layers
-	var patches: PackedByteArray = slot.patches
-	var count: int = layers.size()
-	var lanes: int = PATCH_LAYERS.size()
-	var offsets := PackedInt32Array()
-	offsets.resize(64 * lanes + 1)
-	var bucket_of := PackedInt32Array()
-	bucket_of.resize(count)
-	for q in range(count):
-		var b: int = patches[q] * lanes + PATCH_LAYERS.find(layers[q])
-		bucket_of[q] = b
-		offsets[b + 1] += 1
-	for b in range(1, offsets.size()):
-		offsets[b] += offsets[b - 1]
-	var cursor: PackedInt32Array = offsets.duplicate()
-	var order := PackedInt32Array()
-	order.resize(count)
-	for q in range(count):
-		order[cursor[bucket_of[q]]] = q
-		cursor[bucket_of[q]] += 1
-	slot["patch_order"] = order
-	slot["patch_offsets"] = offsets
-
-
-static func _sha(bytes: PackedByteArray) -> String:
-	var ctx := HashingContext.new()
-	ctx.start(HashingContext.HASH_SHA256)
-	ctx.update(bytes)
-	return ctx.finish().hex_encode()
-
-
-## 33 x 33 lattice of FinalSurface heights (16 m) for distant rendering.
-static func _coarse(surface: RefCounted, ox: float, oz: float) -> Array:
-	var vertices := PackedVector3Array()
-	for j in range(33):
-		for i in range(33):
-			var h: Dictionary = surface.sample_height(ox + 16.0 * i, oz + 16.0 * j)
-			vertices.append(Vector3(16.0 * i, h.height_m if h.is_valid else 0.0, 16.0 * j))
-	var indices := PackedInt32Array()
-	for j in range(32):
-		for i in range(32):
-			var a: int = j * 33 + i
-			indices.append_array([a, a + 1, a + 33, a + 1, a + 34, a + 33])
-	var normals := PackedVector3Array()
-	normals.resize(vertices.size())
-	for k in range(0, indices.size(), 3):
-		var n: Vector3 = (vertices[indices[k + 2]] - vertices[indices[k]]).cross(vertices[indices[k + 1]] - vertices[indices[k]])
-		for m in range(3):
-			normals[indices[k + m]] += n
-	for k in range(normals.size()):
-		normals[k] = normals[k].normalized()
-	var arrays: Array = []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = vertices
-	arrays[Mesh.ARRAY_NORMAL] = normals
-	arrays[Mesh.ARRAY_INDEX] = indices
-	return arrays
 
 
 static func _tiles_digest(slots: Array) -> String:

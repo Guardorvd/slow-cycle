@@ -201,7 +201,22 @@ func _run() -> Dictionary:
 	var slots: Array = []
 	for e: int in order:
 		slots.append({"e": e, "prep": _prepare_edge(e, edges, nodes, ports)})
-	var job := func(i: int) -> void:
+	# Pool dispatch order: expected-heaviest designs first (SINGLETRACK /
+	# TECHNICAL, then longer bands), so one long design does not start last and
+	# hold the pool alone. Each design is isolated (own tools, own budgets) and
+	# lands in its own slot; completion below stays in (class, id) order, so
+	# the outcome does not depend on this order.
+	var dispatch: Array = range(slots.size())
+	dispatch.sort_custom(func(a: int, b: int) -> bool:
+		var ca: int = slots[a].prep.route_class
+		var cb: int = slots[b].prep.route_class
+		if ca != cb:
+			return ca > cb
+		var la: float = _bands[slots[a].e].length()
+		var lb: float = _bands[slots[b].e].length()
+		return la > lb or (la == lb and a < b))
+	var job := func(n: int) -> void:
+		var i: int = dispatch[n]
 		var started: int = Time.get_ticks_usec()
 		slots[i]["independent"] = _independent(slots[i].prep, _tools())
 		slots[i]["cpu_s"] = (Time.get_ticks_usec() - started) / 1e6
