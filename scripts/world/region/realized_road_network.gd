@@ -597,6 +597,10 @@ static func trail_graph(data: Dictionary) -> Dictionary:
 			"road_m": _shortest(both_ways, entry).get(exit, INF), "return_m": _shortest(arcs, exit).get(entry, INF)})
 	var ids: Array = vertices.keys()
 	ids.sort()
+	if ids.is_empty():
+		# No road and no trail: nothing to ride, so not a connected network.
+		return {"vertices": 0, "arcs": 0, "strongly_connected": false, "traps": [], "cycles_road": 0, "cycles": 0, "trail_loops": 0, "forks": 0, "crossings": 0,
+			"trails": [], "classes": {}, "empty": true}
 	var forward: Dictionary = _reach(arcs, ids[0], false)
 	var backward: Dictionary = _reach(arcs, ids[0], true)
 	var traps: Array = ids.filter(func(v: String) -> bool: return not forward.has(v) or not backward.has(v))

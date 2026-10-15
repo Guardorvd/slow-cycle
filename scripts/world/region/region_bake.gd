@@ -126,7 +126,14 @@ static func _bake(seed_value: int, region: Vector2i, options: Dictionary, progre
 	var slots: Array = chosen.slots
 	var excluded: Dictionary = chosen.excluded
 	var trail_report: Dictionary = {}
-	if options.has("trail_config"):
+	if cancelled.is_valid() and cancelled.call():
+		return stopped
+	if options.has("trail_config") and network.get_data().pieces.is_empty():
+		# No road to join: trails are not planned; the empty network stays the
+		# recorded result (the runtime reports ERR_REGION_NO_NETWORK).
+		trail_report = {"config_sha256": JSON.stringify(options.trail_config, "", true).sha256_text(), "procedural": TrailPolicy.is_procedural(options.trail_config),
+			"published": [], "rejected": [{"id": "", "reason_code": "ERR_REGION_NO_NETWORK", "detail": {"stage": "network"}}]}
+	elif options.has("trail_config"):
 		t = Time.get_ticks_usec()
 		_report(progress, "trails", 0.91)
 		var made: Dictionary = _trails(options.trail_config, seed_value, region, network, surface, field, bounds, slots, threads)

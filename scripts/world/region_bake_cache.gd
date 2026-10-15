@@ -64,7 +64,7 @@ static func save(cache_key: String, baked: Dictionary) -> Dictionary:
 	var network_bytes: PackedByteArray = baked.network.to_bytes()
 	var written: Dictionary = _write(dir.path_join("network.bin"), network_bytes)
 	if not written.ok:
-		return {"is_valid": false, "reason_code": "ERR_BAKE_WRITE"}
+		return {"is_valid": false, "reason_code": "ERR_BAKE_WRITE", "file": "network.bin"}
 	files["network.bin"] = written.sha256
 	for k in range(baked.tiles.size()):
 		var slot: Dictionary = baked.tiles[k]
@@ -73,18 +73,18 @@ static func save(cache_key: String, baked: Dictionary) -> Dictionary:
 			"sha256": slot.sha256, "vertex_count": slot.vertex_count, "triangle_count": slot.triangle_count}
 		written = _write(dir.path_join("tile_%d.bin" % k), var_to_bytes(payload))
 		if not written.ok:
-			return {"is_valid": false, "reason_code": "ERR_BAKE_WRITE"}
+			return {"is_valid": false, "reason_code": "ERR_BAKE_WRITE", "file": "tile_%d.bin" % k}
 		files["tile_%d.bin" % k] = written.sha256
 	written = _write(dir.path_join("extras.bin"), var_to_bytes({"bridges": baked.bridges, "water": baked.water, "spawn": baked.spawn, "vegetation": baked.get("vegetation", [])}))
 	if not written.ok:
-		return {"is_valid": false, "reason_code": "ERR_BAKE_WRITE"}
+		return {"is_valid": false, "reason_code": "ERR_BAKE_WRITE", "file": "extras.bin"}
 	files["extras.bin"] = written.sha256
 	var manifest: Dictionary = baked.manifest.duplicate(true)
 	manifest["cache_key"] = cache_key
 	manifest["files"] = files
 	var file := FileAccess.open(dir.path_join("manifest.json"), FileAccess.WRITE)
 	if file == null:
-		return {"is_valid": false, "reason_code": "ERR_BAKE_WRITE"}
+		return {"is_valid": false, "reason_code": "ERR_BAKE_WRITE", "file": "manifest.json"}
 	file.store_string(JSON.stringify(manifest, "\t"))
 	file.close()
 	return {"is_valid": true, "reason_code": "", "directory": dir}
