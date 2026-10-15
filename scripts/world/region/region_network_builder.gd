@@ -38,7 +38,12 @@ static func build(region_plan: RefCounted, terrain_field: RefCounted, hydrology_
 
 
 static func _build(region_plan: RefCounted, terrain_field: RefCounted, hydrology_plan: RefCounted, options: Dictionary) -> Dictionary:
-	var spec := {"seed": options.get("seed", 0), "region": options.get("region", Vector2i.ZERO), "model": MODEL}
+	var engineered: bool = options.get("route_classes", "ALL") == "ENGINEERED"
+	# Experiment variant: R5 plans every class (same layout), R6 builds only the
+	# engineered ones.
+	var r6_only: bool = options.get("route_classes", "ALL") == "R6_ENGINEERED"
+	engineered = engineered or r6_only
+	var spec := {"seed": options.get("seed", 0), "region": options.get("region", Vector2i.ZERO), "model": MODEL + ((";classes=r6_engineered" if r6_only else ";classes=engineered") if engineered else "")}
 	var hints: Array = []
 	var hint_keys: Dictionary = {}
 	var raster: Variant = null
@@ -55,6 +60,8 @@ static func _build(region_plan: RefCounted, terrain_field: RefCounted, hydrology
 		if progress.is_valid():
 			progress.call("network: routes (round %d of up to %d)" % [round_index + 1, max_replans + 1], float(round_index) / (max_replans + 1))
 		var settings: Dictionary = {"hints": hints.duplicate(true)}
+		if engineered and not r6_only:
+			settings["route_classes"] = "ENGINEERED"
 		if raster != null:
 			settings["raster"] = raster
 		var routes: Dictionary = Planner.plan(region_plan, terrain_field, hydrology_plan, settings)
@@ -69,7 +76,8 @@ static func _build(region_plan: RefCounted, terrain_field: RefCounted, hydrology
 			return {"is_valid": false, "reason_code": "ERR_BAKE_CANCELLED", "network": null, "rounds": rounds}
 		if progress.is_valid():
 			progress.call("network: roads (round %d of up to %d)" % [round_index + 1, max_replans + 1], (round_index + 0.3) / (max_replans + 1))
-		var synth: Dictionary = Synth.synthesize(region_plan, terrain_field, hydrology_plan, routes.graph, {}, int(options.get("threads", 1)))
+		var synth: Dictionary = Synth.synthesize(region_plan, terrain_field, hydrology_plan, routes.graph, {}, int(options.get("threads", 1)),
+			[Graph.RouteClass.SINGLETRACK, Graph.RouteClass.TECHNICAL] if r6_only else [])
 		var t2: int = Time.get_ticks_usec()
 		if synth.plan == null:
 			rounds.append({"round": round_index, "status": "R6_" + str(synth.status), "reason_code": synth.reason_code, "hints": hints.size()})
@@ -96,7 +104,7 @@ static func _build(region_plan: RefCounted, terrain_field: RefCounted, hydrology
 		candidates.append(candidate)
 		if best.is_empty() or score > best.score:
 			best = candidate
-		if complete(metrics) or round_index == max_replans:
+		if (complete_engineered(metrics) if engineered else complete(metrics)) or round_index == max_replans:
 			break
 		var fresh: Array = hints_from(realized.analysis, routes.graph)
 		var added: int = 0
@@ -133,6 +141,15 @@ static func score_of(m: Dictionary) -> Array:
 static func complete(m: Dictionary) -> bool:
 	return m.backbone_continuous and m.component_length_m >= 8000.0 and m.cycles >= 2 and m.classes.has("SECONDARY") and m.classes.has("SINGLETRACK") \
 		and m.classes.has("TECHNICAL") and m.blocked_nodes == 0 and m.dead_ends_not_terminus == 0
+
+
+## Experiment (post-BC2 B2): completeness of a road network whose natural
+## classes come from the trail planner - N1-N6 without the SINGLETRACK /
+## TECHNICAL class demands (length, loops, SECONDARY, no blocked node or
+## stray dead end unchanged).
+static func complete_engineered(m: Dictionary) -> bool:
+	return m.backbone_continuous and m.component_length_m >= 8000.0 and m.cycles >= 2 and m.classes.has("SECONDARY") and m.blocked_nodes == 0 \
+		and m.dead_ends_not_terminus == 0
 
 
 ## Additive R5 hints from one round's diagnosis (region-local metres).

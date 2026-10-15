@@ -100,6 +100,9 @@ var _backbone_options: Array = []
 var _hints: Array = []
 var _hint_masks: Dictionary = {}
 var _explanations: Array = []
+## Experiment (post-BC2 B2, settings.route_classes = "ENGINEERED"): no
+## SINGLETRACK / TECHNICAL rounds - those classes come from the trail planner.
+var _engineered_only: bool = false
 ## Built, certified corridor pieces keyed "route:i0:i1" (the final edges).
 var _pieces: Dictionary = {}
 
@@ -149,6 +152,7 @@ static func plan(region_plan: RefCounted, terrain_field: RefCounted, hydrology_p
 	planner._relief_m = macro.relief_cm / 100.0
 	planner._route_seed = Seeds.route_seed(region_plan.get_identity().get_region_seed())
 	planner._hints = checked.hints
+	planner._engineered_only = settings.get("route_classes", "ALL") == "ENGINEERED"
 	var reused: Variant = settings.get("raster")
 	if reused is Raster and reused.origin_x == region_plan.get_bounds().get_min_x_m() and reused.origin_z == region_plan.get_bounds().get_min_z_m() and reused.metrics.get("region_signature", "") == region_plan.signature():
 		planner._raster = reused
@@ -181,8 +185,10 @@ func _tables_for(route_class: int) -> Dictionary:
 
 static func _check_settings(settings: Dictionary) -> Dictionary:
 	for key: Variant in settings:
-		if not key in ["hints", "raster"]:
+		if not key in ["hints", "raster", "route_classes"]:
 			return {"is_valid": false, "detail": "unknown key %s" % str(key)}
+	if not settings.get("route_classes", "ALL") in ["ALL", "ENGINEERED"]:
+		return {"is_valid": false, "detail": "route_classes must be ALL or ENGINEERED"}
 	var hints: Array = []
 	var raw: Variant = settings.get("hints", [])
 	if not raw is Array:
@@ -1045,6 +1051,8 @@ func _run() -> Dictionary:
 	var backbone_path: PackedInt32Array = _routes[0].path
 	_prepare_passable(PackedInt32Array([backbone_path[0], backbone_path[backbone_path.size() - 1]]))
 	for r in range(ROUNDS.size()):
+		if _engineered_only and ROUNDS[r].class in [Graph.RouteClass.SINGLETRACK, Graph.RouteClass.TECHNICAL]:
+			continue
 		_run_round(r + 1, ROUNDS[r])
 	return _assemble()
 
@@ -1140,7 +1148,7 @@ func _assemble() -> Dictionary:
 		anchors.append({"id": a, "kind": anchor.kind, "x_cm": anchor.x_cm, "z_cm": anchor.z_cm, "elevation_cm": anchor.elevation_cm, "status": status, "source": anchor.source, "reason_code": anchor.reason_code})
 	var bounds: Dictionary = _rideability.get_bounds_m()
 	var data := {"region_signature": _region_plan.signature(), "hydrology_signature": _hydrology_plan.signature(), "rideability_signature": _rideability.signature(),
-		"model": Search.MODEL + "|" + Anchors.MODEL + "|" + Scoring.MODEL + "|" + Builder.MODEL + "|" + MODEL, "route_seed": _route_seed,
+		"model": Search.MODEL + "|" + Anchors.MODEL + "|" + Scoring.MODEL + "|" + Builder.MODEL + "|" + MODEL + (";classes=engineered" if _engineered_only else ""), "route_seed": _route_seed,
 		"origin_x_m": bounds.min_x, "origin_z_m": bounds.min_z, "frame_symmetry": _symmetry, "planning_spacing_m": int(Raster.SPACING_M),
 		"nodes": nodes, "edges": edges, "routes": routes, "loops": loops, "anchors": anchors}
 	var composition: Dictionary = _composition(routes, loops, anchors)

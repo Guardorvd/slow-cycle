@@ -80,7 +80,8 @@ static func _bake(seed_value: int, region: Vector2i, options: Dictionary, progre
 	_report(progress, "network", 0.03)
 	var network_progress := func(stage: String, fraction: float) -> void: _report(progress, stage, 0.03 + 0.42 * fraction)
 	var built: Dictionary = Builder.build(plan, terrain, hydro.plan, {"seed": seed_value, "region": region, "max_replans": options.get("max_replans", Builder.MAX_REPLANS),
-		"threads": int(options.get("threads", 1)), "progress": network_progress, "cancelled": cancelled})
+		"threads": int(options.get("threads", 1)), "progress": network_progress, "cancelled": cancelled,
+		"route_classes": options.get("route_classes", "ALL")})
 	timings["network_s"] = _lap(t)
 	if not built.is_valid:
 		return {"is_valid": false, "reason_code": built.reason_code, "rounds": built.get("rounds", [])}

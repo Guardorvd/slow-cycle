@@ -59,6 +59,7 @@ var _threads: int = 1
 ## Diagnostics only (never in the plan data or its signature): design work per
 ## route class and the heaviest edges of this synthesis.
 var _edge_work: Dictionary = {}
+var _skip_classes: Array = []
 ## Failures a descent-preferred design may relieve (policy v2 climb limits).
 const CLIMB_REASONS: Array[String] = ["ERR_R6_GRADE", "ERR_R6_SUSTAINED_GRADE", "ERR_R6_PITCH_LENGTH"]
 
@@ -87,11 +88,15 @@ static func off_main_thread(action: Callable) -> Variant:
 ## WorkerThreadPool threads; outcomes do not depend on it (every piece is
 ## designed in isolation; conflicts are resolved afterwards in stable order)
 ## nor on the calling thread (`off_main_thread`).
-static func synthesize(region_plan: RefCounted, terrain_field: RefCounted, hydrology_plan: RefCounted, graph: RefCounted, settings: Variant = {}, threads: int = 1) -> Dictionary:
-	return off_main_thread(func() -> Dictionary: return _synthesize(region_plan, terrain_field, hydrology_plan, graph, settings, threads))
+## skip_classes (experiment, post-BC2 B2): edges of these classes are not
+## designed; they are recorded REPLAN_REQUIRED / ERR_R6_NOT_SYNTHESIZED.
+static func synthesize(region_plan: RefCounted, terrain_field: RefCounted, hydrology_plan: RefCounted, graph: RefCounted, settings: Variant = {}, threads: int = 1,
+		skip_classes: Array = []) -> Dictionary:
+	return off_main_thread(func() -> Dictionary: return _synthesize(region_plan, terrain_field, hydrology_plan, graph, settings, threads, skip_classes))
 
 
-static func _synthesize(region_plan: RefCounted, terrain_field: RefCounted, hydrology_plan: RefCounted, graph: RefCounted, settings: Variant, threads: int) -> Dictionary:
+static func _synthesize(region_plan: RefCounted, terrain_field: RefCounted, hydrology_plan: RefCounted, graph: RefCounted, settings: Variant, threads: int,
+		skip_classes: Array = []) -> Dictionary:
 	if region_plan == null or terrain_field == null or hydrology_plan == null or graph == null:
 		return _result(Policy.Status.REJECT, null, "ERR_R6_INPUT_MISSING", {})
 	if not region_plan is Region or not terrain_field is Terrain or not hydrology_plan is Hydro or not graph is Graph:
@@ -130,6 +135,7 @@ static func _synthesize(region_plan: RefCounted, terrain_field: RefCounted, hydr
 	synthesizer._surface = surface.surface
 	synthesizer._hfield = hydro.field
 	synthesizer._threads = maxi(1, threads)
+	synthesizer._skip_classes = skip_classes.duplicate()
 	synthesizer._designer = Designer.create(synthesizer._natural, resolved.settings.max_fit_evaluations)
 	synthesizer._junctions = Junctions.create(synthesizer._natural)
 	synthesizer._validator = Validator.create(synthesizer._natural)
@@ -203,6 +209,10 @@ func _run() -> Dictionary:
 		slots.append({"e": e, "prep": _prepare_edge(e, edges, nodes, ports)})
 	var job := func(i: int) -> void:
 		var started: int = Time.get_ticks_usec()
+		if slots[i].prep.route_class in _skip_classes:
+			slots[i]["independent"] = {"skipped": true, "fit_evaluations": 0, "natural_queries": 0, "detail": {}}
+			slots[i]["cpu_s"] = 0.0
+			return
 		slots[i]["independent"] = _independent(slots[i].prep, _tools())
 		slots[i]["cpu_s"] = (Time.get_ticks_usec() - started) / 1e6
 	if _threads > 1 and slots.size() > 1:
@@ -220,7 +230,12 @@ func _run() -> Dictionary:
 		# ran in isolation under its own per-piece budget; an edge whose work
 		# takes the region total past a budget is not accepted.
 		var outcome: Dictionary
-		if _natural.total_queries() > _settings.max_natural_queries or _fit_total + _junctions.fit_evaluations > _settings.max_fit_evaluations:
+		if slot.independent.get("skipped", false):
+			slot.prep.record.reasons.append("ERR_R6_NOT_SYNTHESIZED")
+			for entry: Dictionary in slot.prep.crossings:
+				entry.reasons.append("ERR_R6_EDGE_UNAVAILABLE")
+			outcome = {"record": slot.prep.record, "crossings": slot.prep.crossings, "zones": slot.prep.zones}
+		elif _natural.total_queries() > _settings.max_natural_queries or _fit_total + _junctions.fit_evaluations > _settings.max_fit_evaluations:
 			outcome = _budget_exhausted(slot.prep)
 		else:
 			outcome = _finish_edge(slot.prep, slot.independent, accepted)
