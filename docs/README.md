@@ -12,6 +12,7 @@ Scope: навигация после D0/D1 и Q0 authority approval. Решен�
 |---|---|---|
 | Какую игру строим? | [TARGET_GAME_BLUEPRINT](TARGET_GAME_BLUEPRINT.md) | Product North Star, freedom, region-first, human acceptance |
 | В каком порядке переходим? | [MASTER_IMPLEMENTATION_PLAN](MASTER_IMPLEMENTATION_PLAN.md) | D0 → D1 → Q0 → Q1 → Q2 → R0…R21 |
+| Генератор V2 (тропы, география, скорость) | [generator-v2](generator-v2/README.md), [GEN2-001](DECISIONS/GEN2-001-generator-v2-direction.md) | Принятое направление и план этапов GEN2; каждый этап — отдельное approval |
 | Какие target владельцы и границы? | [TARGET_ARCHITECTURE](TARGET_ARCHITECTURE.md) | Производная будущая архитектура |
 | Что сохраняем/адаптируем/заменяем? | [LEGACY_MIGRATION_MATRIX](LEGACY_MIGRATION_MATRIX.md) | Future migration decisions и parity gates |
 | Какие доказательства нужны? | [TEST_STRATEGY](TEST_STRATEGY.md) | §0 Fast Cycle (FAST → PLAYTEST → DEEP, D3) — порядок по умолчанию; категории/уровни evidence |

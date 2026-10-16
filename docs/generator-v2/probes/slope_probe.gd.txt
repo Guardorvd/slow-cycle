@@ -1,0 +1,53 @@
+extends SceneTree
+## Throwaway V2 diagnostic (not committed): slope bands of the natural ground.
+const Ground = preload("res://scripts/world/region/region_bake_ground.gd")
+const Natural = preload("res://scripts/world/region/hydrology_surface.gd")
+func _initialize() -> void:
+	var args := OS.get_cmdline_user_args()
+	var seed_value := int(args[0]); var region := Vector2i(int(args[1]), int(args[2]))
+	var t0 := Time.get_ticks_msec()
+	var up: Dictionary = Ground.upstream(seed_value, region)
+	var surf: RefCounted = Natural.create(up.terrain, up.field).surface
+	var b: Dictionary = up.bounds
+	var step := 16.0
+	var nx := int((b.max_x - b.min_x) / step); var nz := int((b.max_z - b.min_z) / step)
+	var h := PackedFloat32Array(); h.resize(nx * nz)
+	var wet := PackedByteArray(); wet.resize(nx * nz)
+	for j in nz:
+		for i in nx:
+			var x: float = b.min_x + (i + 0.5) * step; var z: float = b.min_z + (j + 0.5) * step
+			var s: Dictionary = surf.sample_height(x, z)
+			h[j * nx + i] = s.height_m if s.is_valid else NAN
+			var w: Dictionary = up.field.sample_water(x, z)
+			wet[j * nx + i] = 1 if w.get("is_water", false) else 0
+	var bands := [0.10, 0.23, 0.35, 0.60, 1.0, INF]
+	var names := ["<10%", "10-23% (TECH fall line)", "23-35% (traverse/switchback)", "35-60% (bench needed)", "60-100%", ">100%"]
+	var counts := [0, 0, 0, 0, 0, 0]
+	var slope := PackedFloat32Array(); slope.resize(nx * nz)
+	var dry := 0
+	for j in range(1, nz - 1):
+		for i in range(1, nx - 1):
+			var k := j * nx + i
+			if wet[k] == 1: continue
+			var gx := (h[k + 1] - h[k - 1]) / (2 * step); var gz := (h[k + nx] - h[k - nx]) / (2 * step)
+			var g := sqrt(gx * gx + gz * gz); slope[k] = g; dry += 1
+			for m in bands.size():
+				if g < bands[m]: counts[m] += 1; break
+	# Hillsides: connected cells with 0.23 <= slope < 0.60, their drop.
+	var seen := PackedByteArray(); seen.resize(nx * nz)
+	var sides := []
+	for k0 in nx * nz:
+		if seen[k0] == 1 or slope[k0] < 0.23 or slope[k0] >= 0.60 or wet[k0] == 1: continue
+		var stack := [k0]; seen[k0] = 1; var n := 0; var lo := INF; var hi := -INF
+		while not stack.is_empty():
+			var k: int = stack.pop_back(); n += 1; lo = minf(lo, h[k]); hi = maxf(hi, h[k])
+			for d in [1, -1, nx, -nx]:
+				var q: int = k + d
+				if q < 0 or q >= nx * nz or seen[q] == 1 or wet[q] == 1 or slope[q] < 0.23 or slope[q] >= 0.60: continue
+				seen[q] = 1; stack.append(q)
+		if n >= 20: sides.append([n * step * step / 10000.0, hi - lo])
+	sides.sort_custom(func(a, c): return a[1] > c[1])
+	var out := {"seed": seed_value, "region": [region.x, region.y], "cells": dry, "relief_m": [snappedf(Array(h).filter(func(v): return not is_nan(v)).min(), 0.1), snappedf(Array(h).filter(func(v): return not is_nan(v)).max(), 0.1)], "bands": {}, "hillsides_ha_drop_m": sides.slice(0, 8).map(func(s): return [snappedf(s[0], 0.1), snappedf(s[1], 0.1)]), "seconds": (Time.get_ticks_msec() - t0) / 1000.0}
+	for m in names.size(): out.bands[names[m]] = snappedf(100.0 * counts[m] / dry, 0.1)
+	print("V2PROBE ", JSON.stringify(out))
+	quit()

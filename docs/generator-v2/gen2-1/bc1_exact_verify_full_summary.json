@@ -1,0 +1,134 @@
+{
+	"changed_outside_dependency": [],
+	"changed_tiles": [
+		[
+			4,
+			5
+		]
+	],
+	"dependency_tiles": [
+		[
+			4,
+			5
+		]
+	],
+	"dev_cache_dir": "/root/.local/share/godot/app_userdata/Slow Cycle/regions_dev/b94a8348558a218d2f27620735ad0e6b92ee2d7016f0a35332d632c84e65e55d",
+	"digests": {
+		"network": "feff31b4b73ccaaf49ad2752fbd4657a2c41eca0d98af1a14558de4b462eeceb",
+		"tiles": "e85f9c4c6708973edd04a3c8a96d4f1ae5299c9c2b9c3e2593a8ba369f1b7e49",
+		"vegetation": "896ee72f61765c297b28558cfd3d45f214f8d03ac0d23dc2d0327783882844ee"
+	},
+	"exit_code": 0,
+	"ground": "reused",
+	"ground_key": "08df42b64893845a7bd966e4506bcdf3ab4e11b44b2e9f50be494ef5d90663f1",
+	"launch": "godot --path . --script res://tools/dev/ride_trail.gd -- --seed=184729 --region=0,0 --trail-config=res://resources/regions/bc1_trail_184729.json --dev-cache --trail=trail:bc1_meadow",
+	"map": "/root/.local/share/godot/app_userdata/Slow Cycle/trail_probe/bc1_verify/map_exact.png",
+	"mode": "exact",
+	"outside_unchanged": true,
+	"publication": {
+		"attempts": 1,
+		"border_points": 0,
+		"calls": 1,
+		"finalize_s": 0.931563,
+		"join_s": 0.001859,
+		"max_tiles": 1,
+		"refine_s": 18.546884,
+		"seam_passes": 1,
+		"shape_s": 0.36409,
+		"tiles_memo": 0,
+		"tiles_refined": 1,
+		"trail_tiles_s": 0.012928,
+		"trails_attempted": 1,
+		"trap_check_s": 0.0
+	},
+	"published": [
+		{
+			"border_points": 0,
+			"id": "trail:bc1_meadow",
+			"length_m": 453.1,
+			"metrics": {
+				"climb_m": 14.6281668754844,
+				"descent_m": 3.63431944715592,
+				"design_parity_max_m": 1.22482740360857,
+				"max_cross_slope": 0.176108315587044,
+				"max_grade": 0.126724310219288,
+				"max_pitch_grade": 0.182805225253105,
+				"min_radius_m": 26.7754611165989,
+				"shaped_fraction": 0.125790731532131,
+				"shaped_length_m": 57.0
+			},
+			"operations": [
+				{
+					"daylight_m": 1.5,
+					"kind": "BENCH",
+					"metrics": {
+						"attempts": 1,
+						"cross_after_max": 0.0023772414256375,
+						"cross_before_max": 0.194661714709722,
+						"length_m": 57.0,
+						"max_displacement_m": 0.126530114561319,
+						"volume_m3": 14.0500089806068
+					},
+					"mode": "SHAPED",
+					"s0_m": 126.0,
+					"s1_m": 183.0,
+					"taper_m": 4.0
+				}
+			],
+			"tiles": [
+				[
+					4,
+					5
+				]
+			]
+		}
+	],
+	"region": [
+		0,
+		0
+	],
+	"rejected": [],
+	"runtime_key": "b94a8348558a218d2f27620735ad0e6b92ee2d7016f0a35332d632c84e65e55d",
+	"saved": true,
+	"seed": 184729,
+	"threads": 4,
+	"timings_s": {
+		"finish_detail": {
+			"bridges_water_s": 0.031022,
+			"vegetation_s": 19.354179,
+			"vegetation_tiles": 9
+		},
+		"finish_s": 19.463251,
+		"ground_load_s": 14.640261,
+		"map_s": 4.722934,
+		"off_vegetation": "reused",
+		"off_vegetation_s": 0.347002,
+		"publish_s": 20.374737,
+		"save_s": 2.250097,
+		"upstream_s": 2.393431,
+		"verify_full_s": 471.17248
+	},
+	"total_s": 535.504023,
+	"verify_full": {
+		"full_digests": {
+			"network": "feff31b4b73ccaaf49ad2752fbd4657a2c41eca0d98af1a14558de4b462eeceb",
+			"tiles": "e85f9c4c6708973edd04a3c8a96d4f1ae5299c9c2b9c3e2593a8ba369f1b7e49",
+			"vegetation": "896ee72f61765c297b28558cfd3d45f214f8d03ac0d23dc2d0327783882844ee"
+		},
+		"full_timings_s": {
+			"bridges_water_s": 0.019098,
+			"deformer_s": 11.11954,
+			"network_s": 106.96567,
+			"tiles_s": 201.364809,
+			"trails_s": 20.413626,
+			"upstream_s": 2.239455,
+			"vegetation_s": 128.887638
+		},
+		"same": {
+			"network": true,
+			"tiles": true,
+			"vegetation": true
+		},
+		"verdict": "MATCH"
+	}
+}

@@ -1,0 +1,12 @@
+MEASURE label=new_184729_cold exit=0 wall_s=597.514017054 peak_rss_mb=1319
+MEASURE label=probe_check exit=0 wall_s=759.308428354 peak_rss_mb=749
+MEASURE label=probe_check2 exit=2 wall_s=368.456381720 peak_rss_mb=794
+MEASURE label=probe_check3 exit=0 wall_s=375.433606231 peak_rss_mb=724
+MEASURE label=probe_exact_bc1 exit=0 wall_s=189.240982331 peak_rss_mb=443
+MEASURE label=probe_exact_bc1_b exit=0 wall_s=65.453124192 peak_rss_mb=443
+MEASURE label=probe_preview_bc1 exit=0 wall_s=32.254675529 peak_rss_mb=386
+MEASURE label=probe_preview_final exit=0 wall_s=24.167926322 peak_rss_mb=386
+MEASURE label=probe_verify_bc1 exit=0 wall_s=537.865394064 peak_rss_mb=1405
+MEASURE label=v1_184729 exit=0 wall_s=532.742252325 peak_rss_mb=1164
+MEASURE label=v1_2024 exit=0 wall_s=822.621695728 peak_rss_mb=660
+MEASURE label=v1_3628391 exit=0 wall_s=1130.729896511 peak_rss_mb=1035

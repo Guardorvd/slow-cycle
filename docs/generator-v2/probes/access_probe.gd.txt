@@ -1,0 +1,82 @@
+extends SceneTree
+## Throwaway V2 diagnostic (not committed): hillsides vs R5 road corridors.
+const Ground = preload("res://scripts/world/region/region_bake_ground.gd")
+const Natural = preload("res://scripts/world/region/hydrology_surface.gd")
+const Planner = preload("res://scripts/world/region/route_planner.gd")
+func _initialize() -> void:
+	var args := OS.get_cmdline_user_args()
+	var seed_value := int(args[0]); var region := Vector2i(int(args[1]), int(args[2]))
+	var t0 := Time.get_ticks_msec()
+	var up: Dictionary = Ground.upstream(seed_value, region)
+	var surf: RefCounted = Natural.create(up.terrain, up.field).surface
+	var routes: Dictionary = Planner.plan(up.plan, up.terrain, up.hydro.plan, {})
+	var t_r5 := Time.get_ticks_msec() - t0
+	var g: RefCounted = routes.graph
+	var roads := []  # [Vector2 world, h, edge]
+	var classes := {}
+	for e in g.get_edge_count():
+		var c: Dictionary = g.get_corridor(e)
+		classes[c.class_name] = classes.get(c.class_name, 0) + int(c.length_m)
+		if c["class"] > 1: continue
+		for k in range(0, c.x_m.size(), 3):
+			roads.append([Vector2(c.x_m[k], c.z_m[k]), c.elevation_m[k], e])
+	var b: Dictionary = up.bounds
+	var step := 16.0
+	var nx := int((b.max_x - b.min_x) / step); var nz := int((b.max_z - b.min_z) / step)
+	var h := PackedFloat32Array(); h.resize(nx * nz)
+	var wet := PackedByteArray(); wet.resize(nx * nz)
+	for j in nz:
+		for i in nx:
+			var x: float = b.min_x + (i + 0.5) * step; var z: float = b.min_z + (j + 0.5) * step
+			var s: Dictionary = surf.sample_height(x, z)
+			h[j * nx + i] = s.height_m if s.is_valid else NAN
+			wet[j * nx + i] = 1 if up.field.sample_water(x, z).get("is_water", false) else 0
+	# Distance to road: coarse brute force over road points (every 3rd station).
+	var hill := 0; var near300 := 0; var near600 := 0
+	for j in range(1, nz - 1):
+		for i in range(1, nx - 1):
+			var k := j * nx + i
+			if wet[k] == 1: continue
+			var gx := (h[k + 1] - h[k - 1]) / (2 * step); var gz := (h[k + nx] - h[k - nx]) / (2 * step)
+			var s := sqrt(gx * gx + gz * gz)
+			if s < 0.23 or s >= 0.6: continue
+			hill += 1
+			if (i + j) % 2 == 1: continue  # half sample for speed
+			var p := Vector2(b.min_x + (i + 0.5) * step, b.min_z + (j + 0.5) * step)
+			var best := INF
+			for r in roads: best = minf(best, p.distance_squared_to(r[0]))
+			if best < 300.0 * 300.0: near300 += 2
+			if best < 600.0 * 600.0: near600 += 2
+	# Descent opportunities between road points of different edges.
+	var sample := []
+	for r in range(0, roads.size(), 3): sample.append(roads[r])
+	var buckets := {"60-120": 0, "120-250": 0, ">=250": 0}
+	var best_pairs := []
+	for a in sample:
+		for c in sample:
+			if a[2] == c[2]: continue
+			var drop: float = a[1] - c[1]
+			if drop < 60.0: continue
+			var d: float = a[0].distance_to(c[0])
+			if d > 2000.0 or d < 150.0: continue
+			var n := int(d / 16.0); var ok := 0; var mean_s := 0.0; var bad := false
+			for m in range(1, n):
+				var q: Vector2 = a[0].lerp(c[0], float(m) / n)
+				var i := int((q.x - b.min_x) / step); var j := int((q.y - b.min_z) / step)
+				if i < 1 or j < 1 or i >= nx - 1 or j >= nz - 1: bad = true; break
+				var k := j * nx + i
+				if wet[k] == 1: bad = true; break
+				var gx := (h[k + 1] - h[k - 1]) / (2 * step); var gz := (h[k + nx] - h[k - nx]) / (2 * step)
+				var s := sqrt(gx * gx + gz * gz); mean_s += s
+				if s < 0.8: ok += 1
+			if bad or n < 2 or ok < 0.9 * (n - 1): continue
+			mean_s /= (n - 1)
+			if mean_s < 0.15: continue
+			var key := "60-120" if drop < 120 else ("120-250" if drop < 250 else ">=250")
+			buckets[key] += 1
+			best_pairs.append([snappedf(drop, 1), snappedf(d, 1), snappedf(mean_s, 0.01)])
+	best_pairs.sort_custom(func(p, q): return p[0] > q[0])
+	print("V2ACCESS ", JSON.stringify({"seed": seed_value, "region": [region.x, region.y], "r5_ms": t_r5, "road_m_by_class": classes, "hillside_cells": hill,
+		"hillside_within_300m_pct": snappedf(100.0 * near300 / hill, 0.1), "hillside_within_600m_pct": snappedf(100.0 * near600 / hill, 0.1),
+		"descent_pairs_by_drop_m": buckets, "top_pairs_drop_dist_meanslope": best_pairs.slice(0, 6), "seconds": (Time.get_ticks_msec() - t0) / 1000.0}))
+	quit()

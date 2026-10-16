@@ -1,6 +1,6 @@
 # GEN2-1 — single-trail tool and stage cost (record)
 
-STATUS: IMPLEMENTED, awaiting the Director's check of the tool (2026-10-16). Branch `gen2-1-trail-tool` on master `d2ad73f`. Plan: Generator V2 plan GEN2-1 (project files `generator-v2/GENERATOR_V2_PLAN.md`), approved with the Director's clarifications of 2026-10-16 (existing publication mechanism first, preview and exact with different criteria, exact compared with a full publication of the same trail set, success and refusal checks, V1 snapshot kept locally).
+STATUS: COMPLETE — accepted by the Game Director 2026-10-16 ("все норм"); not FORMALLY ACCEPTED (no DEEP campaign). Branch `gen2-1-trail-tool` on master `d2ad73f`. Plan: [Generator V2 plan](../generator-v2/GENERATOR_V2_PLAN.md) GEN2-1, approved with the Director's clarifications of 2026-10-16 (existing publication mechanism first, preview and exact with different criteria, exact compared with a full publication of the same trail set, success and refusal checks, V1 snapshot kept locally, [record](../generator-v2/V1_SNAPSHOT.md)). Evidence files: [docs/generator-v2/gen2-1/](../generator-v2/gen2-1/).
 
 ## What changed
 

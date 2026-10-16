@@ -1,0 +1,387 @@
+{
+ "summary": {
+  "bake_timings_s": {
+   "bridges_water_s": 0.013523,
+   "deformer_s": 13.31244,
+   "network_s": 114.032172,
+   "tiles_s": 212.018894,
+   "trails_s": 101.410613,
+   "upstream_s": 2.460101,
+   "vegetation_s": 141.305224
+  },
+  "network_digest": "aa564a9af5833d321e6ae90402ec649fa2bf873d8ed3023d1deb5c8060501382",
+  "region": [
+   0,
+   0
+  ],
+  "runtime_key": "29a87830d8e1b1df4d5adc14e2e4d27783e55f49f10c1c416020c3c7dc4c22c9",
+  "saved": true,
+  "seed": 184729,
+  "stages": {
+   "ground": "built (ERR_STAGE_REBUILD)",
+   "ground_saved": true,
+   "trails": "built (ERR_STAGE_REBUILD)",
+   "trails_saved": true
+  },
+  "stop_rule": "ROADS",
+  "terrain_kernel": "gdscript",
+  "tiles_digest": "fb2dc7586a2516be3ded8197c6a85a5babe84506d5d7a67bb376748995ead60b",
+  "timings_s": {
+   "finish_s": 141.40138,
+   "ground_build_s": 339.426357,
+   "keys_s": 0.522034,
+   "save_s": 2.979449,
+   "total_s": 594.8513,
+   "trails_build_s": 101.413299,
+   "upstream_s": 2.460101
+  },
+  "trails": [
+   [
+    "trail:tech_9_6_e9_1190R_e9_150R",
+    "TECHNICAL",
+    240.31741912663
+   ],
+   [
+    "trail:tech_8_4_e7_310R_e7_30R",
+    "TECHNICAL",
+    239.982103466988
+   ],
+   [
+    "trail:st_6_9_e9_45R_e9_1550R",
+    "SINGLETRACK",
+    538.148863524199
+   ],
+   [
+    "trail:st_3_8_e2_393R_e8_45R",
+    "SINGLETRACK",
+    356.070204168558
+   ]
+  ],
+  "vegetation_digest": "7a9f336c9efbffe58dfcff2e21c7bd459ef6b5cb01c1dbbc3a8bcc775f356af9"
+ },
+ "timings_s": {
+  "bridges_water_s": 0.013523,
+  "deformer_s": 13.31244,
+  "network_s": 114.032172,
+  "tiles_s": 212.018894,
+  "trails_s": 101.410613,
+  "upstream_s": 2.460101,
+  "vegetation_s": 141.305224
+ },
+ "rounds": [
+  {
+   "classes": {
+    "BACKBONE": 7,
+    "SECONDARY": 1
+   },
+   "component_length_m": 5542.20016611856,
+   "cycles": 1,
+   "edges": 13,
+   "edges_ready": 11,
+   "hints": 0,
+   "r5_work": {
+    "composition": {
+     "backbone": 1,
+     "cross_connection": 1,
+     "loops": 4,
+     "routes": 5,
+     "secondary": 3,
+     "shortcut": 0,
+     "singletrack": 1,
+     "spurs": 0,
+     "technical": 0
+    },
+    "degrade_codes": [
+     "DEGRADED_FEW_SINGLETRACK",
+     "DEGRADED_NO_TECHNICAL_SITE",
+     "DEGRADED_ANCHOR_KIND_UNREACHED:LAKE_SHORE"
+    ],
+    "expanded": 396049,
+    "regenerations": 11,
+    "replans": 0,
+    "rounds": [
+     {
+      "accepted": 3,
+      "generated": 31,
+      "round": "secondary"
+     },
+     {
+      "accepted": 1,
+      "generated": 26,
+      "round": "singletrack"
+     },
+     {
+      "accepted": 0,
+      "generated": 26,
+      "round": "technical"
+     },
+     {
+      "accepted": 0,
+      "generated": 21,
+      "round": "cross_connection"
+     }
+    ],
+    "searches": 157
+   },
+   "r6_edge_work": {
+    "classes": {
+     "BACKBONE": {
+      "cpu_s": 9.75,
+      "descent_retries": 0,
+      "edges": 7,
+      "failed": 0,
+      "failed_cpu_s": 0.0,
+      "max_s": 2.84
+     },
+     "SECONDARY": {
+      "cpu_s": 32.63,
+      "descent_retries": 0,
+      "edges": 5,
+      "failed": 1,
+      "failed_cpu_s": 2.39,
+      "max_s": 15.05
+     },
+     "SINGLETRACK": {
+      "cpu_s": 7.33,
+      "descent_retries": 0,
+      "edges": 1,
+      "failed": 1,
+      "failed_cpu_s": 7.33,
+      "max_s": 7.33
+     }
+    },
+    "heaviest": [
+     {
+      "class": "SECONDARY",
+      "cpu_s": 15.05,
+      "edge": 11,
+      "reason": "",
+      "status": "READY"
+     },
+     {
+      "class": "SINGLETRACK",
+      "cpu_s": 7.33,
+      "edge": 12,
+      "reason": "ERR_R6_EARTHWORK",
+      "status": "REPLAN_REQUIRED"
+     },
+     {
+      "class": "SECONDARY",
+      "cpu_s": 6.88,
+      "edge": 10,
+      "reason": "ERR_R6_CROSSING_MISSING",
+      "status": "READY"
+     },
+     {
+      "class": "SECONDARY",
+      "cpu_s": 5.41,
+      "edge": 8,
+      "reason": "",
+      "status": "READY"
+     },
+     {
+      "class": "SECONDARY",
+      "cpu_s": 2.9,
+      "edge": 9,
+      "reason": "ERR_R6_CROSSING_MISSING",
+      "status": "READY"
+     }
+    ]
+   },
+   "r6_reasons": [
+    "ERR_R6_CROSSING_MISSING",
+    "ERR_R6_EARTHWORK",
+    "ERR_R6_JUNCTION_MOVEMENT",
+    "ERR_R6_CROSSING_APPROACH"
+   ],
+   "r6_timings": {
+    "connectors": 0.702501,
+    "edges": 16.884903,
+    "inputs": 0.002536,
+    "intents_network": 0.086648,
+    "junctions": 4.795796,
+    "overlaps": 0.02731
+   },
+   "round": 0,
+   "score": [
+    1,
+    1,
+    1,
+    1,
+    5542.0
+   ],
+   "seconds": {
+    "network": 0.025867,
+    "r5": 39.582231,
+    "r6": 23.427696
+   },
+   "status": "OK"
+  },
+  {
+   "classes": {
+    "BACKBONE": 7,
+    "SECONDARY": 5
+   },
+   "component_length_m": 9388.32632227378,
+   "cycles": 3,
+   "edges": 13,
+   "edges_ready": 12,
+   "hints": 3,
+   "r5_work": {
+    "composition": {
+     "backbone": 1,
+     "cross_connection": 1,
+     "loops": 4,
+     "routes": 5,
+     "secondary": 3,
+     "shortcut": 0,
+     "singletrack": 1,
+     "spurs": 0,
+     "technical": 0
+    },
+    "degrade_codes": [
+     "DEGRADED_FEW_SINGLETRACK",
+     "DEGRADED_NO_TECHNICAL_SITE",
+     "DEGRADED_ANCHOR_KIND_UNREACHED:LAKE_SHORE"
+    ],
+    "expanded": 406568,
+    "regenerations": 11,
+    "replans": 0,
+    "rounds": [
+     {
+      "accepted": 3,
+      "generated": 31,
+      "round": "secondary"
+     },
+     {
+      "accepted": 1,
+      "generated": 26,
+      "round": "singletrack"
+     },
+     {
+      "accepted": 0,
+      "generated": 26,
+      "round": "technical"
+     },
+     {
+      "accepted": 0,
+      "generated": 21,
+      "round": "cross_connection"
+     }
+    ],
+    "searches": 157
+   },
+   "r6_edge_work": {
+    "classes": {
+     "BACKBONE": {
+      "cpu_s": 10.2,
+      "descent_retries": 0,
+      "edges": 7,
+      "failed": 0,
+      "failed_cpu_s": 0.0,
+      "max_s": 2.65
+     },
+     "SECONDARY": {
+      "cpu_s": 33.47,
+      "descent_retries": 0,
+      "edges": 5,
+      "failed": 0,
+      "failed_cpu_s": 0.0,
+      "max_s": 15.32
+     },
+     "SINGLETRACK": {
+      "cpu_s": 6.26,
+      "descent_retries": 0,
+      "edges": 1,
+      "failed": 1,
+      "failed_cpu_s": 6.26,
+      "max_s": 6.26
+     }
+    },
+    "heaviest": [
+     {
+      "class": "SECONDARY",
+      "cpu_s": 15.32,
+      "edge": 11,
+      "reason": "",
+      "status": "READY"
+     },
+     {
+      "class": "SECONDARY",
+      "cpu_s": 6.55,
+      "edge": 9,
+      "reason": "",
+      "status": "READY"
+     },
+     {
+      "class": "SINGLETRACK",
+      "cpu_s": 6.26,
+      "edge": 12,
+      "reason": "ERR_R6_EARTHWORK",
+      "status": "REPLAN_REQUIRED"
+     },
+     {
+      "class": "SECONDARY",
+      "cpu_s": 5.6,
+      "edge": 7,
+      "reason": "",
+      "status": "READY"
+     },
+     {
+      "class": "SECONDARY",
+      "cpu_s": 4.19,
+      "edge": 8,
+      "reason": "",
+      "status": "READY"
+     }
+    ]
+   },
+   "r6_reasons": [
+    "ERR_R6_EARTHWORK",
+    "ERR_R6_JUNCTION_MOVEMENT"
+   ],
+   "r6_timings": {
+    "connectors": 0.823558,
+    "edges": 17.051812,
+    "inputs": 0.002297,
+    "intents_network": 0.063672,
+    "junctions": 6.083403,
+    "overlaps": 0.018484
+   },
+   "round": 1,
+   "score": [
+    1,
+    1,
+    1,
+    2,
+    9388.0
+   ],
+   "seconds": {
+    "network": 0.04025,
+    "r5": 25.685654,
+    "r6": 25.161227
+   },
+   "status": "OK"
+  }
+ ],
+ "trails_publication": {
+  "attempts": 1,
+  "border_points": 160,
+  "calls": 1,
+  "finalize_s": 3.731089,
+  "join_s": 0.003741,
+  "max_tiles": 8,
+  "refine_s": 73.505145,
+  "seam_passes": 2,
+  "shape_s": 2.529187,
+  "tiles_memo": 0,
+  "tiles_refined": 16,
+  "trail_tiles_s": 0.037704,
+  "trails_attempted": 4,
+  "trap_check_s": 0.011513
+ },
+ "planner": {
+  "seconds": 16.340233,
+  "ground_s": 5.201916
+ }
+}
