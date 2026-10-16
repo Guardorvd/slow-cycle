@@ -11,3 +11,16 @@ mono_crash.*.json
 *.tmp
 .DS_Store
 Thumbs.db
+
+# .NET build outputs / IDE
+bin/
+obj/
+.vs/
+*.user
+
+# Python bytecode (tools/verify)
+__pycache__/
+*.pyc
+
+# Logs
+*.log

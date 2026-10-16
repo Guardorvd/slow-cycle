@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://cdlrixqshvgyl"
+
+[deps]
+
+files=["res://docs/generator-v2/gen2-1/slopes_184729.top.translation", "res://docs/generator-v2/gen2-1/slopes_184729.top.translation", "res://docs/generator-v2/gen2-1/slopes_184729.top.translation", "res://docs/generator-v2/gen2-1/slopes_184729.road.translation", "res://docs/generator-v2/gen2-1/slopes_184729.road.translation", "res://docs/generator-v2/gen2-1/slopes_184729.road.translation", "res://docs/generator-v2/gen2-1/slopes_184729.road.translation", "res://docs/generator-v2/gen2-1/slopes_184729.road.translation", "res://docs/generator-v2/gen2-1/slopes_184729.drop.translation", "res://docs/generator-v2/gen2-1/slopes_184729.straight.translation", "res://docs/generator-v2/gen2-1/slopes_184729.end.translation", "res://docs/generator-v2/gen2-1/slopes_184729.mean.translation", "res://docs/generator-v2/gen2-1/slopes_184729.max.translation", "res://docs/generator-v2/gen2-1/slopes_184729.share.translation", "res://docs/generator-v2/gen2-1/slopes_184729.water.translation", "res://docs/generator-v2/gen2-1/slopes_184729.climb.translation", "res://docs/generator-v2/gen2-1/slopes_184729.descent.translation"]
+
+source_file="res://docs/generator-v2/gen2-1/slopes_184729.csv"
+dest_files=["res://docs/generator-v2/gen2-1/slopes_184729.top.translation", "res://docs/generator-v2/gen2-1/slopes_184729.top.translation", "res://docs/generator-v2/gen2-1/slopes_184729.top.translation", "res://docs/generator-v2/gen2-1/slopes_184729.road.translation", "res://docs/generator-v2/gen2-1/slopes_184729.road.translation", "res://docs/generator-v2/gen2-1/slopes_184729.road.translation", "res://docs/generator-v2/gen2-1/slopes_184729.road.translation", "res://docs/generator-v2/gen2-1/slopes_184729.road.translation", "res://docs/generator-v2/gen2-1/slopes_184729.drop.translation", "res://docs/generator-v2/gen2-1/slopes_184729.straight.translation", "res://docs/generator-v2/gen2-1/slopes_184729.end.translation", "res://docs/generator-v2/gen2-1/slopes_184729.mean.translation", "res://docs/generator-v2/gen2-1/slopes_184729.max.translation", "res://docs/generator-v2/gen2-1/slopes_184729.share.translation", "res://docs/generator-v2/gen2-1/slopes_184729.water.translation", "res://docs/generator-v2/gen2-1/slopes_184729.climb.translation", "res://docs/generator-v2/gen2-1/slopes_184729.descent.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true
