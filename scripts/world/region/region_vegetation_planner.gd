@@ -31,6 +31,8 @@ const THICKET_M: float = 12.0
 ## Clearance from a road footprint (m): trees, shrubs, grass, rocks.
 const CLEAR_M := {"tree": 3.5, "shrub": 1.5, "grass": 0.6, "rock": 2.5}
 const MARGIN_M: float = 8.0
+## Largest rock keep threshold (0.04 + 0.5 * smooth, smooth <= 1).
+const ROCK_KEEP_MAX: float = 0.04 + 0.5
 ## BC1: clearance from a trail band edge (m): trees (handlebar and shoulder
 ## room), shrubs, grass (the band is worn ground), rocks (centre: beyond the
 ## largest rock collider, 0.6 m x scale 1.8).
@@ -150,10 +152,15 @@ func tile(tx: int, tz: int) -> Dictionary:
 			var z: float = (j + 0.15 + 0.7 * _unit(12, i, j)) * ROCK_CELL_M
 			if x < _bounds.min_x + MARGIN_M or z < _bounds.min_z + MARGIN_M or x > _bounds.max_x - MARGIN_M or z > _bounds.max_z - MARGIN_M:
 				continue
+			# The keep threshold below is at most 0.54 (smooth <= 1): a roll at or
+			# above it is rejected whatever the ground, so it needs no signals.
+			var keep_roll: float = _unit(13, i, j)
+			if keep_roll >= ROCK_KEEP_MAX:
+				continue
 			var signals: Dictionary = _context.sample_signals(x, z)
 			if not signals.is_valid or signals.is_water:
 				continue
-			if _unit(13, i, j) >= 0.04 + 0.5 * Context.smooth(0.2, 0.9, signals.slope_grade):
+			if keep_roll >= 0.04 + 0.5 * Context.smooth(0.2, 0.9, signals.slope_grade):
 				continue
 			if not _road_clear(x, z, CLEAR_M.rock):
 				continue

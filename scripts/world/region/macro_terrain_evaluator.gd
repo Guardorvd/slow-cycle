@@ -62,9 +62,15 @@ class Context:
 	var ridged: float
 	var attenuation := PackedFloat64Array() # valley floor, bench, basin
 	var max_summit: float
+	## MacroTerrainKernel (C#) copy of this context, or null (GDScript _sample).
+	var kernel: RefCounted = null
 
 
 const STRIDE: int = 16
+## Bit-identical C# port of _sample (.NET builds; prepared contexts only).
+## SLOW_CYCLE_GD_KERNEL=1 forces the GDScript kernel (parity checks).
+const KERNEL_PATH := "res://scripts/world/region/MacroTerrainKernel.cs"
+static var _kernel_script: Variant = null
 
 
 static func _smooth(t: float) -> float:
@@ -211,7 +217,36 @@ static func _context(plan: Macro, with_cells: bool) -> Context:
 			for j in range(j0, j1 + 1):
 				for i in range(i0, i1 + 1):
 					c.cells[j * CELLS + i].append(s)
+		c.kernel = _kernel_of(c)
 	return c
+
+
+## The C# kernel over a prepared context, or null when the .NET build or the
+## built assembly is not available (or SLOW_CYCLE_GD_KERNEL=1).
+static func _kernel_of(c: Context) -> RefCounted:
+	if _kernel_script == null:
+		_kernel_script = false
+		if OS.get_environment("SLOW_CYCLE_GD_KERNEL") != "1" and ClassDB.class_exists("CSharpScript") and ResourceLoader.exists(KERNEL_PATH):
+			var script: Script = load(KERNEL_PATH)
+			if script != null and script.can_instantiate():
+				_kernel_script = script
+	if not _kernel_script is Script:
+		return null
+	var kernel: RefCounted = _kernel_script.new()
+	kernel.Setup({"symmetry": c.symmetry, "structure_seed": c.structure_seed, "noise_seed": c.noise_seed, "axis": c.axis, "half": c.half, "near_wall": c.near_wall,
+		"far_wall": c.far_wall, "floor_cm": float(c.floor_cm), "drop_cm": float(c.drop_cm), "basin_u": float(c.basin_u), "basin_extra": float(c.basin_extra),
+		"basin_half_length": float(c.basin_half_length), "wall_w": c.wall_w, "wall_h": c.wall_h, "upland": c.upland, "benches": c.benches, "basins": c.basins,
+		"rounding": float(c.rounding), "rib_strength": float(c.rib_strength), "rib_wavelength": float(c.rib_wavelength), "warp_amplitude": float(c.warp_amplitude),
+		"warp_wavelength": float(c.warp_wavelength), "segments": c.segments, "cells": c.cells, "noise_amplitude": float(c.noise_amplitude),
+		"noise_wavelengths": c.noise_wavelengths, "noise_weights": c.noise_weights, "ridged": float(c.ridged), "attenuation": c.attenuation, "max_summit": float(c.max_summit)})
+	return kernel
+
+
+## True when prepared contexts sample through the C# kernel.
+static func kernel_active() -> bool:
+	if _kernel_script == null:
+		_kernel_of(Context.new())
+	return _kernel_script is Script
 
 
 static func _spline(values: PackedFloat64Array, u: float) -> Vector2:
@@ -411,4 +446,6 @@ static func prepare(plan: Macro) -> Context:
 ## Elevation from a prepared context, bit-identical to the point API. The
 ## caller guarantees finite region-local coordinates inside [0, 4096]^2.
 static func sample_prepared(context: Context, local_x_m: float, local_z_m: float, include_noise: bool) -> float:
+	if context.kernel != null:
+		return context.kernel.Sample(local_x_m, local_z_m, include_noise)
 	return _sample(context, local_x_m, local_z_m, include_noise)

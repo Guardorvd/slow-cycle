@@ -56,6 +56,9 @@ var _fit_total: int = 0
 var _surface: RefCounted
 var _hfield: RefCounted
 var _threads: int = 1
+## Diagnostics only (never in the plan data or its signature): design work per
+## route class and the heaviest edges of this synthesis.
+var _edge_work: Dictionary = {}
 ## Failures a descent-preferred design may relieve (policy v2 climb limits).
 const CLIMB_REASONS: Array[String] = ["ERR_R6_GRADE", "ERR_R6_SUSTAINED_GRADE", "ERR_R6_PITCH_LENGTH"]
 
@@ -198,8 +201,25 @@ func _run() -> Dictionary:
 	var slots: Array = []
 	for e: int in order:
 		slots.append({"e": e, "prep": _prepare_edge(e, edges, nodes, ports)})
-	var job := func(i: int) -> void:
+	# Pool dispatch order: expected-heaviest designs first (SINGLETRACK /
+	# TECHNICAL, then longer bands), so one long design does not start last and
+	# hold the pool alone. Each design is isolated (own tools, own budgets) and
+	# lands in its own slot; completion below stays in (class, id) order, so
+	# the outcome does not depend on this order.
+	var dispatch: Array = range(slots.size())
+	dispatch.sort_custom(func(a: int, b: int) -> bool:
+		var ca: int = slots[a].prep.route_class
+		var cb: int = slots[b].prep.route_class
+		if ca != cb:
+			return ca > cb
+		var la: float = _bands[slots[a].e].length()
+		var lb: float = _bands[slots[b].e].length()
+		return la > lb or (la == lb and a < b))
+	var job := func(n: int) -> void:
+		var i: int = dispatch[n]
+		var started: int = Time.get_ticks_usec()
 		slots[i]["independent"] = _independent(slots[i].prep, _tools())
+		slots[i]["cpu_s"] = (Time.get_ticks_usec() - started) / 1e6
 	if _threads > 1 and slots.size() > 1:
 		var group: int = WorkerThreadPool.add_group_task(job, slots.size(), _threads, true, "r6_edges")
 		WorkerThreadPool.wait_for_group_task_completion(group)
@@ -225,6 +245,7 @@ func _run() -> Dictionary:
 			pieces[outcome.piece.piece_id] = outcome.piece
 			accepted.append({"piece_id": outcome.piece.piece_id, "design": outcome.piece.design, "zones": outcome.zones, "shoulder_m": Policy.CLASSES[edges[e].class].shoulder_m, "edge": e})
 	t = _tick("edges", t)
+	_edge_work = _edge_work_of(slots, edges, edge_records)
 	# --- 5. Connectors, seams ---
 	var junction_records: Array = []
 	var node_ids: Array = junctions.keys()
@@ -344,7 +365,7 @@ func _run() -> Dictionary:
 		"region_signature": _region_plan.signature(), "graph_signature": graph.signature(), "hydrology_signature": _hydrology_plan.signature(), "rideability_signature": _ride.signature(),
 		"settings": _settings, "status": Policy.STATUS_NAMES[status], "reason_codes": reasons, "edges": edge_list, "junctions": junction_records, "crossings": crossing_records,
 		"pieces": pieces, "intents": intents, "network": network, "overlaps": overlap}
-	var diagnostics := {"timings_s": _timings, "natural_queries": _natural.queries, "ride_queries": _natural.ride_queries, "validator_ride_samples": _validator.ride_samples,
+	var diagnostics := {"timings_s": _timings, "edge_work": _edge_work, "natural_queries": _natural.queries, "ride_queries": _natural.ride_queries, "validator_ride_samples": _validator.ride_samples,
 		"fit_evaluations": _fit_total + _junctions.fit_evaluations, "dp_transitions": _designer.dp_transitions, "budgets": _settings, "natural_queries_total": _natural.total_queries()}
 	# Diagnostic records may hold unbounded measures (e.g. no sight station
 	# checked, no feasible connector). Canonical encoding refuses non-finite
@@ -506,6 +527,37 @@ func _independent(prep: Dictionary, tools: Dictionary) -> Dictionary:
 	out["fit_evaluations"] = tools.designer.fit_evaluations
 	out["natural_queries"] = tools.natural.total_queries()
 	return out
+
+
+## Per class {edges, cpu_s, max_s, failed, failed_cpu_s, descent_retries} and
+## the five heaviest edges [{edge, class, cpu_s, status, reason}] of the
+## independent edge designs (worker CPU seconds; wall time is the
+## "edges" timing). Observational: read after every decision is made.
+static func _edge_work_of(slots: Array, edges: Array, records: Dictionary) -> Dictionary:
+	var classes: Dictionary = {}
+	var heavy: Array = []
+	for slot: Dictionary in slots:
+		var e: int = slot.e
+		var name: String = Graph.CLASS_NAMES[edges[e].class]
+		var entry: Dictionary = classes.get(name, {"edges": 0, "cpu_s": 0.0, "max_s": 0.0, "failed": 0, "failed_cpu_s": 0.0, "descent_retries": 0})
+		var cpu: float = slot.get("cpu_s", 0.0)
+		var record: Dictionary = records[e]
+		entry.edges += 1
+		entry.cpu_s += cpu
+		entry.max_s = maxf(entry.max_s, cpu)
+		if record.status != "READY":
+			entry.failed += 1
+			entry.failed_cpu_s += cpu
+		if slot.independent.detail.has("bidirectional_attempt"):
+			entry.descent_retries += 1
+		classes[name] = entry
+		heavy.append({"edge": e, "class": name, "cpu_s": snappedf(cpu, 0.01), "status": record.status, "reason": record.reasons[0] if not record.reasons.is_empty() else ""})
+	for name: String in classes:
+		classes[name].cpu_s = snappedf(classes[name].cpu_s, 0.01)
+		classes[name].max_s = snappedf(classes[name].max_s, 0.01)
+		classes[name].failed_cpu_s = snappedf(classes[name].failed_cpu_s, 0.01)
+	heavy.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.cpu_s > b.cpu_s or (a.cpu_s == b.cpu_s and a.edge < b.edge))
+	return {"classes": classes, "heaviest": heavy.slice(0, 5)}
 
 
 ## Edge record of a design past the region work budget: REPLAN_REQUIRED with

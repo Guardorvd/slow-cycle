@@ -254,10 +254,12 @@ func ensure_around(p: Vector3) -> void:
 	add_child(probe)
 	probe.global_position = p
 	tracked = probe
+	# Progress is a patch built, not the active count: a pass may free a patch
+	# out of range and build a wanted one, leaving the count unchanged.
 	for _pass in range(400):
-		var before: int = _active.size()
+		var before: int = stats.patches_built
 		_physics_process(0.0)
-		if _active.size() == before:
+		if stats.patches_built == before:
 			break
 	tracked = saved
 	probe.queue_free()

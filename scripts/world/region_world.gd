@@ -22,6 +22,9 @@ extends Node3D
 ##   prototype-off products). Published trails join recovery and get a post
 ##   at each end; a rejected trail leaves the region as without it and is
 ##   named in the log.
+##   --dev-cache: when the production cache misses, load the dev stage-reuse
+##   products of the same key (tools/dev/dev_bake.gd; never written by a
+##   normal launch, never read without this flag).
 ## A region that cannot be generated (bake failure, crashed bake, empty
 ## network) is a recorded result, not a script failure: the screen names the
 ## seed and reason, the diagnostics are saved under user://regions/failures/
@@ -29,6 +32,7 @@ extends Node3D
 
 const Bake = preload("res://scripts/world/region/region_bake.gd")
 const Cache = preload("res://scripts/world/region_bake_cache.gd")
+const StageCache = preload("res://scripts/world/region_stage_cache.gd")
 const Streamer = preload("res://scripts/world/region_streamer.gd")
 const RoadShader = preload("res://assets/shaders/region_road.gdshader")
 const SPAWN_CLEARANCE_M: float = 0.45
@@ -86,6 +90,7 @@ func _ready() -> void:
 	var threads: int = 8
 	session_seed = 0
 	var seeded: bool = false
+	var dev_cache: bool = false
 	trail_config_path = DEFAULT_TRAIL_CONFIG
 	for arg: String in OS.get_cmdline_user_args():
 		if arg.begins_with("--seed=") and not force_random_next:
@@ -101,6 +106,8 @@ func _ready() -> void:
 			trail_config_path = arg.substr(15)
 		elif arg == "--trails=off":
 			trail_config_path = ""
+		elif arg == "--dev-cache":
+			dev_cache = true
 	force_random_next = false
 	if not seeded:
 		var rng := RandomNumberGenerator.new()
@@ -115,6 +122,13 @@ func _ready() -> void:
 		source = "cache"
 		_finish_load(cached)
 		return
+	if dev_cache:
+		cached = Cache.load_products(key, StageCache.DEV_ROOT)
+		if cached.is_valid:
+			source = "dev-cache"
+			print("REGION_DEV_CACHE key=%s stages=%s" % [key, JSON.stringify(cached.manifest.dev_stage_reuse.get("stages", {}))])
+			_finish_load(cached)
+			return
 	source = "bake"
 	_job = BakeJob.new()
 	_job.seed_value = session_seed
@@ -151,16 +165,28 @@ func _process(_delta: float) -> void:
 	var fraction: float = snapshot[1]
 	var result: Variant = snapshot[2]
 	if _label != null:
-		_label.text = "Mountain River Valley\nseed %d  region %d,%d\n%s  %d%%  (%.0f s)\n\nПервый запуск региона строит его (около 5–6 минут), повторный открывается из кэша." % [session_seed, region.x, region.y, stage, int(fraction * 100.0), (Time.get_ticks_usec() - _t0) / 1e6]
+		_label.text = "Mountain River Valley\nseed %d  region %d,%d\n%s  %d%%  (%.0f s)\n\nПервый запуск региона строит его (это может занять несколько минут), повторный открывается из кэша." % [session_seed, region.x, region.y, stage, int(fraction * 100.0), (Time.get_ticks_usec() - _t0) / 1e6]
 	if result == null:
 		if not _thread.is_alive():
+			# The worker may have stored its result between the snapshot above
+			# and is_alive(): look once more before calling it a crash.
+			result = _job.snapshot()[2]
+		if result == null and not _thread.is_alive():
 			# The bake ended without a result (a script error inside it).
 			_thread = null
 			_job = null
 			_fail("ERR_BAKE_CRASHED", {"stage": stage, "fraction": fraction})
-		return
+			return
+		if result == null:
+			return
+	var cache_write: Dictionary = _job.cache_write
 	_thread = null
 	_job = null
+	if not cache_write.is_empty() and not cache_write.get("is_valid", false):
+		# The region stays playable from memory; the cache entry is not
+		# confirmed (the next launch reads it only if it validates).
+		print("REGION_CACHE_WRITE_FAILED key=%s reason=%s file=%s" % [cache_write.get("cache_key", ""), cache_write.get("reason_code", ""), cache_write.get("file", "")])
+		push_warning("Region cache write failed: key %s, %s" % [cache_write.get("cache_key", ""), cache_write.get("reason_code", "")])
 	if not result.is_valid:
 		_fail(result.reason_code, result)
 		return
@@ -215,7 +241,7 @@ func _show_summary(metrics: Dictionary) -> void:
 	label.add_theme_color_override("font_outline_color", Color.BLACK)
 	label.add_theme_constant_override("outline_size", 6)
 	label.text = "Mountain River Valley · seed %d · сеть %.1f км · петли %d · %s · загрузка %.0f с (%s)" % [session_seed, metrics.component_length_m / 1000.0, metrics.cycles,
-		", ".join(metrics.classes.keys()), load_seconds, "кэш" if source == "cache" else "генерация"]
+		", ".join(metrics.classes.keys()), load_seconds, "кэш" if source == "cache" else ("dev-кэш (stage reuse)" if source == "dev-cache" else "генерация")]
 	var trails: Dictionary = products.manifest.get("trails", {})
 	if trails.get("procedural", false):
 		# BC2: the trail network in one line - classes, length, new loops, forks.
@@ -307,6 +333,9 @@ class BakeJob extends RefCounted:
 	var _fraction: float = 0.0
 	var _result: Variant = null
 	var _cancel: bool = false
+	## Result of RegionBakeCache.save() plus cache_key (empty: not attempted).
+	## Written by the worker before the result is published; read after it.
+	var cache_write: Dictionary = {}
 
 	func run() -> void:
 		var options := {"threads": threads, "cancelled": is_cancelled}
@@ -315,7 +344,9 @@ class BakeJob extends RefCounted:
 		var baked: Dictionary = JobBake.bake(seed_value, region, options, set_progress)
 		if baked.is_valid:
 			set_progress("cache_write", 0.99)
-			JobCache.save(key, baked)
+			var saved: Dictionary = JobCache.save(key, baked)
+			saved["cache_key"] = key
+			cache_write = saved
 		_mutex.lock()
 		_result = baked
 		_mutex.unlock()
@@ -428,14 +459,28 @@ func _set_recovery_from_network(data: Dictionary) -> void:
 			line.append(Vector3(d.x[k], d.y[k], d.z[k]))
 		paths.append(line)
 		recommended.append(int(piece.info.get("recommended", 0)))
-	# BC1: published trails are riding lines too (final heights, both ways).
+	# BC1: published trails are riding lines too (final heights; travel by
+	# their directions, BC2 TECHNICAL is one-way).
 	for trail: Dictionary in data.get("trails", []):
 		var line := PackedVector3Array()
 		for k in range(trail.line.s.size()):
 			line.append(Vector3(trail.line.x[k], trail.line.y[k], trail.line.z[k]))
 		paths.append(line)
-		recommended.append(0)
+		recommended.append(trail_recommended(trail))
 	set_recovery_paths(paths, recommended)
+
+
+## Recovery travel of a published trail by its `directions`: FORWARD only +1,
+## REVERSE only -1, both ways (or a record without directions) 0.
+static func trail_recommended(trail: Dictionary) -> int:
+	var directions: Array = trail.get("directions", [])
+	var forward: bool = "FORWARD" in directions
+	var reverse: bool = "REVERSE" in directions
+	if forward and not reverse:
+		return 1
+	if reverse and not forward:
+		return -1
+	return 0
 
 
 ## Places the bicycle on ground point `ground` facing horizontal `direction`.
