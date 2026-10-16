@@ -1,0 +1,715 @@
+{
+	"cases": [
+		{
+			"case": "suitable_bc1_meadow",
+			"changed_tiles": 1,
+			"config": "user://trail_probe/check/suitable_bc1_meadow.json",
+			"exact_published": [
+				"trail:bc1_meadow"
+			],
+			"exact_rejected": [],
+			"exact_s": 46.06,
+			"expect": "PUBLISH",
+			"fixture_attempts": 0,
+			"launch": "godot --path . --script res://tools/dev/ride_trail.gd -- --seed=184729 --region=0,0 --trail-config=user://trail_probe/check/suitable_bc1_meadow.json --dev-cache --trail=trail:bc1_meadow",
+			"outside_unchanged": true,
+			"preview_detail": {},
+			"preview_reason": "",
+			"preview_s": 5.23,
+			"profile": {
+				"climb_m": 13.4,
+				"descent_m": 2.4,
+				"height_end_m": 336.6,
+				"height_start_m": 325.7,
+				"length_m": 453.1,
+				"max_grade_down": -0.04,
+				"max_grade_up": 0.088,
+				"max_side_slope_off_road": 0.198,
+				"min_radius_off_road_m": 26.8,
+				"road_samples": 6,
+				"water_samples": 0
+			},
+			"publication": {
+				"attempts": 1,
+				"border_points": 0,
+				"calls": 1,
+				"finalize_s": 0.816105,
+				"join_s": 0.001853,
+				"max_tiles": 1,
+				"refine_s": 17.20266,
+				"seam_passes": 1,
+				"shape_s": 0.395476,
+				"tiles_memo": 0,
+				"tiles_refined": 1,
+				"trail_tiles_s": 0.014704,
+				"trails_attempted": 1,
+				"trap_check_s": 0.0
+			},
+			"timings_s": {
+				"finish_detail": {
+					"bridges_water_s": 0.013334,
+					"vegetation_s": 19.844328,
+					"vegetation_tiles": 9
+				},
+				"finish_s": 19.929493,
+				"map_s": 4.360429,
+				"off_vegetation": "reused",
+				"off_vegetation_s": 0.299823,
+				"preview_s": 0.627647,
+				"publish_s": 18.976223,
+				"save_s": 2.486306
+			},
+			"verdict": "PASS"
+		},
+		{
+			"case": "suitable_tech_9_6_e9_1190R_e9_150R",
+			"changed_tiles": 1,
+			"config": "user://trail_probe/check/suitable_tech_9_6_e9_1190R_e9_150R.json",
+			"exact_published": [
+				"trail:tech_9_6_e9_1190R_e9_150R"
+			],
+			"exact_rejected": [],
+			"exact_s": 36.08,
+			"expect": "PUBLISH",
+			"fixture_attempts": 0,
+			"launch": "godot --path . --script res://tools/dev/ride_trail.gd -- --seed=184729 --region=0,0 --trail-config=user://trail_probe/check/suitable_tech_9_6_e9_1190R_e9_150R.json --dev-cache --trail=trail:tech_9_6_e9_1190R_e9_150R",
+			"outside_unchanged": true,
+			"preview_detail": {},
+			"preview_reason": "",
+			"preview_s": 3.07,
+			"profile": {
+				"climb_m": 0.2,
+				"descent_m": 22.6,
+				"height_end_m": 310.6,
+				"height_start_m": 333.0,
+				"length_m": 240.3,
+				"max_grade_down": -0.214,
+				"max_grade_up": 0.044,
+				"max_side_slope_off_road": 0.242,
+				"min_radius_off_road_m": 6.6,
+				"road_samples": 5,
+				"water_samples": 0
+			},
+			"publication": {
+				"attempts": 1,
+				"border_points": 0,
+				"calls": 1,
+				"finalize_s": 0.661177,
+				"join_s": 0.001819,
+				"max_tiles": 1,
+				"refine_s": 12.025903,
+				"seam_passes": 1,
+				"shape_s": 0.511249,
+				"tiles_memo": 0,
+				"tiles_refined": 1,
+				"trail_tiles_s": 0.007913,
+				"trails_attempted": 1,
+				"trap_check_s": 0.0
+			},
+			"timings_s": {
+				"finish_detail": {
+					"bridges_water_s": 0.012832,
+					"vegetation_s": 17.201105,
+					"vegetation_tiles": 9
+				},
+				"finish_s": 17.287688,
+				"map_s": 2.713719,
+				"off_vegetation": "reused",
+				"off_vegetation_s": 0.418408,
+				"preview_s": 0.244343,
+				"publish_s": 13.395792,
+				"save_s": 2.256261
+			},
+			"verdict": "PASS"
+		},
+		{
+			"case": "suitable_tech_8_4_e7_310R_e7_30R",
+			"changed_tiles": 3,
+			"config": "user://trail_probe/check/suitable_tech_8_4_e7_310R_e7_30R.json",
+			"exact_published": [
+				"trail:tech_8_4_e7_310R_e7_30R"
+			],
+			"exact_rejected": [],
+			"exact_s": 63.77,
+			"expect": "PUBLISH",
+			"fixture_attempts": 0,
+			"launch": "godot --path . --script res://tools/dev/ride_trail.gd -- --seed=184729 --region=0,0 --trail-config=user://trail_probe/check/suitable_tech_8_4_e7_310R_e7_30R.json --dev-cache --trail=trail:tech_8_4_e7_310R_e7_30R",
+			"outside_unchanged": true,
+			"preview_detail": {},
+			"preview_reason": "",
+			"preview_s": 3.59,
+			"profile": {
+				"climb_m": 0.0,
+				"descent_m": 21.0,
+				"height_end_m": 333.6,
+				"height_start_m": 354.6,
+				"length_m": 240.0,
+				"max_grade_down": -0.115,
+				"max_grade_up": 0.0,
+				"max_side_slope_off_road": 0.077,
+				"min_radius_off_road_m": 7.3,
+				"road_samples": 4,
+				"water_samples": 0
+			},
+			"publication": {
+				"attempts": 1,
+				"border_points": 44,
+				"calls": 1,
+				"finalize_s": 0.87389,
+				"join_s": 0.001861,
+				"max_tiles": 3,
+				"refine_s": 23.716391,
+				"seam_passes": 2,
+				"shape_s": 0.647046,
+				"tiles_memo": 0,
+				"tiles_refined": 6,
+				"trail_tiles_s": 0.007247,
+				"trails_attempted": 1,
+				"trap_check_s": 0.0
+			},
+			"timings_s": {
+				"finish_detail": {
+					"bridges_water_s": 0.012764,
+					"vegetation_s": 32.30792,
+					"vegetation_tiles": 15
+				},
+				"finish_s": 32.392461,
+				"map_s": 3.327085,
+				"off_vegetation": "reused",
+				"off_vegetation_s": 0.259799,
+				"preview_s": 0.360275,
+				"publish_s": 25.446241,
+				"save_s": 2.338503
+			},
+			"verdict": "PASS"
+		},
+		{
+			"case": "suitable_st_6_9_e9_45R_e9_1550R",
+			"changed_tiles": 4,
+			"config": "user://trail_probe/check/suitable_st_6_9_e9_45R_e9_1550R.json",
+			"exact_published": [
+				"trail:st_6_9_e9_45R_e9_1550R"
+			],
+			"exact_rejected": [],
+			"exact_s": 81.81,
+			"expect": "PUBLISH",
+			"fixture_attempts": 0,
+			"launch": "godot --path . --script res://tools/dev/ride_trail.gd -- --seed=184729 --region=0,0 --trail-config=user://trail_probe/check/suitable_st_6_9_e9_45R_e9_1550R.json --dev-cache --trail=trail:st_6_9_e9_45R_e9_1550R",
+			"outside_unchanged": true,
+			"preview_detail": {},
+			"preview_reason": "",
+			"preview_s": 5.34,
+			"profile": {
+				"climb_m": 17.1,
+				"descent_m": 0.8,
+				"height_end_m": 325.7,
+				"height_start_m": 309.5,
+				"length_m": 538.1,
+				"max_grade_down": -0.024,
+				"max_grade_up": 0.114,
+				"max_side_slope_off_road": 0.219,
+				"min_radius_off_road_m": 10.3,
+				"road_samples": 5,
+				"water_samples": 0
+			},
+			"publication": {
+				"attempts": 1,
+				"border_points": 96,
+				"calls": 1,
+				"finalize_s": 1.655196,
+				"join_s": 0.001987,
+				"max_tiles": 4,
+				"refine_s": 38.697517,
+				"seam_passes": 2,
+				"shape_s": 1.271199,
+				"tiles_memo": 0,
+				"tiles_refined": 8,
+				"trail_tiles_s": 0.032423,
+				"trails_attempted": 1,
+				"trap_check_s": 0.0
+			},
+			"timings_s": {
+				"finish_detail": {
+					"bridges_water_s": 0.013107,
+					"vegetation_s": 32.364455,
+					"vegetation_tiles": 16
+				},
+				"finish_s": 32.505975,
+				"map_s": 4.502426,
+				"off_vegetation": "reused",
+				"off_vegetation_s": 0.295538,
+				"preview_s": 0.679897,
+				"publish_s": 42.28873,
+				"save_s": 2.207312
+			},
+			"verdict": "PASS"
+		},
+		{
+			"case": "suitable_st_3_8_e2_393R_e8_45R",
+			"changed_tiles": 2,
+			"config": "user://trail_probe/check/suitable_st_3_8_e2_393R_e8_45R.json",
+			"exact_published": [
+				"trail:st_3_8_e2_393R_e8_45R"
+			],
+			"exact_rejected": [],
+			"exact_s": 59.56,
+			"expect": "PUBLISH",
+			"fixture_attempts": 0,
+			"launch": "godot --path . --script res://tools/dev/ride_trail.gd -- --seed=184729 --region=0,0 --trail-config=user://trail_probe/check/suitable_st_3_8_e2_393R_e8_45R.json --dev-cache --trail=trail:st_3_8_e2_393R_e8_45R",
+			"outside_unchanged": true,
+			"preview_detail": {},
+			"preview_reason": "",
+			"preview_s": 4.55,
+			"profile": {
+				"climb_m": 25.2,
+				"descent_m": 0.0,
+				"height_end_m": 360.5,
+				"height_start_m": 335.3,
+				"length_m": 356.1,
+				"max_grade_down": 0.0,
+				"max_grade_up": 0.1,
+				"max_side_slope_off_road": 0.099,
+				"min_radius_off_road_m": 24.7,
+				"road_samples": 6,
+				"water_samples": 0
+			},
+			"publication": {
+				"attempts": 1,
+				"border_points": 20,
+				"calls": 1,
+				"finalize_s": 0.955099,
+				"join_s": 0.001963,
+				"max_tiles": 2,
+				"refine_s": 27.010667,
+				"seam_passes": 2,
+				"shape_s": 0.579271,
+				"tiles_memo": 0,
+				"tiles_refined": 4,
+				"trail_tiles_s": 0.010109,
+				"trails_attempted": 1,
+				"trap_check_s": 0.0
+			},
+			"timings_s": {
+				"finish_detail": {
+					"bridges_water_s": 0.013866,
+					"vegetation_s": 23.273772,
+					"vegetation_tiles": 12
+				},
+				"finish_s": 23.394615,
+				"map_s": 4.576258,
+				"off_vegetation": "reused",
+				"off_vegetation_s": 0.26737,
+				"preview_s": 0.3575,
+				"publish_s": 28.824418,
+				"save_s": 2.487436
+			},
+			"verdict": "PASS"
+		},
+		{
+			"case": "unsuitable_other_seed",
+			"changed_tiles": 0,
+			"config": "user://trail_probe/check/unsuitable_other_seed.json",
+			"exact_published": [],
+			"exact_rejected": [
+				{
+					"detail": {
+						"config": [
+							184730.0,
+							[
+								0.0,
+								0.0
+							]
+						],
+						"stage": "seed/region",
+						"world": [
+							184729,
+							[
+								0,
+								0
+							]
+						]
+					},
+					"id": "trail:st_6_9_e9_45R_e9_1550R",
+					"reason_code": "ERR_TRAIL_IDENTITY"
+				}
+			],
+			"exact_s": 0.78,
+			"expect": "ERR_TRAIL_IDENTITY / seed/region",
+			"fixture_attempts": 0,
+			"launch": "godot --path . --script res://tools/dev/ride_trail.gd -- --seed=184729 --region=0,0 --trail-config=user://trail_probe/check/unsuitable_other_seed.json --dev-cache",
+			"outside_unchanged": true,
+			"preview_detail": {
+				"config": [
+					184730.0,
+					[
+						0.0,
+						0.0
+					]
+				],
+				"stage": "seed/region",
+				"world": [
+					184729,
+					[
+						0,
+						0
+					]
+				]
+			},
+			"preview_reason": "ERR_TRAIL_IDENTITY",
+			"preview_s": 5.05,
+			"profile": {
+				"climb_m": 17.1,
+				"descent_m": 0.8,
+				"height_end_m": 325.7,
+				"height_start_m": 309.5,
+				"length_m": 538.1,
+				"max_grade_down": -0.024,
+				"max_grade_up": 0.114,
+				"max_side_slope_off_road": 0.219,
+				"min_radius_off_road_m": 10.3,
+				"road_samples": 5,
+				"water_samples": 0
+			},
+			"publication": {
+				"attempts": 0,
+				"border_points": 0,
+				"calls": 1,
+				"finalize_s": 0.0,
+				"join_s": 0.0,
+				"max_tiles": 0,
+				"refine_s": 0.0,
+				"seam_passes": 0,
+				"shape_s": 0.0,
+				"tiles_memo": 0,
+				"tiles_refined": 0,
+				"trail_tiles_s": 0.0,
+				"trails_attempted": 0,
+				"trap_check_s": 0.0
+			},
+			"timings_s": {
+				"finish_detail": {
+					"bridges_water_s": 0.013142,
+					"vegetation_s": 0.383509,
+					"vegetation_tiles": 0
+				},
+				"finish_s": 0.470921,
+				"map_s": 4.861568,
+				"off_vegetation": "reused",
+				"off_vegetation_s": 0.283256,
+				"preview_s": 0.186437,
+				"publish_s": 0.006489,
+				"save_s": 0.013186
+			},
+			"verdict": "PASS"
+		},
+		{
+			"case": "unsuitable_end_off_road",
+			"changed_tiles": 0,
+			"config": "user://trail_probe/check/unsuitable_end_off_road.json",
+			"exact_published": [],
+			"exact_rejected": [
+				{
+					"detail": {
+						"first_off": 2,
+						"last_off": 313,
+						"samples": 314,
+						"stage": "ends on road"
+					},
+					"id": "trail:check_end_off_road",
+					"reason_code": "ERR_TRAIL_CONNECTION"
+				}
+			],
+			"exact_s": 0.89,
+			"expect": "ERR_TRAIL_CONNECTION / ends on road",
+			"fixture_attempts": 0,
+			"launch": "godot --path . --script res://tools/dev/ride_trail.gd -- --seed=184729 --region=0,0 --trail-config=user://trail_probe/check/unsuitable_end_off_road.json --dev-cache",
+			"outside_unchanged": true,
+			"preview_detail": {
+				"first_off": 2,
+				"last_off": 313,
+				"samples": 314,
+				"stage": "ends on road"
+			},
+			"preview_reason": "ERR_TRAIL_CONNECTION",
+			"preview_s": 3.76,
+			"profile": {
+				"climb_m": 4.5,
+				"descent_m": 0.8,
+				"height_end_m": 313.2,
+				"height_start_m": 309.5,
+				"length_m": 312.2,
+				"max_grade_down": -0.024,
+				"max_grade_up": 0.06,
+				"max_side_slope_off_road": 0.118,
+				"min_radius_off_road_m": 10.3,
+				"road_samples": 2,
+				"water_samples": 0
+			},
+			"publication": {
+				"attempts": 0,
+				"border_points": 0,
+				"calls": 1,
+				"finalize_s": 0.0,
+				"join_s": 0.0,
+				"max_tiles": 0,
+				"refine_s": 0.0,
+				"seam_passes": 0,
+				"shape_s": 0.0,
+				"tiles_memo": 0,
+				"tiles_refined": 0,
+				"trail_tiles_s": 0.0,
+				"trails_attempted": 0,
+				"trap_check_s": 0.0
+			},
+			"timings_s": {
+				"finish_detail": {
+					"bridges_water_s": 0.015737,
+					"vegetation_s": 0.419199,
+					"vegetation_tiles": 0
+				},
+				"finish_s": 0.520482,
+				"map_s": 3.621451,
+				"off_vegetation": "reused",
+				"off_vegetation_s": 0.307498,
+				"preview_s": 0.134502,
+				"publish_s": 0.042492,
+				"save_s": 0.013623
+			},
+			"verdict": "PASS"
+		},
+		{
+			"case": "unsuitable_zigzag",
+			"changed_tiles": 0,
+			"config": "user://trail_probe/check/unsuitable_zigzag.json",
+			"exact_published": [],
+			"exact_rejected": [
+				{
+					"detail": {
+						"limit": 8.0,
+						"radius_m": 7.19076917811135,
+						"s_m": 264.0,
+						"stage": "radius"
+					},
+					"id": "trail:check_zigzag",
+					"reason_code": "ERR_TRAIL_UNRIDEABLE"
+				}
+			],
+			"exact_s": 1.14,
+			"expect": "ERR_TRAIL_UNRIDEABLE / radius",
+			"fixture_attempts": 0,
+			"launch": "godot --path . --script res://tools/dev/ride_trail.gd -- --seed=184729 --region=0,0 --trail-config=user://trail_probe/check/unsuitable_zigzag.json --dev-cache",
+			"outside_unchanged": true,
+			"preview_detail": {
+				"limit": 8.0,
+				"radius_m": 7.19076917811135,
+				"s_m": 264.0,
+				"stage": "radius"
+			},
+			"preview_reason": "ERR_TRAIL_UNRIDEABLE",
+			"preview_s": 5.33,
+			"profile": {
+				"climb_m": 18.9,
+				"descent_m": 2.7,
+				"height_end_m": 325.7,
+				"height_start_m": 309.5,
+				"length_m": 591.9,
+				"max_grade_down": -0.07,
+				"max_grade_up": 0.111,
+				"max_side_slope_off_road": 0.225,
+				"min_radius_off_road_m": 1.8,
+				"road_samples": 4,
+				"water_samples": 0
+			},
+			"publication": {
+				"attempts": 0,
+				"border_points": 0,
+				"calls": 1,
+				"finalize_s": 0.0,
+				"join_s": 0.0,
+				"max_tiles": 0,
+				"refine_s": 0.0,
+				"seam_passes": 0,
+				"shape_s": 0.0,
+				"tiles_memo": 0,
+				"tiles_refined": 0,
+				"trail_tiles_s": 0.0,
+				"trails_attempted": 0,
+				"trap_check_s": 0.0
+			},
+			"timings_s": {
+				"finish_detail": {
+					"bridges_water_s": 0.016432,
+					"vegetation_s": 0.445017,
+					"vegetation_tiles": 0
+				},
+				"finish_s": 0.541824,
+				"map_s": 4.728499,
+				"off_vegetation": "reused",
+				"off_vegetation_s": 0.269799,
+				"preview_s": 0.599833,
+				"publish_s": 0.307305,
+				"save_s": 0.018295
+			},
+			"verdict": "PASS"
+		},
+		{
+			"case": "unsuitable_through_water",
+			"changed_tiles": 0,
+			"config": "user://trail_probe/check/unsuitable_through_water.json",
+			"exact_published": [],
+			"exact_rejected": [
+				{
+					"detail": {
+						"lateral_m": -0.65,
+						"s_m": 189.0,
+						"stage": "water"
+					},
+					"id": "trail:check_through_water",
+					"reason_code": "ERR_TRAIL_UNRIDEABLE"
+				}
+			],
+			"exact_s": 0.98,
+			"expect": "ERR_TRAIL_UNRIDEABLE / water",
+			"fixture_attempts": 2,
+			"launch": "godot --path . --script res://tools/dev/ride_trail.gd -- --seed=184729 --region=0,0 --trail-config=user://trail_probe/check/unsuitable_through_water.json --dev-cache",
+			"outside_unchanged": true,
+			"preview_detail": {
+				"lateral_m": -0.65,
+				"s_m": 189.0,
+				"stage": "water"
+			},
+			"preview_reason": "ERR_TRAIL_UNRIDEABLE",
+			"preview_s": 5.21,
+			"profile": {
+				"climb_m": 18.9,
+				"descent_m": 2.7,
+				"height_end_m": 325.7,
+				"height_start_m": 309.5,
+				"length_m": 539.7,
+				"max_grade_down": -0.171,
+				"max_grade_up": 0.26,
+				"max_side_slope_off_road": 0.4,
+				"min_radius_off_road_m": 7.6,
+				"road_samples": 4,
+				"water_samples": 12
+			},
+			"publication": {
+				"attempts": 0,
+				"border_points": 0,
+				"calls": 1,
+				"finalize_s": 0.0,
+				"join_s": 0.0,
+				"max_tiles": 0,
+				"refine_s": 0.0,
+				"seam_passes": 0,
+				"shape_s": 0.0,
+				"tiles_memo": 0,
+				"tiles_refined": 0,
+				"trail_tiles_s": 0.0,
+				"trails_attempted": 0,
+				"trap_check_s": 0.0
+			},
+			"timings_s": {
+				"finish_detail": {
+					"bridges_water_s": 0.013177,
+					"vegetation_s": 0.412897,
+					"vegetation_tiles": 0
+				},
+				"finish_s": 0.505167,
+				"map_s": 4.783014,
+				"off_vegetation": "reused",
+				"off_vegetation_s": 0.264552,
+				"preview_s": 0.417405,
+				"publish_s": 0.190101,
+				"save_s": 0.013105
+			},
+			"verdict": "PASS"
+		},
+		{
+			"case": "unsuitable_descent_reversed",
+			"changed_tiles": 0,
+			"config": "user://trail_probe/check/unsuitable_descent_reversed.json",
+			"exact_published": [],
+			"exact_rejected": [
+				{
+					"detail": {
+						"rise_m": 22.4289746056596,
+						"stage": "direction"
+					},
+					"id": "trail:check_descent_reversed",
+					"reason_code": "ERR_TRAIL_UNRIDEABLE"
+				}
+			],
+			"exact_s": 0.78,
+			"expect": "ERR_TRAIL_UNRIDEABLE / direction",
+			"fixture_attempts": 0,
+			"launch": "godot --path . --script res://tools/dev/ride_trail.gd -- --seed=184729 --region=0,0 --trail-config=user://trail_probe/check/unsuitable_descent_reversed.json --dev-cache",
+			"outside_unchanged": true,
+			"preview_detail": {
+				"rise_m": 22.4289746056596,
+				"stage": "direction"
+			},
+			"preview_reason": "ERR_TRAIL_UNRIDEABLE",
+			"preview_s": 2.95,
+			"profile": {
+				"climb_m": 22.7,
+				"descent_m": 0.2,
+				"height_end_m": 333.0,
+				"height_start_m": 310.6,
+				"length_m": 240.3,
+				"max_grade_down": -0.052,
+				"max_grade_up": 0.214,
+				"max_side_slope_off_road": 0.242,
+				"min_radius_off_road_m": 6.7,
+				"road_samples": 5,
+				"water_samples": 0
+			},
+			"publication": {
+				"attempts": 0,
+				"border_points": 0,
+				"calls": 1,
+				"finalize_s": 0.0,
+				"join_s": 0.0,
+				"max_tiles": 0,
+				"refine_s": 0.0,
+				"seam_passes": 0,
+				"shape_s": 0.0,
+				"tiles_memo": 0,
+				"tiles_refined": 0,
+				"trail_tiles_s": 0.0,
+				"trails_attempted": 0,
+				"trap_check_s": 0.0
+			},
+			"timings_s": {
+				"finish_detail": {
+					"bridges_water_s": 0.01324,
+					"vegetation_s": 0.383934,
+					"vegetation_tiles": 0
+				},
+				"finish_s": 0.48172,
+				"map_s": 2.842395,
+				"off_vegetation": "reused",
+				"off_vegetation_s": 0.260587,
+				"preview_s": 0.102238,
+				"publish_s": 0.027776,
+				"save_s": 0.010526
+			},
+			"verdict": "PASS"
+		}
+	],
+	"exit_code": 0,
+	"ground": "reused",
+	"ground_key": "08df42b64893845a7bd966e4506bcdf3ab4e11b44b2e9f50be494ef5d90663f1",
+	"mode": "check",
+	"region": [
+		0,
+		0
+	],
+	"seed": 184729,
+	"threads": 4,
+	"timings_s": {
+		"ground_load_s": 13.031057,
+		"upstream_s": 2.130905
+	},
+	"total_s": 373.038579
+}

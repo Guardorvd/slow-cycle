@@ -9,7 +9,9 @@ extends RefCounted
 ## the former RegionBake steps. Results also carry what the published surface
 ## was built from (surface_trails: the trail records of with_trails;
 ## refined: tile indices of with_published), so a stage reload rebuilds the
-## same surface.
+## same surface. report.publication (GEN2-1) records the work of every
+## publication attempt (counters and wall-clock seconds of its steps); it is
+## a measurement only and never changes the products.
 
 const Ground = preload("res://scripts/world/region/region_bake_ground.gd")
 const Network = preload("res://scripts/world/region/realized_road_network.gd")
@@ -44,7 +46,10 @@ static func publish(config: Variant, seed_value: int, region: Vector2i, network:
 		return _procedural_trails(config, context, network, surface, bounds, slots, threads)
 	var realized: Dictionary = Trail.realize_all(config, context)
 	var report := {"config_sha256": JSON.stringify(config, "", true).sha256_text(), "published": [], "rejected": realized.rejected.duplicate(true)}
-	return _publish_trails(realized.trails, report, context, network, surface, bounds, slots, threads)
+	var stats: Dictionary = _new_stats()
+	var made: Dictionary = _publish_trails(realized.trails, report, context, network, surface, bounds, slots, threads, stats)
+	made.report["publication"] = stats
+	return made
 
 
 ## BC2: trails proposed by TrailNetworkPlanner (configuration TrailPolicy) on
@@ -71,9 +76,11 @@ static func _procedural_trails(config: Variant, context: Dictionary, network: Re
 	report.planner["ground_s"] = ground_s
 	report.rejected.append_array(planned.rejected)
 	var products: Dictionary = unchanged
+	var stats: Dictionary = _new_stats()
+	report["publication"] = stats
 	# The whole selection at once (_publish_trails drops a trail that fails and
 	# publishes the rest again without it).
-	var made: Dictionary = _publish_trails(planned.trails, {"published": [], "rejected": []}, context, network, surface, bounds, slots, threads)
+	var made: Dictionary = _publish_trails(planned.trails, {"published": [], "rejected": []}, context, network, surface, bounds, slots, threads, stats)
 	report.rejected.append_array(made.report.rejected)
 	var done: Array = made.report.published.map(func(entry: Dictionary) -> String: return entry.id)
 	var chosen: Array = planned.trails.filter(func(trail: Dictionary) -> bool: return trail.id in done)
@@ -91,7 +98,7 @@ static func _procedural_trails(config: Variant, context: Dictionary, network: Re
 			if option.class_name != trail.class_name or chosen.any(func(other: Dictionary) -> bool: return other.id == option.id or not _clear_of(option, other)):
 				continue
 			attempts += 1
-			var again: Dictionary = _publish_trails(chosen + [option], {"published": [], "rejected": []}, context, network, surface, bounds, slots, threads)
+			var again: Dictionary = _publish_trails(chosen + [option], {"published": [], "rejected": []}, context, network, surface, bounds, slots, threads, stats)
 			report.rejected.append_array(again.report.rejected)
 			if again.report.published.size() == chosen.size() + 1:
 				chosen.append(option)
@@ -100,12 +107,16 @@ static func _procedural_trails(config: Variant, context: Dictionary, network: Re
 	# No traps: every place of the riding graph reaches every other; trails
 	# are given up from the last one until it holds (atomic: the rest are
 	# published again without them).
+	t = Time.get_ticks_usec()
 	var graph: Dictionary = Network.trail_graph(products.network.get_data())
+	stats.trap_check_s += _lap(t)
 	while not graph.strongly_connected and not chosen.is_empty():
 		var dropped: Dictionary = chosen.pop_back()
 		report.rejected.append({"id": dropped.id, "reason_code": "ERR_TRAIL_TRAP", "detail": {"stage": "network", "traps": graph.traps}})
-		products = unchanged if chosen.is_empty() else _publish_trails(chosen, {"published": [], "rejected": []}, context, network, surface, bounds, slots, threads)
+		products = unchanged if chosen.is_empty() else _publish_trails(chosen, {"published": [], "rejected": []}, context, network, surface, bounds, slots, threads, stats)
+		t = Time.get_ticks_usec()
 		graph = Network.trail_graph(products.network.get_data())
+		stats.trap_check_s += _lap(t)
 	report["network"] = graph
 	var ids: Array = chosen.map(func(trail: Dictionary) -> String: return trail.id)
 	report.published = products.report.published if not chosen.is_empty() else []
@@ -134,16 +145,25 @@ static func _clear_of(a: Dictionary, b: Dictionary) -> bool:
 
 
 ## Publication of realized trails (BC1): shaped, tiles refined, finalized on
-## the published triangles, joined to the network; see _trails.
+## the published triangles, joined to the network; see _trails. `stats`
+## (_new_stats) accumulates the work of every call (measurement only).
 static func _publish_trails(trails: Array, report: Dictionary, context: Dictionary, network: RefCounted, surface: RefCounted, bounds: Dictionary, slots: Array,
-		threads: int) -> Dictionary:
+		threads: int, stats: Dictionary = {}) -> Dictionary:
+	if stats.is_empty():
+		stats.merge(_new_stats())
+	stats.calls += 1
 	var rejected: Array = report.rejected
 	var unchanged := {"network": network, "surface": surface, "slots": slots, "report": report, "surface_trails": [], "refined": []}
 	var piece_class: Dictionary = {}
 	for piece: Dictionary in network.get_data().pieces:
 		piece_class[piece.id] = piece.info.route_class
 	while not trails.is_empty():
+		stats.attempts += 1
+		stats.trails_attempted += trails.size()
+		var t: int = Time.get_ticks_usec()
 		var indices: Array = _trail_tiles(trails, slots, bounds)
+		stats.trail_tiles_s += _lap(t)
+		t = Time.get_ticks_usec()
 		# Benches are measured on the published pre-bench surface of their zone.
 		var pre: RefCounted = surface.with_trails(trails).with_published(indices.map(func(k: int) -> Dictionary: return slots[k]))
 		var shaped: Array = []
@@ -153,6 +173,7 @@ static func _publish_trails(trails: Array, report: Dictionary, context: Dictiona
 				shaped.append(made.trail)
 			else:
 				rejected.append({"id": made.id, "reason_code": made.reason_code, "detail": made.detail})
+		stats.shape_s += _lap(t)
 		if shaped.size() < trails.size():
 			trails = shaped
 			continue
@@ -163,8 +184,10 @@ static func _publish_trails(trails: Array, report: Dictionary, context: Dictiona
 		var failure: Dictionary = {}
 		var agreed: bool = false
 		var memo: Dictionary = {}
+		t = Time.get_ticks_usec()
 		for attempt in range(MAX_SEAM_PASSES):
-			refined = _refine_tiles(trail_surface, bounds, piece_class, threads, slots, indices, forced, memo)
+			stats.seam_passes += 1
+			refined = _refine_tiles(trail_surface, bounds, piece_class, threads, slots, indices, forced, memo, stats)
 			for slot: Dictionary in refined:
 				if not slot.is_valid:
 					failure = slot
@@ -185,6 +208,9 @@ static func _publish_trails(trails: Array, report: Dictionary, context: Dictiona
 			if not grew:
 				agreed = true
 				break
+		stats.refine_s += _lap(t)
+		stats.max_tiles = maxi(stats.max_tiles, indices.size())
+		stats.border_points = maxi(stats.border_points, forced.size())
 		if failure.is_empty() and not agreed:
 			failure = {"reason_code": "ERR_TRAIL_TILE", "tx": -1, "tz": -1, "detail": "no border agreement in %d passes" % MAX_SEAM_PASSES}
 		if not failure.is_empty():
@@ -192,6 +218,7 @@ static func _publish_trails(trails: Array, report: Dictionary, context: Dictiona
 				rejected.append({"id": trail.id, "reason_code": "ERR_TRAIL_UNRIDEABLE", "detail": {"stage": "published geometry", "reason": failure.get("reason_code", ""),
 					"tile": [failure.tx, failure.tz], "note": str(failure.get("detail", ""))}})
 			return unchanged
+		t = Time.get_ticks_usec()
 		var published: RefCounted = trail_surface.with_published(refined)
 		var finished: Array = []
 		var kept: Array = []
@@ -202,10 +229,13 @@ static func _publish_trails(trails: Array, report: Dictionary, context: Dictiona
 				kept.append(trail)
 			else:
 				rejected.append({"id": made.id, "reason_code": made.reason_code, "detail": made.detail})
+		stats.finalize_s += _lap(t)
 		if kept.size() < trails.size():
 			trails = kept
 			continue
+		t = Time.get_ticks_usec()
 		var joined: Dictionary = network.with_trails(finished)
+		stats.join_s += _lap(t)
 		if not joined.is_valid:
 			for trail: Dictionary in trails:
 				rejected.append({"id": trail.id, "reason_code": joined.reason_code, "detail": {"stage": "network publication"}})
@@ -247,7 +277,7 @@ static func _trail_tiles(trails: Array, slots: Array, bounds: Dictionary) -> Arr
 ## result of a tile whose border points did not change instead of refining
 ## it again.
 static func _refine_tiles(surface: RefCounted, bounds: Dictionary, piece_class: Dictionary, threads: int, slots: Array, indices: Array, forced: Dictionary,
-		memo: Dictionary = {}) -> Array:
+		memo: Dictionary = {}, stats: Dictionary = {}) -> Array:
 	var out: Array = []
 	var keys: Array = []
 	var todo: Array = []
@@ -280,7 +310,19 @@ static func _refine_tiles(surface: RefCounted, bounds: Dictionary, piece_class: 
 			job.call(n)
 	for m: int in todo:
 		memo[indices[m]] = {"key": keys[m], "slot": out[m]}
+	if not stats.is_empty():
+		stats.tiles_refined += todo.size()
+		stats.tiles_memo += indices.size() - todo.size()
 	return out
+
+
+## Publication work record (report.publication): calls of _publish_trails,
+## attempts (one per realized set tried), trails in them, seam passes, tiles
+## refined / taken from the seam memo, the largest tile set and border-point
+## set of an attempt, and seconds of each step summed over all attempts.
+static func _new_stats() -> Dictionary:
+	return {"calls": 0, "attempts": 0, "trails_attempted": 0, "seam_passes": 0, "tiles_refined": 0, "tiles_memo": 0, "max_tiles": 0, "border_points": 0,
+		"trail_tiles_s": 0.0, "shape_s": 0.0, "refine_s": 0.0, "finalize_s": 0.0, "join_s": 0.0, "trap_check_s": 0.0}
 
 
 static func _lap(t0: int) -> float:
