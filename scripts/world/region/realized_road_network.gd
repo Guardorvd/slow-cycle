@@ -252,6 +252,21 @@ static func from_plan(plan: RefCounted, graph: RefCounted, spec: Dictionary, exc
 			if ok_edges.has(e):
 				incident.append(e)
 		net.nodes.append({"id": node_id, "kind": Graph.NODE_KIND_NAMES[node.kind], "x_m": node.x_cm / 100.0, "z_m": node.z_cm / 100.0, "edges": incident})
+	# PERF-P2: natural route intents (edges R6 left undesigned on purpose):
+	# R5 corridor and end nodes, region-local metres. Read-only planning input
+	# for BC2 trails; never pieces, never riding graph.
+	var natural: Array = []
+	for e: int in range(graph.get_edge_count()):
+		if not edge_rec.has(e) or not "R6_NATURAL_ROUTE_NOT_DESIGNED" in edge_rec[e].reasons:
+			continue
+		var g: Dictionary = graph_edges[e]
+		var line := {"x": PackedFloat64Array(), "z": PackedFloat64Array()}
+		for k in range(g.corridor.x_cm.size()):
+			line.x.append(g.corridor.x_cm[k] / 100.0)
+			line.z.append(g.corridor.z_cm[k] / 100.0)
+		natural.append({"edge_id": e, "class": Graph.CLASS_NAMES[edge_rec[e].class], "a": g.a, "b": g.b, "a_m": [nodes[g.a].x_cm / 100.0, nodes[g.a].z_cm / 100.0],
+			"b_m": [nodes[g.b].x_cm / 100.0, nodes[g.b].z_cm / 100.0], "line": line})
+	net["natural_routes"] = natural
 	var network = _instance()
 	network._data = net
 	net["metrics"] = network._metrics(graph, backbone_edges, junction_rec)

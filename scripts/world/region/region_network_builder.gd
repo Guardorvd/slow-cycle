@@ -30,6 +30,10 @@ const MODEL := "network_builder/1;replans=2;wall=close:64,penalty:6:96;crossing=
 ## so demanding them only forced every region through all rounds;
 ## ALL_CLASSES is the earlier rule (also demands READY SINGLETRACK and
 ## TECHNICAL road edges), kept for comparison runs.
+## PERF-P2: SINGLETRACK / TECHNICAL edges are natural route intents (R6 does
+## not design them; BC2 trails realize them). options.natural_intents = false
+## restores R6 designs of every class (comparison runs).
+const INTENT_CLASSES: Array[int] = [Graph.RouteClass.SINGLETRACK, Graph.RouteClass.TECHNICAL]
 const STOP_ROADS := "ROADS"
 const STOP_ALL_CLASSES := "ALL_CLASSES"
 const WALL_REASONS: Array[String] = ["ERR_R6_EARTHWORK", "ERR_R6_NATURAL_BARRIER", "ERR_R6_CORRIDOR_CLEARANCE"]
@@ -51,7 +55,9 @@ static func _build(region_plan: RefCounted, terrain_field: RefCounted, hydrology
 	var stop_rule: String = options.get("stop_rule", STOP_ROADS)
 	if not stop_rule in [STOP_ROADS, STOP_ALL_CLASSES]:
 		return {"is_valid": false, "reason_code": "ERR_NETWORK_STOP_RULE", "network": null, "rounds": []}
-	var spec := {"seed": options.get("seed", 0), "region": options.get("region", Vector2i.ZERO), "model": MODEL + (";stop=roads" if stop_rule == STOP_ROADS else "")}
+	var intents: bool = bool(options.get("natural_intents", true))
+	var spec := {"seed": options.get("seed", 0), "region": options.get("region", Vector2i.ZERO), "model": MODEL + (";stop=roads" if stop_rule == STOP_ROADS else "")
+		+ (";natural=intents" if intents else "")}
 	var hints: Array = []
 	var hint_keys: Dictionary = {}
 	var raster: Variant = null
@@ -82,7 +88,7 @@ static func _build(region_plan: RefCounted, terrain_field: RefCounted, hydrology
 			return {"is_valid": false, "reason_code": "ERR_BAKE_CANCELLED", "network": null, "rounds": rounds}
 		if progress.is_valid():
 			progress.call("network: roads (round %d of up to %d)" % [round_index + 1, max_replans + 1], (round_index + 0.3) / (max_replans + 1))
-		var synth: Dictionary = Synth.synthesize(region_plan, terrain_field, hydrology_plan, routes.graph, {}, int(options.get("threads", 1)))
+		var synth: Dictionary = Synth.synthesize(region_plan, terrain_field, hydrology_plan, routes.graph, {}, int(options.get("threads", 1)), INTENT_CLASSES if intents else [])
 		var t2: int = Time.get_ticks_usec()
 		if synth.plan == null:
 			rounds.append({"round": round_index, "status": "R6_" + str(synth.status), "reason_code": synth.reason_code, "hints": hints.size()})

@@ -55,6 +55,16 @@ const Trail = preload("res://scripts/world/region/trail_realization.gd")
 const TrailPolicy = preload("res://scripts/world/region/trail_policy.gd")
 const Surface = preload("res://scripts/world/region/final_surface.gd")
 const TILE_M: float = 512.0
+## PERF-P2: ports within INTENT_PORT_M of a natural route intent's corridor
+## may carry it (nearest port per INTENT_BIN_M of corridor), at most
+## INTENT_PAIRS pairs per intent; an intent pair may span up to
+## INTENT_STRAIGHT_FACTOR x the class's straight_max_m.
+const INTENT_PORT_M: float = 160.0
+const INTENT_BIN_M: float = 40.0
+const INTENT_PAIRS: int = 3
+const INTENT_STRAIGHT_FACTOR: float = 2.0
+## Score bonus of a trail realizing an R5 natural route intent.
+const INTENT_BONUS: float = 1.0
 ## Neighbour steps of the search lattice (16-connected).
 const STEPS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1),
 	Vector2i(2, 1), Vector2i(2, -1), Vector2i(-2, 1), Vector2i(-2, -1), Vector2i(1, 2), Vector2i(1, -2), Vector2i(-1, 2), Vector2i(-1, -2)]
@@ -111,6 +121,9 @@ static func _plan_class(state: _State, wanted: int) -> Dictionary:
 	state.last_filtered = {}
 	var pairs: Array = _descent_pairs(ports, context.network, state, int(context.seed)) if profile.directed else _pairs(ports, context.network, state, int(context.seed))
 	var tally := {"passed": [], "rejected": [], "searches": 0, "checks": 0, "expanded": 0}
+	# PERF-P2: the natural routes R5 planned for this class come first.
+	var intent_pairs: Array = _intent_pairs(context.network, state, int(context.seed))
+	_try_pairs(intent_pairs, state, wanted, tally, TrailPolicy.MAX_SEARCHES)
 	_try_pairs(pairs, state, wanted, tally, TrailPolicy.MAX_SEARCHES)
 	var destinations: Array = []
 	var destination_pairs: Array = []
@@ -125,7 +138,8 @@ static func _plan_class(state: _State, wanted: int) -> Dictionary:
 	var checks: int = tally.checks
 	var expanded: int = tally.expanded
 	passed.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.planner.score > b.planner.score or (a.planner.score == b.planner.score and a.id < b.id))
-	var report := {"class": state.class_name_value, "ports": ports.size(), "pairs": pairs.size(), "searches": searches, "checks": checks, "expanded": expanded,
+	var report := {"class": state.class_name_value, "ports": ports.size(), "pairs": pairs.size(), "intent_pairs": intent_pairs.size(),
+		"intent_trails": passed.filter(func(t: Dictionary) -> bool: return t.planner.has("intent")).size(), "searches": searches, "checks": checks, "expanded": expanded,
 		"passed": passed.size(), "destinations": destinations.size(), "destination_pairs": destination_pairs.size(), "filtered": state.last_filtered.duplicate(),
 		"destination_sample": destinations.slice(0, 4).map(func(d: Dictionary) -> Dictionary: return {"x_m": snappedf(d.p.x, 1.0), "z_m": snappedf(d.p.y, 1.0),
 			"height_m": snappedf(d.h, 0.1), "prominence_m": snappedf(d.prominence, 0.1), "nearest_port_m": snappedf(_nearest_port(ports, d.p), 1.0)})}
@@ -570,6 +584,100 @@ static func _pairs(ports: Array, data: Dictionary, state: _State, seed_value: in
 		out.append_array(list.slice(0, 1 if state.profile.get("along", false) else 2))
 	out.sort_custom(_better)
 	state.last_filtered = filtered
+	return out
+
+
+## PERF-P2: port pairs carrying the R5 natural route intents of the state's
+## class (RealizedRoadNetwork natural_routes). R5 natural routes often end at
+## natural-only nodes, so a pair takes any stretch of the intent corridor
+## between two road ports: ports along the road edges within INTENT_PORT_M of
+## a corridor station (the nearest port per INTENT_BIN_M of corridor), pairs
+## on distinct incident nodes whose corridor stretch is at least the class's
+## straight_min_m. The detour / gain filters are waived (R5 judged the
+## route); straight length up to INTENT_STRAIGHT_FACTOR x the class maximum;
+## facing, a straight line clear of roads, the class climb (SINGLETRACK) or
+## drop (TECHNICAL, high port first) checks are kept. Longer stretches and
+## nearer ports first, INTENT_PAIRS per intent; search, screening and
+## realization are the normal ones.
+static func _intent_pairs(data: Dictionary, state: _State, seed_value: int) -> Array:
+	var routes: Array = data.get("natural_routes", []).filter(func(r: Dictionary) -> bool: return r["class"] == state.class_name_value)
+	if routes.is_empty():
+		return []
+	var profile: Dictionary = state.profile
+	var ports: Array = _along_ports(data, state)
+	var ground: Dictionary = state.context.ground
+	var heights: Array = ports.map(func(p: Dictionary) -> float: return Surface.ground_height(ground, p.q.x, p.q.y))
+	var dist: Dictionary = _node_distances(data)
+	var lengths: Dictionary = {}
+	var ends: Dictionary = {}
+	for edge: Dictionary in data.edges:
+		lengths[edge.edge_id] = edge.length_m
+		ends[edge.edge_id] = [edge.a, edge.b]
+	var out: Array = []
+	for route: Dictionary in routes:
+		var xs: PackedFloat64Array = route.line.x
+		var zs: PackedFloat64Array = route.line.z
+		var along := PackedFloat64Array([0.0])
+		for k in range(1, xs.size()):
+			along.append(along[k - 1] + Vector2(xs[k], zs[k]).distance_to(Vector2(xs[k - 1], zs[k - 1])))
+		# Nearest port per corridor bin: [distance, port index, corridor s].
+		var bins: Dictionary = {}
+		for i in range(ports.size()):
+			if is_nan(heights[i]):
+				continue
+			var best: Array = [INF, -1]
+			for k in range(xs.size()):
+				var d: float = ports[i].q.distance_to(Vector2(xs[k], zs[k]))
+				if d < best[0]:
+					best = [d, k]
+			if best[0] > INTENT_PORT_M:
+				continue
+			var bin: int = int(along[best[1]] / INTENT_BIN_M)
+			if not bins.has(bin) or best[0] < bins[bin][0]:
+				bins[bin] = [best[0], i, along[best[1]]]
+		var near: Array = bins.values()
+		near.sort()
+		var found: Array = []
+		for x: Array in near:
+			for y: Array in near:
+				if x[2] >= y[2] or y[2] - x[2] < profile.straight_min_m:
+					continue
+				var i: int = x[1]
+				var j: int = y[1]
+				if profile.directed and heights[j] > heights[i]:
+					var swap: int = i
+					i = j
+					j = swap
+				var p: Dictionary = ports[i]
+				var q: Dictionary = ports[j]
+				var nodes: Array = _distinct_nodes(p, q)
+				if nodes.is_empty():
+					continue
+				var straight: float = p.q.distance_to(q.q)
+				if straight < profile.straight_min_m or straight > INTENT_STRAIGHT_FACTOR * profile.straight_max_m:
+					continue
+				var drop: float = heights[i] - heights[j]
+				if profile.directed and (drop < profile.drop_min_m or drop / straight < profile.drop_ratio_min):
+					continue
+				if not profile.directed and absf(drop) / straight > profile.climb_mean_max:
+					continue
+				if not _faces(p, q.q) or not _faces(q, p.q):
+					continue
+				if _straight_profile(p.q, q.q, state).road_samples > 0:
+					continue
+				var road: float = _road_between(p, q, dist, lengths, ends, data)
+				var span: float = minf(y[2] - x[2], INTENT_STRAIGHT_FACTOR * profile.straight_max_m)
+				var entry := {"id": "pair:%s~%s" % [p.id, q.id], "a": p, "b": q, "nodes": nodes, "straight_m": straight, "road_m": road, "intent": route.edge_id,
+					"score": INTENT_BONUS + span / 1000.0 - (x[0] + y[0]) / 1000.0, "tie": ("%d|%s|%s" % [seed_value, p.id, q.id]).hash(), "group": "intent:%d" % route.edge_id}
+				if profile.directed:
+					var slope: float = 0.0
+					for m in range(1, 10):
+						var g: Vector2 = _ground_gradient(ground, lerpf(p.q.x, q.q.x, m / 10.0), lerpf(p.q.y, q.q.y, m / 10.0))
+						slope += minf(g.length(), 0.6) / 9.0
+					entry.merge({"drop_m": drop, "ground_slope": slope})
+				found.append(entry)
+		found.sort_custom(_better)
+		out.append_array(found.slice(0, INTENT_PAIRS))
 	return out
 
 
@@ -1282,6 +1390,8 @@ static func _realize(pair: Dictionary, points: Array[Vector2], screened: Diction
 	var node_a: Dictionary = _node(context.network, ends[0])
 	var node_b: Dictionary = _node(context.network, ends[1])
 	var purpose: String = _purpose(pair, screened, directed)
+	if pair.has("intent"):
+		purpose += "; realizes the R5 natural route edge:%d" % pair.intent
 	var id: String = "trail:%s_%d_%d_%s_%s" % [profile.id_prefix, ends[0], ends[1], String(pair.a.id).replace("edge:", "e").replace("@", "_"),
 		String(pair.b.id).replace("edge:", "e").replace("@", "_")]
 	var control: Array = []
@@ -1317,6 +1427,9 @@ static func _realize(pair: Dictionary, points: Array[Vector2], screened: Diction
 		record.planner["destination"] = {"x_m": pair.via.x, "z_m": pair.via.y, "height_m": pair.destination.h, "prominence_m": pair.destination.prominence}
 		if not directed:
 			score = pair.score + 1.0
+	if pair.has("intent"):
+		record.planner.score += INTENT_BONUS
+		record.planner["intent"] = pair.intent
 	if directed:
 		record.planner.merge({"drop_m": pair.drop_m, "ground_slope": pair.ground_slope, "turns": screened.metrics.turns, "steep_share": screened.metrics.steep_share,
 			"return": {"via": "road", "road_m": pair.road_m}})

@@ -10,7 +10,8 @@ extends SceneTree
 ##   --seed=S --region=X,Z [--threads=N (4)] [--trail-config=res://...]
 ##   [--rebuild=ground|trails] (run that stage and the later ones anyway)
 ##   [--stop-rule=ROADS|ALL_CLASSES] (network replan stop rule; products of
-##   ALL_CLASSES are not saved as final products)
+##   ALL_CLASSES are not saved as final products) [--natural=designed] (R6
+##   designs SINGLETRACK / TECHNICAL edges as before PERF-P2; not saved)
 ##   [--out=ABS.json]
 ## Prints DEV_BAKE {stages: {ground, trails: reused|built (reason)}, timings,
 ## digests, keys} and DEV_VERIFY.
@@ -31,6 +32,7 @@ func _initialize() -> void:
 	var rebuild: String = ""
 	var out_path: String = ""
 	var stop_rule: String = "ROADS"
+	var natural_intents: bool = true
 	for arg: String in OS.get_cmdline_user_args():
 		if arg.begins_with("--seed="):
 			seed_value = arg.substr(7).to_int()
@@ -43,13 +45,15 @@ func _initialize() -> void:
 			config_path = arg.substr(15)
 		elif arg.begins_with("--rebuild="):
 			rebuild = arg.substr(10)
+		elif arg == "--natural=designed":
+			natural_intents = false
 		elif arg.begins_with("--stop-rule="):
 			stop_rule = arg.substr(12)
 		elif arg.begins_with("--out="):
 			out_path = arg.substr(6)
 	var t0: int = Time.get_ticks_usec()
 	var settings: Dictionary = Cache.trail_settings(config_path)
-	var options := {"threads": threads, "trail_config": JSON.parse_string(FileAccess.get_file_as_string(config_path)), "max_replans": Builder.MAX_REPLANS, "stop_rule": stop_rule}
+	var options := {"threads": threads, "trail_config": JSON.parse_string(FileAccess.get_file_as_string(config_path)), "max_replans": Builder.MAX_REPLANS, "stop_rule": stop_rule, "natural_intents": natural_intents}
 	var made: Dictionary = Synth.off_main_thread(func() -> Dictionary: return _work(seed_value, region, options, settings, rebuild))
 	if not made.is_valid:
 		print("DEV_BAKE_FAIL ", JSON.stringify(made.get("report", {"reason_code": made.reason_code})))
@@ -61,11 +65,11 @@ func _initialize() -> void:
 	baked.manifest["dev_stage_reuse"] = made.report
 	# Products of a non-default stop rule are not what the runtime bakes for
 	# this key: never stored as final products (stages are keyed by the rule).
-	var saved: Dictionary = Cache.save(key, baked, Stage.DEV_ROOT) if stop_rule == Builder.STOP_ROADS else {"is_valid": false}
+	var saved: Dictionary = Cache.save(key, baked, Stage.DEV_ROOT) if stop_rule == Builder.STOP_ROADS and natural_intents else {"is_valid": false}
 	made.report.timings["save_s"] = (Time.get_ticks_usec() - t) / 1e6
 	made.report.timings["total_s"] = (Time.get_ticks_usec() - t0) / 1e6
 	var m: Dictionary = baked.manifest
-	var summary := {"seed": seed_value, "stop_rule": stop_rule, "terrain_kernel": m.terrain_kernel, "region": [region.x, region.y], "stages": made.report.stages, "timings_s": made.report.timings, "bake_timings_s": m.timings_s,
+	var summary := {"seed": seed_value, "stop_rule": stop_rule, "natural_intents": natural_intents, "terrain_kernel": m.terrain_kernel, "region": [region.x, region.y], "stages": made.report.stages, "timings_s": made.report.timings, "bake_timings_s": m.timings_s,
 		"network_digest": m.network_digest, "tiles_digest": m.tiles_digest, "vegetation_digest": m.vegetation.digest, "runtime_key": key, "saved": saved.is_valid,
 		"trails": (m.get("trails", {}).get("published", []) as Array).map(func(e: Dictionary) -> Array: return [e.id, e.get("class", ""), e.length_m])}
 	print("DEV_BAKE ", JSON.stringify(summary))

@@ -119,7 +119,8 @@ static func closure_digest(entries: Array) -> Dictionary:
 
 static func ground_key(seed_value: int, region: Vector2i, options: Dictionary) -> Dictionary:
 	var source: Dictionary = closure_digest([GROUND_ENTRY])
-	var settings := {"max_replans": int(options.get("max_replans", -1)), "stop_rule": str(options.get("stop_rule", "ROADS"))}
+	var settings := {"max_replans": int(options.get("max_replans", -1)), "stop_rule": str(options.get("stop_rule", "ROADS")),
+		"natural_intents": bool(options.get("natural_intents", true))}
 	var text: String = FORMAT + "\nground\n" + Bake.SCHEMA + "\n" + str(Engine.get_version_info()) + "\n%d\n%d,%d\n" % [seed_value, region.x, region.y] \
 		+ JSON.stringify(settings, "", true) + "\n" + source.digest
 	return {"key": text.sha256_text(), "files": source.files, "paths": source.paths}

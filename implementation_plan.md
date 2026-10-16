@@ -3,7 +3,7 @@ DATE: 2026-10-15
 STATUS: PLAN_ONLY — awaiting Game Director approval (AGENTS.md: new phase → compact ExecPlan, STOP)
 BRANCH/BASE: bc2-stabilization-perf (post-BC2 A + B1) on master e7730ca
 PREVIOUS: [BC2](docs/plans/completed/BC2.md) COMPLETE (playtest-accepted); post-BC2 stabilization A1–A6 + B1 counters; ENGINEERED-only experiment not adopted ([record](docs/investigations/POST_BC2_PERF.md)).
-ALSO PLAN_ONLY (2026-10-15): PERF-P2 natural route intents, at the end of this file (PERFORMANCE FIRST part 2; answers D4 below). Branch `perf-first`.
+ALSO (2026-10-16, APPROVED, IMPLEMENTING): PERF-P2 natural route intents, at the end of this file (PERFORMANCE FIRST part 2; answers D4 below). Branch `perf-first`.
 
 ---
 
@@ -61,7 +61,7 @@ Director playtest acceptance of S1–S4 (S5 decision recorded); backlog updated;
 
 TASK: PERF-P2 — Natural route intents: R5 keeps them, R6 does not design them, trails realize them
 DATE: 2026-10-15
-STATUS: PLAN_ONLY — awaiting Game Director approval (PERFORMANCE FIRST part 2: substantial R5 → R6 → BC2 interaction change)
+STATUS: APPROVED 2026-10-16 (Game Director, decision card "Одобрить PERF-P2"); IMPLEMENTING S1
 BRANCH/BASE: `perf-first` (stage reuse, C# terrain kernel, ROADS stop rule; [record](docs/investigations/PERF_FIRST.md))
 
 ## Goal

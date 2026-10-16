@@ -73,7 +73,7 @@ static func build(seed_value: int, region: Vector2i, up: Dictionary, options: Di
 	_report(progress, "network", 0.03)
 	var network_progress := func(stage: String, fraction: float) -> void: _report(progress, stage, 0.03 + 0.42 * fraction)
 	var built: Dictionary = Builder.build(plan, terrain, hydro.plan, {"seed": seed_value, "region": region, "max_replans": options.get("max_replans", Builder.MAX_REPLANS),
-		"stop_rule": options.get("stop_rule", Builder.STOP_ROADS),
+		"stop_rule": options.get("stop_rule", Builder.STOP_ROADS), "natural_intents": bool(options.get("natural_intents", true)),
 		"threads": int(options.get("threads", 1)), "progress": network_progress, "cancelled": cancelled})
 	timings["network_s"] = _lap(t)
 	if not built.is_valid:
