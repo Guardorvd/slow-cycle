@@ -1,6 +1,6 @@
 # Performance First: dev bake and cold-bake acceleration
 
-STATUS: RECORD (2026-10-15). Branch `perf-first` (from `bc2-stabilization-perf` `ab5083f`), not merged. Director sprint "Slow Cycle — PERFORMANCE FIRST".
+STATUS: RECORD (2026-10-15). Branch `perf-first` (from `bc2-stabilization-perf` `ab5083f`), merged to master 2026-10-16 (Director decision card «Влить»); sprint closed. Director sprint "Slow Cycle — PERFORMANCE FIRST".
 
 ## Conditions
 
