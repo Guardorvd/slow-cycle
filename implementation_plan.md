@@ -3,7 +3,7 @@ DATE: 2026-10-15
 STATUS: PLAN_ONLY — awaiting Game Director approval (AGENTS.md: new phase → compact ExecPlan, STOP)
 BRANCH/BASE: bc2-stabilization-perf (post-BC2 A + B1) on master e7730ca
 PREVIOUS: [BC2](docs/plans/completed/BC2.md) COMPLETE (playtest-accepted); post-BC2 stabilization A1–A6 + B1 counters; ENGINEERED-only experiment not adopted ([record](docs/investigations/POST_BC2_PERF.md)).
-ALSO PLAN_ONLY (2026-10-15): PERF-P2 natural route intents, at the end of this file (PERFORMANCE FIRST part 2; answers D4 below). Branch `perf-first`.
+PERF-P2 natural route intents (end of this file): APPROVED 2026-10-16, implemented, NOT ADOPTED at S3 (184729 lost trails); code on `perf-p2-experiment`. Answers D4 below.
 
 ---
 
@@ -61,7 +61,7 @@ Director playtest acceptance of S1–S4 (S5 decision recorded); backlog updated;
 
 TASK: PERF-P2 — Natural route intents: R5 keeps them, R6 does not design them, trails realize them
 DATE: 2026-10-15
-STATUS: PLAN_ONLY — awaiting Game Director approval (PERFORMANCE FIRST part 2: substantial R5 → R6 → BC2 interaction change)
+STATUS: CLOSED — approved 2026-10-16 (Game Director decision card), S1+S2 implemented on `perf-p2-experiment` (commit on that branch), S3 = not adopted: 184729 (the one seed baked, per Director) trails TECHNICAL 2 + SINGLETRACK 2 → 1 + 1, roads re-laid, no time gain; see [record](docs/investigations/PERF_FIRST.md#perf-p2-result)
 BRANCH/BASE: `perf-first` (stage reuse, C# terrain kernel, ROADS stop rule; [record](docs/investigations/PERF_FIRST.md))
 
 ## Goal

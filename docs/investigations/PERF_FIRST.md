@@ -50,6 +50,19 @@ Measured (B1 counters, this branch):
 - **ROADS stop rule** (default on this branch): the rounds end at the first road network meeting N1–N6 without natural road classes (continuous backbone, ≥ 8 km, ≥ 2 loops, SECONDARY, no blocked node, no stray dead end). The old rule stays available as `stop_rule = ALL_CLASSES` (`--stop-rule=ALL_CLASSES` in the dev tools) for comparison. Effect: 184729 stops after round 1, the round the old rule chose anyway: same network, −47 s. 3628391: only round 2 meets N1–N6, so all rounds still run: same result, no gain. 2024: no round has a continuous backbone (N-7), unchanged.
 - Remaining cost on 3628391 / 2024: R6 design of natural edges that fail (≈ 70–100 s of R6 per round on 3628391). Removing it changes the layout feedback (the earlier R6_ENGINEERED experiment re-rolled 184729 and lost two trails), so it is a restructuring of R5 → R6 → BC2 interaction: proposed as ExecPlan PERF-P2 in [implementation_plan.md](../../implementation_plan.md), not implemented.
 
+## PERF-P2 result
+
+Approved 2026-10-16, implemented on branch `perf-p2-experiment`, **not adopted** (plan S3). One seed baked, by Director instruction: 184729 (0,0), cold, same machine.
+
+| 184729 | total s | network s | trails s | roads | road loops | trails |
+|---|---|---|---|---|---|---|
+| `perf-first` (ROADS) | 246.4 | 62.0 | 64.1 | BB 7 / SEC 5, 9.39 km | 3 | TECHNICAL 2 + SINGLETRACK 2 |
+| PERF-P2 | 239.9 | 89.6 | 36.9 | BB 10 / SEC 4, 8.85 km | 3 | TECHNICAL 1 + SINGLETRACK 1 (trail graph strongly connected) |
+
+- Without R6's natural-edge designs the round hints change, round 1 no longer reaches 8 km, a third round runs and the chosen layout is the one the R6_ENGINEERED experiment produced. No time gain on 184729 (natural designs were cheap there; the extra round eats the saving).
+- No R5 intent became a trail: the three natural routes (1.1–2.4 km) end at natural-only junctions away from the roads; the TECHNICAL corridor passes no road port within 160 m, the SINGLETRACK ones have road ports only near one end. Intents as R5 plans them are not trail-shaped.
+- So the coupling, not the cost, decides: the R6 natural designs on 184729 matter only through the hints they feed. A future road model change (BC3 D4) would need R5 itself to plan natural routes as road-to-road stretches; not attempted here.
+
 ## How to use
 
 - Once per checkout on the .NET build: `dotnet build SlowCycle.csproj` (Godot.NET.Sdk 4.7.2 from NuGet). Without it everything works on the GDScript kernel with identical results, only slower; the manifest records `terrain_kernel`.
