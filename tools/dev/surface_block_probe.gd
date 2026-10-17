@@ -14,8 +14,9 @@ extends SceneTree
 ##   composition  at sample points off every operation the block equals the
 ##                design surface, on road planes the road height (by rule);
 ##   grid_error   |bilinear(block) - exact composition| at cell centres, per
-##                material; the trail band and platform limit is 0.02 m
-##                (GEN2-S plan, preliminary), other classes are reported;
+##                material: REPORTED, no limit (Game Director 2026-10-17: the
+##                0.5 m grid's softened creases are accepted; the ride judges
+##                them; the preliminary 0.02 m trail limit is withdrawn);
 ##   incremental  the platform moved: only blocks of its old and new
 ##                rectangles are rebuilt and the result equals a full rebuild.
 ## Outputs in user://surface_block_probe/<name>/: summary JSON, map PNG.
@@ -36,7 +37,6 @@ const PLATFORM_TAPER_M: float = 3.0
 ## SITE_CLEAR_M (along the line) from a BENCH and from the trail ends.
 const TURN_SPAN_M: float = 6.0
 const SITE_CLEAR_M: float = 15.0
-const TRAIL_ERROR_LIMIT_M: float = 0.02
 const MOVE_M := Vector2(4.0, 0.0)
 
 var _args: Dictionary = {}
@@ -152,7 +152,7 @@ func _work(out_dir: String) -> Dictionary:
 	timings["map_s"] = _lap(t)
 	var ok: bool = true
 	for key: String in checks:
-		ok = ok and checks[key].verdict == "PASS"
+		ok = ok and checks[key].verdict in ["PASS", "REPORTED"]
 		print("SURFACE_CHECK ", key, " ", JSON.stringify(checks[key]))
 	print("SURFACE_TIMINGS ", JSON.stringify(timings))
 	out["exit_code"] = 0 if ok else 2
@@ -295,8 +295,8 @@ func _grid_error(blocks: Array, ops: RefCounted) -> Dictionary:
 		if cls.begins_with("TRAIL"):
 			trail_max = maxf(trail_max, out[cls].max_m)
 	trail_max = INF if trail_max < 0.0 else trail_max
-	out["verdict"] = "PASS" if trail_max <= TRAIL_ERROR_LIMIT_M else "FAIL"
-	out["limit_trail_m"] = TRAIL_ERROR_LIMIT_M
+	out["verdict"] = "REPORTED"
+	out["trail_max_m"] = trail_max
 	return out
 
 
