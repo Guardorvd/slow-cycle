@@ -43,7 +43,12 @@ Code: `scripts/world/surface/surface_block_vegetation.gd` (candidates from the n
 
 Cost: candidates 0.63 s + placement 0.02 s for the 9 blocks (4 threads); the planner's tile for the same ground 2.5 s. A trail change re-places vegetation in 0.02 s, against 17–19 s for the 3 x 3 tile ring in GEN2-1's exact mode. The ride check with vegetation: PASS (same places; 1365 plants, 1286 trunk / rock colliders); ready to ride in 41.8 s (blocks 28.4 s).
 
+## Director's machine (Windows, C# kernel, Vulkan; 2026-10-17)
+
+Ride check (`--check`): PASS. First run builds and stores the ground stage once: 188 s, total 220.6 s; 9 blocks 12.4 s. With the cached ground the section is ready to ride in 32 s. Shots 1_entry, 2_bench, 3_platform, 4_seam (Vulkan, bike placed at each point — placement captures, not a ride check): no holes, no visible block seams, trail and bench read well. 5_top was fog only; fixed in 8457cc3 (top camera without region fog), not re-captured yet. Open observation: thin dark-red stripes on the grass left of the platform in 3_platform, cause not established (uv interpolation between platform / trail / grass vertices or a shadow). Log: only the known "6 ObjectDB instances leaked" (audio). Desktop shortcut "Slow Cycle - участок GEN2-S".
+
 ## NOT RUN
 
-- Windows / C# kernel timings; other seeds; a real switchback (BC1 has no sharp turn).
-- Vulkan captures (no GPU here; requested on the Director's machine); a human ride.
+- Other seeds; a real switchback (BC1 has no sharp turn).
+- 5_top re-capture; cause of the platform stripes.
+- Human ride (S4).
