@@ -1,6 +1,6 @@
 # GEN2-S — surface block prototype (record)
 
-STATUS: IMPLEMENTING (S1 done, S2 next). Plan: [GEN2_SURFACE_PLAN.md](../generator-v2/GEN2_SURFACE_PLAN.md), approved by the Game Director 2026-10-17. Branch `gen2-s-surface-block` on master `92e01e1`. Dev-only: the production bake, caches, runtime and player are unchanged.
+STATUS: IMPLEMENTING (S1 done; S2 code and headless checks done, Vulkan captures pending on the Director's machine). Plan: [GEN2_SURFACE_PLAN.md](../generator-v2/GEN2_SURFACE_PLAN.md), approved by the Game Director 2026-10-17. Branch `gen2-s-surface-block` on master `92e01e1`. Dev-only: the production bake, caches, runtime and player are unchanged.
 
 ## S1 — block data and operations (2026-10-17)
 
@@ -22,6 +22,15 @@ Cause of the grid error: creases (bench daylight edge, road shoulder) not aligne
 
 Cost (Linux, GDScript kernel): 4.7 s per block on one thread (≈ 72 us per sample; natural ground 39–47 us, road deformer +16–120 us near roads), 27 s for 9 blocks on 4 threads. Per 512 m of area that is ≈ 75 s of thread time against ≈ 13 s for today's tile build — a uniform 0.5 m grid everywhere is slower for a full bake; it pays only as local detail (near the rider and the operations) with a coarse grid elsewhere, and with the C# kernel (12x per natural sample, PERF_FIRST) on the Director's build. A changed trail costs 4.7 s (1 block) against 12–17 s per 512 m tile today.
 
+## S2 — render, collision, cover (2026-10-17)
+
+Code: `scripts/world/surface_block_streamer.gd` (adapter: one mesh per block with the bake's terrain shader; HeightMapShape3D per block on the terrain layer; road / trail cells as ConcavePolygonShape3D strips on their layers, heightfield sunk 0.3 m under strip interiors; cells split on the same diagonal as HeightMapShape3D — measured), `scripts/world/surface/surface_section.gd` (shared setup), `tools/dev/surface_block_ride.gd` (section in the region world scene, same bicycle, camera, light; recovery to the trail at the section edge).
+
+Cover without changing the bicycle: holes in HeightMapShape3D (NaN) were tried first and rejected — the ray misses the four cells around the sample and the physics server warns on every query. The strip method keeps the bicycle's existing rule (collision layer under the wheel).
+
+Headless check (`--check`, Linux): the bike placed on trail, platform, road and grass, 90 physics frames each — wheel layers 18 / 18 / 2 / 4 as expected, no drift, rests on the ground; pedal 3 s on the trail: moved 3.9 m on layer 18. PASS. Time to ride 37 s in a fresh process (ground stage load 9.3 s, 9 blocks 24.9 s on 4 threads, nodes 2.7 s).
+
 ## NOT RUN
 
 - Windows / C# kernel timings; other seeds; a real switchback (BC1 has no sharp turn).
+- Vulkan captures (no GPU here; requested on the Director's machine); a human ride.
