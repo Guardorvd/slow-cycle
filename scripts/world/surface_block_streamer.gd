@@ -19,6 +19,8 @@ extends Node3D
 
 const Ops = preload("res://scripts/world/surface/surface_ops.gd")
 const Block = preload("res://scripts/world/surface/surface_block.gd")
+const Flora = preload("res://scripts/world/region_flora_meshes.gd")
+const Vegetation = preload("res://scripts/world/region/region_vegetation_planner.gd")
 
 const SINK_M: float = 0.3
 
@@ -200,3 +202,52 @@ func _add_collision(b: Dictionary, cells: PackedByteArray, origin: Vector2) -> i
 		strip_body.add_child(sc)
 		add_child(strip_body)
 	return strip
+
+
+## S3: vegetation of the blocks (SurfaceBlockVegetation.place results, world
+## x/z): one MultiMesh per block and kind, trunk / rock cylinders on layer 1
+## (as RegionStreamer: the same meshes, ranges, shadows and collider sizes).
+func add_flora(placed: Array, ids: Array, offset: Vector2) -> void:
+	var meshes: Dictionary = Flora.build_all()
+	var instances: int = 0
+	var colliders: int = 0
+	for k in range(placed.size()):
+		var origin := Vector3(ids[k].x * Block.SIZE_M - offset.x, 0.0, ids[k].y * Block.SIZE_M - offset.y)
+		var body := StaticBody3D.new()
+		body.name = "FloraColliders_%d_%d" % [ids[k].x, ids[k].y]
+		body.collision_layer = 1
+		body.collision_mask = 0
+		for kind: String in Flora.KINDS:
+			var v: PackedFloat32Array = placed[k].get(kind, PackedFloat32Array())
+			var count: int = v.size() / 5
+			if count == 0:
+				continue
+			var multimesh := MultiMesh.new()
+			multimesh.transform_format = MultiMesh.TRANSFORM_3D
+			multimesh.mesh = meshes[kind]
+			multimesh.instance_count = count
+			for q in range(count):
+				var p := Vector3(v[5 * q] - offset.x, v[5 * q + 1], v[5 * q + 2] - offset.y)
+				var sc: float = v[5 * q + 4]
+				multimesh.set_instance_transform(q, Transform3D(Basis(Vector3.UP, v[5 * q + 3]).scaled(Vector3(sc, sc, sc)), p - origin))
+				if Vegetation.TRUNK_RADIUS.has(kind):
+					var shape := CylinderShape3D.new()
+					shape.radius = Vegetation.TRUNK_RADIUS[kind] * sc
+					shape.height = Flora.TRUNK_HEIGHT.get(kind, 1.0) * sc
+					var collider := CollisionShape3D.new()
+					collider.shape = shape
+					collider.position = Vector3(p.x, p.y + 0.5 * shape.height - 0.2, p.z)
+					body.add_child(collider)
+					colliders += 1
+			var node := MultiMeshInstance3D.new()
+			node.name = "Flora_%d_%d_%s" % [ids[k].x, ids[k].y, kind]
+			node.multimesh = multimesh
+			node.position = origin
+			node.visibility_range_end = Flora.RANGE_M[kind]
+			node.visibility_range_end_margin = 30.0
+			node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if Flora.SHADOWS[kind] else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			add_child(node)
+			instances += count
+		add_child(body)
+	stats["flora_instances"] = instances
+	stats["flora_colliders"] = colliders

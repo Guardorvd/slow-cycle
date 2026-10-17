@@ -11,6 +11,8 @@ const Stage = preload("res://scripts/world/region_stage_cache.gd")
 const Trail = preload("res://scripts/world/region/trail_realization.gd")
 const Ops = preload("res://scripts/world/surface/surface_ops.gd")
 const Block = preload("res://scripts/world/surface/surface_block.gd")
+const Vegetation = preload("res://scripts/world/region/region_vegetation_planner.gd")
+const Flora = preload("res://scripts/world/surface/surface_block_vegetation.gd")
 
 const PLATFORM_RADIUS_M: float = 3.5
 const PLATFORM_TAPER_M: float = 3.0
@@ -54,8 +56,11 @@ static func prepare(seed_value: int, region: Vector2i, config_path: String, thre
 	var made_ops: Dictionary = Ops.create(ground.surface, trails, [platform], piece_class)
 	if not made_ops.is_valid:
 		return {"is_valid": false, "reason_code": made_ops.reason_code, "detail": made_ops.detail, "stage": "ops"}
+	var flora: Dictionary = Vegetation.create(up.plan, up.terrain, up.hydro.plan, ground.surface)
+	if not flora.is_valid:
+		return {"is_valid": false, "reason_code": flora.reason_code, "stage": "vegetation"}
 	return {"is_valid": true, "up": up, "ground": ground, "trails": trails, "site": site, "platform": platform, "piece_class": piece_class,
-		"ops": made_ops.ops, "timings": timings, "reason_code": ""}
+		"ops": made_ops.ops, "vegetation_planner": flora.planner, "timings": timings, "reason_code": ""}
 
 
 static func block_ids(rect: Array) -> Array:
@@ -78,6 +83,38 @@ static func build(ops: RefCounted, ids: Array, threads: int) -> Array:
 		for k in range(ids.size()):
 			job.call(k)
 	return blocks
+
+
+## Vegetation of blocks `ids` in two steps: {candidates: [per id], placed: [per
+## id], candidates_s, place_s}. `cands` (optional, per id) reuses candidates.
+static func vegetation(planner: RefCounted, blocks: Array, ids: Array, threads: int, cands: Array = []) -> Dictionary:
+	var by_id: Dictionary = {}
+	for b: Dictionary in blocks:
+		by_id[Vector2i(b.bx, b.bz)] = b
+	var t: int = Time.get_ticks_usec()
+	var candidates: Array = cands.duplicate()
+	if candidates.is_empty():
+		candidates.resize(ids.size())
+		var job := func(k: int) -> void:
+			candidates[k] = Flora.candidates(planner, ids[k].x, ids[k].y)
+		_run(job, ids.size(), threads)
+	var candidates_s: float = _lap(t)
+	t = Time.get_ticks_usec()
+	var placed: Array = []
+	placed.resize(ids.size())
+	var place := func(k: int) -> void:
+		placed[k] = Flora.place(candidates[k], by_id[ids[k]], by_id)
+	_run(place, ids.size(), threads)
+	return {"candidates": candidates, "placed": placed, "candidates_s": candidates_s, "place_s": _lap(t)}
+
+
+static func _run(job: Callable, count: int, threads: int) -> void:
+	if threads > 1:
+		var group: int = WorkerThreadPool.add_group_task(job, count, threads, true, "surface_section")
+		WorkerThreadPool.wait_for_group_task_completion(group)
+	else:
+		for k in range(count):
+			job.call(k)
 
 
 static func platform_site(trail: Dictionary, bounds: Dictionary) -> Dictionary:

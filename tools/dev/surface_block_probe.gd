@@ -56,6 +56,7 @@ func _initialize() -> void:
 	var t0: int = Time.get_ticks_usec()
 	var made: Dictionary = Synth.off_main_thread(func() -> Dictionary: return _work(out_dir))
 	made["total_s"] = _lap(t0)
+	made.erase("_flora")
 	var path: String = out_dir.path_join("summary.json")
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	f.store_string(JSON.stringify(made, "\t"))
@@ -107,6 +108,7 @@ func _work(out_dir: String) -> Dictionary:
 	checks["grid_error"] = _grid_error(blocks, ops)
 	timings["grid_error_s"] = _lap(t)
 	checks["incremental"] = _incremental(ground.surface, trails, platform, piece_class, ids, blocks, timings)
+	_vegetation_checks(prep, blocks, ids, checks, timings, out)
 	var materials := {"GRASS": 0, "ROAD": 0, "ROUGH_ROAD": 0, "TRAIL": 0}
 	for b: Dictionary in blocks:
 		for m: int in b.material:
@@ -114,7 +116,8 @@ func _work(out_dir: String) -> Dictionary:
 	out["samples_by_material"] = materials
 	out["digests"] = blocks.map(func(b: Dictionary) -> String: return b.digest.left(16))
 	t = Time.get_ticks_usec()
-	_map(blocks, ids, out_dir.path_join("map.png"), site.centre)
+	_map(blocks, ids, out_dir.path_join("map.png"), site.centre, out.get("_flora", []))
+	out.erase("_flora")
 	timings["map_s"] = _lap(t)
 	var ok: bool = true
 	for key: String in checks:
@@ -259,7 +262,7 @@ func _incremental(surface: RefCounted, trails: Array, platform: Dictionary, piec
 		"rebuilt_blocks": redo.size(), "changed_blocks": changed, "mismatched_vs_full": mismatched, "seconds": timings.incremental_s}
 
 
-func _map(blocks: Array, ids: Array, path: String, mark: Vector2) -> void:
+func _map(blocks: Array, ids: Array, path: String, mark: Vector2, flora: Array = []) -> void:
 	var n: int = Block.N - 1
 	var lo := Vector2i(ids[0])
 	var hi := Vector2i(ids[ids.size() - 1])
@@ -278,6 +281,18 @@ func _map(blocks: Array, ids: Array, path: String, mark: Vector2) -> void:
 				var nz: float = (b.heights[q] - b.heights[q + Block.N]) / Block.STEP_M
 				var shade: float = clampf(Vector3(nx, 1.0, nz).normalized().dot(light), 0.2, 1.0)
 				img.set_pixel(ox + i, oz + j, colors[b.material[q]] * (0.35 + 0.75 * shade))
+	var dot := {"pine": Color(0.05, 0.25, 0.1), "birch": Color(0.2, 0.45, 0.1), "autumn": Color(0.85, 0.45, 0.1), "shrub": Color(0.15, 0.35, 0.15), "grass": Color(0.55, 0.7, 0.3), "rock": Color(0.6, 0.6, 0.6)}
+	for d: Dictionary in flora:
+		for kind: String in dot:
+			var v: PackedFloat32Array = d[kind]
+			for q in range(v.size() / 5):
+				var px: int = int((v[5 * q] - lo.x * Block.SIZE_M) / Block.STEP_M)
+				var pz: int = int((v[5 * q + 2] - lo.y * Block.SIZE_M) / Block.STEP_M)
+				var rad: int = 3 if kind in ["pine", "birch", "autumn"] else 2
+				for dz in range(-rad, rad + 1):
+					for dx in range(-rad, rad + 1):
+						if dx * dx + dz * dz <= rad * rad and px + dx >= 0 and pz + dz >= 0 and px + dx < w and pz + dz < h:
+							img.set_pixel(px + dx, pz + dz, dot[kind])
 	var mx: int = int((mark.x - lo.x * Block.SIZE_M) / Block.STEP_M)
 	var mz: int = int((mark.y - lo.y * Block.SIZE_M) / Block.STEP_M)
 	for d in range(-12, 13):
@@ -285,6 +300,134 @@ func _map(blocks: Array, ids: Array, path: String, mark: Vector2) -> void:
 			if p.x >= 0 and p.y >= 0 and p.x < w and p.y < h:
 				img.set_pixelv(p, Color(0.9, 0.1, 0.1))
 	img.save_png(path)
+
+
+# --- S3: vegetation -----------------------------------------------------------
+
+const Vegetation = preload("res://scripts/world/region/region_vegetation_planner.gd")
+const Flora = preload("res://scripts/world/surface/surface_block_vegetation.gd")
+
+
+func _vegetation_checks(prep: Dictionary, blocks: Array, ids: Array, checks: Dictionary, timings: Dictionary, out: Dictionary) -> void:
+	var planner: RefCounted = prep.vegetation_planner
+	var veg: Dictionary = Section.vegetation(planner, blocks, ids, _args.threads)
+	timings["vegetation_candidates_s"] = veg.candidates_s
+	timings["vegetation_place_s"] = veg.place_s
+	var one: Dictionary = Section.vegetation(planner, blocks, ids, 1)
+	checks["vegetation_determinism"] = {"verdict": "PASS" if _flora_hash(veg.placed) == _flora_hash(one.placed) and _flora_hash(veg.candidates) == _flora_hash(one.candidates) else "FAIL", "threads": [_args.threads, 1]}
+	var counts: Dictionary = {}
+	for kind: String in Vegetation.KINDS:
+		counts[kind] = 0
+		for placed: Dictionary in veg.placed:
+			counts[kind] += placed[kind].size() / 5
+	out["vegetation_counts"] = counts
+	checks["vegetation_clear"] = _flora_clear(prep, veg.placed)
+	checks["vegetation_incremental"] = _flora_incremental(prep, blocks, ids, veg, timings)
+	checks["vegetation_vs_planner"] = _flora_vs_planner(prep, veg.placed, ids, timings)
+	out["_flora"] = veg.placed
+
+
+## Every trunk / rock collider and shrub clear of the riding band, the
+## platform and the road planes (independent of the cover raster: the
+## realized trail lines and the design surface).
+func _flora_clear(prep: Dictionary, placed: Array) -> Dictionary:
+	var surface: RefCounted = prep.ground.surface.with_trails(prep.trails)
+	var bad: Array = []
+	var checked: int = 0
+	for blockflora: Dictionary in placed:
+		for kind: String in ["pine", "birch", "autumn", "rock", "shrub"]:
+			var v: PackedFloat32Array = blockflora[kind]
+			for q in range(v.size() / 5):
+				var x: float = v[5 * q]
+				var z: float = v[5 * q + 2]
+				var r: float = Vegetation.TRUNK_RADIUS.get(kind, 0.3) * v[5 * q + 4]
+				checked += 1
+				var near: Dictionary = surface.trail_near(x, z, r)
+				var on_band: bool = not near.is_empty() and near.distance <= near.half_width + r
+				var on_platform: bool = Vector2(x, z).distance_to(prep.site.centre) <= prep.platform.radius_m + r
+				var on_road: bool = not prep.ground.surface.road_owner(x, z).is_empty()
+				if on_band or on_platform or on_road:
+					bad.append({"kind": kind, "at": [snappedf(x, 0.1), snappedf(z, 0.1)], "band": on_band, "platform": on_platform, "road": on_road})
+	return {"verdict": "PASS" if bad.is_empty() and checked > 0 else "FAIL", "checked": checked, "violations": bad.slice(0, 10), "violation_count": bad.size()}
+
+
+## The platform moved: re-place only blocks within the largest clearance of
+## its old / new rectangles (candidates reused) == a full re-placement.
+func _flora_incremental(prep: Dictionary, blocks: Array, ids: Array, veg: Dictionary, timings: Dictionary) -> Dictionary:
+	var moved: Dictionary = prep.platform.duplicate()
+	moved.centre = prep.platform.centre + MOVE_M
+	var made: Dictionary = Ops.create(prep.ground.surface, prep.trails, [moved], prep.piece_class)
+	var blocks2: Array = Section.build(made.ops, ids, _args.threads)
+	var r: float = prep.platform.radius_m + prep.platform.taper_m + Vegetation.CLEAR_M.tree
+	var reach := Rect2(prep.platform.centre - Vector2(r, r), Vector2(2 * r, 2 * r)).merge(Rect2(moved.centre - Vector2(r, r), Vector2(2 * r, 2 * r)))
+	var redo: Array = []
+	var redo_k: Array = []
+	for k in range(ids.size()):
+		if Rect2(Vector2(ids[k]) * Block.SIZE_M, Vector2(Block.SIZE_M, Block.SIZE_M)).grow(Vegetation.CLEAR_M.tree).intersects(reach):
+			redo.append(ids[k])
+			redo_k.append(k)
+	var t: int = Time.get_ticks_usec()
+	var sub_blocks: Array = []
+	var sub_cands: Array = []
+	for k: int in redo_k:
+		sub_cands.append(veg.candidates[k])
+	var partial: Dictionary = Section.vegetation(prep.vegetation_planner, blocks2, redo, _args.threads, sub_cands)
+	timings["vegetation_incremental_s"] = _lap(t)
+	var full: Dictionary = Section.vegetation(prep.vegetation_planner, blocks2, ids, _args.threads, veg.candidates)
+	var merged: Array = veg.placed.duplicate()
+	for m in range(redo_k.size()):
+		merged[redo_k[m]] = partial.placed[m]
+	var same: bool = _flora_hash(merged) == _flora_hash(full.placed)
+	return {"verdict": "PASS" if same else "FAIL", "replaced_blocks": redo.size(), "seconds": timings.vegetation_incremental_s,
+		"changed_blocks": range(ids.size()).filter(func(k: int) -> bool: return _flora_hash([veg.placed[k]]) != _flora_hash([full.placed[k]])).size()}
+
+
+## Information: the current planner's tile (trails surface) inside the window,
+## kind by kind: same positions kept / only here / only in the planner.
+func _flora_vs_planner(prep: Dictionary, placed: Array, ids: Array, timings: Dictionary) -> Dictionary:
+	var lo: Vector2 = Vector2(ids[0]) * Block.SIZE_M
+	var window := Rect2(lo, Vector2(Vector2(ids[ids.size() - 1]) * Block.SIZE_M + Vector2(Block.SIZE_M, Block.SIZE_M) - lo))
+	var made: Dictionary = Vegetation.create(prep.up.plan, prep.up.terrain, prep.up.hydro.plan, prep.ground.surface.with_trails(prep.trails))
+	var bounds: Dictionary = prep.up.bounds
+	var tiles: Dictionary = {}
+	var t: int = Time.get_ticks_usec()
+	for x in [window.position.x, window.end.x - 1.0]:
+		for z in [window.position.y, window.end.y - 1.0]:
+			tiles[Vector2i(floori(x / Vegetation.TILE_M), floori(z / Vegetation.TILE_M))] = true
+	var theirs: Dictionary = {}
+	for tile: Vector2i in tiles:
+		var got: Dictionary = made.planner.tile(tile.x, tile.y)
+		for kind: String in Vegetation.KINDS:
+			var v: PackedFloat32Array = got[kind]
+			for q in range(v.size() / 5):
+				var p := Vector2(v[5 * q] + bounds.min_x, v[5 * q + 2] + bounds.min_z)
+				if window.has_point(p):
+					theirs["%s@%.2f,%.2f" % [kind, p.x, p.y]] = v[5 * q + 1]
+	timings["planner_tiles_s"] = _lap(t)
+	var ours: Dictionary = {}
+	for blockflora: Dictionary in placed:
+		for kind: String in Vegetation.KINDS:
+			var v: PackedFloat32Array = blockflora[kind]
+			for q in range(v.size() / 5):
+				ours["%s@%.2f,%.2f" % [kind, v[5 * q], v[5 * q + 2]]] = v[5 * q + 1]
+	var both: int = 0
+	var dy_max: float = 0.0
+	for key: String in ours:
+		if theirs.has(key):
+			both += 1
+			dy_max = maxf(dy_max, absf(ours[key] - theirs[key]))
+	return {"verdict": "REPORTED", "planner_tiles": tiles.size(), "here": ours.size(), "planner": theirs.size(), "same_positions": both,
+		"only_here": ours.size() - both, "only_planner": theirs.size() - both, "max_height_difference_m": snappedf(dy_max, 0.001)}
+
+
+static func _flora_hash(lists: Array) -> String:
+	var ctx := HashingContext.new()
+	ctx.start(HashingContext.HASH_SHA256)
+	for d: Dictionary in lists:
+		for kind: String in Vegetation.KINDS:
+			var bytes: PackedByteArray = d[kind].to_byte_array()
+			ctx.update(bytes if not bytes.is_empty() else kind.to_utf8_buffer())
+	return ctx.finish().hex_encode()
 
 
 static func _ops_at(ops: Array, p: Vector2) -> Array:

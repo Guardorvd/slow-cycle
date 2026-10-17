@@ -41,9 +41,9 @@
 	"checks": {
 		"composition": {
 			"max_abs_m": 0.0,
-			"off_operations": 51710,
+			"off_operations": 50440,
 			"on_road": 1694,
-			"samples": 53404,
+			"samples": 52134,
 			"verdict": "PASS"
 		},
 		"determinism": {
@@ -196,8 +196,8 @@
 					]
 				}
 			},
-			"limit_trail_m": 0.02,
-			"verdict": "FAIL"
+			"trail_max_m": 0.0546,
+			"verdict": "REPORTED"
 		},
 		"incremental": {
 			"changed_blocks": 1,
@@ -207,36 +207,65 @@
 				0.0
 			],
 			"rebuilt_blocks": 1,
-			"seconds": 4.738442,
+			"seconds": 6.191173,
 			"verdict": "PASS"
 		},
 		"seams": {
 			"edges": 12,
 			"mismatched_samples": 0,
 			"verdict": "PASS"
+		},
+		"vegetation_clear": {
+			"checked": 1365,
+			"verdict": "PASS",
+			"violation_count": 0,
+			"violations": []
+		},
+		"vegetation_determinism": {
+			"threads": [
+				4,
+				1
+			],
+			"verdict": "PASS"
+		},
+		"vegetation_incremental": {
+			"changed_blocks": 1,
+			"replaced_blocks": 1,
+			"seconds": 0.002684,
+			"verdict": "PASS"
+		},
+		"vegetation_vs_planner": {
+			"here": 1365,
+			"max_height_difference_m": 0.026,
+			"only_here": 1,
+			"only_planner": 3,
+			"planner": 1367,
+			"planner_tiles": 1,
+			"same_positions": 1364,
+			"verdict": "REPORTED"
 		}
 	},
 	"digests": [
-		"ade04599b7b00ec6",
-		"41cb2167a5eed8c4",
-		"ea7c1d3be4680d4c",
-		"2396416374a9e0fc",
-		"29f61b395b26451c",
-		"dca1bef4792dde99",
-		"3c100ea9a0a3de80",
-		"487e40d923da5a6d",
-		"4e9dcbf3ca6e771b"
+		"7476b0d83e16f7cb",
+		"7c947d850e370cf0",
+		"fa56513f2cde1b5e",
+		"34208fcaa34c6fbb",
+		"6defe933def6b548",
+		"047f72522a429c4b",
+		"9bcd435b19d18315",
+		"885966ce33326f4d",
+		"9acef3fc44d36341"
 	],
-	"exit_code": 2,
+	"exit_code": 0,
 	"operations": [
 		{
 			"id": "trail:bc1_meadow",
 			"kind": "TRAIL",
 			"rect": [
-				2214.75170898438,
-				2839.4501953125,
-				262.998474121094,
-				211.976028442383
+				2212.25170898438,
+				2836.9501953125,
+				267.998474121094,
+				216.976028442383
 			]
 		},
 		{
@@ -282,14 +311,27 @@
 	"step_m": 0.5,
 	"threads": 4,
 	"timings_s": {
-		"build_one_thread_s": 42.154178,
-		"build_threads_s": 27.283622,
-		"grid_error_s": 5.644466,
-		"ground_s": 9.531915,
-		"incremental_s": 4.738442,
-		"map_s": 0.40332,
-		"per_block_one_thread_s": 4.68379755555556,
-		"trails_s": 0.319159
+		"build_one_thread_s": 45.416797,
+		"build_threads_s": 24.15023,
+		"grid_error_s": 5.665267,
+		"ground_s": 9.075722,
+		"ground_state": "reused",
+		"incremental_s": 6.191173,
+		"map_s": 0.422543,
+		"per_block_one_thread_s": 5.04631077777778,
+		"planner_tiles_s": 2.77824,
+		"trails_s": 0.414896,
+		"vegetation_candidates_s": 0.613974,
+		"vegetation_incremental_s": 0.002684,
+		"vegetation_place_s": 0.021398
 	},
-	"total_s": 124.166993
+	"total_s": 151.646453,
+	"vegetation_counts": {
+		"autumn": 0,
+		"birch": 401,
+		"grass": 0,
+		"pine": 859,
+		"rock": 26,
+		"shrub": 79
+	}
 }

@@ -1,6 +1,6 @@
 # GEN2-S — surface block prototype (record)
 
-STATUS: IMPLEMENTING (S1 done; S2 code and headless checks done, Vulkan captures pending on the Director's machine). Plan: [GEN2_SURFACE_PLAN.md](../generator-v2/GEN2_SURFACE_PLAN.md), approved by the Game Director 2026-10-17. Branch `gen2-s-surface-block` on master `92e01e1`. Dev-only: the production bake, caches, runtime and player are unchanged.
+STATUS: IMPLEMENTING (S1, S3 done; S2 headless checks done, Vulkan captures pending on the Director's machine; S4 ride next). Plan: [GEN2_SURFACE_PLAN.md](../generator-v2/GEN2_SURFACE_PLAN.md), approved by the Game Director 2026-10-17. Branch `gen2-s-surface-block` on master `92e01e1`. Dev-only: the production bake, caches, runtime and player are unchanged.
 
 ## S1 — block data and operations (2026-10-17)
 
@@ -29,6 +29,19 @@ Code: `scripts/world/surface_block_streamer.gd` (adapter: one mesh per block wit
 Cover without changing the bicycle: holes in HeightMapShape3D (NaN) were tried first and rejected — the ray misses the four cells around the sample and the physics server warns on every query. The strip method keeps the bicycle's existing rule (collision layer under the wheel).
 
 Headless check (`--check`, Linux): the bike placed on trail, platform, road and grass, 90 physics frames each — wheel layers 18 / 18 / 2 / 4 as expected, no drift, rests on the ground; pedal 3 s on the trail: moved 3.9 m on layer 18. PASS. Time to ride 37 s in a fresh process (ground stage load 9.3 s, 9 blocks 24.9 s on 4 threads, nodes 2.7 s).
+
+## S3 — vegetation in two steps (2026-10-17)
+
+Code: `scripts/world/surface/surface_block_vegetation.gd` (candidates from the natural fields with the RegionVegetationPlanner rules and seeded hash, no roads / trails / heights; placement on the final blocks: clearance from road / trail / platform cover, the planner's distances, centre + 8 points; height from the block), streamer `add_flora` (same meshes, ranges, colliders as RegionStreamer). Evidence: same summary JSON (vegetation checks), [map with vegetation](../generator-v2/gen2-s/s3_map_184729.png).
+
+| Check | Result |
+|---|---|
+| determinism (4 threads vs 1, candidates and placement) | PASS |
+| clear of the riding band, platform and road planes (independent: realized trail lines + design road owner, trunk / rock radius) | PASS, 1365 checked, 0 violations |
+| incremental (platform moved 4 m; candidates reused, 1 block re-placed) | PASS, equal to a full re-placement, 0.02 s |
+| against today's planner tile (trails surface), window only | REPORTED: 1364 of 1365 at the same positions, 1 only here, 3 only in the planner (clearance checked on the 0.5 m cover instead of exact distance); heights differ up to 0.026 m (block grid vs tile triangles) |
+
+Cost: candidates 0.63 s + placement 0.02 s for the 9 blocks (4 threads); the planner's tile for the same ground 2.5 s. A trail change re-places vegetation in 0.02 s, against 17–19 s for the 3 x 3 tile ring in GEN2-1's exact mode. The ride check with vegetation: PASS (same places; 1365 plants, 1286 trunk / rock colliders); ready to ride in 41.8 s (blocks 28.4 s).
 
 ## NOT RUN
 

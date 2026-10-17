@@ -76,6 +76,7 @@ func _run() -> void:
 	streamer.name = "SurfaceBlocks"
 	_scene.attach_content(streamer)
 	streamer.setup(made.blocks, offset, _scene._materials().terrain)
+	streamer.add_flora(made.flora, made.ids, offset)
 	var lo: Vector2 = made.blocks[0].origin
 	_rect = Rect2(lo - offset, Vector2(_args.blocks[2], _args.blocks[3]) * Block.SIZE_M)
 	_floor_m = INF
@@ -115,13 +116,19 @@ func _prepare() -> Dictionary:
 		return prep
 	var timings: Dictionary = prep.timings.duplicate()
 	var t2: int = Time.get_ticks_usec()
-	var blocks: Array = Section.build(prep.ops, Section.block_ids(_args.blocks), _args.threads)
+	var ids: Array = Section.block_ids(_args.blocks)
+	var blocks: Array = Section.build(prep.ops, ids, _args.threads)
 	timings["blocks_s"] = (Time.get_ticks_usec() - t2) / 1e6
+	for b: Dictionary in blocks:
+		if not b.is_valid:
+			return b
+	var veg: Dictionary = Section.vegetation(prep.vegetation_planner, blocks, ids, _args.threads)
+	timings["vegetation_s"] = veg.candidates_s + veg.place_s
 	timings["total_s"] = (Time.get_ticks_usec() - t) / 1e6
 	for b: Dictionary in blocks:
 		if not b.is_valid:
 			return b
-	return {"is_valid": true, "prep": prep, "blocks": blocks, "timings": timings}
+	return {"is_valid": true, "prep": prep, "blocks": blocks, "ids": ids, "flora": veg.placed, "timings": timings}
 
 
 ## Out of the section or below its lowest point: back to the trail.
