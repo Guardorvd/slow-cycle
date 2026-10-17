@@ -1,0 +1,295 @@
+{
+	"block_m": 128.0,
+	"blocks": [
+		[
+			17,
+			21
+		],
+		[
+			18,
+			21
+		],
+		[
+			19,
+			21
+		],
+		[
+			17,
+			22
+		],
+		[
+			18,
+			22
+		],
+		[
+			19,
+			22
+		],
+		[
+			17,
+			23
+		],
+		[
+			18,
+			23
+		],
+		[
+			19,
+			23
+		]
+	],
+	"checks": {
+		"composition": {
+			"max_abs_m": 0.0,
+			"off_operations": 51710,
+			"on_road": 1694,
+			"samples": 53404,
+			"verdict": "PASS"
+		},
+		"determinism": {
+			"threads": [
+				4,
+				1
+			],
+			"verdict": "PASS"
+		},
+		"grid_error": {
+			"GRASS": {
+				"count": 35820,
+				"max_m": 0.0615,
+				"mean_m": 0.0002,
+				"p99_m": 0.0061,
+				"worst": {
+					"at": [
+						2540.25,
+						2940.25
+					],
+					"error_m": 0.0615,
+					"ops": []
+				}
+			},
+			"ROAD": {
+				"count": 10123,
+				"max_m": 0.0003,
+				"mean_m": 0.0,
+				"p99_m": 0.0002,
+				"worst": {
+					"at": [
+						2509.25,
+						2979.25
+					],
+					"error_m": 0.0003,
+					"ops": []
+				}
+			},
+			"ROAD_EDGE": {
+				"count": 2993,
+				"max_m": 0.1271,
+				"mean_m": 0.0163,
+				"p99_m": 0.0946,
+				"worst": {
+					"at": [
+						2546.75,
+						2941.25
+					],
+					"error_m": 0.1271,
+					"ops": []
+				}
+			},
+			"TRAIL": {
+				"count": 998,
+				"max_m": 0.0353,
+				"mean_m": 0.0001,
+				"p99_m": 0.0001,
+				"worst": {
+					"at": [
+						2474.25,
+						3050.25
+					],
+					"error_m": 0.0353,
+					"ops": [
+						"TRAIL"
+					]
+				}
+			},
+			"TRAIL_BENCH": {
+				"count": 196,
+				"max_m": 0.0126,
+				"mean_m": 0.0019,
+				"p99_m": 0.0126,
+				"worst": {
+					"at": [
+						2215.75,
+						2963.75
+					],
+					"error_m": 0.0126,
+					"ops": [
+						"TRAIL",
+						"BENCH"
+					]
+				}
+			},
+			"TRAIL_BENCH_EDGE": {
+				"count": 296,
+				"max_m": 0.0351,
+				"mean_m": 0.0072,
+				"p99_m": 0.0345,
+				"worst": {
+					"at": [
+						2215.25,
+						2962.75
+					],
+					"error_m": 0.0351,
+					"ops": [
+						"TRAIL",
+						"BENCH"
+					]
+				}
+			},
+			"TRAIL_EDGE": {
+				"count": 1822,
+				"max_m": 0.0546,
+				"mean_m": 0.0001,
+				"p99_m": 0.0001,
+				"worst": {
+					"at": [
+						2474.75,
+						3049.75
+					],
+					"error_m": 0.0546,
+					"ops": [
+						"TRAIL"
+					]
+				}
+			},
+			"TRAIL_PLATFORM": {
+				"count": 149,
+				"max_m": 0.0052,
+				"mean_m": 0.0003,
+				"p99_m": 0.0049,
+				"worst": {
+					"at": [
+						2233.25,
+						3002.25
+					],
+					"error_m": 0.0052,
+					"ops": [
+						"TRAIL",
+						"PLATFORM"
+					]
+				}
+			},
+			"TRAIL_PLATFORM_EDGE": {
+				"count": 98,
+				"max_m": 0.0064,
+				"mean_m": 0.0019,
+				"p99_m": 0.0057,
+				"worst": {
+					"at": [
+						2235.25,
+						3002.75
+					],
+					"error_m": 0.0064,
+					"ops": [
+						"TRAIL",
+						"PLATFORM"
+					]
+				}
+			},
+			"limit_trail_m": 0.02,
+			"verdict": "FAIL"
+		},
+		"incremental": {
+			"changed_blocks": 1,
+			"mismatched_vs_full": [],
+			"moved_m": [
+				4.0,
+				0.0
+			],
+			"rebuilt_blocks": 1,
+			"seconds": 4.738442,
+			"verdict": "PASS"
+		},
+		"seams": {
+			"edges": 12,
+			"mismatched_samples": 0,
+			"verdict": "PASS"
+		}
+	},
+	"digests": [
+		"ade04599b7b00ec6",
+		"41cb2167a5eed8c4",
+		"ea7c1d3be4680d4c",
+		"2396416374a9e0fc",
+		"29f61b395b26451c",
+		"dca1bef4792dde99",
+		"3c100ea9a0a3de80",
+		"487e40d923da5a6d",
+		"4e9dcbf3ca6e771b"
+	],
+	"exit_code": 2,
+	"operations": [
+		{
+			"id": "trail:bc1_meadow",
+			"kind": "TRAIL",
+			"rect": [
+				2214.75170898438,
+				2839.4501953125,
+				262.998474121094,
+				211.976028442383
+			]
+		},
+		{
+			"id": "trail:bc1_meadow/bench",
+			"kind": "BENCH",
+			"rect": [
+				2213.25170898438,
+				2928.38818359375,
+				11.0802736282349,
+				61.9401359558105
+			]
+		},
+		{
+			"id": "platform:turn",
+			"kind": "PLATFORM",
+			"rect": [
+				2223.0458984375,
+				2993.53759765625,
+				13.0,
+				13.0
+			]
+		}
+	],
+	"platform": {
+		"centre": [
+			2229.5458984375,
+			3000.03759765625
+		],
+		"s_m": 199.0,
+		"turn_deg": 10.119381170501
+	},
+	"region": [
+		0,
+		0
+	],
+	"samples_by_material": {
+		"GRASS": 580217,
+		"ROAD": 11766,
+		"ROUGH_ROAD": 0,
+		"TRAIL": 2458
+	},
+	"seed": 184729,
+	"step_m": 0.5,
+	"threads": 4,
+	"timings_s": {
+		"build_one_thread_s": 42.154178,
+		"build_threads_s": 27.283622,
+		"grid_error_s": 5.644466,
+		"ground_s": 9.531915,
+		"incremental_s": 4.738442,
+		"map_s": 0.40332,
+		"per_block_one_thread_s": 4.68379755555556,
+		"trails_s": 0.319159
+	},
+	"total_s": 124.166993
+}
