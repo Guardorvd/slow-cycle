@@ -164,12 +164,12 @@ func _places(made: Dictionary, path: PackedVector3Array, offset: Vector2) -> Arr
 		for b: Dictionary in made.blocks:
 			if found:
 				break
-			for q in range(Block.N * 40, Block.N * Block.N - Block.N * 40, 97):
+			for q in range(Block.N * 40, Block.N * Block.N - Block.N * 40, 31):
 				var i: int = q % Block.N
 				if i < 40 or i > Block.N - 40 or b.material[q] != want:
 					continue
 				var ok: bool = true
-				for d in [-6, 6, -6 * Block.N, 6 * Block.N]:
+				for d in [-4, 4, -4 * Block.N, 4 * Block.N]:
 					ok = ok and b.material[q + d] == want
 				if not ok:
 					continue
@@ -198,7 +198,24 @@ func _check(made: Dictionary, path: PackedVector3Array, offset: Vector2) -> void
 		print("SURFACE_RIDE_CHECK ", JSON.stringify({"place": place.name, "verdict": "PASS" if ok else "FAIL", "expected_layer": place.layer, "wheel_layers": layers,
 			"drift_m": snappedf(drift, 0.01), "height_above_ground_m": snappedf(height_gap, 0.01), "on_grass": bike.is_on_grass,
 			"rough_weight": snappedf(bike.surface_rough_weight, 0.01)}))
-	print("SURFACE_RIDE_CHECKS ", "PASS" if all_ok else "FAIL")
+	# The bike is live, not frozen: pedal 3 s along the trail from its entry.
+	var line: Dictionary = made.prep.trails[0].line
+	var k0: int = _entry_index(made.prep.trails[0])
+	_scene.spawn_bike(path[k0], Vector3(line.tx[k0], 0.0, line.tz[k0]))
+	for _f in range(SETTLE_FRAMES):
+		await physics_frame
+	var start: Vector3 = bike.global_position
+	Input.action_press("pedal")
+	for _f in range(180):
+		await physics_frame
+	Input.action_release("pedal")
+	var moved: float = Vector2(bike.global_position.x - start.x, bike.global_position.z - start.z).length()
+	var on_layers: Array = [bike.front_ray, bike.rear_ray].map(func(r: RayCast3D) -> int: return r.get_collider().collision_layer if r.is_colliding() and r.get_collider() is CollisionObject3D else -1)
+	print("SURFACE_RIDE_CHECK ", JSON.stringify({"place": "pedal_3s", "moved_m": snappedf(moved, 0.01), "wheel_layers": on_layers, "verdict": "PASS" if moved > 2.0 else "FAIL"}))
+	all_ok = all_ok and moved > 2.0
+	var names: Array = _places(made, path, offset).map(func(p: Dictionary) -> String: return p.name)
+	all_ok = all_ok and names.size() == 4
+	print("SURFACE_RIDE_CHECKS ", "PASS" if all_ok else "FAIL", " places=", names)
 
 
 ## One frame per view: bike placed at the view point (its camera), and a top view.
