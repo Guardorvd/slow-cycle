@@ -256,6 +256,7 @@ func _composition(blocks: Array, ids: Array, surface: RefCounted, ops: RefCounte
 ## not all grass, every 4th otherwise. Per class: max, p99, count.
 func _grid_error(blocks: Array, ops: RefCounted) -> Dictionary:
 	var by: Dictionary = {}
+	var worst: Dictionary = {}
 	var n: int = Block.N
 	for b: Dictionary in blocks:
 		var touching: Array = ops.touching(Rect2(b.origin, Vector2(Block.SIZE_M, Block.SIZE_M)))
@@ -265,7 +266,10 @@ func _grid_error(blocks: Array, ops: RefCounted) -> Dictionary:
 				var m: Array = [b.material[q], b.material[q + 1], b.material[q + n], b.material[q + n + 1]]
 				var cls: String = "GRASS"
 				if Ops.Cover.TRAIL in m:
-					cls = "TRAIL"
+					var kinds: Array = _ops_at(touching, b.origin + Vector2(i + 0.5, j + 0.5) * Block.STEP_M)
+					cls = "TRAIL_PLATFORM" if "PLATFORM" in kinds else ("TRAIL_BENCH" if "BENCH" in kinds else "TRAIL")
+					if m.count(Ops.Cover.TRAIL) < 4:
+						cls += "_EDGE"
 				elif Ops.Cover.ROAD in m or Ops.Cover.ROUGH_ROAD in m:
 					cls = "ROAD" if m.count(Ops.Cover.ROAD) + m.count(Ops.Cover.ROUGH_ROAD) == 4 else "ROAD_EDGE"
 				if cls == "GRASS" and (i % 4 != 0 or j % 4 != 0):
@@ -275,14 +279,22 @@ func _grid_error(blocks: Array, ops: RefCounted) -> Dictionary:
 				var exact: Dictionary = ops.sample(x, z, touching)
 				if not by.has(cls):
 					by[cls] = PackedFloat32Array()
-				by[cls].append(absf(Block.height_at(b, x, z) - exact.height_m))
+					worst[cls] = {"error_m": -1.0}
+				var e: float = absf(Block.height_at(b, x, z) - exact.height_m)
+				by[cls].append(e)
+				if e > worst[cls].error_m:
+					worst[cls] = {"error_m": snappedf(e, 0.0001), "at": [x, z], "ops": _ops_at(touching, Vector2(x, z))}
 	var out := {}
 	for cls: String in by:
 		var v: PackedFloat32Array = by[cls]
 		v.sort()
 		out[cls] = {"count": v.size(), "max_m": snappedf(v[v.size() - 1], 0.0001), "p99_m": snappedf(v[int(0.99 * (v.size() - 1))], 0.0001),
-			"mean_m": snappedf(_mean(v), 0.0001)}
-	var trail_max: float = out.get("TRAIL", {"max_m": INF}).max_m
+			"mean_m": snappedf(_mean(v), 0.0001), "worst": worst[cls]}
+	var trail_max: float = -1.0
+	for cls: String in out:
+		if cls.begins_with("TRAIL"):
+			trail_max = maxf(trail_max, out[cls].max_m)
+	trail_max = INF if trail_max < 0.0 else trail_max
 	out["verdict"] = "PASS" if trail_max <= TRAIL_ERROR_LIMIT_M else "FAIL"
 	out["limit_trail_m"] = TRAIL_ERROR_LIMIT_M
 	return out
@@ -348,6 +360,10 @@ func _map(blocks: Array, ids: Array, path: String, mark: Vector2) -> void:
 			if p.x >= 0 and p.y >= 0 and p.x < w and p.y < h:
 				img.set_pixelv(p, Color(0.9, 0.1, 0.1))
 	img.save_png(path)
+
+
+static func _ops_at(ops: Array, p: Vector2) -> Array:
+	return ops.filter(func(op: Dictionary) -> bool: return op.rect.has_point(p)).map(func(op: Dictionary) -> String: return op.kind)
 
 
 static func _mean(v: PackedFloat32Array) -> float:
