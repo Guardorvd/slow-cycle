@@ -254,8 +254,16 @@ func _shots(made: Dictionary, path: PackedVector3Array, offset: Vector2) -> void
 	_scene.add_child(cam)
 	var centre: Vector2 = _rect.get_center()
 	var h: float = _height(made.blocks, centre + offset)
-	cam.global_transform = Transform3D(Basis.looking_at(Vector3(0, -1, 0.35).normalized(), Vector3(0, 0, -1)), Vector3(centre.x, h + 260.0, centre.y - 90.0))
+	cam.global_transform = Transform3D(Basis.looking_at(Vector3(0, -1, 0.35).normalized(), Vector3(0, 0, -1)), Vector3(centre.x, h + 220.0, centre.y - 75.0))
 	cam.far = 2000.0
+	# The region fog hides the ground from this height: same environment, no fog.
+	var world: World3D = cam.get_world_3d()
+	var env: Environment = world.environment if world.environment != null else world.fallback_environment
+	if env != null:
+		env = env.duplicate()
+		env.fog_enabled = false
+		env.volumetric_fog_enabled = false
+		cam.environment = env
 	cam.make_current()
 	for _f in range(10):
 		await process_frame
