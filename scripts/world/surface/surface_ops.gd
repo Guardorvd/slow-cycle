@@ -9,7 +9,9 @@ class_name SurfaceOps
 ##             the FinalSurface.trail_displacement() formula;
 ##   PLATFORM  SHAPED turn platform: flat disc at the design height of its
 ##             centre, smooth taper back to the ground.
-## Priority: road plane > PLATFORM > BENCH > TRAIL > natural ground. Every
+## Priority: road plane > PLATFORM > BENCH > TRAIL > natural ground (the
+## list holds every trail's TRAIL and BENCH before the platforms, and a later
+## operation overrides an earlier one where they overlap). Every
 ## operation has a world rectangle (its footprint + taper); a block is touched
 ## by the operations whose rectangles overlap it, so a changed operation
 ## rebuilds exactly the blocks of its old and new rectangles.
@@ -20,6 +22,10 @@ enum Cover { GRASS = 0, ROAD = 1, ROUGH_ROAD = 2, TRAIL = 3 }
 ## Collision layers of the current bake (RegionBakeGround) per material: the
 ## bicycle reads grass / rough / road from these (unchanged contract).
 const LAYERS: Array[int] = [4, 2, 2 | 16, 2 | 16]
+## Trail shading reach beyond a band (FinalSurfaceTileRenderer.TRAIL_SHADE_M)
+## and the shading half width of a platform's edge.
+const TRAIL_SHADE_M: float = 2.5
+const PLATFORM_SHADE_HALF_M: float = 0.65
 
 var _surface: RefCounted
 var _trails_surface: RefCounted
@@ -39,7 +45,7 @@ static func create(surface: RefCounted, trails: Array, platforms: Array, piece_c
 	var origin := Vector2(bounds.min_x, bounds.min_z)
 	for trail: Dictionary in trails:
 		var line: Dictionary = trail.line
-		var reach: float = trail.half_width_m + 0.5
+		var reach: float = trail.half_width_m + TRAIL_SHADE_M + 0.5
 		out._ops.append({"kind": "TRAIL", "id": trail.id, "rect": _line_rect(line, 0, line.s.size() - 1, reach, origin)})
 		for op: Dictionary in trail.get("operations", []):
 			if op.kind != "BENCH":
@@ -81,37 +87,41 @@ func touching(rect: Rect2) -> Array:
 	return out
 
 
-## Final height and material at a world point under the given operations
-## (normally touching() of the point's block): {is_valid, height_m, material}.
+## Final height, cover and shading coordinates at a world point under the
+## given operations (normally touching() of the point's block): {is_valid,
+## height_m, material, uv}. uv follows the bake's terrain shader convention
+## (FinalSurfaceTileRenderer): road (lateral, half width), trail (lateral,
+## -half width) within TRAIL_SHADE_M of a band, (100, 0) elsewhere.
 func sample(x: float, z: float, ops: Array) -> Dictionary:
 	var s: Dictionary = _surface.sample_surface(x, z)
 	if not s.is_valid:
 		return {"is_valid": false, "reason_code": s.reason_code}
 	if s.kind == "ROAD":
 		var rough: bool = int(_piece_class.get(s.owner, 0)) >= Graph.RouteClass.SINGLETRACK
-		return {"is_valid": true, "height_m": float(s.height_m), "material": Cover.ROUGH_ROAD if rough else Cover.ROAD}
+		return {"is_valid": true, "height_m": float(s.height_m), "material": Cover.ROUGH_ROAD if rough else Cover.ROAD, "uv": Vector2(s.lateral, s.half_width)}
 	var h: float = s.height_m
 	var material: int = Cover.GRASS
+	var uv := Vector2(100.0, 0.0)
 	var p := Vector2(x, z)
-	var on_platform: bool = false
 	for op: Dictionary in ops:
 		if not op.rect.has_point(p):
 			continue
 		match op.kind:
 			"TRAIL":
-				if material == Cover.GRASS and _trails_surface.trail_inside(x, z):
-					material = Cover.TRAIL
+				var near: Dictionary = _trails_surface.trail_near(x, z, TRAIL_SHADE_M)
+				if not near.is_empty():
+					uv = Vector2(near.lateral, -near.half_width)
+					if near.distance <= near.half_width and material == Cover.GRASS:
+						material = Cover.TRAIL
 			"BENCH":
-				if not on_platform:
-					h += _trails_surface.trail_displacement(x, z)
+				h += _trails_surface.trail_displacement(x, z)
 			"PLATFORM":
 				var d: float = p.distance_to(op.centre)
+				uv = Vector2(maxf(d - op.radius_m, 0.0), -PLATFORM_SHADE_HALF_M) if d < op.radius_m + TRAIL_SHADE_M else uv
 				if d <= op.radius_m:
 					h = op.height_m
 					material = Cover.TRAIL
-					on_platform = true
 				elif d < op.radius_m + op.taper_m:
 					var u: float = (d - op.radius_m) / op.taper_m
 					h = lerpf(op.height_m, h, u * u * (3.0 - 2.0 * u))
-					on_platform = true
-	return {"is_valid": true, "height_m": h, "material": material}
+	return {"is_valid": true, "height_m": h, "material": material, "uv": uv}

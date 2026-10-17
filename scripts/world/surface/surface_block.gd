@@ -16,15 +16,18 @@ const N: int = int(SIZE_M / STEP_M) + 1
 
 
 ## {is_valid, bx, bz, origin: Vector2, heights: PackedFloat32Array (N * N,
-## row j = z), material: PackedByteArray (N * N), ops: [op ids], digest,
+## row j = z), material: PackedByteArray (N * N, SurfaceOps.Cover), uv:
+## PackedVector2Array (N * N, terrain shader coordinates), ops: [op ids], digest,
 ## reason_code}.
 static func build(ops: RefCounted, bx: int, bz: int) -> Dictionary:
 	var origin := Vector2(bx * SIZE_M, bz * SIZE_M)
 	var touching: Array = ops.touching(Rect2(origin, Vector2(SIZE_M, SIZE_M)))
 	var heights := PackedFloat32Array()
 	var material := PackedByteArray()
+	var uv := PackedVector2Array()
 	heights.resize(N * N)
 	material.resize(N * N)
+	uv.resize(N * N)
 	for j in range(N):
 		var z: float = origin.y + j * STEP_M
 		for i in range(N):
@@ -34,11 +37,13 @@ static func build(ops: RefCounted, bx: int, bz: int) -> Dictionary:
 				return {"is_valid": false, "bx": bx, "bz": bz, "reason_code": s.reason_code, "detail": {"x": x, "z": z}}
 			heights[j * N + i] = s.height_m
 			material[j * N + i] = s.material
+			uv[j * N + i] = s.uv
 	var ctx := HashingContext.new()
 	ctx.start(HashingContext.HASH_SHA256)
 	ctx.update(heights.to_byte_array())
 	ctx.update(material)
-	return {"is_valid": true, "bx": bx, "bz": bz, "origin": origin, "heights": heights, "material": material,
+	ctx.update(uv.to_byte_array())
+	return {"is_valid": true, "bx": bx, "bz": bz, "origin": origin, "heights": heights, "material": material, "uv": uv,
 		"ops": touching.map(func(op: Dictionary) -> String: return op.id), "digest": ctx.finish().hex_encode(), "reason_code": ""}
 
 

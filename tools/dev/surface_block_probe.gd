@@ -21,22 +21,12 @@ extends SceneTree
 ##                rectangles are rebuilt and the result equals a full rebuild.
 ## Outputs in user://surface_block_probe/<name>/: summary JSON, map PNG.
 
-const Ground = preload("res://scripts/world/region/region_bake_ground.gd")
-const Bake = preload("res://scripts/world/region/region_bake.gd")
-const Builder = preload("res://scripts/world/region/region_network_builder.gd")
-const Stage = preload("res://scripts/world/region_stage_cache.gd")
 const Synth = preload("res://scripts/world/region/road_synthesizer.gd")
-const Trail = preload("res://scripts/world/region/trail_realization.gd")
 const Ops = preload("res://scripts/world/surface/surface_ops.gd")
 const Block = preload("res://scripts/world/surface/surface_block.gd")
+const Section = preload("res://scripts/world/surface/surface_section.gd")
 
 const OUT_ROOT := "user://surface_block_probe"
-const PLATFORM_RADIUS_M: float = 3.5
-const PLATFORM_TAPER_M: float = 3.0
-## Platform site: sharpest heading change over +-TURN_SPAN_M, at least
-## SITE_CLEAR_M (along the line) from a BENCH and from the trail ends.
-const TURN_SPAN_M: float = 6.0
-const SITE_CLEAR_M: float = 15.0
 const MOVE_M := Vector2(4.0, 0.0)
 
 var _args: Dictionary = {}
@@ -75,50 +65,26 @@ func _initialize() -> void:
 
 
 func _work(out_dir: String) -> Dictionary:
-	var timings: Dictionary = {}
-	var t: int = Time.get_ticks_usec()
-	var up: Dictionary = Ground.upstream(_args.seed, _args.region)
-	var options := {"threads": _args.threads, "max_replans": Builder.MAX_REPLANS, "stop_rule": Builder.STOP_ROADS}
-	var gkey: Dictionary = Stage.ground_key(_args.seed, _args.region, options)
-	var ground: Dictionary = Stage.load_ground(gkey.key, _args.seed, _args.region, up)
-	if not ground.is_valid:
-		ground = Bake.ground_stage(_args.seed, _args.region, up, options, Callable(), {})
-		if not ground.is_valid:
-			return {"exit_code": 1, "reason_code": ground.reason_code, "stage": "ground"}
-		Stage.save_ground(gkey.key, _args.seed, _args.region, up, ground)
-	timings["ground_s"] = _lap(t)
-	# Trails (realized on the design surface, as the bake does).
-	t = Time.get_ticks_usec()
-	var parsed: Dictionary = Trail.parse(JSON.parse_string(FileAccess.get_file_as_string(_args.config)))
-	if not parsed.is_valid:
-		return {"exit_code": 1, "reason_code": parsed.reason_code, "detail": parsed.detail}
-	var context := {"seed": _args.seed, "region": _args.region, "network": ground.network.get_data(), "surface": ground.surface, "field": up.field}
-	var trails: Array = []
-	for cfg: Dictionary in parsed.config.trails:
-		var made: Dictionary = Trail.realize(cfg, parsed.config, context)
-		if not made.is_valid:
-			return {"exit_code": 1, "reason_code": made.reason_code, "detail": made.detail, "stage": "trail"}
-		trails.append(made.trail)
-	timings["trails_s"] = _lap(t)
-	var site: Dictionary = _platform_site(trails[0], up.bounds)
-	var platform := {"id": "platform:turn", "centre": site.centre, "radius_m": PLATFORM_RADIUS_M, "taper_m": PLATFORM_TAPER_M}
-	var piece_class: Dictionary = Ground.piece_classes(ground.network.get_data())
-	var made_ops: Dictionary = Ops.create(ground.surface, trails, [platform], piece_class)
-	if not made_ops.is_valid:
-		return {"exit_code": 1, "reason_code": made_ops.reason_code, "detail": made_ops.detail}
-	var ops: RefCounted = made_ops.ops
+	var prep: Dictionary = Section.prepare(_args.seed, _args.region, _args.config, _args.threads)
+	if not prep.is_valid:
+		return {"exit_code": 1, "reason_code": prep.reason_code, "detail": prep.get("detail", {}), "stage": prep.stage}
+	var timings: Dictionary = prep.timings
+	var t: int
+	var ground: Dictionary = prep.ground
+	var trails: Array = prep.trails
+	var site: Dictionary = prep.site
+	var platform: Dictionary = prep.platform
+	var piece_class: Dictionary = prep.piece_class
+	var ops: RefCounted = prep.ops
 	print("SURFACE_SITE ", JSON.stringify({"platform": [snappedf(site.centre.x, 0.1), snappedf(site.centre.y, 0.1)], "turn_deg": snappedf(site.turn_deg, 0.1), "s_m": snappedf(site.s_m, 0.1)}))
-	var ids: Array = []
-	for dz in range(_args.blocks[3]):
-		for dx in range(_args.blocks[2]):
-			ids.append(Vector2i(_args.blocks[0] + dx, _args.blocks[1] + dz))
+	var ids: Array = Section.block_ids(_args.blocks)
 	var out := {"seed": _args.seed, "region": [_args.region.x, _args.region.y], "threads": _args.threads, "block_m": Block.SIZE_M, "step_m": Block.STEP_M,
 		"blocks": ids.map(func(v: Vector2i) -> Array: return [v.x, v.y]), "platform": {"centre": [site.centre.x, site.centre.y], "turn_deg": site.turn_deg, "s_m": site.s_m},
 		"operations": ops.operations().map(func(op: Dictionary) -> Dictionary: return {"kind": op.kind, "id": op.id, "rect": [op.rect.position.x, op.rect.position.y, op.rect.size.x, op.rect.size.y]}),
 		"timings_s": timings, "checks": {}}
 	# Build on N threads, then on 1 thread.
 	t = Time.get_ticks_usec()
-	var blocks: Array = _build(ops, ids, _args.threads)
+	var blocks: Array = Section.build(ops, ids, _args.threads)
 	timings["build_threads_s"] = _lap(t)
 	for b: Dictionary in blocks:
 		if not b.is_valid:
@@ -127,7 +93,7 @@ func _work(out_dir: String) -> Dictionary:
 			out["detail"] = b.get("detail", {})
 			return out
 	t = Time.get_ticks_usec()
-	var single: Array = _build(ops, ids, 1)
+	var single: Array = Section.build(ops, ids, 1)
 	timings["build_one_thread_s"] = _lap(t)
 	timings["per_block_one_thread_s"] = timings.build_one_thread_s / ids.size()
 	var checks: Dictionary = out.checks
@@ -157,47 +123,6 @@ func _work(out_dir: String) -> Dictionary:
 	print("SURFACE_TIMINGS ", JSON.stringify(timings))
 	out["exit_code"] = 0 if ok else 2
 	return out
-
-
-func _build(ops: RefCounted, ids: Array, threads: int) -> Array:
-	var blocks: Array = []
-	blocks.resize(ids.size())
-	var job := func(k: int) -> void:
-		blocks[k] = Block.build(ops, ids[k].x, ids[k].y)
-	if threads > 1:
-		var group: int = WorkerThreadPool.add_group_task(job, ids.size(), threads, true, "surface_blocks")
-		WorkerThreadPool.wait_for_group_task_completion(group)
-	else:
-		for k in range(ids.size()):
-			job.call(k)
-	return blocks
-
-
-func _platform_site(trail: Dictionary, bounds: Dictionary) -> Dictionary:
-	var line: Dictionary = trail.line
-	var n: int = line.s.size()
-	var length: float = line.s[n - 1]
-	var benches: Array = trail.get("operations", []).filter(func(op: Dictionary) -> bool: return op.kind == "BENCH")
-	var best := {"turn_deg": -1.0}
-	for k in range(n):
-		var s: float = line.s[k]
-		if s < SITE_CLEAR_M + TURN_SPAN_M or s > length - SITE_CLEAR_M - TURN_SPAN_M:
-			continue
-		var clear: bool = true
-		for op: Dictionary in benches:
-			clear = clear and (s < op.s0_m - SITE_CLEAR_M or s > op.s1_m + SITE_CLEAR_M)
-		if not clear:
-			continue
-		var a: int = clampi(line.s.bsearch(s - TURN_SPAN_M), 1, n - 1)
-		var b: int = clampi(line.s.bsearch(s + TURN_SPAN_M), 1, n - 1)
-		var d0 := Vector2(line.x[k] - line.x[a - 1], line.z[k] - line.z[a - 1])
-		var d1 := Vector2(line.x[b] - line.x[k], line.z[b] - line.z[k])
-		if d0.length() < 1e-6 or d1.length() < 1e-6:
-			continue
-		var turn: float = absf(rad_to_deg(d0.angle_to(d1)))
-		if turn > best.turn_deg:
-			best = {"turn_deg": turn, "s_m": s, "centre": Vector2(line.x[k] + bounds.min_x, line.z[k] + bounds.min_z)}
-	return best
 
 
 func _seams(blocks: Array, ids: Array) -> Dictionary:
@@ -316,9 +241,9 @@ func _incremental(surface: RefCounted, trails: Array, platform: Dictionary, piec
 		var rect := Rect2(Vector2(id) * Block.SIZE_M, Vector2(Block.SIZE_M, Block.SIZE_M))
 		if rect.intersects(old_rect) or rect.intersects(new_rect):
 			redo.append(id)
-	var partial: Array = _build(ops2, redo, _args.threads)
+	var partial: Array = Section.build(ops2, redo, _args.threads)
 	timings["incremental_s"] = _lap(t)
-	var full: Array = _build(ops2, ids, _args.threads)
+	var full: Array = Section.build(ops2, ids, _args.threads)
 	var by_id: Dictionary = {}
 	for b: Dictionary in partial:
 		by_id[Vector2i(b.bx, b.bz)] = b
